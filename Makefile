@@ -72,8 +72,8 @@ py-test: generate ## Run the Python tests
 	cd $(PY_DIR) && pytest -q
 
 .PHONY: py-lint
-py-lint: generate ## Lint the Python packages
-	cd $(PY_DIR) && ruff check . && ruff format --check .
+py-lint: generate ## Lint and type-check the Python packages
+	cd $(PY_DIR) && ruff check . && ruff format --check . && mypy
 
 .PHONY: check
 check: generate-check vet lint test py-lint py-test ## What CI runs

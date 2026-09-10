@@ -15,3 +15,13 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["dafter_core/tests"]
 pythonpath = ["dafter_core/src"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["dafter_core/src", "dafter_core/tests"]
+mypy_path = "dafter_core/src"
+
+[[tool.mypy.overrides]]
+module = "dafter_core.enums"
+disable_error_code = ["explicit-any"]

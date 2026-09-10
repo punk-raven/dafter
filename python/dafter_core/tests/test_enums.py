@@ -47,11 +47,13 @@ CASES = [
 @pytest.mark.parametrize(
     ("enum_cls", "schema_file", "pointer"), CASES, ids=[c[0].__name__ for c in CASES]
 )
-def test_enum_matches_schema(enum_cls, schema_file, pointer):
+def test_enum_matches_schema(
+    enum_cls: type[StrEnum], schema_file: str, pointer: tuple[str, ...]
+) -> None:
     assert {str(m) for m in enum_cls} == schemas.enum_at(schema_file, *pointer)
 
 
-def test_every_generated_enum_has_a_drift_test():
+def test_every_generated_enum_has_a_drift_test() -> None:
     generated = {
         name
         for name, obj in vars(enums).items()

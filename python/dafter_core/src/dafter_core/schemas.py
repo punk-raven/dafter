@@ -15,7 +15,9 @@ IDS = "common/v1/ids.schema.json"
 def load(relative: str) -> dict[str, Any]:
     package, _, name = relative.rpartition("/")
     anchor = f"{_ROOT}.{package.replace('/', '.')}" if package else _ROOT
-    return json.loads(resources.files(anchor).joinpath(name).read_text(encoding="utf-8"))
+    text = resources.files(anchor).joinpath(name).read_text(encoding="utf-8")
+    doc: dict[str, Any] = json.loads(text)
+    return doc
 
 
 def enum_at(relative: str, *keys: str) -> set[str]:
