@@ -9,7 +9,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
@@ -22,13 +21,11 @@ const (
 	Error                 = "https://schemas.dafter.dev/errors/v1/error.schema.json"
 )
 
-var (
-	compileOnce sync.Once
-	compiled    map[string]*jsonschema.Schema
-	compileErr  error
-)
+type Validator struct {
+	compiled map[string]*jsonschema.Schema
+}
 
-func compileAll() {
+func New() (*Validator, error) {
 	c := jsonschema.NewCompiler()
 	c.AssertFormat()
 
@@ -36,20 +33,27 @@ func compileAll() {
 		return c.AddResource(id, doc)
 	})
 	if err != nil {
-		compileErr = err
-		return
+		return nil, err
 	}
 
-	compiled = make(map[string]*jsonschema.Schema, len(ids))
+	v := &Validator{compiled: make(map[string]*jsonschema.Schema, len(ids))}
 	for _, id := range ids {
 		s, err := c.Compile(id)
 		if err != nil {
-			compileErr = fmt.Errorf("schema: compile schema %s: %w", id, err)
-			return
+			return nil, fmt.Errorf("schema: compile %s: %w", id, err)
 		}
-		compiled[id] = s
+		v.compiled[id] = s
 	}
+	return v, nil
 }
+
+var Default = func() *Validator {
+	v, err := New()
+	if err != nil {
+		panic(err)
+	}
+	return v
+}()
 
 func walkSchemas(visit func(id string, doc any) error) ([]string, error) {
 	var ids []string
@@ -91,32 +95,28 @@ func walkSchemas(visit func(id string, doc any) error) ([]string, error) {
 	return ids, nil
 }
 
-func SchemaFor(id string) (*jsonschema.Schema, error) {
-	compileOnce.Do(compileAll)
-	if compileErr != nil {
-		return nil, compileErr
-	}
-	s, ok := compiled[id]
+func (v *Validator) SchemaFor(id string) (*jsonschema.Schema, error) {
+	s, ok := v.compiled[id]
 	if !ok {
 		return nil, fmt.Errorf("schema: no schema registered for %s", id)
 	}
 	return s, nil
 }
 
-func ValidateAgainst(id string, v any, code errs.ErrorCode) error {
-	s, err := SchemaFor(id)
+func (v *Validator) ValidateAgainst(id string, doc any, code errs.ErrorCode) error {
+	s, err := v.SchemaFor(id)
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(doc)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "marshal value for schema validation")
 	}
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
+	parsed, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "reparse value for schema validation")
 	}
-	if err := s.Validate(doc); err != nil {
+	if err := s.Validate(parsed); err != nil {
 		problems := leafProblems(err)
 		e := errs.Wrap(code, err, "%d problem(s) validating against %s", len(problems), id)
 		e.Details = problems
@@ -153,4 +153,8 @@ func leafProblems(err error) []string {
 
 func Raw(p string) ([]byte, error) {
 	return schemasFS.ReadFile(path.Join("schemas", p))
+}
+
+func ValidateAgainst(id string, doc any, code errs.ErrorCode) error {
+	return Default.ValidateAgainst(id, doc, code)
 }
