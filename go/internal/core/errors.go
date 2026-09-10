@@ -1,0 +1,86 @@
+package core
+
+import "fmt"
+
+type ErrorCode string
+
+const (
+	CodeInvalidConfig         ErrorCode = "invalid_config"
+	CodeUnsupportedCapability ErrorCode = "unsupported_capability"
+	CodeResidencyViolation    ErrorCode = "residency_violation"
+	CodeConsentRequired       ErrorCode = "consent_required"
+	CodePrivacyModeForbids    ErrorCode = "privacy_mode_forbids"
+	CodeQuotaExceeded         ErrorCode = "quota_exceeded"
+	CodeBudgetExceeded        ErrorCode = "budget_exceeded"
+	CodeRateLimited           ErrorCode = "rate_limited"
+	CodeAuthenticationFailed  ErrorCode = "authentication_failed"
+	CodeProviderUnavailable   ErrorCode = "provider_unavailable"
+	CodeProviderTimeout       ErrorCode = "provider_timeout"
+	CodeStreamClosed          ErrorCode = "stream_closed"
+	CodeCancelled             ErrorCode = "cancelled"
+	CodeInternal              ErrorCode = "internal"
+)
+
+type Stage string
+
+const (
+	StageVAD           Stage = "vad"
+	StageSTT           Stage = "stt"
+	StageTurnDetection Stage = "turn_detection"
+	StageContext       Stage = "context"
+	StageLLM           Stage = "llm"
+	StageTools         Stage = "tools"
+	StageSpeechPlanner Stage = "speech_planner"
+	StageTTS           Stage = "tts"
+	StageEgress        Stage = "egress"
+	StageSeal          Stage = "seal"
+	StageTransport     Stage = "transport"
+	StageControl       Stage = "control"
+)
+
+type ProviderContext struct {
+	Name       string `json:"name"`
+	RequestID  string `json:"requestId,omitempty"`
+	NativeCode string `json:"nativeCode,omitempty"`
+}
+
+// Message must stay safe to log: no name, email, phone or transcript content.
+type Error struct {
+	Code      ErrorCode        `json:"code"`
+	Message   string           `json:"message"`
+	Retryable bool             `json:"retryable"`
+	Stage     Stage            `json:"stage,omitempty"`
+	Provider  *ProviderContext `json:"provider,omitempty"`
+
+	wrapped error
+}
+
+func (e *Error) Error() string {
+	if e.Provider != nil && e.Provider.RequestID != "" {
+		return fmt.Sprintf("%s: %s (provider %s request %s)", e.Code, e.Message, e.Provider.Name, e.Provider.RequestID)
+	}
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+func (e *Error) Unwrap() error { return e.wrapped }
+
+func Errorf(code ErrorCode, format string, args ...any) *Error {
+	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Retryable: retryable(code)}
+}
+
+func Wrap(code ErrorCode, err error, format string, args ...any) *Error {
+	e := Errorf(code, format, args...)
+	e.wrapped = err
+	return e
+}
+
+// Auth and quota failures are excluded on purpose: retrying burns budget and
+// delays the page.
+func retryable(code ErrorCode) bool {
+	switch code {
+	case CodeProviderUnavailable, CodeProviderTimeout, CodeRateLimited, CodeStreamClosed:
+		return true
+	default:
+		return false
+	}
+}

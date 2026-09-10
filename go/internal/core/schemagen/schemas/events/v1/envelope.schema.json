@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/events/v1/envelope.schema.json",
+  "title": "EventEnvelope",
+  "description": "Events are a durable stream with consumer groups, at-least-once delivery and ordering within a session partition - not fire-and-forget pub/sub, which silently drops recording.completed when a consumer is down. The envelope is the second of exactly two contact points between the Go and Python halves.\n\nPayloads are typed per event type through the allOf below. Only the events the platform currently emits are typed; the rest keep an open payload deliberately, because inventing a shape for an event no code produces yet is how a data model gets locked wrong. THE RULE: an event type must have a payload schema in this file before any code emits it. An open payload does not generate a type - it generates map[string]any, dict and Record<string, unknown> - so an event left open is an event with no SDK contract.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["eventId", "type", "version", "sessionId", "tenantId", "sequence", "occurredAt"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "pattern": "^e_[0-9a-f]{32}$",
+      "description": "Doubles as the idempotency key for webhook delivery. 128 bits, because consumers store these and the width cannot be changed after issue."
+    },
+    "type": { "$ref": "#/$defs/EventType" },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Per-event version. Additive by default; behaviour never changes silently."
+    },
+    "sessionId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/SessionId" },
+    "tenantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/TenantId" },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic within the session partition. Ordering is guaranteed here and nowhere else."
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 with a UTC offset and millisecond precision. The pattern is asserted alongside the format because format assertion is opt-in in most validators, so a format keyword alone would be documentation rather than a check.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "traceId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "W3C trace id. One trace per turn, not per session."
+    },
+    "payload": { "type": "object" }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "session.created" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/SessionCreatedPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "session.ended" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/SessionEndedPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "session.signal" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/SessionSignalPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "connection.established" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/ConnectionEstablishedPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "connection.lost" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/ConnectionLostPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "connection.restored" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/ConnectionRestoredPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "agent.dispatched" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/AgentDispatchedPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "agent.state_changed" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/AgentStateChangedPayload" } }, "required": ["payload"] }
+    }
+  ],
+
+  "$defs": {
+    "EventType": {
+      "type": "string",
+      "description": "agent.state_changed is the most important event for user experience: a user who can see 'thinking' waits, while a user staring at silence talks over the agent.",
+      "enum": [
+        "session.created",
+        "session.ended",
+        "session.signal",
+        "connection.established",
+        "connection.lost",
+        "connection.restored",
+        "agent.dispatched",
+        "agent.state_changed",
+        "agent.handoff_requested",
+        "transcript.partial",
+        "transcript.final",
+        "transcript.version_created",
+        "translation.final",
+        "recording.started",
+        "recording.completed",
+        "recording.sealed",
+        "provider.degraded",
+        "provider.failed_over",
+        "policy.violation",
+        "budget.exceeded"
+      ]
+    },
+
+    "AgentState": {
+      "type": "string",
+      "enum": ["idle", "listening", "thinking", "speaking"]
+    },
+
+    "SessionCreatedPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["privacyMode", "language", "channel"],
+      "properties": {
+        "privacyMode": { "type": "string", "enum": ["open", "sealed", "trusted_agent"] },
+        "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
+        "channel": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Channel" },
+        "configHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Ties this session to the exact resolved config it ran under, which is what makes it explainable afterwards."
+        }
+      }
+    },
+
+    "SessionEndedPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": ["completed", "participant_left", "timeout", "terminated", "error"]
+        },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "SessionSignalPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["name"],
+      "description": "The consumer-defined passthrough. Its data is open by design: this is the extension point that stops a consumer forking when they need to carry something the platform has no opinion about.",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$" },
+        "data": { "type": "object", "additionalProperties": true }
+      }
+    },
+
+    "ConnectionEstablishedPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["participantId", "role", "relayed"],
+      "properties": {
+        "participantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId" },
+        "role": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Role" },
+        "relayed": {
+          "type": "boolean",
+          "description": "Whether media is going through a TURN relay rather than a direct path. Expect 10-20% of connections to relay, higher on mobile. Reported per connection because relay bandwidth is metered per tenant and doubles as a diagnostic: a rising relay share means the consumer's network changed, not that the platform did."
+        }
+      }
+    },
+
+    "ConnectionLostPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["participantId"],
+      "properties": {
+        "participantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId" },
+        "reason": { "type": "string", "enum": ["network", "client_closed", "server_closed", "timeout", "unknown"] }
+      }
+    },
+
+    "ConnectionRestoredPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["participantId", "downtimeMs"],
+      "properties": {
+        "participantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId" },
+        "downtimeMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Mobile clients drop constantly, so reconnection is the SDK's job rather than the consumer's. This is how long the gap actually was."
+        }
+      }
+    },
+
+    "AgentDispatchedPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["pool"],
+      "properties": {
+        "pool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$",
+          "description": "Which worker pool took the job. Recorded per session so a second pool can be introduced and observed without guessing which sessions it served."
+        },
+        "mode": { "type": "string", "enum": ["cascaded", "half_cascade", "speech_to_speech"] }
+      }
+    },
+
+    "AgentStateChangedPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["state"],
+      "description": "The single most important event for user experience. A consumer renders this directly, so it is typed rather than left for them to discover at runtime.",
+      "properties": {
+        "state": { "$ref": "#/$defs/AgentState" },
+        "previousState": { "$ref": "#/$defs/AgentState" }
+      }
+    }
+  }
+}

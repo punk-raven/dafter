@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/common/v1/ids.schema.json",
+  "title": "Opaque identifiers",
+  "description": "Identifiers propagate into logs, traces, metric labels and vendor dashboards, so they are opaque by construction and never carry a name, email or phone number. The control plane generates them and rejects consumer-supplied ones.",
+  "$defs": {
+    "TenantId": {
+      "type": "string",
+      "pattern": "^t_[0-9a-f]{8}$",
+      "examples": ["t_9c21a4be"]
+    },
+    "SessionId": {
+      "type": "string",
+      "pattern": "^s_[0-9a-f]{8}$",
+      "examples": ["s_7f3a9c21"]
+    },
+    "ParticipantId": {
+      "type": "string",
+      "pattern": "^p_[0-9a-f]{8}$",
+      "examples": ["p_4b81e0d7"]
+    },
+    "RecordingId": {
+      "type": "string",
+      "pattern": "^r_[0-9a-f]{8}$",
+      "examples": ["r_1d05fa73"]
+    },
+    "SecretRef": {
+      "type": "string",
+      "description": "A reference into the secrets store, never a value. Config documents are safe to store, diff, log and hand to a consumer.",
+      "pattern": "^secret://[a-z0-9][a-z0-9._/-]{0,190}$",
+      "examples": ["secret://tenants/t_9c21a4be/sarvam/api-key"]
+    },
+    "LanguageTag": {
+      "type": "string",
+      "description": "BCP 47 language tag.",
+      "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+      "examples": ["en-IN", "hi", "kn-IN"]
+    },
+    "Channel": {
+      "type": "string",
+      "description": "Transport channel. Turn constants, codecs and attribution strategy all vary by it.",
+      "enum": ["webrtc", "telephony", "long_form"]
+    },
+    "Role": {
+      "type": "string",
+      "description": "Token grants derive from the role and never from a client request; room-admin grants are never issued to a client. This is the role vocabulary only. Role as a config overlay axis is a separate, later piece of work.",
+      "enum": ["participant", "presenter", "observer", "agent", "recorder"]
+    }
+  }
+}

@@ -24,3 +24,7 @@
 
 # Review surfaces
 .lavish/
+
+# Go
+/go/bin/
+*.test
