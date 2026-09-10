@@ -7,6 +7,7 @@ PY_DIR     := python
 PY_CORE    := $(PY_DIR)/dafter_core/src/dafter_core
 GO_SCHEMAS := $(GO_DIR)/internal/schema/schemas
 PY_SCHEMAS := $(PY_CORE)/_schemas
+LINT       := $(abspath $(GO_DIR)/bin/golangci-lint)
 GENERATED  := $(GO_SCHEMAS) $(PY_SCHEMAS) $(PY_CORE)/enums.py ':(glob)$(GO_DIR)/internal/**/*_gen.go'
 
 .PHONY: help
@@ -63,17 +64,20 @@ vet: generate ## go vet
 tidy: ## Tidy the Go module
 	cd $(GO_DIR) && go mod tidy
 
+$(LINT):
+	cd $(GO_DIR)/tools/golangci && GOBIN=$(dir $(LINT)) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+
 .PHONY: lint
-lint: generate ## Lint, including the package dependency graph
-	cd $(GO_DIR) && golangci-lint run
+lint: generate $(LINT) ## Lint, including the package dependency graph
+	cd $(GO_DIR) && $(LINT) run
 
 .PHONY: py-test
 py-test: generate ## Run the Python tests
-	cd $(PY_DIR) && pytest -q
+	cd $(PY_DIR) && uv run --frozen pytest -q
 
 .PHONY: py-lint
 py-lint: generate ## Lint and type-check the Python packages
-	cd $(PY_DIR) && ruff check . && ruff format --check . && mypy
+	cd $(PY_DIR) && uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy
 
 .PHONY: check
 check: generate-check vet lint test py-lint py-test ## What CI runs
