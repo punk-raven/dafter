@@ -40,6 +40,11 @@
       "type": "string",
       "description": "Transport channel. Turn constants, codecs and attribution strategy all vary by it.",
       "enum": ["webrtc", "telephony", "long_form"]
+    },
+    "Role": {
+      "type": "string",
+      "description": "Token grants derive from the role and never from a client request; room-admin grants are never issued to a client. This is the role vocabulary only. Role as a config overlay axis is a separate, later piece of work.",
+      "enum": ["participant", "presenter", "observer", "agent", "recorder"]
     }
   }
 }
