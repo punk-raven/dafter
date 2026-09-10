@@ -25,3 +25,7 @@ def enum_at(relative: str, *keys: str) -> set[str]:
     for key in keys:
         node = node[key]
     return set(node)
+
+
+def schema_id(relative: str) -> str:
+    return str(load(relative)["$id"])

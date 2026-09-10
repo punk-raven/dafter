@@ -130,3 +130,29 @@ def test_track_egress_cannot_start_before_a_track_exists() -> None:
 def test_auth_failures_are_not_retryable() -> None:
     assert not DafterError(ErrorCode.AUTHENTICATION_FAILED, "bad key").retryable
     assert DafterError(ErrorCode.PROVIDER_TIMEOUT, "slow").retryable
+
+
+def test_pipeline_fields_are_assigned_by_name() -> None:
+    c = parse(
+        doc(
+            agent={
+                "enabled": True,
+                "pool": "dafter-py",
+                "pipeline": {
+                    "stt": {"provider": "stt_vendor"},
+                    "tts": {"provider": "tts_vendor"},
+                    "realtime": {"provider": "realtime_vendor"},
+                },
+            }
+        )
+    )
+    assert c.agent.pipeline is not None
+    assert c.agent.pipeline.stt is not None and c.agent.pipeline.stt.provider == "stt_vendor"
+    assert c.agent.pipeline.tts is not None and c.agent.pipeline.tts.provider == "tts_vendor"
+    assert c.agent.pipeline.vad is None
+    assert c.agent.pipeline.llm is None
+    assert c.agent.pipeline.mt is None
+    assert (
+        c.agent.pipeline.realtime is not None
+        and c.agent.pipeline.realtime.provider == "realtime_vendor"
+    )

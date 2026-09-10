@@ -51,7 +51,14 @@ class Pipeline:
             v = d.get(key)
             return ProviderRef.from_dict(v) if v else None
 
-        return cls(*(ref(k) for k in ("vad", "stt", "llm", "tts", "mt", "realtime")))
+        return cls(
+            vad=ref("vad"),
+            stt=ref("stt"),
+            llm=ref("llm"),
+            tts=ref("tts"),
+            mt=ref("mt"),
+            realtime=ref("realtime"),
+        )
 
 
 @dataclass(frozen=True, slots=True)

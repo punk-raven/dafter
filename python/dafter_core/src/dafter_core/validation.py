@@ -60,7 +60,9 @@ def validate_document(relative: str, raw: bytes, code: ErrorCode) -> Any:
     problems = _problems(v, doc)
     if problems:
         raise DafterError(
-            code, f"{len(problems)} problem(s) validating against {relative}", details=problems
+            code,
+            f"{len(problems)} problem(s) validating against {schemas.schema_id(relative)}",
+            details=problems,
         )
     return doc
 
