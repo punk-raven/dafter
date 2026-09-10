@@ -1,6 +1,8 @@
 package events
 
 import (
+	"bytes"
+	"encoding/json"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
@@ -25,4 +27,17 @@ type EventEnvelope struct {
 
 func (e *EventEnvelope) Validate() error {
 	return schema.ValidateAgainst(schema.EventEnvelope, e, errs.CodeInternal)
+}
+
+func Parse(raw []byte) (*EventEnvelope, error) {
+	if err := schema.ValidateDocument(schema.EventEnvelope, raw, errs.CodeInternal); err != nil {
+		return nil, err
+	}
+	var e EventEnvelope
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&e); err != nil {
+		return nil, errs.Wrap(errs.CodeInternal, err, "decode event envelope")
+	}
+	return &e, nil
 }
