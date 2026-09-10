@@ -1,0 +1,76 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - depguard
+    - errorlint
+    - misspell
+
+  settings:
+    depguard:
+      # errs -> schema and schema -> config are cycles the compiler rejects
+      # before depguard runs. The rules stay as documentation of the graph.
+      rules:
+        ids-is-a-leaf:
+          files:
+            - "**/internal/ids/**"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/errs
+              desc: ids depends on nothing
+            - pkg: github.com/punk-raven/dafter/go/internal/schema
+              desc: ids depends on nothing
+            - pkg: github.com/punk-raven/dafter/go/internal/events
+              desc: ids depends on nothing
+            - pkg: github.com/punk-raven/dafter/go/internal/config
+              desc: ids depends on nothing
+
+        errs-is-a-leaf:
+          files:
+            - "**/internal/errs/**"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/schema
+              desc: errs depends on nothing; schema depends on errs
+            - pkg: github.com/punk-raven/dafter/go/internal/events
+              desc: errs depends on nothing
+            - pkg: github.com/punk-raven/dafter/go/internal/config
+              desc: errs depends on nothing
+
+        schema-depends-on-errs-only:
+          files:
+            - "**/internal/schema/**"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/events
+              desc: schema is below events; an import here closes a cycle
+            - pkg: github.com/punk-raven/dafter/go/internal/config
+              desc: schema is below config; an import here closes a cycle
+
+        events-and-config-do-not-know-each-other:
+          files:
+            - "**/internal/events/**"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/config
+              desc: events and config are siblings; shared types belong lower
+
+        config-does-not-import-events:
+          files:
+            - "**/internal/config/**"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/events
+              desc: events and config are siblings; shared types belong lower
+
+        no-vendor-sdks:
+          files:
+            - "$all"
+          deny:
+            - pkg: github.com/livekit/server-sdk-go
+              desc: the media server SDK belongs behind the transport package, nowhere else
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -56,5 +56,9 @@ vet: generate ## go vet
 tidy: ## Tidy the Go module
 	cd $(GO_DIR) && go mod tidy
 
+.PHONY: lint
+lint: generate ## Lint, including the package dependency graph
+	cd $(GO_DIR) && golangci-lint run
+
 .PHONY: check
-check: generate-check vet test ## What CI runs
+check: generate-check vet lint test ## What CI runs

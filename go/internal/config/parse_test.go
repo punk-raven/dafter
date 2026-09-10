@@ -37,7 +37,7 @@ func TestParseRejectsAMisspelledField(t *testing.T) {
 }
 
 func TestParseRejectsAnUnknownField(t *testing.T) {
-	mustFail(t, withField(`"totallyUnknownField":"typo"`))
+	_ = mustFail(t, withField(`"totallyUnknownField":"typo"`))
 }
 
 func TestParseRejectsAValueTheStructWouldAccept(t *testing.T) {
@@ -49,7 +49,7 @@ func TestParseRejectsAValueTheStructWouldAccept(t *testing.T) {
 }
 
 func TestParseRejectsMalformedJSON(t *testing.T) {
-	mustFail(t, []byte(`{"apiVersion":`))
+	_ = mustFail(t, []byte(`{"apiVersion":`))
 }
 
 func TestParseAppliesCrossFieldRules(t *testing.T) {
