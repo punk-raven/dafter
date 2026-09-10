@@ -3,6 +3,7 @@ package schema
 import "testing"
 
 func TestNewCompilesEveryEmbeddedSchema(t *testing.T) {
+	t.Parallel()
 	v, err := New()
 	if err != nil {
 		t.Fatalf("embedded schemas do not compile: %v", err)
@@ -15,12 +16,14 @@ func TestNewCompilesEveryEmbeddedSchema(t *testing.T) {
 }
 
 func TestCompilationHappensBeforeAnyValidation(t *testing.T) {
+	t.Parallel()
 	if Default == nil || len(Default.compiled) == 0 {
 		t.Fatal("Default was not compiled at initialisation")
 	}
 }
 
 func TestUnknownSchemaIDIsAnError(t *testing.T) {
+	t.Parallel()
 	if _, err := Default.SchemaFor("https://schemas.dafter.dev/nope/v1/nope.schema.json"); err == nil {
 		t.Fatal("an unregistered schema id was accepted")
 	}

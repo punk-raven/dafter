@@ -1,4 +1,4 @@
-package events
+package events_test
 
 import (
 	"errors"
@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
+	"github.com/punk-raven/dafter/go/internal/events"
 )
 
-func event(t EventType, payload map[string]any) *EventEnvelope {
-	return &EventEnvelope{
-		EventID:    "e_" + "0123456789abcdef0123456789abcdef",
-		Type:       t,
+func event(t *testing.T, typ events.EventType, payload map[string]any) *events.EventEnvelope {
+	t.Helper()
+	return &events.EventEnvelope{
+		EventID:    "e_0123456789abcdef0123456789abcdef",
+		Type:       typ,
 		Version:    1,
 		SessionID:  "s_7f3a9c21",
 		TenantID:   "t_9c21a4be",
@@ -22,8 +24,9 @@ func event(t EventType, payload map[string]any) *EventEnvelope {
 }
 
 func TestValidEventPasses(t *testing.T) {
-	e := event(EventAgentStateChanged, map[string]any{
-		"state": string(AgentThinking), "previousState": string(AgentListening),
+	t.Parallel()
+	e := event(t, events.EventAgentStateChanged, map[string]any{
+		"state": string(events.AgentThinking), "previousState": string(events.AgentListening),
 	})
 	if err := e.Validate(); err != nil {
 		t.Fatalf("a well-formed agent.state_changed was rejected: %v", err)
@@ -31,6 +34,7 @@ func TestValidEventPasses(t *testing.T) {
 }
 
 func TestTypedPayloadIsEnforced(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		payload map[string]any
@@ -42,7 +46,8 @@ func TestTypedPayloadIsEnforced(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := event(EventAgentStateChanged, tc.payload).Validate()
+			t.Parallel()
+			err := event(t, events.EventAgentStateChanged, tc.payload).Validate()
 			if err == nil {
 				t.Fatalf("agent.state_changed accepted %v", tc.payload)
 			}
@@ -58,19 +63,21 @@ func TestTypedPayloadIsEnforced(t *testing.T) {
 }
 
 func TestUntypedEventsStillAcceptAnything(t *testing.T) {
-	e := event(EventRecordingSealed, map[string]any{"whatever": []any{1.0, 2.0}})
+	t.Parallel()
+	e := event(t, events.EventRecordingSealed, map[string]any{"whatever": []any{1.0, 2.0}})
 	if err := e.Validate(); err != nil {
 		t.Fatalf("an intentionally untyped event was rejected: %v", err)
 	}
 }
 
 func TestTimestampsGoProducesAreAccepted(t *testing.T) {
+	t.Parallel()
 	for _, ts := range []time.Time{
 		time.Date(2026, 9, 11, 10, 0, 0, 0, time.UTC),
 		time.Date(2026, 9, 11, 10, 0, 0, 123456789, time.UTC),
 		time.Date(2026, 9, 11, 15, 30, 0, 0, time.FixedZone("IST", 5*3600+1800)),
 	} {
-		e := event(EventSessionSignal, map[string]any{"name": "handoff"})
+		e := event(t, events.EventSessionSignal, map[string]any{"name": "handoff"})
 		e.OccurredAt = ts
 		if err := e.Validate(); err != nil {
 			t.Errorf("timestamp %s was rejected: %v", ts.Format(time.RFC3339Nano), err)
@@ -79,7 +86,8 @@ func TestTimestampsGoProducesAreAccepted(t *testing.T) {
 }
 
 func TestEventRejectsANonOpaqueSessionID(t *testing.T) {
-	e := event(EventSessionSignal, map[string]any{"name": "handoff"})
+	t.Parallel()
+	e := event(t, events.EventSessionSignal, map[string]any{"name": "handoff"})
 	e.SessionID = "call-with-jane@example.com"
 	if err := e.Validate(); err == nil {
 		t.Fatal("an identifying session id reached an event; these land in vendor dashboards")

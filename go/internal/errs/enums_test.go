@@ -8,6 +8,7 @@ import (
 )
 
 func TestGeneratedEnumsMatchSchema(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		file    string
@@ -19,6 +20,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if err := schema.CheckEnum(tc.file, tc.pointer, tc.got); err != nil {
 				t.Error(err)
 			}

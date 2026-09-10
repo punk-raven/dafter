@@ -1,38 +1,42 @@
-package config
+package config_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
+	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/errs"
 	"github.com/punk-raven/dafter/go/internal/schema"
 )
 
-func validConfig() *ResolvedSessionConfig {
-	return &ResolvedSessionConfig{
+func validConfig(t *testing.T) *config.ResolvedSessionConfig {
+	t.Helper()
+	return &config.ResolvedSessionConfig{
 		APIVersion:  "dafter.dev/v1",
 		SessionID:   "s_7f3a9c21",
 		TenantID:    "t_9c21a4be",
-		PrivacyMode: PrivacyOpen,
+		PrivacyMode: config.PrivacyOpen,
 		Language:    "en-IN",
-		Channel:     ChannelWebRTC,
-		Agent:       Agent{Enabled: true, Pool: "dafter-py", Mode: ModeCascaded},
-		Turn:        Turn{Strategy: TurnAuto},
-		Recording:   Recording{Enabled: false},
-		Budgets:     Budgets{TurnGapP50Ms: 800, TurnGapP95Ms: 1500},
+		Channel:     config.ChannelWebRTC,
+		Agent:       config.Agent{Enabled: true, Pool: "dafter-py", Mode: config.ModeCascaded},
+		Turn:        config.Turn{Strategy: config.TurnAuto},
+		Recording:   config.Recording{Enabled: false},
+		Budgets:     config.Budgets{TurnGapP50Ms: 800, TurnGapP95Ms: 1500},
 	}
 }
 
 func TestValidateAcceptsAMinimalConfig(t *testing.T) {
-	if err := validConfig().Validate(); err != nil {
+	t.Parallel()
+	if err := validConfig(t).Validate(); err != nil {
 		t.Fatalf("minimal config rejected: %v", err)
 	}
 }
 
 func TestValidateRejectsAgentInASealedSession(t *testing.T) {
-	c := validConfig()
-	c.PrivacyMode = PrivacySealed
+	t.Parallel()
+	c := validConfig(t)
+	c.PrivacyMode = config.PrivacySealed
 	var de *errs.Error
 	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodePrivacyModeForbids {
 		t.Fatalf("want %s, got %v", errs.CodePrivacyModeForbids, err)
@@ -40,8 +44,9 @@ func TestValidateRejectsAgentInASealedSession(t *testing.T) {
 }
 
 func TestValidateRejectsRecordingWithoutConsent(t *testing.T) {
-	c := validConfig()
-	c.Recording = Recording{Enabled: true, Layout: LayoutTrack}
+	t.Parallel()
+	c := validConfig(t)
+	c.Recording = config.Recording{Enabled: true, Layout: config.LayoutTrack}
 	var de *errs.Error
 	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeConsentRequired {
 		t.Fatalf("want %s, got %v", errs.CodeConsentRequired, err)
@@ -49,10 +54,11 @@ func TestValidateRejectsRecordingWithoutConsent(t *testing.T) {
 }
 
 func TestValidateRejectsImpossibleRecordingStart(t *testing.T) {
-	c := validConfig()
-	c.Recording = Recording{
-		Enabled: true, Layout: LayoutTrack,
-		StartAt: StartAtSessionCreate, ConsentArtifactID: "consent_1",
+	t.Parallel()
+	c := validConfig(t)
+	c.Recording = config.Recording{
+		Enabled: true, Layout: config.LayoutTrack,
+		StartAt: config.StartAtSessionCreate, ConsentArtifactID: "consent_1",
 	}
 	var de *errs.Error
 	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
@@ -61,7 +67,8 @@ func TestValidateRejectsImpossibleRecordingStart(t *testing.T) {
 }
 
 func TestValidateRejectsAConsumerSuppliedSessionID(t *testing.T) {
-	c := validConfig()
+	t.Parallel()
+	c := validConfig(t)
 	c.SessionID = "session-for-jane@example.com"
 	if err := c.Validate(); err == nil {
 		t.Fatal("a non-opaque session id was accepted; identifiers leak into logs and vendor dashboards")
@@ -69,11 +76,12 @@ func TestValidateRejectsAConsumerSuppliedSessionID(t *testing.T) {
 }
 
 func TestValidationNamesEveryProblem(t *testing.T) {
-	c := validConfig()
+	t.Parallel()
+	c := validConfig(t)
 	c.APIVersion = "wrong"
 	c.SessionID = "not-opaque"
 	c.Channel = "carrier-pigeon"
-	c.Budgets = Budgets{}
+	c.Budgets = config.Budgets{}
 
 	var de *errs.Error
 	if !errors.As(c.Validate(), &de) {
@@ -88,7 +96,8 @@ func TestValidationNamesEveryProblem(t *testing.T) {
 }
 
 func TestErrorSerializesWithinItsOwnSchema(t *testing.T) {
-	c := validConfig()
+	t.Parallel()
+	c := validConfig(t)
 	c.Channel = "carrier-pigeon"
 	var de *errs.Error
 	errors.As(c.Validate(), &de)
