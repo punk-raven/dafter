@@ -1,0 +1,17 @@
+[project]
+name = "dafter-workspace"
+version = "0.0.0"
+description = "Dafter agent plane, providers, batch pass and evals"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["**/enums.py", "**/_schemas/**"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["dafter_core/tests"]
+pythonpath = ["dafter_core/src"]

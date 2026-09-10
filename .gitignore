@@ -28,3 +28,11 @@
 # Go
 /go/bin/
 *.test
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/

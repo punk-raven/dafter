@@ -3,8 +3,11 @@ SHELL := /bin/bash
 
 GO_DIR     := go
 SCHEMA_DIR := schemas
+PY_DIR     := python
+PY_CORE    := $(PY_DIR)/dafter_core/src/dafter_core
 GO_SCHEMAS := $(GO_DIR)/internal/schema/schemas
-GENERATED  := $(GO_SCHEMAS) ':(glob)$(GO_DIR)/internal/**/*_gen.go'
+PY_SCHEMAS := $(PY_CORE)/_schemas
+GENERATED  := $(GO_SCHEMAS) $(PY_SCHEMAS) $(PY_CORE)/enums.py ':(glob)$(GO_DIR)/internal/**/*_gen.go'
 
 .PHONY: help
 help: ## Show this help
@@ -22,12 +25,14 @@ help: ## Show this help
 
 .PHONY: generate
 generate: ## Refresh everything derived from schemas/
-	@cd $(GO_DIR) && go run ./tools/enumgen ../$(SCHEMA_DIR) .
-	@rm -rf $(GO_SCHEMAS)
-	@mkdir -p $(GO_SCHEMAS)
-	@cp -R $(SCHEMA_DIR)/. $(GO_SCHEMAS)/
-	@find $(GO_SCHEMAS) -type f ! -name '*.schema.json' -delete
-	@echo "generated $(GO_SCHEMAS)"
+	@cd $(GO_DIR) && go run ./tools/enumgen ../$(SCHEMA_DIR) . ../$(PY_CORE)/enums.py
+	@for dest in $(GO_SCHEMAS) $(PY_SCHEMAS); do \
+		rm -rf "$$dest"; mkdir -p "$$dest"; \
+		cp -R $(SCHEMA_DIR)/. "$$dest"/; \
+		find "$$dest" -type f ! -name '*.schema.json' -delete; \
+		echo "  generated $$dest"; \
+	done
+	@find $(PY_SCHEMAS) -type d -exec touch {}/__init__.py \;
 
 .PHONY: generate-check
 generate-check: generate ## Fail if any generated output is stale or hand-edited
@@ -62,5 +67,13 @@ tidy: ## Tidy the Go module
 lint: generate ## Lint, including the package dependency graph
 	cd $(GO_DIR) && golangci-lint run
 
+.PHONY: py-test
+py-test: generate ## Run the Python tests
+	cd $(PY_DIR) && pytest -q
+
+.PHONY: py-lint
+py-lint: generate ## Lint the Python packages
+	cd $(PY_DIR) && ruff check . && ruff format --check .
+
 .PHONY: check
-check: generate-check vet lint test ## What CI runs
+check: generate-check vet lint test py-lint py-test ## What CI runs
