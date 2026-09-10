@@ -4,6 +4,14 @@ version = "0.0.0"
 description = "Dafter agent plane, providers, batch pass and evals"
 requires-python = ">=3.11"
 
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.9",
+    "mypy>=1.11",
+    "types-jsonschema",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -21,6 +29,10 @@ python_version = "3.11"
 strict = true
 files = ["dafter_core/src", "dafter_core/tests"]
 mypy_path = "dafter_core/src"
+
+[[tool.mypy.overrides]]
+module = "referencing.*"
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "dafter_core.enums"

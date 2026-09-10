@@ -3,7 +3,7 @@ name = "dafter-core"
 version = "0.0.0"
 description = "The shared contract: types generated from schemas/, and the schemas themselves"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["jsonschema>=4.20"]
 
 [build-system]
 requires = ["hatchling"]
