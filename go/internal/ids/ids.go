@@ -1,5 +1,5 @@
-// Package core holds the config model, the taxonomies and the identifier rules.
-package core
+// Package ids mints and validates the platform's opaque identifiers.
+package ids
 
 import (
 	"crypto/rand"
@@ -33,11 +33,11 @@ var idPattern = regexp.MustCompile(`^([tspre])_([0-9a-f]+)$`)
 func NewID(p IDPrefix) (string, error) {
 	n, ok := idBytes[p]
 	if !ok {
-		return "", fmt.Errorf("core: unknown id prefix %q", p)
+		return "", fmt.Errorf("ids: unknown id prefix %q", p)
 	}
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("core: read entropy: %w", err)
+		return "", fmt.Errorf("ids: read entropy: %w", err)
 	}
 	return string(p) + "_" + hex.EncodeToString(b), nil
 }
@@ -53,17 +53,17 @@ func MustNewID(p IDPrefix) string {
 func ValidateID(p IDPrefix, id string) error {
 	n, ok := idBytes[p]
 	if !ok {
-		return fmt.Errorf("core: unknown id prefix %q", p)
+		return fmt.Errorf("ids: unknown id prefix %q", p)
 	}
 	m := idPattern.FindStringSubmatch(id)
 	if m == nil {
-		return fmt.Errorf("core: %q is not an opaque identifier", id)
+		return fmt.Errorf("ids: %q is not an opaque identifier", id)
 	}
 	if m[1] != string(p) {
-		return fmt.Errorf("core: %q is a %q identifier, want %q", id, m[1], p)
+		return fmt.Errorf("ids: %q is a %q identifier, want %q", id, m[1], p)
 	}
 	if len(m[2]) != n*2 {
-		return fmt.Errorf("core: %q has %d hex digits, want %d", id, len(m[2]), n*2)
+		return fmt.Errorf("ids: %q has %d hex digits, want %d", id, len(m[2]), n*2)
 	}
 	return nil
 }

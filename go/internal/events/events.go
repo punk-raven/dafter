@@ -1,6 +1,11 @@
-package core
+package events
 
-import "time"
+import (
+	"time"
+
+	"github.com/punk-raven/dafter/go/internal/errs"
+	"github.com/punk-raven/dafter/go/internal/schema"
+)
 
 type EventType string
 
@@ -56,4 +61,8 @@ type EventEnvelope struct {
 	TraceID    string    `json:"traceId,omitempty"`
 
 	Payload map[string]any `json:"payload,omitempty"`
+}
+
+func (e *EventEnvelope) Validate() error {
+	return schema.ValidateAgainst(schema.EventEnvelope, e, errs.CodeInternal)
 }

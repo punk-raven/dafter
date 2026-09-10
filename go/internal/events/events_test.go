@@ -1,14 +1,18 @@
-package core
+package events
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/punk-raven/dafter/go/internal/errs"
+	"github.com/punk-raven/dafter/go/internal/schema"
 )
 
 func event(t EventType, payload map[string]any) *EventEnvelope {
 	return &EventEnvelope{
-		EventID:    MustNewID(PrefixEvent),
+		EventID:    "e_" + "0123456789abcdef0123456789abcdef",
 		Type:       t,
 		Version:    1,
 		SessionID:  "s_7f3a9c21",
@@ -19,10 +23,43 @@ func event(t EventType, payload map[string]any) *EventEnvelope {
 	}
 }
 
+func TestEventTypesMatchSchema(t *testing.T) {
+	want, err := schema.EnumAt("events/v1/envelope.schema.json", "$defs", "EventType", "enum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{
+		string(EventSessionCreated), string(EventSessionEnded), string(EventSessionSignal),
+		string(EventConnectionEstablished), string(EventConnectionLost), string(EventConnectionRestored),
+		string(EventAgentDispatched), string(EventAgentStateChanged), string(EventAgentHandoffRequested),
+		string(EventTranscriptPartial), string(EventTranscriptFinal), string(EventTranscriptVersionCreated),
+		string(EventTranslationFinal), string(EventRecordingStarted), string(EventRecordingCompleted),
+		string(EventRecordingSealed), string(EventProviderDegraded), string(EventProviderFailedOver),
+		string(EventPolicyViolation), string(EventBudgetExceeded),
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("EventType drift\n go: %v\n schema: %v", got, want)
+	}
+}
+
+func TestAgentStatesMatchSchema(t *testing.T) {
+	want, err := schema.EnumAt("events/v1/envelope.schema.json", "$defs", "AgentState", "enum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{
+		string(AgentIdle), string(AgentListening), string(AgentThinking), string(AgentSpeaking),
+	}
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("AgentState drift\n go: %v\n schema: %v", got, want)
+	}
+}
+
 func TestValidEventPasses(t *testing.T) {
 	e := event(EventAgentStateChanged, map[string]any{
-		"state":         string(AgentThinking),
-		"previousState": string(AgentListening),
+		"state": string(AgentThinking), "previousState": string(AgentListening),
 	})
 	if err := e.Validate(); err != nil {
 		t.Fatalf("a well-formed agent.state_changed was rejected: %v", err)
@@ -45,9 +82,9 @@ func TestTypedPayloadIsEnforced(t *testing.T) {
 			if err == nil {
 				t.Fatalf("agent.state_changed accepted %v", tc.payload)
 			}
-			var de *Error
-			if !errors.As(err, &de) || de.Code != CodeInternal {
-				t.Fatalf("want %s, got %v", CodeInternal, err)
+			var de *errs.Error
+			if !errors.As(err, &de) || de.Code != errs.CodeInternal {
+				t.Fatalf("want %s, got %v", errs.CodeInternal, err)
 			}
 			if len(de.Details) == 0 {
 				t.Errorf("no located problem reported for %v", tc.payload)

@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 GO_DIR     := go
 SCHEMA_DIR := schemas
-GO_SCHEMAS := $(GO_DIR)/internal/core/schemagen/schemas
+GO_SCHEMAS := $(GO_DIR)/internal/schema/schemas
 
 .PHONY: help
 help: ## Show this help
