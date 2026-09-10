@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/events/v1/envelope.schema.json",
+  "title": "EventEnvelope",
+  "description": "Events are a durable stream with consumer groups, at-least-once delivery and ordering within a session partition - not fire-and-forget pub/sub, which silently drops recording.completed when a consumer is down. The envelope is the second of exactly two contact points between the Go and Python halves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "type", "version", "sessionId", "tenantId", "sequence", "occurredAt"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "pattern": "^e_[0-9a-f]{16}$",
+      "description": "Doubles as the idempotency key for webhook delivery."
+    },
+    "type": { "$ref": "#/$defs/EventType" },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Per-event version. Additive by default; behaviour never changes silently."
+    },
+    "sessionId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/SessionId" },
+    "tenantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/TenantId" },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic within the session partition. Ordering is guaranteed here and nowhere else."
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "traceId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "W3C trace id. One trace per turn, not per session."
+    },
+    "payload": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "EventType": {
+      "type": "string",
+      "description": "agent.state_changed is the most important event for user experience: a user who can see 'thinking' waits, while a user staring at silence talks over the agent.",
+      "enum": [
+        "session.created",
+        "session.ended",
+        "session.signal",
+        "connection.established",
+        "connection.lost",
+        "connection.restored",
+        "agent.dispatched",
+        "agent.state_changed",
+        "agent.handoff_requested",
+        "transcript.partial",
+        "transcript.final",
+        "transcript.version_created",
+        "translation.final",
+        "recording.started",
+        "recording.completed",
+        "recording.sealed",
+        "provider.degraded",
+        "provider.failed_over",
+        "policy.violation",
+        "budget.exceeded"
+      ]
+    },
+    "AgentState": {
+      "type": "string",
+      "enum": ["idle", "listening", "thinking", "speaking"]
+    }
+  }
+}

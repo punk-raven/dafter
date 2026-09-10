@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/errors/v1/error.schema.json",
+  "title": "DafterError",
+  "description": "Every vendor error is mapped into this taxonomy inside its own provider subpackage, so no vendor exception escapes and callers never branch on a vendor's error shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message", "retryable"],
+  "properties": {
+    "code": { "$ref": "#/$defs/ErrorCode" },
+    "message": {
+      "type": "string",
+      "description": "Human-readable and safe to log. Never contains a name, email, phone number or transcript content."
+    },
+    "retryable": {
+      "type": "boolean",
+      "description": "Whether the caller may retry the same request. Auth and quota failures are not retryable and page someone; transient transport failures are."
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Provider request IDs are what make vendor support tickets actionable.",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+        "requestId": { "type": "string" },
+        "nativeCode": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "stage": {
+      "type": "string",
+      "enum": ["vad", "stt", "turn_detection", "context", "llm", "tools", "speech_planner", "tts", "egress", "seal", "transport", "control"]
+    }
+  },
+  "$defs": {
+    "ErrorCode": {
+      "type": "string",
+      "enum": [
+        "invalid_config",
+        "unsupported_capability",
+        "residency_violation",
+        "consent_required",
+        "privacy_mode_forbids",
+        "quota_exceeded",
+        "budget_exceeded",
+        "rate_limited",
+        "authentication_failed",
+        "provider_unavailable",
+        "provider_timeout",
+        "stream_closed",
+        "cancelled",
+        "internal"
+      ]
+    }
+  }
+}
