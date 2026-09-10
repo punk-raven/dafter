@@ -4,7 +4,7 @@
   "title": "DafterError",
   "description": "Every vendor error is mapped into this taxonomy inside its own provider subpackage, so no vendor exception escapes and callers never branch on a vendor's error shape.",
   "type": "object",
-  "additionalProperties": false,
+  "unevaluatedProperties": false,
   "required": ["code", "message", "retryable"],
   "properties": {
     "code": { "$ref": "#/$defs/ErrorCode" },
@@ -18,7 +18,7 @@
     },
     "provider": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "description": "Provider request IDs are what make vendor support tickets actionable.",
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },

@@ -4,12 +4,12 @@
   "title": "EventEnvelope",
   "description": "Events are a durable stream with consumer groups, at-least-once delivery and ordering within a session partition - not fire-and-forget pub/sub, which silently drops recording.completed when a consumer is down. The envelope is the second of exactly two contact points between the Go and Python halves.",
   "type": "object",
-  "additionalProperties": false,
+  "unevaluatedProperties": false,
   "required": ["eventId", "type", "version", "sessionId", "tenantId", "sequence", "occurredAt"],
   "properties": {
     "eventId": {
       "type": "string",
-      "pattern": "^e_[0-9a-f]{16}$",
+      "pattern": "^e_[0-9a-f]{32}$",
       "description": "Doubles as the idempotency key for webhook delivery."
     },
     "type": { "$ref": "#/$defs/EventType" },

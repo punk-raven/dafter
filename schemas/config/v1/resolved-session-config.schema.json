@@ -4,7 +4,7 @@
   "title": "ResolvedSessionConfig",
   "description": "The output of layered resolution (defaults, tenant, profile, session overrides, then language/channel/role overlays). Resolved once in the control plane, hashed, stored with the session and handed to the worker as a finished document. This is one of exactly two contact points between the Go and Python halves of the platform.",
   "type": "object",
-  "additionalProperties": false,
+  "unevaluatedProperties": false,
   "required": ["apiVersion", "sessionId", "tenantId", "privacyMode", "language", "channel", "agent", "turn", "recording", "budgets"],
   "properties": {
     "apiVersion": {
@@ -15,7 +15,7 @@
     "tenantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/TenantId" },
     "configHash": {
       "type": "string",
-      "description": "Hex SHA-256 over the canonical serialization of this document with configHash itself omitted. Makes any session explainable and replayable.",
+      "description": "Hex SHA-256 over the RFC 8785 (JSON Canonicalization Scheme) serialization of this document with configHash itself omitted. The scheme is named rather than implied: 'canonical JSON' is not one thing, and Go and Python order keys, escape unicode and render numbers differently, so an unnamed scheme yields two hashes for one document and proves nothing at the moment somebody audits a specific call.",
       "pattern": "^[0-9a-f]{64}$"
     },
     "privacyMode": {
@@ -27,12 +27,13 @@
     "channel": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Channel" },
     "residency": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "description": "Providers and storage are filtered to allowed regions at resolution time; a violation is an error now, not at first use.",
       "properties": {
         "allowedRegions": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[a-z]{2}-[a-z]+-[0-9]$" },
+          "description": "Opaque provider-scoped region tokens. Deliberately not matched against one cloud's naming convention: Dafter has no home region and prescribes no cloud, and AWS, GCP, Azure and others disagree on the shape ('ap-south-1', 'asia-south1', 'centralindia'). Which tokens are permitted is a residency policy decision, not something a regex can express.",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,31}$" },
           "minItems": 1
         }
       },
@@ -40,7 +41,7 @@
     },
     "agent": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "required": ["enabled", "pool"],
       "properties": {
         "enabled": { "type": "boolean" },
@@ -70,7 +71,7 @@
   "$defs": {
     "ProviderRef": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "description": "Providers are named by variable and pinned by model version, so a vendor silently upgrading a model cannot silently change a consumer's agent.",
       "required": ["provider"],
       "properties": {
@@ -83,7 +84,7 @@
     },
     "Pipeline": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "description": "Stage assembly. With a realtime provider the stt/llm/tts stages collapse and the rest is unchanged.",
       "properties": {
         "vad": { "$ref": "#/$defs/ProviderRef" },
@@ -96,7 +97,7 @@
     },
     "Turn": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "description": "Every bad voice demo fails here, not on the LLM. Semantic turn detectors are English-trained and degrade elsewhere, which is why strategy resolves per language rather than globally.",
       "required": ["strategy"],
       "properties": {
@@ -114,7 +115,7 @@
         },
         "interruption": {
           "type": "object",
-          "additionalProperties": false,
+          "unevaluatedProperties": false,
           "properties": {
             "enabled": { "type": "boolean", "default": true },
             "minDurationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
@@ -127,7 +128,7 @@
     },
     "Recording": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" },
@@ -151,7 +152,7 @@
     },
     "Budgets": {
       "type": "object",
-      "additionalProperties": false,
+      "unevaluatedProperties": false,
       "description": "Budgets live in config so violations alert automatically instead of regressing silently.",
       "required": ["turnGapP50Ms", "turnGapP95Ms"],
       "properties": {
