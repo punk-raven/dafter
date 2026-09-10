@@ -1,6 +1,9 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
+
 	"github.com/punk-raven/dafter/go/internal/errs"
 	"github.com/punk-raven/dafter/go/internal/schema"
 )
@@ -151,6 +154,10 @@ func (c *ResolvedSessionConfig) Validate() error {
 	if err := schema.ValidateAgainst(schema.ResolvedSessionConfig, c, errs.CodeInvalidConfig); err != nil {
 		return err
 	}
+	return c.check()
+}
+
+func (c *ResolvedSessionConfig) check() error {
 	if c.PrivacyMode == PrivacySealed && c.Agent.Enabled {
 		return errs.Errorf(errs.CodePrivacyModeForbids,
 			"session %s is sealed, so an agent cannot be dispatched into it", c.SessionID)
@@ -167,4 +174,20 @@ func (c *ResolvedSessionConfig) Validate() error {
 				"attaches to a published track and cannot start before one exists", c.SessionID, c.Recording.Layout)
 	}
 	return nil
+}
+
+func Parse(raw []byte) (*ResolvedSessionConfig, error) {
+	if err := schema.ValidateDocument(schema.ResolvedSessionConfig, raw, errs.CodeInvalidConfig); err != nil {
+		return nil, err
+	}
+	var c ResolvedSessionConfig
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&c); err != nil {
+		return nil, errs.Wrap(errs.CodeInvalidConfig, err, "decode resolved session config")
+	}
+	if err := c.check(); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

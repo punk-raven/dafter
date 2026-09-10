@@ -158,3 +158,27 @@ func Raw(p string) ([]byte, error) {
 func ValidateAgainst(id string, doc any, code errs.ErrorCode) error {
 	return Default.ValidateAgainst(id, doc, code)
 }
+
+// Validate the document before decoding it: decoding first drops fields the
+// struct does not declare, so the schema never sees them.
+func (v *Validator) ValidateDocument(id string, raw []byte, code errs.ErrorCode) error {
+	s, err := v.SchemaFor(id)
+	if err != nil {
+		return err
+	}
+	parsed, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	if err != nil {
+		return errs.Wrap(errs.CodeInvalidConfig, err, "input is not valid JSON")
+	}
+	if err := s.Validate(parsed); err != nil {
+		problems := leafProblems(err)
+		e := errs.Wrap(code, err, "%d problem(s) validating against %s", len(problems), id)
+		e.Details = problems
+		return e
+	}
+	return nil
+}
+
+func ValidateDocument(id string, raw []byte, code errs.ErrorCode) error {
+	return Default.ValidateDocument(id, raw, code)
+}
