@@ -5,42 +5,6 @@ import (
 	"strings"
 )
 
-type ErrorCode string
-
-const (
-	CodeInvalidConfig         ErrorCode = "invalid_config"
-	CodeUnsupportedCapability ErrorCode = "unsupported_capability"
-	CodeResidencyViolation    ErrorCode = "residency_violation"
-	CodeConsentRequired       ErrorCode = "consent_required"
-	CodePrivacyModeForbids    ErrorCode = "privacy_mode_forbids"
-	CodeQuotaExceeded         ErrorCode = "quota_exceeded"
-	CodeBudgetExceeded        ErrorCode = "budget_exceeded"
-	CodeRateLimited           ErrorCode = "rate_limited"
-	CodeAuthenticationFailed  ErrorCode = "authentication_failed"
-	CodeProviderUnavailable   ErrorCode = "provider_unavailable"
-	CodeProviderTimeout       ErrorCode = "provider_timeout"
-	CodeStreamClosed          ErrorCode = "stream_closed"
-	CodeCancelled             ErrorCode = "cancelled"
-	CodeInternal              ErrorCode = "internal"
-)
-
-type Stage string
-
-const (
-	StageVAD           Stage = "vad"
-	StageSTT           Stage = "stt"
-	StageTurnDetection Stage = "turn_detection"
-	StageContext       Stage = "context"
-	StageLLM           Stage = "llm"
-	StageTools         Stage = "tools"
-	StageSpeechPlanner Stage = "speech_planner"
-	StageTTS           Stage = "tts"
-	StageEgress        Stage = "egress"
-	StageSeal          Stage = "seal"
-	StageTransport     Stage = "transport"
-	StageControl       Stage = "control"
-)
-
 type ProviderContext struct {
 	Name       string `json:"name"`
 	RequestID  string `json:"requestId,omitempty"`

@@ -21,6 +21,7 @@ help: ## Show this help
 
 .PHONY: generate
 generate: ## Refresh everything derived from schemas/
+	@cd $(GO_DIR) && go run ./tools/enumgen ../$(SCHEMA_DIR) .
 	@rm -rf $(GO_SCHEMAS)
 	@mkdir -p $(GO_SCHEMAS)
 	@cp -R $(SCHEMA_DIR)/. $(GO_SCHEMAS)/

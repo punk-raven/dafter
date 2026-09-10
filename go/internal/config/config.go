@@ -28,32 +28,6 @@ type ResolvedSessionConfig struct {
 	Budgets   Budgets    `json:"budgets"`
 }
 
-type PrivacyMode string
-
-const (
-	PrivacyOpen         PrivacyMode = "open"
-	PrivacySealed       PrivacyMode = "sealed"
-	PrivacyTrustedAgent PrivacyMode = "trusted_agent"
-)
-
-type Channel string
-
-const (
-	ChannelWebRTC    Channel = "webrtc"
-	ChannelTelephony Channel = "telephony"
-	ChannelLongForm  Channel = "long_form"
-)
-
-type Role string
-
-const (
-	RoleParticipant Role = "participant"
-	RolePresenter   Role = "presenter"
-	RoleObserver    Role = "observer"
-	RoleAgent       Role = "agent"
-	RoleRecorder    Role = "recorder"
-)
-
 type Residency struct {
 	AllowedRegions []string `json:"allowedRegions"`
 }
@@ -65,14 +39,6 @@ type Agent struct {
 	PersonaRef string    `json:"personaRef,omitempty"`
 	Pipeline   *Pipeline `json:"pipeline,omitempty"`
 }
-
-type AgentMode string
-
-const (
-	ModeCascaded       AgentMode = "cascaded"
-	ModeHalfCascade    AgentMode = "half_cascade"
-	ModeSpeechToSpeech AgentMode = "speech_to_speech"
-)
 
 type ProviderRef struct {
 	Provider      string         `json:"provider"`
@@ -90,17 +56,6 @@ type Pipeline struct {
 	MT       *ProviderRef `json:"mt,omitempty"`
 	Realtime *ProviderRef `json:"realtime,omitempty"`
 }
-
-type TurnStrategy string
-
-const (
-	TurnAuto                TurnStrategy = "auto"
-	TurnVAD                 TurnStrategy = "vad"
-	TurnProviderEndpointing TurnStrategy = "provider_endpointing"
-	TurnSemantic            TurnStrategy = "semantic"
-	TurnServerVAD           TurnStrategy = "server_vad"
-	TurnManual              TurnStrategy = "manual"
-)
 
 type Turn struct {
 	Strategy           TurnStrategy `json:"strategy"`
@@ -120,21 +75,6 @@ type Interruption struct {
 	FalseInterruptionTimeoutMs int   `json:"falseInterruptionTimeoutMs,omitempty"`
 	ResumeFalseInterruption    *bool `json:"resumeFalseInterruption,omitempty"`
 }
-
-type EgressLayout string
-
-const (
-	LayoutTrack          EgressLayout = "track"
-	LayoutTrackComposite EgressLayout = "track_composite"
-	LayoutRoomComposite  EgressLayout = "room_composite"
-)
-
-type RecordingStart string
-
-const (
-	StartAtSessionCreate RecordingStart = "session_create"
-	StartAtFirstPublish  RecordingStart = "first_publish"
-)
 
 type Recording struct {
 	Enabled           bool           `json:"enabled"`
