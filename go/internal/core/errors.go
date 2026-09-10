@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type ErrorCode string
 
@@ -51,15 +54,21 @@ type Error struct {
 	Retryable bool             `json:"retryable"`
 	Stage     Stage            `json:"stage,omitempty"`
 	Provider  *ProviderContext `json:"provider,omitempty"`
+	Details   []string         `json:"details,omitempty"`
 
 	wrapped error
 }
 
 func (e *Error) Error() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s: %s", e.Code, e.Message)
 	if e.Provider != nil && e.Provider.RequestID != "" {
-		return fmt.Sprintf("%s: %s (provider %s request %s)", e.Code, e.Message, e.Provider.Name, e.Provider.RequestID)
+		fmt.Fprintf(&b, " (provider %s request %s)", e.Provider.Name, e.Provider.RequestID)
 	}
-	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+	for _, d := range e.Details {
+		fmt.Fprintf(&b, "\n  %s", d)
+	}
+	return b.String()
 }
 
 func (e *Error) Unwrap() error { return e.wrapped }

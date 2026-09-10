@@ -30,6 +30,11 @@
     "stage": {
       "type": "string",
       "enum": ["vad", "stt", "turn_detection", "context", "llm", "tools", "speech_planner", "tts", "egress", "seal", "transport", "control"]
+    },
+    "details": {
+      "type": "array",
+      "description": "Located sub-problems, one per line, each naming the JSON pointer it failed at. A validation failure that reports only 'the document is invalid' makes the config gate unusable, so the individual failures are carried rather than collapsed.",
+      "items": { "type": "string" }
     }
   },
   "$defs": {

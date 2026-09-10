@@ -46,8 +46,11 @@ func TestTypedPayloadIsEnforced(t *testing.T) {
 				t.Fatalf("agent.state_changed accepted %v", tc.payload)
 			}
 			var de *Error
-			if !errors.As(err, &de) || de.Code != CodeInvalidConfig {
-				t.Fatalf("want a Dafter error, got %v", err)
+			if !errors.As(err, &de) || de.Code != CodeInternal {
+				t.Fatalf("want %s, got %v", CodeInternal, err)
+			}
+			if len(de.Details) == 0 {
+				t.Errorf("no located problem reported for %v", tc.payload)
 			}
 		})
 	}

@@ -1,10 +1,13 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 
@@ -100,7 +103,7 @@ func SchemaFor(id string) (*jsonschema.Schema, error) {
 	return s, nil
 }
 
-func ValidateAgainst(id string, v any) error {
+func ValidateAgainst(id string, v any, code ErrorCode) error {
 	s, err := SchemaFor(id)
 	if err != nil {
 		return err
@@ -109,22 +112,54 @@ func ValidateAgainst(id string, v any) error {
 	if err != nil {
 		return Wrap(CodeInternal, err, "marshal value for schema validation")
 	}
-	doc, err := jsonschema.UnmarshalJSON(strings.NewReader(string(b)))
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(b))
 	if err != nil {
 		return Wrap(CodeInternal, err, "reparse value for schema validation")
 	}
 	if err := s.Validate(doc); err != nil {
-		return Wrap(CodeInvalidConfig, err, "document does not satisfy %s", id)
+		problems := leafProblems(err)
+		e := Wrap(code, err, "%d problem(s) validating against %s", len(problems), id)
+		e.Details = problems
+		return e
 	}
 	return nil
 }
 
+// leafProblems flattens the validation tree to the located failures an operator
+// can act on. Without it every failure reads "document does not satisfy <url>".
+func leafProblems(err error) []string {
+	var ve *jsonschema.ValidationError
+	if !errors.As(err, &ve) {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	var walk func(*jsonschema.ValidationError)
+	walk = func(e *jsonschema.ValidationError) {
+		if len(e.Causes) == 0 {
+			p := strings.ReplaceAll(strings.TrimSpace(e.Error()), "\n", " ")
+			if !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+			return
+		}
+		for _, c := range e.Causes {
+			walk(c)
+		}
+	}
+	walk(ve)
+	sort.Strings(out)
+	return out
+}
+
+// A malformed event is a platform fault, not a consumer's config error.
 func (e *EventEnvelope) Validate() error {
-	return ValidateAgainst(SchemaEventEnvelope, e)
+	return ValidateAgainst(SchemaEventEnvelope, e, CodeInternal)
 }
 
 func (c *ResolvedSessionConfig) Validate() error {
-	if err := ValidateAgainst(SchemaResolvedSessionConfig, c); err != nil {
+	if err := ValidateAgainst(SchemaResolvedSessionConfig, c, CodeInvalidConfig); err != nil {
 		return err
 	}
 	if c.PrivacyMode == PrivacySealed && c.Agent.Enabled {
