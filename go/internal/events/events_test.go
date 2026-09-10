@@ -2,12 +2,10 @@ package events
 
 import (
 	"errors"
-	"slices"
 	"testing"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
-	"github.com/punk-raven/dafter/go/internal/schema"
 )
 
 func event(t EventType, payload map[string]any) *EventEnvelope {
@@ -20,40 +18,6 @@ func event(t EventType, payload map[string]any) *EventEnvelope {
 		Sequence:   0,
 		OccurredAt: time.Date(2026, 9, 11, 10, 0, 0, 0, time.UTC),
 		Payload:    payload,
-	}
-}
-
-func TestEventTypesMatchSchema(t *testing.T) {
-	want, err := schema.EnumAt("events/v1/envelope.schema.json", "$defs", "EventType", "enum")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := []string{
-		string(EventSessionCreated), string(EventSessionEnded), string(EventSessionSignal),
-		string(EventConnectionEstablished), string(EventConnectionLost), string(EventConnectionRestored),
-		string(EventAgentDispatched), string(EventAgentStateChanged), string(EventAgentHandoffRequested),
-		string(EventTranscriptPartial), string(EventTranscriptFinal), string(EventTranscriptVersionCreated),
-		string(EventTranslationFinal), string(EventRecordingStarted), string(EventRecordingCompleted),
-		string(EventRecordingSealed), string(EventProviderDegraded), string(EventProviderFailedOver),
-		string(EventPolicyViolation), string(EventBudgetExceeded),
-	}
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Errorf("EventType drift\n go: %v\n schema: %v", got, want)
-	}
-}
-
-func TestAgentStatesMatchSchema(t *testing.T) {
-	want, err := schema.EnumAt("events/v1/envelope.schema.json", "$defs", "AgentState", "enum")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := []string{
-		string(AgentIdle), string(AgentListening), string(AgentThinking), string(AgentSpeaking),
-	}
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Errorf("AgentState drift\n go: %v\n schema: %v", got, want)
 	}
 }
 

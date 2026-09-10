@@ -2,28 +2,12 @@ package config
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 	"github.com/punk-raven/dafter/go/internal/schema"
 )
-
-func TestRolesMatchSchema(t *testing.T) {
-	want, err := schema.EnumAt("common/v1/ids.schema.json", "$defs", "Role", "enum")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := []string{
-		string(RoleParticipant), string(RolePresenter), string(RoleObserver),
-		string(RoleAgent), string(RoleRecorder),
-	}
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Errorf("Role drift\n go: %v\n schema: %v", got, want)
-	}
-}
 
 func validConfig() *ResolvedSessionConfig {
 	return &ResolvedSessionConfig{

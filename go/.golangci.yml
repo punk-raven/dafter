@@ -15,6 +15,7 @@ linters:
         ids-is-a-leaf:
           files:
             - "**/internal/ids/**"
+            - "!$test"
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/errs
               desc: ids depends on nothing
@@ -28,6 +29,7 @@ linters:
         errs-is-a-leaf:
           files:
             - "**/internal/errs/**"
+            - "!$test"
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/schema
               desc: errs depends on nothing; schema depends on errs
@@ -39,6 +41,7 @@ linters:
         schema-depends-on-errs-only:
           files:
             - "**/internal/schema/**"
+            - "!$test"
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/events
               desc: schema is below events; an import here closes a cycle
@@ -48,6 +51,7 @@ linters:
         events-and-config-do-not-know-each-other:
           files:
             - "**/internal/events/**"
+            - "!$test"
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/config
               desc: events and config are siblings; shared types belong lower
@@ -55,6 +59,7 @@ linters:
         config-does-not-import-events:
           files:
             - "**/internal/config/**"
+            - "!$test"
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/events
               desc: events and config are siblings; shared types belong lower

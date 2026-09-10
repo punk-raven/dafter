@@ -4,6 +4,7 @@ SHELL := /bin/bash
 GO_DIR     := go
 SCHEMA_DIR := schemas
 GO_SCHEMAS := $(GO_DIR)/internal/schema/schemas
+GENERATED  := $(GO_SCHEMAS) ':(glob)$(GO_DIR)/internal/**/*_gen.go'
 
 .PHONY: help
 help: ## Show this help
@@ -29,10 +30,11 @@ generate: ## Refresh everything derived from schemas/
 	@echo "generated $(GO_SCHEMAS)"
 
 .PHONY: generate-check
-generate-check: generate ## Fail if the generated copy is stale
-	@if ! git diff --quiet -- $(GO_SCHEMAS); then \
-		echo "generated output is stale - run 'make generate' and commit the result"; \
-		git --no-pager diff --stat -- $(GO_SCHEMAS); \
+generate-check: generate ## Fail if any generated output is stale or hand-edited
+	@dirty=$$(git status --porcelain -- $(GENERATED)); \
+	if [ -n "$$dirty" ]; then \
+		echo "generated output does not match schemas/ - run 'make generate' and commit the result"; \
+		echo "$$dirty"; \
 		exit 1; \
 	fi
 
