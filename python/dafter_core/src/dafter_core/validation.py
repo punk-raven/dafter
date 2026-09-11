@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from functools import cache
 from typing import Any
 
@@ -30,6 +31,11 @@ def validator_for(relative: str) -> Draft202012Validator:
     )
 
 
+def _pointer(path: Iterable[str | int]) -> str:
+    """RFC 6901 pointer, the same location form the Go half reports."""
+    return "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in path)
+
+
 def _problems(validator: Draft202012Validator, doc: Any) -> tuple[str, ...]:
     seen: dict[str, None] = {}
 
@@ -38,7 +44,7 @@ def _problems(validator: Draft202012Validator, doc: Any) -> tuple[str, ...]:
             for sub in err.context:
                 walk(sub)
             return
-        seen.setdefault(f"at {err.json_path!r}: {err.message}", None)
+        seen.setdefault(f"at {_pointer(err.absolute_path)!r}: {err.message}", None)
 
     for err in validator.iter_errors(doc):
         walk(err)
@@ -54,7 +60,7 @@ def validate_document(relative: str, raw: bytes, code: ErrorCode) -> Any:
     try:
         doc = json.loads(raw)
     except ValueError as exc:
-        raise DafterError(ErrorCode.INVALID_CONFIG, f"input is not valid JSON: {exc}") from exc
+        raise DafterError(code, f"input is not valid JSON: {exc}") from exc
 
     v = validator_for(relative)
     problems = _problems(v, doc)

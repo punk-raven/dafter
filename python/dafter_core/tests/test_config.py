@@ -71,7 +71,7 @@ def test_rejects_an_inline_secret() -> None:
 
 def test_rejects_a_value_the_dataclass_would_accept() -> None:
     err = refuse(doc(agent={"enabled": True, "pool": "NOT A VALID POOL NAME"}))
-    assert any("agent.pool" in p for p in err.details)
+    assert any("at '/agent/pool':" in p for p in err.details)
 
 
 def test_rejects_a_non_opaque_session_id() -> None:

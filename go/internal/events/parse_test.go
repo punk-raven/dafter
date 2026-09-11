@@ -45,6 +45,13 @@ func TestParseRejectsAnUnknownEnvelopeField(t *testing.T) {
 	}
 }
 
+func TestParseRejectsMalformedJSONAsInternal(t *testing.T) {
+	t.Parallel()
+	if de := mustFail(t, `{"eventId":`); de.Code != errs.CodeInternal {
+		t.Errorf("want %s, got %s", errs.CodeInternal, de.Code)
+	}
+}
+
 func TestParseRejectsATimestampWithNoOffset(t *testing.T) {
 	t.Parallel()
 	raw := strings.Replace(valid, `2026-09-11T10:00:00Z`, `2026-09-11T10:00:00`, 1)

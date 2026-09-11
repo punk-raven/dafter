@@ -168,7 +168,7 @@ func (v *Validator) ValidateDocument(id string, raw []byte, code errs.ErrorCode)
 	}
 	parsed, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
-		return errs.Wrap(errs.CodeInvalidConfig, err, "input is not valid JSON")
+		return errs.Wrap(code, err, "input is not valid JSON")
 	}
 	if err := s.Validate(parsed); err != nil {
 		problems := leafProblems(err)

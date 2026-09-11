@@ -24,7 +24,7 @@ def test_wire_form_uses_schema_field_names() -> None:
         "slow",
         stage=Stage.TTS,
         provider=ProviderContext("sarvam", request_id="req_1", native_code="1013"),
-        details=("at '$': bad",),
+        details=("at '': bad",),
     )
     d = e.to_dict()
     assert d == {
@@ -33,7 +33,7 @@ def test_wire_form_uses_schema_field_names() -> None:
         "retryable": True,
         "stage": "tts",
         "provider": {"name": "sarvam", "requestId": "req_1", "nativeCode": "1013"},
-        "details": ["at '$': bad"],
+        "details": ["at '': bad"],
     }
     validate_document(schemas.ERROR, json.dumps(d).encode(), ErrorCode.INTERNAL)
 

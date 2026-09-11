@@ -98,3 +98,9 @@ def test_parse_event_refuses_a_malformed_document() -> None:
     with pytest.raises(DafterError) as exc:
         parse_event('{"eventId":"e_short","type":"session.created"}')
     assert exc.value.code is ErrorCode.INTERNAL
+
+
+def test_parse_event_refuses_malformed_json_as_internal() -> None:
+    with pytest.raises(DafterError) as exc:
+        parse_event('{"eventId":')
+    assert exc.value.code is ErrorCode.INTERNAL

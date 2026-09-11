@@ -49,14 +49,16 @@ func TestParseRejectsAValueTheStructWouldAccept(t *testing.T) {
 	t.Parallel()
 	raw := strings.Replace(minimal, `"pool":"dafter-py"`, `"pool":"NOT A VALID POOL NAME"`, 1)
 	err := mustFail(t, []byte(raw))
-	if !strings.Contains(strings.Join(err.Details, "\n"), "/agent/pool") {
+	if !strings.Contains(strings.Join(err.Details, "\n"), "at '/agent/pool':") {
 		t.Errorf("want a located /agent/pool problem, got:\n%v", err)
 	}
 }
 
 func TestParseRejectsMalformedJSON(t *testing.T) {
 	t.Parallel()
-	_ = mustFail(t, []byte(`{"apiVersion":`))
+	if err := mustFail(t, []byte(`{"apiVersion":`)); err.Code != errs.CodeInvalidConfig {
+		t.Errorf("want %s, got %s", errs.CodeInvalidConfig, err.Code)
+	}
 }
 
 func TestParseAppliesCrossFieldRules(t *testing.T) {
