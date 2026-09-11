@@ -31,7 +31,11 @@ description: >-
 
 6. Add behaviour tests on both sides that feed the same document and expect the same error code.
 
-7. Run `make check` (without Go: `make py-lint py-test` on a tree where generate already ran).
+7. Run `make check`. Without Go, `make py-lint py-test` fails because both depend on
+   `generate` (which runs `go run ./tools/enumgen`), so on a tree where generate already ran
+   call uv directly from `python/`:
+   `uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy`
+   then `uv run --frozen pytest -q`.
 
 8. Commit the generated output in the same commit as the schema edit, or `make generate-check` fails.
 
