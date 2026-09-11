@@ -37,3 +37,9 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .mypy_cache/
+
+# Build and profiling output
+coverage.out
+*.prof
+/dist/
+/build/
