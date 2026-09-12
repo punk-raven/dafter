@@ -563,7 +563,9 @@ dafter/
 │   │   ├── dafter-sealer/      # egress orchestration, seal stage, manifests
 │   │   └── dafter-ctl/         # operator CLI
 │   └── internal/
-│       ├── core/               # config schema + resolution, event and error taxonomy, telemetry
+│       ├── ids/ errs/ schema/  # the shared contract, split into leaf packages: identifiers,
+│       │   events/ config/     #   error taxonomy, schema validation, event envelope, resolved
+│       │                       #   config. "core" below means these five; depguard holds the DAG
 │       ├── transport/          # media-transport seam + LiveKit adapter (thin; see decision 9)
 │       ├── control/            # sessions, tokens, dispatch, policy, consent, tenancy,
 │       │                       #   metering, webhooks
