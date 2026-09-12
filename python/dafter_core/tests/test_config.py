@@ -79,6 +79,29 @@ def test_rejects_a_non_opaque_session_id() -> None:
     assert any("sessionId" in p for p in err.details)
 
 
+@pytest.mark.parametrize(
+    ("overrides", "value"),
+    [
+        ({"sessionId": "call-with-jane@example.com"}, "call-with-jane@example.com"),
+        (
+            {
+                "agent": {
+                    "enabled": True,
+                    "pool": "dafter-py",
+                    "pipeline": {"stt": {"provider": "sarvam", "credentialRef": "sk-live-abc"}},
+                }
+            },
+            "sk-live-abc",
+        ),
+        ({"channel": "carrier-pigeon"}, "carrier-pigeon"),
+    ],
+)
+def test_never_echoes_the_rejected_value(overrides: dict[str, Any], value: str) -> None:
+    err = refuse(doc(**overrides))
+    assert value not in str(err)
+    assert value not in json.dumps(err.to_dict())
+
+
 def test_rejects_malformed_json() -> None:
     assert refuse('{"apiVersion":').code is ErrorCode.INVALID_CONFIG
 

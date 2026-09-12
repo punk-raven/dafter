@@ -36,6 +36,45 @@ def _pointer(path: Iterable[str | int]) -> str:
     return "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in path)
 
 
+_NAMES_KEYS_ONLY = frozenset(
+    {"required", "additionalProperties", "unevaluatedProperties", "dependentRequired"}
+)
+_BOUNDS = frozenset(
+    {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "minProperties",
+        "maxProperties",
+    }
+)
+
+
+def _rule(err: Any) -> str:
+    keyword, want = err.validator, err.validator_value
+    if keyword == "pattern":
+        return f"does not match pattern {want!r}"
+    if keyword == "format":
+        return f"is not a valid {want}"
+    if keyword == "enum":
+        return "value must be one of " + ", ".join(repr(v) for v in want)
+    if keyword == "const":
+        return f"value must be {want!r}"
+    if keyword == "type":
+        return "is not of type " + (", ".join(want) if isinstance(want, list) else str(want))
+    if keyword in _BOUNDS:
+        return f"{keyword}: want {want!r}"
+    if keyword in _NAMES_KEYS_ONLY:
+        return str(err.message)
+    return f"{keyword!r} failed"
+
+
 def _problems(validator: Draft202012Validator, doc: Any) -> tuple[str, ...]:
     seen: dict[str, None] = {}
 
@@ -44,7 +83,7 @@ def _problems(validator: Draft202012Validator, doc: Any) -> tuple[str, ...]:
             for sub in err.context:
                 walk(sub)
             return
-        seen.setdefault(f"at {_pointer(err.absolute_path)!r}: {err.message}", None)
+        seen.setdefault(f"at {_pointer(err.absolute_path)!r}: {_rule(err)}", None)
 
     for err in validator.iter_errors(doc):
         walk(err)

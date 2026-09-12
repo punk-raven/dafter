@@ -6,11 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/big"
 	"path"
 	"sort"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
@@ -125,6 +129,8 @@ func (v *Validator) ValidateAgainst(id string, doc any, code errs.ErrorCode) err
 	return nil
 }
 
+var printer = message.NewPrinter(language.English)
+
 func leafProblems(err error) []string {
 	var ve *jsonschema.ValidationError
 	if !errors.As(err, &ve) {
@@ -135,7 +141,7 @@ func leafProblems(err error) []string {
 	var walk func(*jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			p := strings.ReplaceAll(strings.TrimSpace(e.Error()), "\n", " ")
+			p := fmt.Sprintf("at '%s': %s", pointer(e.InstanceLocation), rule(e.ErrorKind))
 			if !seen[p] {
 				seen[p] = true
 				out = append(out, p)
@@ -149,6 +155,43 @@ func leafProblems(err error) []string {
 	walk(ve)
 	sort.Strings(out)
 	return out
+}
+
+var pointerEscaper = strings.NewReplacer("~", "~0", "/", "~1")
+
+func pointer(tokens []string) string {
+	var sb strings.Builder
+	for _, tok := range tokens {
+		sb.WriteByte('/')
+		sb.WriteString(pointerEscaper.Replace(tok))
+	}
+	return sb.String()
+}
+
+func rule(k jsonschema.ErrorKind) string {
+	switch k := k.(type) {
+	case *kind.Pattern:
+		return fmt.Sprintf("does not match pattern '%s'", k.Want)
+	case *kind.Format:
+		return fmt.Sprintf("is not a valid %s", k.Want)
+	case *kind.Minimum:
+		return "minimum: want " + bound(k.Want)
+	case *kind.Maximum:
+		return "maximum: want " + bound(k.Want)
+	case *kind.ExclusiveMinimum:
+		return "exclusiveMinimum: want " + bound(k.Want)
+	case *kind.ExclusiveMaximum:
+		return "exclusiveMaximum: want " + bound(k.Want)
+	case *kind.MultipleOf:
+		return "multipleOf: want " + bound(k.Want)
+	default:
+		return k.LocalizedString(printer)
+	}
+}
+
+func bound(r *big.Rat) string {
+	f, _ := r.Float64()
+	return fmt.Sprintf("%v", f)
 }
 
 func Raw(p string) ([]byte, error) {

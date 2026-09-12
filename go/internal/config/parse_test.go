@@ -54,6 +54,27 @@ func TestParseRejectsAValueTheStructWouldAccept(t *testing.T) {
 	}
 }
 
+func TestParseNeverEchoesTheRejectedValue(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct{ old, new, value string }{
+		"session id": {`"sessionId":"s_7f3a9c21"`, `"sessionId":"call-with-jane@example.com"`, "call-with-jane@example.com"},
+		"enum":       {`"channel":"webrtc"`, `"channel":"carrier-pigeon"`, "carrier-pigeon"},
+		"secret": {
+			`"pool":"dafter-py"`,
+			`"pool":"dafter-py","pipeline":{"stt":{"provider":"sarvam","credentialRef":"sk-live-abc"}}`,
+			"sk-live-abc",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			err := mustFail(t, []byte(strings.Replace(minimal, tc.old, tc.new, 1)))
+			if strings.Contains(err.Error(), tc.value) {
+				t.Errorf("the rejected value is echoed in the error:\n%v", err)
+			}
+		})
+	}
+}
+
 func TestParseRejectsMalformedJSON(t *testing.T) {
 	t.Parallel()
 	if err := mustFail(t, []byte(`{"apiVersion":`)); err.Code != errs.CodeInvalidConfig {

@@ -58,6 +58,14 @@ func TestParseRejectsATimestampWithNoOffset(t *testing.T) {
 	_ = mustFail(t, raw)
 }
 
+func TestParseRejectsATimestampThatIsNotACalendarDate(t *testing.T) {
+	t.Parallel()
+	raw := strings.Replace(valid, `2026-09-11T10:00:00Z`, `2026-13-45T25:61:61Z`, 1)
+	if de := mustFail(t, raw); !strings.Contains(strings.Join(de.Details, "\n"), "at '/occurredAt':") {
+		t.Errorf("want a located /occurredAt problem, got:\n%v", de)
+	}
+}
+
 func TestParseRejectsAWrongPayload(t *testing.T) {
 	t.Parallel()
 	raw := strings.Replace(valid, `"state":"thinking"`, `"state":"THINKING"`, 1)

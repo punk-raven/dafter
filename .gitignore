@@ -41,5 +41,5 @@ __pycache__/
 # Build and profiling output
 coverage.out
 *.prof
-/dist/
-/build/
+dist/
+build/

@@ -61,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         # requires-python is >=3.11, so every version we claim gets exercised.
-        python: ["3.11", "3.12", "3.13"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -86,7 +86,14 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
+          cache-dependency-path: |
+            go/go.sum
+            go/tools/govulncheck/go.sum
+      - name: cache the scanner binary
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: go/bin
+          key: govulncheck-${{ runner.os }}-${{ hashFiles('go/tools/govulncheck/go.sum') }}
       # Reports only vulnerabilities on a reachable call path, so it is a
       # finding rather than a dependency-graph alert nobody acts on.
-      - run: go -C go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - run: make vulncheck

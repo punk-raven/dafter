@@ -8,6 +8,7 @@ PY_CORE    := $(PY_DIR)/dafter_core/src/dafter_core
 GO_SCHEMAS := $(GO_DIR)/internal/schema/schemas
 PY_SCHEMAS := $(PY_CORE)/_schemas
 LINT       := $(abspath $(GO_DIR)/bin/golangci-lint)
+VULN       := $(abspath $(GO_DIR)/bin/govulncheck)
 GENERATED  := $(GO_SCHEMAS) $(PY_SCHEMAS) $(PY_CORE)/enums.py ':(glob)$(GO_DIR)/internal/**/*_gen.go'
 
 .PHONY: help
@@ -70,6 +71,13 @@ $(LINT):
 .PHONY: lint
 lint: generate $(LINT) ## Lint, including the package dependency graph
 	cd $(GO_DIR) && $(LINT) run
+
+$(VULN):
+	cd $(GO_DIR)/tools/govulncheck && GOBIN=$(dir $(VULN)) go install golang.org/x/vuln/cmd/govulncheck
+
+.PHONY: vulncheck
+vulncheck: generate $(VULN) ## Report vulnerabilities on a reachable call path
+	cd $(GO_DIR) && $(VULN) ./...
 
 .PHONY: py-test
 py-test: generate ## Run the Python tests

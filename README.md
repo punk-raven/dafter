@@ -26,7 +26,8 @@ package boundary is unstable and may change without notice.
 - `schemas/` - JSON Schema for the config document, the event envelope, the
   error taxonomy and identifiers. The only source of truth for shared types.
 - `go/` - the control plane, state, egress and seal, plus the code generator
-  in `go/tools/enumgen` and the linter module in `go/tools/golangci`.
+  in `go/tools/enumgen` and the pinned linter and vulnerability scanner
+  modules in `go/tools/golangci` and `go/tools/govulncheck`.
 - `python/` - the agent runtime, providers, batch pass and evals, as a `uv`
   workspace starting with `dafter_core`.
 - `.github/` - CI workflow and Dependabot configuration.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
@@ -88,8 +89,6 @@ def test_utc_is_written_as_Z_matching_go() -> None:
 
 def test_round_trips_through_the_wire_form() -> None:
     original = event(EventType.AGENT_STATE_CHANGED, {"state": "thinking"}, trace_id="a" * 32)
-    import json
-
     back = parse_event(json.dumps(original.to_dict()))
     assert back == original
 
@@ -98,6 +97,14 @@ def test_parse_event_refuses_a_malformed_document() -> None:
     with pytest.raises(DafterError) as exc:
         parse_event('{"eventId":"e_short","type":"session.created"}')
     assert exc.value.code is ErrorCode.INTERNAL
+
+
+def test_parse_event_refuses_a_timestamp_that_is_not_a_calendar_date() -> None:
+    raw = event(EventType.SESSION_SIGNAL, {"name": "handoff"}).to_dict()
+    raw["occurredAt"] = "2026-13-45T25:61:61Z"
+    with pytest.raises(DafterError) as exc:
+        parse_event(json.dumps(raw))
+    assert any(p.startswith("at '/occurredAt':") for p in exc.value.details)
 
 
 def test_parse_event_refuses_malformed_json_as_internal() -> None:
