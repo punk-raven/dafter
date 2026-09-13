@@ -1,0 +1,51 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+.fuse_hidden*
+.nfs*
+
+# Local environment. Secrets are references in config documents; values only
+# ever live here or in the secrets store, never in a committed file.
+.env
+.env.*
+!.env.example
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Review surfaces
+.lavish/
+
+# Go
+/go/bin/
+*.test
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.mypy_cache/
+
+# Build and profiling output
+coverage.out
+*.prof
+dist/
+build/
+
+# Generated from schemas/ by `make generate`
+/go/internal/**/*_gen.go
+/go/internal/schema/schemas/
+/python/dafter_core/src/dafter_core/_schemas/
+/python/dafter_core/src/dafter_core/enums.py

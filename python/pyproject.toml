@@ -1,0 +1,49 @@
+[project]
+name = "dafter-workspace"
+version = "0.0.0"
+description = "Dafter agent plane, providers, batch pass and evals"
+requires-python = ">=3.11"
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+dafter-core = { workspace = true }
+
+[tool.uv.workspace]
+members = ["dafter_core"]
+
+[dependency-groups]
+dev = [
+    "dafter-core",
+    "pytest>=8",
+    "ruff>=0.9",
+    "mypy>=1.11",
+    "types-jsonschema",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["**/enums.py", "**/_schemas/**"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["dafter_core/tests"]
+pythonpath = ["dafter_core/src"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["dafter_core/src", "dafter_core/tests"]
+mypy_path = "dafter_core/src"
+
+[[tool.mypy.overrides]]
+module = "referencing.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "dafter_core.enums"
+disable_error_code = ["explicit-any"]

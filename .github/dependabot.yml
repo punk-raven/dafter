@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Keeps the pinned action SHAs current. Pinning without this is how a
+  # workflow ends up frozen on a version with a known problem.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directories:
+      - /go
+      - /go/tools/golangci
+      - /go/tools/govulncheck
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /python
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]

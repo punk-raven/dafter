@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json",
+  "title": "ResolvedSessionConfig",
+  "description": "The output of layered resolution (defaults, tenant, profile, session overrides, then language/channel/role overlays). Resolved once in the control plane, hashed, stored with the session and handed to the worker as a finished document. This is one of exactly two contact points between the Go and Python halves of the platform.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["apiVersion", "sessionId", "tenantId", "privacyMode", "language", "channel", "agent", "turn", "recording", "budgets"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "dafter.dev/v1"
+    },
+    "sessionId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/SessionId" },
+    "tenantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/TenantId" },
+    "configHash": {
+      "type": "string",
+      "description": "Hex SHA-256 over the RFC 8785 (JSON Canonicalization Scheme) serialization of this document with configHash itself omitted. The scheme is named rather than implied: 'canonical JSON' is not one thing, and Go and Python order keys, escape unicode and render numbers differently, so an unnamed scheme yields two hashes for one document and proves nothing at the moment somebody audits a specific call.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "privacyMode": {
+      "type": "string",
+      "description": "An agent that transcribes or responds must decrypt the audio, so end-to-end encryption and AI participation are mutually exclusive unless the agent holds a key. Enforced at the control plane, not by convention.",
+      "enum": ["open", "sealed", "trusted_agent"]
+    },
+    "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
+    "channel": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Channel" },
+    "residency": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Providers and storage are filtered to allowed regions at resolution time; a violation is an error now, not at first use.",
+      "properties": {
+        "allowedRegions": {
+          "type": "array",
+          "description": "Opaque provider-scoped region tokens. Deliberately not matched against one cloud's naming convention: Dafter has no home region and prescribes no cloud, and AWS, GCP, Azure and others disagree on the shape ('ap-south-1', 'asia-south1', 'centralindia'). Which tokens are permitted is a residency policy decision, not something a regex can express.",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,31}$" },
+          "minItems": 1
+        }
+      },
+      "required": ["allowedRegions"]
+    },
+    "agent": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["enabled", "pool"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "pool": {
+          "type": "string",
+          "description": "The worker pool this session dispatches to, addressed by name over the media server's own protocol. A config field rather than a constant, so a second pool can serve one language or tenant without a rewrite.",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$",
+          "default": "dafter-py"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Cascaded is the default. Half-cascade and speech-to-speech are provider modes, and switching is a config edit.",
+          "enum": ["cascaded", "half_cascade", "speech_to_speech"],
+          "default": "cascaded"
+        },
+        "personaRef": {
+          "type": "string",
+          "description": "Reference to a prompt/persona document. Never inline prose."
+        },
+        "pipeline": { "$ref": "#/$defs/Pipeline" }
+      }
+    },
+    "turn": { "$ref": "#/$defs/Turn" },
+    "recording": { "$ref": "#/$defs/Recording" },
+    "budgets": { "$ref": "#/$defs/Budgets" }
+  },
+  "$defs": {
+    "ProviderRef": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Providers are named by variable and pinned by model version, so a vendor silently upgrading a model cannot silently change a consumer's agent.",
+      "required": ["provider"],
+      "properties": {
+        "provider": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+        "model": { "type": "string" },
+        "region": { "type": "string" },
+        "credentialRef": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/SecretRef" },
+        "options": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "Pipeline": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Stage assembly. With a realtime provider the stt/llm/tts stages collapse and the rest is unchanged.",
+      "properties": {
+        "vad": { "$ref": "#/$defs/ProviderRef" },
+        "stt": { "$ref": "#/$defs/ProviderRef" },
+        "llm": { "$ref": "#/$defs/ProviderRef" },
+        "tts": { "$ref": "#/$defs/ProviderRef" },
+        "mt": { "$ref": "#/$defs/ProviderRef" },
+        "realtime": { "$ref": "#/$defs/ProviderRef" }
+      }
+    },
+    "Turn": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Every bad voice demo fails here, not on the LLM. Semantic turn detectors are English-trained and degrade elsewhere, which is why strategy resolves per language rather than globally.",
+      "required": ["strategy"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["auto", "vad", "provider_endpointing", "semantic", "server_vad", "manual"]
+        },
+        "silenceMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+        "minSpeechMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+        "endpointingDelayMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+        "localVadEnabled": {
+          "type": "boolean",
+          "description": "Turn off where a provider's server VAD is authoritative: a second local VAD sees the same audio as the recognizer and fights it.",
+          "default": true
+        },
+        "interruption": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "minDurationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+            "minWords": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "resumeFalseInterruption": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    },
+    "Recording": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "layout": {
+          "type": "string",
+          "description": "A track egress attaches to a published track and cannot start before the participant publishes, so no-gap coverage requires room_composite started at session creation.",
+          "enum": ["track", "track_composite", "room_composite"],
+          "default": "track"
+        },
+        "startAt": {
+          "type": "string",
+          "enum": ["session_create", "first_publish"],
+          "default": "first_publish"
+        },
+        "retentionClass": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+        "consentArtifactId": {
+          "type": "string",
+          "description": "Recording and storage cannot proceed without a valid artifact. Consent is a gate in the control plane, not a flag a consumer can forget to check."
+        }
+      }
+    },
+    "Budgets": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Budgets live in config so violations alert automatically instead of regressing silently.",
+      "required": ["turnGapP50Ms", "turnGapP95Ms"],
+      "properties": {
+        "turnGapP50Ms": { "type": "integer", "minimum": 1, "default": 800 },
+        "turnGapP95Ms": { "type": "integer", "minimum": 1, "default": 1500 },
+        "maxSessionCostUsd": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

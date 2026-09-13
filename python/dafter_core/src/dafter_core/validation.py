@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from functools import cache
+from typing import Any
+
+from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
+
+from . import schemas
+from .enums import ErrorCode
+from .errors import DafterError
+
+_FILES = (schemas.IDS, schemas.RESOLVED_SESSION_CONFIG, schemas.EVENT_ENVELOPE, schemas.ERROR)
+
+
+@cache
+def _registry() -> Registry[Any]:
+    resources = []
+    for f in _FILES:
+        doc = schemas.load(f)
+        resources.append((doc["$id"], Resource.from_contents(doc)))
+    return Registry().with_resources(resources)
+
+
+@cache
+def validator_for(relative: str) -> Draft202012Validator:
+    return Draft202012Validator(
+        schemas.load(relative), registry=_registry(), format_checker=FormatChecker()
+    )
+
+
+def _pointer(path: Iterable[str | int]) -> str:
+    """RFC 6901 pointer, the same location form the Go half reports."""
+    return "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in path)
+
+
+_NAMES_KEYS_ONLY = frozenset(
+    {"required", "additionalProperties", "unevaluatedProperties", "dependentRequired"}
+)
+_BOUNDS = frozenset(
+    {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "minProperties",
+        "maxProperties",
+    }
+)
+
+
+def _rule(err: Any) -> str:
+    keyword, want = err.validator, err.validator_value
+    if keyword == "pattern":
+        return f"does not match pattern {want!r}"
+    if keyword == "format":
+        return f"is not a valid {want}"
+    if keyword == "enum":
+        return "value must be one of " + ", ".join(repr(v) for v in want)
+    if keyword == "const":
+        return f"value must be {want!r}"
+    if keyword == "type":
+        return "is not of type " + (", ".join(want) if isinstance(want, list) else str(want))
+    if keyword in _BOUNDS:
+        return f"{keyword}: want {want!r}"
+    if keyword in _NAMES_KEYS_ONLY:
+        return str(err.message)
+    return f"{keyword!r} failed"
+
+
+def _problems(validator: Draft202012Validator, doc: Any) -> tuple[str, ...]:
+    seen: dict[str, None] = {}
+
+    def walk(err: Any) -> None:
+        if err.context:
+            for sub in err.context:
+                walk(sub)
+            return
+        seen.setdefault(f"at {_pointer(err.absolute_path)!r}: {_rule(err)}", None)
+
+    for err in validator.iter_errors(doc):
+        walk(err)
+    return tuple(sorted(seen))
+
+
+def validate_document(relative: str, raw: bytes, code: ErrorCode) -> Any:
+    """Validate raw JSON before it is decoded.
+
+    Decoding first drops keys the target does not declare, so the schema never
+    sees them.
+    """
+    try:
+        doc = json.loads(raw)
+    except ValueError as exc:
+        raise DafterError(code, f"input is not valid JSON: {exc}") from exc
+
+    v = validator_for(relative)
+    problems = _problems(v, doc)
+    if problems:
+        raise DafterError(
+            code,
+            f"{len(problems)} problem(s) validating against {schemas.schema_id(relative)}",
+            details=problems,
+        )
+    return doc
+
+
+def compile_all() -> None:
+    for f in _FILES:
+        validator_for(f).check_schema(schemas.load(f))
+
+
+compile_all()
