@@ -87,5 +87,12 @@ py-test: generate ## Run the Python tests
 py-lint: generate ## Lint and type-check the Python packages
 	cd $(PY_DIR) && uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy
 
+.PHONY: tools
+tools: $(LINT) $(VULN) ## Build the pinned linter and vulnerability scanner
+
+.PHONY: setup
+setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Python environment
+	@./scripts/setup.sh
+
 .PHONY: check
 check: generate-check vet lint test py-lint py-test ## What CI runs
