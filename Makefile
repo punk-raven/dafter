@@ -20,9 +20,9 @@ help: ## Show this help
 # Codegen
 #
 # There is one definition of an event, ever, and it lives in schemas/. Go cannot
-# //go:embed across a module boundary, so the schemas are copied into the module
-# and checked in. That keeps `go build` and `go test` working without make, at
-# the cost of a duplicate that CI has to police - which generate-check does.
+# //go:embed across a module boundary and Python cannot read a resource outside
+# its package, so the schemas are copied into each one - here, at build time.
+# Nothing this target writes is committed, which is what generate-check proves.
 # ---------------------------------------------------------------------------
 
 .PHONY: generate
@@ -37,11 +37,11 @@ generate: ## Refresh everything derived from schemas/
 	@find $(PY_SCHEMAS) -type d -exec touch {}/__init__.py \;
 
 .PHONY: generate-check
-generate-check: generate ## Fail if any generated output is stale or hand-edited
-	@dirty=$$(git status --porcelain -- $(GENERATED)); \
-	if [ -n "$$dirty" ]; then \
-		echo "generated output does not match schemas/ - run 'make generate' and commit the result"; \
-		echo "$$dirty"; \
+generate-check: ## Fail if any generated output was committed
+	@tracked=$$(git ls-files -- $(GENERATED)); \
+	if [ -n "$$tracked" ]; then \
+		echo "generated output must not be committed - 'make generate' produces it:"; \
+		echo "$$tracked"; \
 		exit 1; \
 	fi
 
