@@ -20,15 +20,15 @@ description: >-
    Go: structs in `go/internal/config/config.go` or `go/internal/events/events.go`.
    Python: dataclasses and `from_dict` in `python/dafter_core/src/dafter_core/config.py` or
    `events.py`; assign by keyword (why: commit body `fix(python): assign pipeline fields by name`).
-   A rule the schema cannot express goes in `check` on both sides, same error code.
+   A rule the schema cannot express is one entry in `go/internal/config/rules.go` and
+   `python/dafter_core/src/dafter_core/rules.py`, same error code and pointer on both sides.
 
 4. Enum member added or removed on an enum enumgen already knows: nothing more, output regenerates.
 
 5. New enum: add it to `targets` in `go/tools/enumgen/main.go` (schema path, pointer to the
    `enum` array, package, type, prefix, output file, `All*` name), re-run `make generate`, then
-   add a drift case in `go/internal/<pkg>/enums_test.go` and in `CASES` of
-   `python/dafter_core/tests/test_enums.py`, and export the class from
-   `python/dafter_core/src/dafter_core/__init__.py`.
+   add a drift case in `CASES` of `python/dafter_core/tests/test_enums.py`, and export the
+   class from `python/dafter_core/src/dafter_core/__init__.py`.
 
 6. Add behaviour tests on both sides that feed the same document and expect the same error code.
 

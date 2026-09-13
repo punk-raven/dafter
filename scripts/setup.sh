@@ -43,57 +43,34 @@ confirm() {
   esac
 }
 
-installer_for_make() {
+# Install command for this machine, or nothing when there is no package manager
+# it knows. Arguments: what the tool is called in apt, dnf and pacman.
+package_installer() {
+  local apt=$1 dnf=$2 pacman=$3
   if [ "$(uname -s)" = Darwin ]; then
     echo 'xcode-select --install'
   elif have apt-get; then
-    echo 'sudo apt-get update && sudo apt-get install -y build-essential'
+    echo "sudo apt-get update && sudo apt-get install -y $apt"
   elif have dnf; then
-    echo 'sudo dnf install -y make'
+    echo "sudo dnf install -y $dnf"
   elif have pacman; then
-    echo 'sudo pacman -S --needed --noconfirm make'
+    echo "sudo pacman -S --needed --noconfirm $pacman"
   fi
 }
+
+installer_for_git() { package_installer git git git; }
+installer_for_make() { package_installer build-essential make make; }
+installer_for_uv() { echo 'curl -LsSf https://astral.sh/uv/install.sh | sh'; }
+
+# `go test -race` links through cgo, which needs a C compiler. Go's default is
+# gcc on Linux and clang on macOS; either one, or whatever $CC names, will do.
+installer_for_cc() { package_installer build-essential gcc gcc; }
 
 installer_for_go() {
   if have brew; then
     echo 'brew install go'
-  elif have apt-get; then
-    echo 'sudo apt-get update && sudo apt-get install -y golang-go'
-  elif have dnf; then
-    echo 'sudo dnf install -y golang'
-  elif have pacman; then
-    echo 'sudo pacman -S --needed --noconfirm go'
-  fi
-}
-
-installer_for_git() {
-  if [ "$(uname -s)" = Darwin ]; then
-    echo 'xcode-select --install'
-  elif have apt-get; then
-    echo 'sudo apt-get update && sudo apt-get install -y git'
-  elif have dnf; then
-    echo 'sudo dnf install -y git'
-  elif have pacman; then
-    echo 'sudo pacman -S --needed --noconfirm git'
-  fi
-}
-
-installer_for_uv() {
-  echo 'curl -LsSf https://astral.sh/uv/install.sh | sh'
-}
-
-# `go test -race` links through cgo, which needs a C compiler. Go's default is
-# gcc on Linux and clang on macOS; either one, or whatever $CC names, will do.
-installer_for_cc() {
-  if [ "$(uname -s)" = Darwin ]; then
-    echo 'xcode-select --install'
-  elif have apt-get; then
-    echo 'sudo apt-get update && sudo apt-get install -y build-essential'
-  elif have dnf; then
-    echo 'sudo dnf install -y gcc'
-  elif have pacman; then
-    echo 'sudo pacman -S --needed --noconfirm gcc'
+  else
+    package_installer golang-go golang go
   fi
 }
 
@@ -135,8 +112,10 @@ else
   if [ -d "$dir/.git" ]; then
     echo "==> using the existing clone in $dir"
   else
+    clone=(git clone --quiet)
+    [ -n "${DAFTER_REF:-}" ] && clone+=(--branch "$DAFTER_REF")
     echo "==> cloning $repo_url${DAFTER_REF:+ at $DAFTER_REF} into $dir"
-    git clone --quiet ${DAFTER_REF:+--branch "$DAFTER_REF"} "$repo_url" "$dir"
+    "${clone[@]}" "$repo_url" "$dir"
   fi
   cd "$dir"
 fi

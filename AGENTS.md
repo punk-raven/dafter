@@ -25,10 +25,10 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 
 - Validate the raw document, then decode: `config.Parse`, `events.Parse`; `config.parse`, `events.parse_event`.
 - Unknown fields rejected: schemas close with `unevaluatedProperties`; Go also uses `DisallowUnknownFields`.
-- Three cross-field checks in `go/internal/config/config.go` `check` and `python/dafter_core/src/dafter_core/config.py` `check`: sealed forbids agent; recording needs consent artifact; `session_create` start needs `room_composite` layout.
+- Cross-field rules the schema cannot express are one table per half, `go/internal/config/rules.go` and `python/dafter_core/src/dafter_core/rules.py`, every broken rule reported with its pointer: sealed forbids agent; recording needs consent artifact; `session_create` start needs `room_composite` layout.
 - Error messages safe to log (no name, email, phone, transcript): `schemas/errors/v1/error.schema.json`. Report every problem, located by JSON pointer.
 - Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque.
-- Enum drift tested in `go/internal/*/enums_test.go` and `python/dafter_core/tests/test_enums.py`.
+- Enum drift tested in `python/dafter_core/tests/test_enums.py`; each Go package carries at most one test file, named after the package.
 
 ## Dependency graph
 
