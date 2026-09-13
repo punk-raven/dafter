@@ -94,26 +94,7 @@ func (c *ResolvedSessionConfig) Validate() error {
 	if err := schema.ValidateAgainst(schema.ResolvedSessionConfig, c, errs.CodeInvalidConfig); err != nil {
 		return err
 	}
-	return c.check()
-}
-
-func (c *ResolvedSessionConfig) check() error {
-	if c.PrivacyMode == PrivacySealed && c.Agent.Enabled {
-		return errs.Errorf(errs.CodePrivacyModeForbids,
-			"session %s is sealed, so an agent cannot be dispatched into it", c.SessionID)
-	}
-	if c.Recording.Enabled && c.Recording.ConsentArtifactID == "" {
-		return errs.Errorf(errs.CodeConsentRequired,
-			"session %s enables recording without a consent artifact", c.SessionID)
-	}
-	if c.Recording.Enabled &&
-		c.Recording.StartAt == StartAtSessionCreate &&
-		c.Recording.Layout != LayoutRoomComposite {
-		return errs.Errorf(errs.CodeInvalidConfig,
-			"session %s asks for capture at session creation with layout %q, but a track egress "+
-				"attaches to a published track and cannot start before one exists", c.SessionID, c.Recording.Layout)
-	}
-	return nil
+	return c.validateCrossFieldRules()
 }
 
 func Parse(raw []byte) (*ResolvedSessionConfig, error) {
@@ -126,7 +107,7 @@ func Parse(raw []byte) (*ResolvedSessionConfig, error) {
 	if err := d.Decode(&c); err != nil {
 		return nil, errs.Wrap(errs.CodeInvalidConfig, err, "decode resolved session config")
 	}
-	if err := c.check(); err != nil {
+	if err := c.validateCrossFieldRules(); err != nil {
 		return nil, err
 	}
 	return &c, nil

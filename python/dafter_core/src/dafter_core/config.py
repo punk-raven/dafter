@@ -14,6 +14,7 @@ from .enums import (
     TurnStrategy,
 )
 from .errors import DafterError
+from .rules import CROSS_FIELD_RULES
 from .validation import validate_document
 
 
@@ -169,28 +170,10 @@ class ResolvedSessionConfig:
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
 
-    def check(self) -> None:
-        if self.privacy_mode is PrivacyMode.SEALED and self.agent.enabled:
-            raise DafterError(
-                ErrorCode.PRIVACY_MODE_FORBIDS,
-                f"session {self.session_id} is sealed, so an agent cannot be dispatched into it",
-            )
-        if self.recording.enabled and not self.recording.consent_artifact_id:
-            raise DafterError(
-                ErrorCode.CONSENT_REQUIRED,
-                f"session {self.session_id} enables recording without a consent artifact",
-            )
-        if (
-            self.recording.enabled
-            and self.recording.start_at is RecordingStart.SESSION_CREATE
-            and self.recording.layout is not EgressLayout.ROOM_COMPOSITE
-        ):
-            raise DafterError(
-                ErrorCode.INVALID_CONFIG,
-                f"session {self.session_id} asks for capture at session creation with layout "
-                f"{self.recording.layout!r}, but a track egress attaches to a published track "
-                f"and cannot start before one exists",
-            )
+    def validate_cross_field_rules(self) -> None:
+        for rule in CROSS_FIELD_RULES:
+            if rule.broken(self):
+                raise DafterError(rule.code, f"session {self.session_id}: {rule.because}")
 
 
 def parse(raw: bytes | str) -> ResolvedSessionConfig:
@@ -212,5 +195,5 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
     )
-    cfg.check()
+    cfg.validate_cross_field_rules()
     return cfg

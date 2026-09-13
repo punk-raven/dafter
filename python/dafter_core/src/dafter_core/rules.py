@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from .enums import EgressLayout, ErrorCode, PrivacyMode, RecordingStart
+
+if TYPE_CHECKING:
+    from .config import ResolvedSessionConfig
+
+
+@dataclass(frozen=True, slots=True)
+class CrossFieldRule:
+    broken: Callable[[ResolvedSessionConfig], bool]
+    code: ErrorCode
+    pointer: str
+    because: str
+
+
+CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
+    CrossFieldRule(
+        broken=lambda c: c.privacy_mode is PrivacyMode.SEALED and c.agent.enabled,
+        code=ErrorCode.PRIVACY_MODE_FORBIDS,
+        pointer="/agent/enabled",
+        because=(
+            "a sealed session cannot have an agent dispatched into it, because an agent "
+            "that transcribes or responds must decrypt the audio"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.recording.enabled and not c.recording.consent_artifact_id,
+        code=ErrorCode.CONSENT_REQUIRED,
+        pointer="/recording/consentArtifactId",
+        because="recording cannot proceed without a consent artifact",
+    ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.recording.enabled
+            and c.recording.start_at is RecordingStart.SESSION_CREATE
+            and c.recording.layout is not EgressLayout.ROOM_COMPOSITE
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/recording/layout",
+        because=(
+            "capture at session creation needs a room composite, because a track egress "
+            "attaches to a published track and cannot start before one exists"
+        ),
+    ),
+)
