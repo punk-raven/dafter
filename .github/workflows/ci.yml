@@ -17,18 +17,24 @@ env:
 
 jobs:
   generated:
-    name: generated output is current
+    name: generated output is not committed
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
       - run: make generate-check
+      - name: the check rejects a generated file that was committed anyway
+        run: |
+          sentinel=go/internal/config/zz_selftest_gen.go
+          : > "$sentinel"
+          git add -f "$sentinel"
+          if make generate-check; then
+            echo "generate-check accepted $sentinel; the check has stopped working"
+            exit 1
+          fi
+          git rm -qf "$sentinel"
 
   go:
     name: go
