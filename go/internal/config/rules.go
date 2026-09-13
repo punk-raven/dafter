@@ -1,6 +1,10 @@
 package config
 
-import "github.com/punk-raven/dafter/go/internal/errs"
+import (
+	"fmt"
+
+	"github.com/punk-raven/dafter/go/internal/errs"
+)
 
 type crossFieldRule struct {
 	broken  func(*ResolvedSessionConfig) bool
@@ -35,10 +39,18 @@ var crossFieldRules = []crossFieldRule{
 }
 
 func (c *ResolvedSessionConfig) validateCrossFieldRules() error {
+	var broken []crossFieldRule
 	for _, rule := range crossFieldRules {
 		if rule.broken(c) {
-			return errs.Errorf(rule.code, "session %s: %s", c.SessionID, rule.because)
+			broken = append(broken, rule)
 		}
 	}
-	return nil
+	if len(broken) == 0 {
+		return nil
+	}
+	e := errs.Errorf(broken[0].code, "%d rule(s) rejected session %s", len(broken), c.SessionID)
+	for _, rule := range broken {
+		e.Details = append(e.Details, fmt.Sprintf("at '%s': %s", rule.pointer, rule.because))
+	}
+	return e
 }

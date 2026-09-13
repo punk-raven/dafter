@@ -66,6 +66,26 @@ func TestValidateRejectsImpossibleRecordingStart(t *testing.T) {
 	}
 }
 
+func TestValidateNamesEveryBrokenRule(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.PrivacyMode = config.PrivacySealed
+	c.Recording = config.Recording{
+		Enabled: true, Layout: config.LayoutTrack, StartAt: config.StartAtSessionCreate,
+	}
+
+	var de *errs.Error
+	if !errors.As(c.Validate(), &de) {
+		t.Fatal("want *errs.Error")
+	}
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{"/agent/enabled", "/recording/consentArtifactId", "/recording/layout"} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s; an operator fixes one rule per round trip\n%v", pointer, de)
+		}
+	}
+}
+
 func TestValidateRejectsAConsumerSuppliedSessionID(t *testing.T) {
 	t.Parallel()
 	c := validConfig(t)

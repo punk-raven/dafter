@@ -123,6 +123,18 @@ def test_recording_requires_consent() -> None:
     assert refuse(doc(recording={"enabled": True})).code is ErrorCode.CONSENT_REQUIRED
 
 
+def test_reports_every_broken_rule_located_by_pointer() -> None:
+    err = refuse(
+        doc(
+            privacyMode="sealed",
+            recording={"enabled": True, "layout": "track", "startAt": "session_create"},
+        )
+    )
+    joined = "\n".join(err.details)
+    for pointer in ("/agent/enabled", "/recording/consentArtifactId", "/recording/layout"):
+        assert pointer in joined, f"{pointer} not named in:\n{joined}"
+
+
 def test_track_egress_cannot_start_before_a_track_exists() -> None:
     err = refuse(
         doc(

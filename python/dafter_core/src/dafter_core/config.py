@@ -171,9 +171,14 @@ class ResolvedSessionConfig:
     allowed_regions: tuple[str, ...] = ()
 
     def validate_cross_field_rules(self) -> None:
-        for rule in CROSS_FIELD_RULES:
-            if rule.broken(self):
-                raise DafterError(rule.code, f"session {self.session_id}: {rule.because}")
+        broken = [rule for rule in CROSS_FIELD_RULES if rule.broken(self)]
+        if not broken:
+            return
+        raise DafterError(
+            broken[0].code,
+            f"{len(broken)} rule(s) rejected session {self.session_id}",
+            details=tuple(f"at '{rule.pointer}': {rule.because}" for rule in broken),
+        )
 
 
 def parse(raw: bytes | str) -> ResolvedSessionConfig:
