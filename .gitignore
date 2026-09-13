@@ -43,3 +43,9 @@ coverage.out
 *.prof
 dist/
 build/
+
+# Generated from schemas/ by `make generate`
+/go/internal/**/*_gen.go
+/go/internal/schema/schemas/
+/python/dafter_core/src/dafter_core/_schemas/
+/python/dafter_core/src/dafter_core/enums.py
