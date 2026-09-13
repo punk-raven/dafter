@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+# Runs two ways:
+#   ./scripts/setup.sh                                   inside a checkout
+#   curl -fsSL <raw url of this file> | bash [-s -- -y]  before there is one
+# Piped, there is no file to locate the checkout from, so it clones into
+# $DAFTER_DIR (default ./dafter), at $DAFTER_REF if set, after the
+# prerequisites are in place.
+repo_url=https://github.com/punk-raven/dafter.git
+checkout=
+if [ -f "${BASH_SOURCE[0]:-}" ] && [ -f "$(dirname "${BASH_SOURCE[0]}")/../Makefile" ]; then
+  checkout=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+fi
 
 assume_yes=0
 for arg in "$@"; do
@@ -17,15 +27,16 @@ done
 have() { command -v "$1" >/dev/null 2>&1; }
 die() { printf 'setup: %s\n' "$*" >&2; exit 1; }
 
+# Asks on the terminal, not stdin: when piped from curl, stdin is this script.
 confirm() {
   if [ "$assume_yes" -eq 1 ]; then
     return 0
   fi
-  if [ ! -t 0 ]; then
+  if ! { : </dev/tty; } 2>/dev/null; then
     return 1
   fi
-  printf '%s not installed. Install it with:\n\n    %s\n\nRun that now? [y/N] ' "$1" "$2"
-  read -r reply
+  printf '%s not installed. Install it with:\n\n    %s\n\nRun that now? [y/N] ' "$1" "$2" >/dev/tty
+  read -r reply </dev/tty
   case "$reply" in
     [yY] | [yY][eE][sS]) return 0 ;;
     *) return 1 ;;
@@ -53,6 +64,18 @@ installer_for_go() {
     echo 'sudo dnf install -y golang'
   elif have pacman; then
     echo 'sudo pacman -S --needed --noconfirm go'
+  fi
+}
+
+installer_for_git() {
+  if [ "$(uname -s)" = Darwin ]; then
+    echo 'xcode-select --install'
+  elif have apt-get; then
+    echo 'sudo apt-get update && sudo apt-get install -y git'
+  elif have dnf; then
+    echo 'sudo dnf install -y git'
+  elif have pacman; then
+    echo 'sudo pacman -S --needed --noconfirm git'
   fi
 }
 
@@ -99,10 +122,24 @@ ensure() {
   present "$tool" || die "$tool installed but is not on PATH. Open a new shell and run this again"
 }
 
+ensure git https://git-scm.com/downloads
 ensure make https://www.gnu.org/software/make/
 ensure cc https://go.dev/doc/install/source#environment
 ensure go https://go.dev/dl/
 ensure uv https://docs.astral.sh/uv/getting-started/installation/
+
+if [ -n "$checkout" ]; then
+  cd "$checkout"
+else
+  dir=${DAFTER_DIR:-dafter}
+  if [ -d "$dir/.git" ]; then
+    echo "==> using the existing clone in $dir"
+  else
+    echo "==> cloning $repo_url${DAFTER_REF:+ at $DAFTER_REF} into $dir"
+    git clone --quiet ${DAFTER_REF:+--branch "$DAFTER_REF"} "$repo_url" "$dir"
+  fi
+  cd "$dir"
+fi
 
 go_version=$(go env GOVERSION | sed 's/^go//')
 if [ "$(printf '1.21\n%s\n' "$go_version" | sort -V | head -1)" != "1.21" ]; then
@@ -120,9 +157,9 @@ echo '==> resolving the Python environment from python/uv.lock'
 echo '==> building the pinned linter and vulnerability scanner'
 make tools
 
-cat <<'DONE'
+cat <<DONE
 
-Ready.
+Ready, in $(pwd).
 
   make check   the checks CI runs
   make help    every target

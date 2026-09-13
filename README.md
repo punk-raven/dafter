@@ -47,12 +47,22 @@ Three prerequisites:
 
 Everything derived from `schemas/` is built rather than committed, so a fresh
 clone does not compile until it has been generated once. The setup script does
-that, and first checks for `make`, a C compiler, `go` and `uv`, offering the
-install command for this machine for whichever is missing:
+that, and first checks for `git`, `make`, a C compiler, `go` and `uv`, offering
+the install command for this machine for whichever is missing. Without a clone
+yet, one command does all of it, clone included:
 
 ```sh
-./scripts/setup.sh  # or: make setup; -y accepts every prompt
+curl -fsSL https://raw.githubusercontent.com/punk-raven/dafter/main/scripts/setup.sh | bash
 ```
+
+Inside a clone, the same script:
+
+```sh
+./scripts/setup.sh  # or: make setup
+```
+
+`-y` accepts every install prompt (`| bash -s -- -y` when piped). `DAFTER_DIR`
+picks the clone directory and `DAFTER_REF` the branch, when piped.
 
 ```sh
 make check          # the Go and Python checks CI runs

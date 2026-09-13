@@ -8,11 +8,13 @@ prerequisites, and the setup script offers to install whichever is missing.
 dependency, so a clean checkout reproduces exactly what CI runs.
 
 ```sh
-git clone https://github.com/punk-raven/dafter.git
+curl -fsSL https://raw.githubusercontent.com/punk-raven/dafter/main/scripts/setup.sh | bash
 cd dafter
-./scripts/setup.sh   # -y to accept every prompt
 make check
 ```
+
+Or clone first and run `./scripts/setup.sh` from the checkout; `-y` accepts
+every install prompt either way (`| bash -s -- -y` when piped).
 
 The setup step matters: everything derived from `schemas/` is generated, not
 committed, so a clone does not compile until it has run once.
