@@ -60,9 +60,29 @@ installer_for_uv() {
   echo 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 }
 
+# `go test -race` links through cgo, which needs a C compiler. Go's default is
+# gcc on Linux and clang on macOS; either one, or whatever $CC names, will do.
+installer_for_cc() {
+  if [ "$(uname -s)" = Darwin ]; then
+    echo 'xcode-select --install'
+  elif have apt-get; then
+    echo 'sudo apt-get update && sudo apt-get install -y build-essential'
+  elif have dnf; then
+    echo 'sudo dnf install -y gcc'
+  elif have pacman; then
+    echo 'sudo pacman -S --needed --noconfirm gcc'
+  fi
+}
+
+# A tool is present when its own probe says so, or, failing one, when it is on PATH.
+present_cc() { have "${CC:-}" || have gcc || have clang || have cc; }
+present() {
+  if declare -F "present_$1" >/dev/null; then "present_$1"; else have "$1"; fi
+}
+
 ensure() {
   local tool=$1 docs=$2 installer
-  have "$tool" && return 0
+  present "$tool" && return 0
 
   installer=$("installer_for_$tool")
   [ -n "$installer" ] || die "$tool is missing and there is no known way to install it here. See $docs"
@@ -76,10 +96,11 @@ ensure() {
   esac
   hash -r
 
-  have "$tool" || die "$tool installed but is not on PATH. Open a new shell and run this again"
+  present "$tool" || die "$tool installed but is not on PATH. Open a new shell and run this again"
 }
 
 ensure make https://www.gnu.org/software/make/
+ensure cc https://go.dev/doc/install/source#environment
 ensure go https://go.dev/dl/
 ensure uv https://docs.astral.sh/uv/getting-started/installation/
 

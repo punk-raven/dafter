@@ -36,16 +36,19 @@ package boundary is unstable and may change without notice.
 
 ## Build and test
 
-Two prerequisites, both single binaries:
+Three prerequisites:
 
 - `go` - `go/go.mod` pins the toolchain, so any Go 1.21 or newer fetches the
   right version on first use.
 - `uv` - manages the Python interpreter, the virtualenv and every dev
   dependency, from the committed `python/uv.lock`.
+- a C compiler (`gcc` or `clang`) - `make test` runs the race detector, which
+  links through cgo.
 
 Everything derived from `schemas/` is built rather than committed, so a fresh
 clone does not compile until it has been generated once. The setup script does
-that, and offers to install either prerequisite if it is missing:
+that, and first checks for `make`, a C compiler, `go` and `uv`, offering the
+install command for this machine for whichever is missing:
 
 ```sh
 ./scripts/setup.sh  # or: make setup; -y accepts every prompt

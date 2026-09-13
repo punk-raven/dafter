@@ -2,10 +2,10 @@
 
 ## Setup
 
-`go` and `uv` are the only prerequisites, and the setup script offers to
-install whichever is missing. `go/go.mod` pins the Go toolchain and
-`python/uv.lock` pins every Python dependency, so a clean checkout reproduces
-exactly what CI runs.
+`go`, `uv` and a C compiler (for the race detector) are the only
+prerequisites, and the setup script offers to install whichever is missing.
+`go/go.mod` pins the Go toolchain and `python/uv.lock` pins every Python
+dependency, so a clean checkout reproduces exactly what CI runs.
 
 ```sh
 git clone https://github.com/punk-raven/dafter.git
