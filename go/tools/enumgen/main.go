@@ -192,37 +192,44 @@ func renderPython(all map[string][]string, order []target) []byte {
 	return b.Bytes()
 }
 
+// run writes every target and reports one line per file written.
+func run(schemaRoot, goRoot, pyOut string) ([]string, error) {
+	collected := map[string][]string{}
+	var report []string
+
+	for _, t := range targets {
+		values, err := enumAt(schemaRoot, t)
+		if err != nil {
+			return nil, err
+		}
+		src, err := render(t, values)
+		if err != nil {
+			return nil, fmt.Errorf("render %s: %w", t.Out, err)
+		}
+		out := filepath.Join(goRoot, t.Out)
+		if err := os.WriteFile(out, src, 0o644); err != nil {
+			return nil, fmt.Errorf("write %s: %w", out, err)
+		}
+		collected[t.Type] = values
+		report = append(report, fmt.Sprintf("  %-34s %2d values", t.Out, len(values)))
+	}
+
+	if err := os.WriteFile(pyOut, renderPython(collected, targets), 0o644); err != nil {
+		return nil, fmt.Errorf("write %s: %w", pyOut, err)
+	}
+	report = append(report, fmt.Sprintf("  %-34s %2d enums", pyOut, len(collected)))
+	return report, nil
+}
+
 func main() {
 	if len(os.Args) != 4 {
 		fmt.Fprintln(os.Stderr, "usage: enumgen <schemas-dir> <go-module-root> <python-enums-file>")
 		os.Exit(2)
 	}
-	schemaRoot, goRoot, pyOut := os.Args[1], os.Args[2], os.Args[3]
-	collected := map[string][]string{}
-
-	for _, t := range targets {
-		values, err := enumAt(schemaRoot, t)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "enumgen: %v\n", err)
-			os.Exit(1)
-		}
-		src, err := render(t, values)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "enumgen: render %s: %v\n", t.Out, err)
-			os.Exit(1)
-		}
-		out := filepath.Join(goRoot, t.Out)
-		if err := os.WriteFile(out, src, 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "enumgen: write %s: %v\n", out, err)
-			os.Exit(1)
-		}
-		collected[t.Type] = values
-		fmt.Printf("  %-34s %2d values\n", t.Out, len(values))
-	}
-
-	if err := os.WriteFile(pyOut, renderPython(collected, targets), 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "enumgen: write %s: %v\n", pyOut, err)
+	report, err := run(os.Args[1], os.Args[2], os.Args[3])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "enumgen: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("  %-34s %2d enums\n", pyOut, len(collected))
+	fmt.Println(strings.Join(report, "\n"))
 }

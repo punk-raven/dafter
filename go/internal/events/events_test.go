@@ -7,6 +7,7 @@ import (
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 	"github.com/punk-raven/dafter/go/internal/events"
+	"github.com/punk-raven/dafter/go/internal/schema"
 )
 
 func event(t *testing.T, typ events.EventType, payload map[string]any) *events.EventEnvelope {
@@ -91,5 +92,26 @@ func TestEventRejectsANonOpaqueSessionID(t *testing.T) {
 	e.SessionID = "call-with-jane@example.com"
 	if err := e.Validate(); err == nil {
 		t.Fatal("an identifying session id reached an event; these land in vendor dashboards")
+	}
+}
+
+func TestGeneratedEnumsMatchSchema(t *testing.T) {
+	t.Parallel()
+	const file = "events/v1/envelope.schema.json"
+	cases := []struct {
+		name    string
+		pointer []string
+		got     []string
+	}{
+		{"EventType", []string{"$defs", "EventType", "enum"}, schema.Names(events.AllEventTypes)},
+		{"AgentState", []string{"$defs", "AgentState", "enum"}, schema.Names(events.AllAgentStates)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if err := schema.CheckEnum(file, tc.pointer, tc.got); err != nil {
+				t.Error(err)
+			}
+		})
 	}
 }

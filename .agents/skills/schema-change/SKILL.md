@@ -27,8 +27,9 @@ description: >-
 
 5. New enum: add it to `targets` in `go/tools/enumgen/main.go` (schema path, pointer to the
    `enum` array, package, type, prefix, output file, `All*` name), re-run `make generate`, then
-   add a drift case in `CASES` of `python/dafter_core/tests/test_enums.py`, and export the
-   class from `python/dafter_core/src/dafter_core/__init__.py`.
+   add a drift case on both halves: `TestGeneratedEnumsMatchSchema` in the owning Go package's
+   test file and `CASES` in `python/dafter_core/tests/test_enums.py`, and export the class from
+   `python/dafter_core/src/dafter_core/__init__.py`.
 
 6. Add behaviour tests on both sides that feed the same document and expect the same error code.
 
