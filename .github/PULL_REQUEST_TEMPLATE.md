@@ -9,6 +9,6 @@
 
 ## Checklist
 
-- [ ] Schema changed: yes / no. If yes, `make generate` output is committed in the same commit.
+- [ ] Schema changed: yes / no. If yes, both hand-written parsers are updated and no `make generate` output is committed.
 - [ ] `docs/dafter.md`, `AGENTS.md` or a skill updated if a rule they state changed.
 - [ ] Commit messages follow Conventional Commits and each body explains why.

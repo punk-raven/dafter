@@ -43,16 +43,25 @@ Two prerequisites, both single binaries:
 - `uv` - manages the Python interpreter, the virtualenv and every dev
   dependency, from the committed `python/uv.lock`.
 
+Everything derived from `schemas/` is built rather than committed, so a fresh
+clone does not compile until it has been generated once. The setup script does
+that, and offers to install either prerequisite if it is missing:
+
 ```sh
-make check          # everything CI runs
+./scripts/setup.sh  # or: make setup; -y accepts every prompt
+```
+
+```sh
+make check          # the Go and Python checks CI runs
 make generate       # refresh the outputs derived from schemas/
 make build vet lint test tidy   # Go targets
 make py-lint py-test            # Python: ruff, mypy strict, pytest
 make help           # list every target
 ```
 
-`make check` runs `generate-check` first and fails if any generated output is
-stale or was hand-edited.
+Every target above regenerates from `schemas/` before it runs, so the output is
+never stale. `make check` starts with `generate-check`, which fails if any of
+it was committed. CI also runs `make vulncheck`.
 
 ## How the two halves relate
 
@@ -60,8 +69,8 @@ The Go and Python halves touch only at the resolved config document and the
 event envelope, and both of those are defined once, in `schemas/`. From the
 schemas, `make generate` produces the enum constants for both languages and
 copies the schemas into each module so they can be embedded and validated at
-startup. Generated files are committed with the schema change that produced
-them and are never edited by hand. Every rule the schema cannot express is
+startup. None of that output is committed or edited by hand; it is rebuilt from
+`schemas/` on every target that needs it. Every rule the schema cannot express is
 implemented identically on both sides and tested with the same documents, so
 a given input gets the same answer, and the same error code, from either
 half.

@@ -8,7 +8,8 @@ description: >-
 # Changing a schema
 
 1. Edit under `schemas/` only. Never touch `go/internal/schema/schemas/`,
-   `python/dafter_core/src/dafter_core/_schemas/`, `*_gen.go` or `enums.py`; they are outputs.
+   `python/dafter_core/src/dafter_core/_schemas/`, `*_gen.go` or `enums.py`; they are git-ignored
+   build output.
    Objects close with `unevaluatedProperties: false` (why: commit body
    `fix(schemas): correct region, hash, closure and event id width`). An event type needs a
    payload schema before code emits it (`schemas/events/v1/envelope.schema.json`).
@@ -37,7 +38,8 @@ description: >-
    `uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy`
    then `uv run --frozen pytest -q`.
 
-8. Commit the generated output in the same commit as the schema edit, or `make generate-check` fails.
+8. Commit the schema edit and the hand-written changes only. The generated output is git-ignored;
+   `git add -f`-ing it back in makes `make generate-check` fail.
 
 Never hand-edit generated output to pass a test. Never add a Go field without the schema change
 (why: commit body `fix(core): report every validation failure, and locate each one`).

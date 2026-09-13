@@ -2,15 +2,20 @@
 
 ## Setup
 
-Install `go` and `uv`; nothing else is needed. `go/go.mod` pins the Go
-toolchain and `python/uv.lock` pins every Python dependency, so a clean
-checkout reproduces exactly what CI runs.
+`go` and `uv` are the only prerequisites, and the setup script offers to
+install whichever is missing. `go/go.mod` pins the Go toolchain and
+`python/uv.lock` pins every Python dependency, so a clean checkout reproduces
+exactly what CI runs.
 
 ```sh
 git clone https://github.com/punk-raven/dafter.git
 cd dafter
+./scripts/setup.sh   # -y to accept every prompt
 make check
 ```
+
+The setup step matters: everything derived from `schemas/` is generated, not
+committed, so a clone does not compile until it has run once.
 
 `make help` lists every target. The Go and Python halves can be checked
 separately with `make vet lint test` and `make py-lint py-test`.
@@ -19,12 +24,13 @@ separately with `make vet lint test` and `make py-lint py-test`.
 
 `schemas/` is the only source of truth for shared types. Anything under
 `go/internal/schema/schemas/`, `python/dafter_core/src/dafter_core/_schemas/`,
-`*_gen.go` and `enums.py` is produced by `make generate` and must not be
-edited by hand; `make generate-check` is the first step of `make check` and
-fails the build if it drifts. The full procedure for a schema change,
-including the hand-written parsers and drift tests on both sides, is the
-`schema-change` skill in `.agents/skills/schema-change/SKILL.md`. `AGENTS.md`
-at the repository root summarises the rules both halves must keep identical.
+`*_gen.go` and `enums.py` is produced by `make generate`, is git-ignored, and
+must never be committed or edited by hand. `make generate-check` is the first
+step of `make check` and fails the build if any of it was. The full procedure
+for a schema change, including the hand-written parsers and drift tests on
+both sides, is the `schema-change` skill in
+`.agents/skills/schema-change/SKILL.md`. `AGENTS.md` at the repository root
+summarises the rules both halves must keep identical.
 
 ## Commits
 
@@ -43,10 +49,11 @@ the defect or gap, how it was found, what changed, and how it was verified.
 ## Pull requests
 
 - One logical change per PR. A refactor and a behaviour change are two PRs.
-- CI must be green: generated output current, Go vet, lint and race tests,
+- CI must be green: no generated output committed, Go vet, lint and race tests,
   Python lint, types and tests on every supported version, govulncheck.
 - The description says what and why, following the pull request template.
-  If a schema changed, the generated output is in the same PR.
+  If a schema changed, the PR contains the schema edit and the hand-written
+  parser changes on both sides - never the generated output.
 - Update `docs/dafter.md`, `AGENTS.md` or a skill when a change alters a
   rule they state.
 

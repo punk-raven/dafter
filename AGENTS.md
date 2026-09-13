@@ -8,15 +8,16 @@ Realtime AI media toolkit (agents, translation, transcription, sealed recording)
 - `go/` (control plane, state, egress, seal) and `python/` (agent runtime, providers, batch, evals). They touch only at the resolved config document and the event envelope.
 - `go/tools/enumgen`: emits enum constants for both halves. `Makefile` is the entry point; `.github/workflows/ci.yml` runs it.
 
-## Generated files: never hand-edit
+## Generated files: never hand-edit, never commit
 
-Produced by `make generate`, policed by `make generate-check` (first step of `make check`):
+Produced by `make generate`, git-ignored, policed by `make generate-check` (first step of `make check`):
 `go/internal/**/*_gen.go`, `python/dafter_core/src/dafter_core/enums.py`, `go/internal/schema/schemas/`, `python/dafter_core/src/dafter_core/_schemas/`.
-Commit generated output with the schema edit. See the `schema-change` skill.
+Every target regenerates before it runs, so a clone only needs `./scripts/setup.sh` once. See the `schema-change` skill.
 
 ## Commands
 
-- `make check` (what CI runs)
+- `./scripts/setup.sh` once per clone (a fresh checkout does not compile until it runs)
+- `make check` (the Go and Python checks CI runs)
 - Go: `make build vet lint test tidy`
 - Python: `make py-lint py-test` (ruff, mypy strict, pytest via `uv run --frozen` from `python/`)
 
