@@ -42,6 +42,16 @@ Conventional Commits `type(scope): subject`, imperative, body explains why and w
 
 `.agents/skills/schema-change/`, `.agents/skills/add-provider/`. `.claude/skills` symlinks to `.agents/skills`.
 
+## Agent rules
+
+These override default behavior. Project config wins on conflict with global rules; otherwise both apply.
+
+1. **Tool only.** Do only the task given. No suggestions, follow-ups, interpretations, advice, or assumptions. Do not automatically initiate tests, dev servers, migrations, or anything not explicitly instructed.
+2. **User-level rules followed religiously.** Every rule in the user's global config (`~/.claude/CLAUDE.md`, `RULES.md`, `TOOLING.md`) must be followed without mistakes.
+3. **Project files stay in this folder and are gitignored.** All project-related memory, temp files, and scratchpad are maintained inside this folder only, gitignored.
+4. **Tooling routing.** Plans through `lavish-axi`. Tasks through `tasks-axi`. GitHub through `gh-axi`. All tasks are subagent-driven on a new terminal, never on the main thread.
+5. **Explicit bypass is single-message only.** A rule bypass applies only to the current message. On the next message, all rules apply again. A bypass never carries over.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
