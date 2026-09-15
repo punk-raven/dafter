@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/livekit/protocol/auth"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/errs"
@@ -14,6 +14,23 @@ const (
 	DefaultTTL = 15 * time.Minute
 	maxTTL     = time.Hour
 )
+
+type videoGrant struct {
+	RoomJoin       bool   `json:"roomJoin,omitempty"`
+	Room           string `json:"room,omitempty"`
+	CanPublish     *bool  `json:"canPublish,omitempty"`
+	CanSubscribe   *bool  `json:"canSubscribe,omitempty"`
+	CanPublishData *bool  `json:"canPublishData,omitempty"`
+	Hidden         bool   `json:"hidden,omitempty"`
+	Recorder       bool   `json:"recorder,omitempty"`
+	Agent          bool   `json:"agent,omitempty"`
+}
+
+type claims struct {
+	jwt.RegisteredClaims
+	Identity string     `json:"identity"`
+	Video    videoGrant `json:"video"`
+}
 
 type LiveKit struct {
 	url    string
@@ -52,36 +69,44 @@ func (l *LiveKit) MintToken(g Grant) (Token, error) {
 			"a join token lives at most %s; a long-lived token cannot be revoked", maxTTL)
 	}
 
-	jwt, err := auth.NewAccessToken(l.key, l.secret).
-		SetVideoGrant(video).
-		SetIdentity(g.Identity).
-		SetValidFor(ttl).
-		ToJWT()
+	issued := l.now()
+	expires := issued.Add(ttl)
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    l.key,
+			Subject:   g.Identity,
+			IssuedAt:  jwt.NewNumericDate(issued),
+			NotBefore: jwt.NewNumericDate(issued),
+			ExpiresAt: jwt.NewNumericDate(expires),
+		},
+		Identity: g.Identity,
+		Video:    *video,
+	}).SignedString([]byte(l.secret))
 	if err != nil {
 		return Token{}, errs.Wrap(errs.CodeInternal, err, "mint join token")
 	}
-	return Token{JWT: jwt, URL: l.url, ExpiresAt: l.now().Add(ttl)}, nil
+	return Token{JWT: signed, URL: l.url, ExpiresAt: expires}, nil
 }
 
 func ptr(b bool) *bool { return &b }
 
-func grantsFor(role config.Role) (*auth.VideoGrant, error) {
+func grantsFor(role config.Role) (*videoGrant, error) {
 	switch role {
 	case config.RoleParticipant, config.RolePresenter:
-		return &auth.VideoGrant{
+		return &videoGrant{
 			RoomJoin: true, CanPublish: ptr(true), CanSubscribe: ptr(true), CanPublishData: ptr(true),
 		}, nil
 	case config.RoleObserver:
-		return &auth.VideoGrant{
+		return &videoGrant{
 			RoomJoin: true, CanPublish: ptr(false), CanSubscribe: ptr(true), CanPublishData: ptr(false),
 		}, nil
 	case config.RoleAgent:
-		return &auth.VideoGrant{
+		return &videoGrant{
 			RoomJoin: true, CanPublish: ptr(true), CanSubscribe: ptr(true), CanPublishData: ptr(true),
 			Agent: true,
 		}, nil
 	case config.RoleRecorder:
-		return &auth.VideoGrant{
+		return &videoGrant{
 			RoomJoin: true, CanPublish: ptr(false), CanSubscribe: ptr(true), CanPublishData: ptr(false),
 			Hidden: true, Recorder: true,
 		}, nil

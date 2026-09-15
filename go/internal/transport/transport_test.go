@@ -1,11 +1,14 @@
 package transport_test
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/livekit/protocol/auth"
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/errs"
@@ -28,41 +31,97 @@ func livekit(t *testing.T) transport.Transport {
 	return lk
 }
 
-func mint(t *testing.T, role config.Role) (*auth.ClaimGrants, transport.Token) {
+// Decoded and verified with the standard library rather than with a JWT
+// package, so the test cannot agree with the minter by sharing its bugs.
+func verified(t *testing.T, raw string) (header, payload map[string]any) {
+	t.Helper()
+	parts := strings.Split(raw, ".")
+	if len(parts) != 3 {
+		t.Fatalf("token has %d segments, want 3", len(parts))
+	}
+	mac := hmac.New(sha256.New, []byte(apiSecret))
+	mac.Write([]byte(parts[0] + "." + parts[1]))
+	want := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(parts[2]), []byte(want)) {
+		t.Fatal("the token is not signed with the api secret")
+	}
+	return segment(t, parts[0]), segment(t, parts[1])
+}
+
+func segment(t *testing.T, s string) map[string]any {
+	t.Helper()
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		t.Fatalf("decode segment: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode segment json: %v", err)
+	}
+	return out
+}
+
+func mint(t *testing.T, role config.Role) (map[string]any, transport.Token) {
 	t.Helper()
 	tok, err := livekit(t).MintToken(transport.Grant{Room: room, Identity: identity, Role: role})
 	if err != nil {
 		t.Fatalf("mint %s token: %v", role, err)
 	}
-	verifier, err := auth.ParseAPIToken(tok.JWT)
-	if err != nil {
-		t.Fatalf("parse minted token: %v", err)
+	header, payload := verified(t, tok.JWT)
+	if header["alg"] != "HS256" || header["typ"] != "JWT" {
+		t.Errorf("header is %v", header)
 	}
-	if verifier.APIKey() != apiKey {
-		t.Errorf("token names api key %q, want %q", verifier.APIKey(), apiKey)
-	}
-	_, grants, err := verifier.Verify(apiSecret)
-	if err != nil {
-		t.Fatalf("the minted token does not verify against its own secret: %v", err)
-	}
-	return grants, tok
+	return payload, tok
 }
 
-func TestAMintedTokenVerifiesAndNamesItsRoomAndIdentity(t *testing.T) {
-	t.Parallel()
-	grants, tok := mint(t, config.RoleParticipant)
-
-	if grants.Identity != identity {
-		t.Errorf("identity is %q, want %q", grants.Identity, identity)
+func video(t *testing.T, role config.Role) map[string]any {
+	t.Helper()
+	payload, _ := mint(t, role)
+	grant, ok := payload["video"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s token carries no video grant: %v", role, payload)
 	}
-	if grants.Video.Room != room || !grants.Video.RoomJoin {
-		t.Errorf("token does not grant a join to %q: %+v", room, grants.Video)
+	return grant
+}
+
+func TestAMintedTokenNamesItsIssuerRoomAndIdentity(t *testing.T) {
+	t.Parallel()
+	payload, tok := mint(t, config.RoleParticipant)
+
+	if payload["iss"] != apiKey {
+		t.Errorf("issuer is %v, want %q", payload["iss"], apiKey)
+	}
+	if payload["sub"] != identity || payload["identity"] != identity {
+		t.Errorf("subject/identity are %v/%v, want %q", payload["sub"], payload["identity"], identity)
+	}
+	if _, ok := payload["name"]; ok {
+		t.Error("the token carries a display name; a real name would reach the media server's dashboards")
+	}
+	grant := payload["video"].(map[string]any)
+	if grant["room"] != room || grant["roomJoin"] != true {
+		t.Errorf("token does not grant a join to %q: %v", room, grant)
 	}
 	if tok.URL != "ws://127.0.0.1:7880" {
 		t.Errorf("token carries url %q", tok.URL)
 	}
 	if tok.ExpiresAt.Before(time.Now()) {
 		t.Errorf("token expired at mint time: %s", tok.ExpiresAt)
+	}
+}
+
+func TestATokenIsValidFromIssueUntilItsStatedExpiry(t *testing.T) {
+	t.Parallel()
+	payload, tok := mint(t, config.RoleParticipant)
+
+	iat, nbf, exp := payload["iat"].(float64), payload["nbf"].(float64), payload["exp"].(float64)
+	if nbf != iat {
+		t.Errorf("token is not valid from the moment it was issued: nbf %v, iat %v", nbf, iat)
+	}
+	if exp-iat != transport.DefaultTTL.Seconds() {
+		t.Errorf("token lives %vs, want %vs", exp-iat, transport.DefaultTTL.Seconds())
+	}
+	if got := int64(exp); got != tok.ExpiresAt.Unix() {
+		t.Errorf("the claim expires at %d, the caller was told %d", got, tok.ExpiresAt.Unix())
 	}
 }
 
@@ -85,38 +144,52 @@ func TestGrantsDeriveFromTheRole(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(string(tc.role), func(t *testing.T) {
 			t.Parallel()
-			v := mustVideo(t, tc.role)
-			if v.GetCanPublish() != tc.publish {
-				t.Errorf("canPublish = %v, want %v", v.GetCanPublish(), tc.publish)
+			grant := video(t, tc.role)
+			if grant["canPublish"] != tc.publish {
+				t.Errorf("canPublish = %v, want %v", grant["canPublish"], tc.publish)
 			}
-			if v.GetCanSubscribe() != tc.subscribe {
-				t.Errorf("canSubscribe = %v, want %v", v.GetCanSubscribe(), tc.subscribe)
+			if grant["canSubscribe"] != tc.subscribe {
+				t.Errorf("canSubscribe = %v, want %v", grant["canSubscribe"], tc.subscribe)
 			}
-			if v.Hidden != tc.hidden || v.Recorder != tc.recorder || v.Agent != tc.agent {
+			if grant["canPublishData"] != tc.publish {
+				t.Errorf("canPublishData = %v, want %v", grant["canPublishData"], tc.publish)
+			}
+			if truth(grant["hidden"]) != tc.hidden || truth(grant["recorder"]) != tc.recorder ||
+				truth(grant["agent"]) != tc.agent {
 				t.Errorf("hidden/recorder/agent = %v/%v/%v, want %v/%v/%v",
-					v.Hidden, v.Recorder, v.Agent, tc.hidden, tc.recorder, tc.agent)
+					grant["hidden"], grant["recorder"], grant["agent"], tc.hidden, tc.recorder, tc.agent)
 			}
 		})
+	}
+}
+
+func truth(v any) bool {
+	b, ok := v.(bool)
+	return ok && b
+}
+
+func TestPermissionsAreAlwaysStatedRatherThanLeftToTheServerDefault(t *testing.T) {
+	t.Parallel()
+	for _, role := range config.AllRoles {
+		grant := video(t, role)
+		for _, key := range []string{"canPublish", "canSubscribe", "canPublishData"} {
+			if _, ok := grant[key]; !ok {
+				t.Errorf("%s leaves %s unset; an absent permission is granted by default", role, key)
+			}
+		}
 	}
 }
 
 func TestNoRoleEverReceivesAnOperatorGrant(t *testing.T) {
 	t.Parallel()
 	for _, role := range config.AllRoles {
-		v := mustVideo(t, role)
-		if v.RoomAdmin || v.RoomCreate || v.RoomList || v.RoomRecord || v.IngressAdmin {
-			t.Errorf("%s holds an operator grant: %+v", role, v)
+		grant := video(t, role)
+		for _, key := range []string{"roomAdmin", "roomCreate", "roomList", "roomRecord", "ingressAdmin"} {
+			if _, ok := grant[key]; ok {
+				t.Errorf("%s holds the operator grant %s: %v", role, key, grant)
+			}
 		}
 	}
-}
-
-func mustVideo(t *testing.T, role config.Role) *auth.VideoGrant {
-	t.Helper()
-	grants, _ := mint(t, role)
-	if grants.Video == nil {
-		t.Fatalf("%s token carries no video grant", role)
-	}
-	return grants.Video
 }
 
 func TestAnUnknownRoleMintsNothing(t *testing.T) {
