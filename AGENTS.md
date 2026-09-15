@@ -31,11 +31,12 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 - Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque.
 - Config resolution is layers then axes, `go/internal/config/resolve.go`: defaults, tenant, profile, session overrides, then the language and channel overlays. The overlays land last, so a channel overlay wins over a session override.
 - The config hash is RFC 8785 then SHA-256 with `configHash` stripped, mirrored in `go/internal/config/hash.go` and `python/dafter_core/src/dafter_core/hashing.py`. Both halves are pinned to the vectors in `testdata/`; changing either without the other fails on its own side.
+- Token grants derive from the role and never from a client request, and no role is ever issued a room-admin, room-create, room-list, room-record or ingress grant: `grantsFor` in `go/internal/transport/livekit.go`. Every permission is stated rather than left unset, because the media server grants an absent permission by default.
 - Enum drift tested on both halves: `TestGeneratedEnumsMatchSchema` in each owning Go package and `python/dafter_core/tests/test_enums.py`; each Go package carries at most one test file, named after the package.
 
 ## Dependency graph
 
-depguard in `go/.golangci.yml` (also documents the graph and denies the media server SDK outside transport). Target graph: `docs/dafter.md` section 5.
+depguard in `go/.golangci.yml` holds the graph and keeps the media server behind one package: `github.com/livekit/*` is denied outside `go/internal/transport`. Target graph: `docs/dafter.md` section 5.
 
 ## Commits
 

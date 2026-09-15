@@ -74,12 +74,30 @@ linters:
             - pkg: github.com/punk-raven/dafter/go/internal/control
               desc: control depends on state, never the other way round
 
+        transport-depends-on-core-only:
+          files:
+            - "**/internal/transport/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: state and transport are siblings under control
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: control depends on transport, never the other way round
+
         no-vendor-sdks:
           files:
             - "$all"
           deny:
             - pkg: github.com/livekit/server-sdk-go
               desc: the media server SDK belongs behind the transport package, nowhere else
+
+        media-server-stays-behind-the-seam:
+          files:
+            - "$all"
+            - "!**/internal/transport/**"
+          deny:
+            - pkg: github.com/livekit/protocol
+              desc: the media server's own types belong behind the transport package, nowhere else
 
 formatters:
   enable:
