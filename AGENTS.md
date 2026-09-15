@@ -7,7 +7,7 @@ Realtime AI media toolkit (agents, translation, transcription, sealed recording)
 - `schemas/`: the only source of truth. All language types are generated from it.
 - `go/` (control plane, state, egress, seal) and `python/` (agent runtime, providers, batch, evals). They touch only at the resolved config document and the event envelope.
 - `go/tools/enumgen`: emits enum constants for both halves. `Makefile` is the entry point; `.github/workflows/ci.yml` runs it.
-- `testdata/`: fixtures both halves read, so a cross-language claim is checked on both sides rather than asserted on one. Each directory has a README saying what it pins.
+- `testdata/`: fixtures both halves read, so a cross-language claim is checked on both sides rather than asserted on one. Each directory has a README saying what it pins; `testdata/rfc8785/` is vendored verbatim and must never be edited or reformatted.
 
 ## Generated files: never hand-edit, never commit
 
