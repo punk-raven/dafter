@@ -27,6 +27,7 @@ type Request struct {
 type Resolution struct {
 	Config   *ResolvedSessionConfig
 	Document []byte
+	Hash     string
 }
 
 var reservedOverrides = []string{"sessionId", "tenantId", "configHash"}
@@ -46,11 +47,15 @@ func (c *Catalog) Resolve(req Request) (*Resolution, error) {
 	if err != nil {
 		return nil, errs.Wrap(errs.CodeInternal, err, "marshal resolved document")
 	}
-	cfg, err := Parse(raw)
+	document, hash, err := Seal(raw)
 	if err != nil {
 		return nil, err
 	}
-	return &Resolution{Config: cfg, Document: raw}, nil
+	cfg, err := Parse(document)
+	if err != nil {
+		return nil, err
+	}
+	return &Resolution{Config: cfg, Document: document, Hash: hash}, nil
 }
 
 type source struct {

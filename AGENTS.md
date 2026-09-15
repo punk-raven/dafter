@@ -7,6 +7,7 @@ Realtime AI media toolkit (agents, translation, transcription, sealed recording)
 - `schemas/`: the only source of truth. All language types are generated from it.
 - `go/` (control plane, state, egress, seal) and `python/` (agent runtime, providers, batch, evals). They touch only at the resolved config document and the event envelope.
 - `go/tools/enumgen`: emits enum constants for both halves. `Makefile` is the entry point; `.github/workflows/ci.yml` runs it.
+- `testdata/`: fixtures both halves read, so a cross-language claim is checked on both sides rather than asserted on one. Each directory has a README saying what it pins.
 
 ## Generated files: never hand-edit, never commit
 
@@ -29,6 +30,7 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 - Error messages safe to log (no name, email, phone, transcript): `schemas/errors/v1/error.schema.json`. Report every problem, located by JSON pointer.
 - Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque.
 - Config resolution is layers then axes, `go/internal/config/resolve.go`: defaults, tenant, profile, session overrides, then the language and channel overlays. The overlays land last, so a channel overlay wins over a session override.
+- The config hash is RFC 8785 then SHA-256 with `configHash` stripped, mirrored in `go/internal/config/hash.go` and `python/dafter_core/src/dafter_core/hashing.py`. Both halves are pinned to the vectors in `testdata/`; changing either without the other fails on its own side.
 - Enum drift tested on both halves: `TestGeneratedEnumsMatchSchema` in each owning Go package and `python/dafter_core/tests/test_enums.py`; each Go package carries at most one test file, named after the package.
 
 ## Dependency graph
