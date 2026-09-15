@@ -64,6 +64,16 @@ linters:
             - pkg: github.com/punk-raven/dafter/go/internal/events
               desc: events and config are siblings; shared types belong lower
 
+        state-depends-on-core-only:
+          files:
+            - "**/internal/state/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: state and transport are siblings under control
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: control depends on state, never the other way round
+
         no-vendor-sdks:
           files:
             - "$all"
