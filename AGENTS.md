@@ -28,7 +28,7 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 - Unknown fields rejected: schemas close with `unevaluatedProperties`; Go also uses `DisallowUnknownFields`.
 - Cross-field rules the schema cannot express are one table per half, `go/internal/config/rules.go` and `python/dafter_core/src/dafter_core/rules.py`, every broken rule reported with its pointer: sealed forbids agent; recording needs consent artifact; `session_create` start needs `room_composite` layout.
 - Error messages safe to log (no name, email, phone, transcript): `schemas/errors/v1/error.schema.json`. Report every problem, located by JSON pointer.
-- Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque.
+- Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque. Real credentials reach the process through the environment only.
 - Config resolution is layers then axes, `go/internal/config/resolve.go`: defaults, tenant, profile, session overrides, then the language and channel overlays. The overlays land last, so a channel overlay wins over a session override.
 - The config hash is RFC 8785 then SHA-256 with `configHash` stripped, mirrored in `go/internal/config/hash.go` and `python/dafter_core/src/dafter_core/hashing.py`. Both halves are pinned to the vectors in `testdata/`; changing either without the other fails on its own side.
 - Token grants derive from the role and never from a client request, and no role is ever issued a room-admin, room-create, room-list, room-record or ingress grant: `grantsFor` in `go/internal/transport/livekit.go`. Every permission is stated rather than left unset, because the media server grants an absent permission by default.
@@ -38,6 +38,10 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 ## Dependency graph
 
 depguard in `go/.golangci.yml` holds the whole graph: core below everything, state and transport siblings above it, control above them. `github.com/livekit/*` is denied outside `go/internal/transport`, which is the seam every media server concern goes behind. Target graph: `docs/dafter.md` section 5.
+
+## Running the control plane
+
+`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <dir>` replaces the catalog embedded in the binary (`go/cmd/dafter-control/catalog/`, one file per tenant, profile, language and channel). For a local media server, `livekit-server --dev` serves `devkey`/`secret` on `127.0.0.1:7880`.
 
 ## Commits
 
