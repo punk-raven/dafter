@@ -21,7 +21,7 @@ import (
 
 // The catalog the binary ships with, so what the tests resolve is what an
 // operator gets rather than a fixture that agrees with them.
-const catalogDir = "../../cmd/dafter-control/catalog"
+const catalogPath = "../../cmd/dafter-control/catalog.json"
 
 const tenantID = "t_9c21a4be"
 
@@ -50,7 +50,11 @@ type harness struct {
 
 func serve(t *testing.T) *harness {
 	t.Helper()
-	catalog, err := config.LoadCatalog(os.DirFS(catalogDir))
+	raw, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("read catalog: %v", err)
+	}
+	catalog, err := config.LoadCatalog(raw)
 	if err != nil {
 		t.Fatalf("load catalog: %v", err)
 	}

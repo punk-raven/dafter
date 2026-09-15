@@ -41,7 +41,7 @@ depguard in `go/.golangci.yml` holds the whole graph: core below everything, sta
 
 ## Running the control plane
 
-`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <dir>` replaces the catalog embedded in the binary (`go/cmd/dafter-control/catalog/`, one file per tenant, profile, language and channel). For a local media server, `livekit-server --dev` serves `devkey`/`secret` on `127.0.0.1:7880`.
+`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <file>` replaces the catalog embedded in the binary, `go/cmd/dafter-control/catalog.json`. For a local media server, `livekit-server --dev` serves `devkey`/`secret` on `127.0.0.1:7880`.
 
 ## Commits
 

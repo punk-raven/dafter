@@ -1,4 +1,0 @@
-{
-  "turn": { "silenceMs": 1200, "endpointingDelayMs": 400 },
-  "budgets": { "turnGapP50Ms": 1200, "turnGapP95Ms": 2500 }
-}

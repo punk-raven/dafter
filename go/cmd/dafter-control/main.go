@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
-	"embed"
+	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -20,8 +19,8 @@ import (
 	"github.com/punk-raven/dafter/go/internal/transport"
 )
 
-//go:embed all:catalog
-var embedded embed.FS
+//go:embed catalog.json
+var embeddedCatalog []byte
 
 func main() {
 	if err := run(); err != nil {
@@ -33,7 +32,7 @@ func main() {
 func run() error {
 	addr := flag.String("addr", envOr("DAFTER_ADDR", "127.0.0.1:8080"), "listen address")
 	dbPath := flag.String("db", envOr("DAFTER_DB", "dafter.db"), "SQLite path")
-	catalogDir := flag.String("catalog", os.Getenv("DAFTER_CATALOG"), "config catalog directory; empty uses the embedded one")
+	catalogPath := flag.String("catalog", os.Getenv("DAFTER_CATALOG"), "config catalog file; empty uses the embedded one")
 	ttl := flag.Duration("token-ttl", transport.DefaultTTL, "join token lifetime")
 	flag.Parse()
 
@@ -46,7 +45,11 @@ func run() error {
 		return fmt.Errorf("media transport: %w", err)
 	}
 
-	catalog, err := config.LoadCatalog(catalogFS(*catalogDir))
+	raw, err := catalogBytes(*catalogPath)
+	if err != nil {
+		return err
+	}
+	catalog, err := config.LoadCatalog(raw)
 	if err != nil {
 		return fmt.Errorf("config catalog: %w", err)
 	}
@@ -87,15 +90,15 @@ func run() error {
 	return nil
 }
 
-func catalogFS(dir string) fs.FS {
-	if dir != "" {
-		return os.DirFS(dir)
+func catalogBytes(path string) ([]byte, error) {
+	if path == "" {
+		return embeddedCatalog, nil
 	}
-	sub, err := fs.Sub(embedded, "catalog")
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("read config catalog: %w", err)
 	}
-	return sub
+	return raw, nil
 }
 
 func envOr(key, fallback string) string {

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/errs"
@@ -488,45 +487,45 @@ func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	}
 }
 
-func TestLoadCatalogReadsOneFilePerLayerAndOverlay(t *testing.T) {
+func TestLoadCatalogReadsOneDocument(t *testing.T) {
 	t.Parallel()
-	fsys := fstest.MapFS{
-		"defaults.json":           {Data: []byte(`{"apiVersion": "dafter.dev/v1"}`)},
-		"tenants/t_9c21a4be.json": {Data: []byte(`{}`)},
-		"profiles/support.json":   {Data: []byte(`{}`)},
-		"languages/hi.json":       {Data: []byte(`{}`)},
-		"languages/en-IN.json":    {Data: []byte(`{}`)},
-		"languages/notes.md":      {Data: []byte("ignored")},
-		"channels/webrtc.json":    {Data: []byte(`{}`)},
-		"channels/telephony.json": {Data: []byte(`{}`)},
-		"channels/long_form.json": {Data: []byte(`{}`)},
-	}
-	c, err := config.LoadCatalog(fsys)
+	raw := []byte(`{
+		"defaults": {"apiVersion": "dafter.dev/v1"},
+		"tenants": {"t_9c21a4be": {}},
+		"profiles": {"support": {}},
+		"languages": {"hi": {}, "en-IN": {}},
+		"channels": {"webrtc": {}, "telephony": {}}
+	}`)
+	c, err := config.LoadCatalog(raw)
 	if err != nil {
 		t.Fatalf("load catalog: %v", err)
 	}
-	if len(c.Tenants) != 1 || len(c.Profiles) != 1 || len(c.Languages) != 2 || len(c.Channels) != 3 {
+	if len(c.Tenants) != 1 || len(c.Profiles) != 1 || len(c.Languages) != 2 || len(c.Channels) != 2 {
 		t.Fatalf("catalog loaded %d tenants, %d profiles, %d languages, %d channels",
 			len(c.Tenants), len(c.Profiles), len(c.Languages), len(c.Channels))
 	}
 	if _, ok := c.Languages["en-IN"]; !ok {
-		t.Error("a language tag with a region subtag did not survive the filename")
+		t.Error("a language tag with a region subtag did not survive the key")
 	}
-	if _, ok := c.Channels[config.ChannelLongForm]; !ok {
-		t.Error("long_form did not load")
+	if _, ok := c.Channels[config.ChannelTelephony]; !ok {
+		t.Error("telephony did not load")
 	}
 }
 
-func TestLoadCatalogRejectsAChannelItCannotServe(t *testing.T) {
+func TestLoadCatalogRejectsWhatCouldNeverResolve(t *testing.T) {
 	t.Parallel()
-	fsys := fstest.MapFS{
-		"defaults.json":         {Data: []byte(`{}`)},
-		"tenants/t_1.json":      {Data: []byte(`{}`)},
-		"profiles/p.json":       {Data: []byte(`{}`)},
-		"languages/hi.json":     {Data: []byte(`{}`)},
-		"channels/carrier.json": {Data: []byte(`{}`)},
+	cases := map[string]string{
+		"no defaults layer": `{"tenants": {"t_9c21a4be": {}}, "languages": {"hi": {}}}`,
+		"unknown channel":   `{"defaults": {}, "channels": {"carrier_pigeon": {}}}`,
+		"unknown section":   `{"defaults": {}, "roles": {"participant": {}}}`,
+		"not a JSON object": `["defaults"]`,
 	}
-	if _, err := config.LoadCatalog(fsys); err == nil {
-		t.Fatal("an overlay for an unknown channel loaded; it could never be selected")
+	for name, raw := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := config.LoadCatalog([]byte(raw)); err == nil {
+				t.Error("the catalog loaded")
+			}
+		})
 	}
 }

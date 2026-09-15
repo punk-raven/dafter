@@ -1,0 +1,116 @@
+{
+  "defaults": {
+    "apiVersion": "dafter.dev/v1",
+    "privacyMode": "open",
+    "agent": {
+      "enabled": true,
+      "pool": "dafter-py",
+      "mode": "cascaded"
+    },
+    "turn": {
+      "strategy": "auto",
+      "silenceMs": 500,
+      "minSpeechMs": 120,
+      "interruption": {
+        "enabled": true,
+        "minWords": 2,
+        "minDurationMs": 300,
+        "falseInterruptionTimeoutMs": 2000,
+        "resumeFalseInterruption": true
+      }
+    },
+    "recording": { "enabled": false },
+    "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500 }
+  },
+
+  "tenants": {
+    "t_9c21a4be": {
+      "residency": { "allowedRegions": ["ap-south-1"] },
+      "budgets": { "maxSessionCostUsd": 2.5 }
+    }
+  },
+
+  "profiles": {
+    "support": {
+      "agent": { "personaRef": "persona://support/v3" }
+    }
+  },
+
+  "languages": {
+    "hi": {
+      "turn": {
+        "strategy": "provider_endpointing",
+        "localVadEnabled": false
+      },
+      "agent": {
+        "pipeline": {
+          "stt": {
+            "provider": "sarvam",
+            "model": "saaras",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+            "options": { "chunkMs": 500, "encoding": "pcm_s16le" }
+          },
+          "llm": {
+            "provider": "sarvam",
+            "model": "sarvam-105b",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          },
+          "tts": {
+            "provider": "sarvam",
+            "model": "bulbul",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+            "options": { "prewarm": true }
+          }
+        }
+      }
+    },
+
+    "en-IN": {
+      "turn": {
+        "strategy": "semantic",
+        "localVadEnabled": true
+      },
+      "agent": {
+        "pipeline": {
+          "vad": { "provider": "silero" },
+          "stt": {
+            "provider": "deepgram",
+            "model": "nova",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/deepgram/api-key"
+          },
+          "llm": {
+            "provider": "sarvam",
+            "model": "sarvam-105b",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          },
+          "tts": {
+            "provider": "sarvam",
+            "model": "bulbul",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+            "options": { "prewarm": true }
+          }
+        }
+      }
+    }
+  },
+
+  "channels": {
+    "webrtc": {
+      "turn": { "endpointingDelayMs": 0 }
+    },
+
+    "telephony": {
+      "turn": {
+        "silenceMs": 900,
+        "endpointingDelayMs": 200,
+        "interruption": { "minWords": 3 }
+      }
+    }
+  }
+}

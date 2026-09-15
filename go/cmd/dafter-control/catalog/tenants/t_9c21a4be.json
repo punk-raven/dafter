@@ -1,4 +1,0 @@
-{
-  "residency": { "allowedRegions": ["ap-south-1"] },
-  "budgets": { "maxSessionCostUsd": 2.5 }
-}

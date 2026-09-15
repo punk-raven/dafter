@@ -8,11 +8,11 @@ import (
 )
 
 type Catalog struct {
-	Defaults  json.RawMessage
-	Tenants   map[string]json.RawMessage
-	Profiles  map[string]json.RawMessage
-	Languages map[string]json.RawMessage
-	Channels  map[Channel]json.RawMessage
+	Defaults  json.RawMessage             `json:"defaults"`
+	Tenants   map[string]json.RawMessage  `json:"tenants"`
+	Profiles  map[string]json.RawMessage  `json:"profiles"`
+	Languages map[string]json.RawMessage  `json:"languages"`
+	Channels  map[Channel]json.RawMessage `json:"channels"`
 }
 
 type Request struct {
