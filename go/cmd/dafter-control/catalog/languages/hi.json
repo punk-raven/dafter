@@ -1,0 +1,30 @@
+{
+  "turn": {
+    "strategy": "provider_endpointing",
+    "localVadEnabled": false
+  },
+  "agent": {
+    "pipeline": {
+      "stt": {
+        "provider": "sarvam",
+        "model": "saaras",
+        "region": "ap-south-1",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+        "options": { "chunkMs": 500, "encoding": "pcm_s16le" }
+      },
+      "llm": {
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "region": "ap-south-1",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+      },
+      "tts": {
+        "provider": "sarvam",
+        "model": "bulbul",
+        "region": "ap-south-1",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+        "options": { "prewarm": true }
+      }
+    }
+  }
+}

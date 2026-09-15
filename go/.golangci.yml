@@ -84,6 +84,22 @@ linters:
             - pkg: github.com/punk-raven/dafter/go/internal/control
               desc: control depends on transport, never the other way round
 
+        core-sits-below-everything:
+          files:
+            - "**/internal/ids/**"
+            - "**/internal/errs/**"
+            - "**/internal/schema/**"
+            - "**/internal/events/**"
+            - "**/internal/config/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: state depends on core, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: transport depends on core, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: control depends on core, never the other way round
+
         no-vendor-sdks:
           files:
             - "$all"

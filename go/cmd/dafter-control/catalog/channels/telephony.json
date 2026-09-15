@@ -1,0 +1,7 @@
+{
+  "turn": {
+    "silenceMs": 900,
+    "endpointingDelayMs": 200,
+    "interruption": { "minWords": 3 }
+  }
+}
