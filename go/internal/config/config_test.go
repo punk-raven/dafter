@@ -1,6 +1,8 @@
 package config_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -153,5 +155,228 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 				t.Error(err)
 			}
 		})
+	}
+}
+
+const (
+	tenantID  = "t_9c21a4be"
+	sessionID = "s_7f3a9c21"
+)
+
+func catalog() *config.Catalog {
+	return &config.Catalog{
+		Defaults: json.RawMessage(`{
+			"apiVersion": "dafter.dev/v1",
+			"privacyMode": "open",
+			"agent": {"enabled": true, "pool": "dafter-py", "mode": "cascaded"},
+			"turn": {"strategy": "auto", "silenceMs": 500, "minSpeechMs": 120},
+			"recording": {"enabled": false},
+			"budgets": {"turnGapP50Ms": 800, "turnGapP95Ms": 1500}
+		}`),
+		Tenants: map[string]json.RawMessage{
+			tenantID: json.RawMessage(`{"budgets": {"turnGapP95Ms": 1200}}`),
+		},
+		Profiles: map[string]json.RawMessage{
+			"support": json.RawMessage(`{"agent": {"personaRef": "persona://support/v3"}}`),
+		},
+		Languages: map[string]json.RawMessage{
+			"hi": json.RawMessage(`{
+				"turn": {"strategy": "provider_endpointing", "localVadEnabled": false},
+				"agent": {"pipeline": {"stt": {"provider": "sarvam", "model": "saaras"}}}
+			}`),
+			"en-IN": json.RawMessage(`{
+				"turn": {"strategy": "semantic", "localVadEnabled": true},
+				"agent": {"pipeline": {
+					"vad": {"provider": "silero"},
+					"stt": {"provider": "deepgram", "model": "nova"}
+				}}
+			}`),
+		},
+		Channels: map[config.Channel]json.RawMessage{
+			config.ChannelWebRTC:    json.RawMessage(`{"turn": {"endpointingDelayMs": 0}}`),
+			config.ChannelTelephony: json.RawMessage(`{"turn": {"silenceMs": 900}}`),
+		},
+	}
+}
+
+func request() config.Request {
+	return config.Request{
+		SessionID: sessionID,
+		TenantID:  tenantID,
+		Profile:   "support",
+		Language:  "en-IN",
+		Channel:   config.ChannelWebRTC,
+	}
+}
+
+func resolve(t *testing.T, req config.Request) *config.Resolution {
+	t.Helper()
+	res, err := catalog().Resolve(req)
+	if err != nil {
+		t.Fatalf("resolve %s/%s: %v", req.Language, req.Channel, err)
+	}
+	return res
+}
+
+func TestResolveAppliesLayersInOrder(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"budgets": {"maxSessionCostUsd": 2.5}}`)
+	c := resolve(t, req).Config
+
+	if c.Budgets.TurnGapP50Ms != 800 {
+		t.Errorf("defaults layer lost: p50 = %d, want 800", c.Budgets.TurnGapP50Ms)
+	}
+	if c.Budgets.TurnGapP95Ms != 1200 {
+		t.Errorf("tenant layer did not win over defaults: p95 = %d, want 1200", c.Budgets.TurnGapP95Ms)
+	}
+	if c.Agent.PersonaRef != "persona://support/v3" {
+		t.Errorf("profile layer lost: personaRef = %q", c.Agent.PersonaRef)
+	}
+	if c.Budgets.MaxSessionCostUSD != 2.5 {
+		t.Errorf("session override lost: maxSessionCostUsd = %v", c.Budgets.MaxSessionCostUSD)
+	}
+	if c.SessionID != sessionID || c.TenantID != tenantID {
+		t.Errorf("identity not stamped from the request: %s/%s", c.SessionID, c.TenantID)
+	}
+}
+
+func TestResolveTakesTurnStrategyFromTheLanguageAxis(t *testing.T) {
+	t.Parallel()
+	hi := request()
+	hi.Language = "hi"
+	en := request()
+
+	hindi, english := resolve(t, hi).Config, resolve(t, en).Config
+	if hindi.Turn.Strategy == english.Turn.Strategy {
+		t.Fatalf("both languages resolved %s; a semantic detector is English-trained and degrades elsewhere", hindi.Turn.Strategy)
+	}
+	if hindi.Turn.Strategy != config.TurnProviderEndpointing {
+		t.Errorf("hi resolved %s, want %s", hindi.Turn.Strategy, config.TurnProviderEndpointing)
+	}
+	if english.Turn.Strategy != config.TurnSemantic {
+		t.Errorf("en-IN resolved %s, want %s", english.Turn.Strategy, config.TurnSemantic)
+	}
+	if hindi.Turn.LocalVADEnabled == nil || *hindi.Turn.LocalVADEnabled {
+		t.Error("hi kept local VAD on; it fights the provider's server VAD over the same audio")
+	}
+	if hindi.Turn.SilenceMs != 500 || english.Turn.SilenceMs != 500 {
+		t.Error("the language overlay dropped a base turn constant it does not set")
+	}
+}
+
+func TestResolveComposesLanguageAndChannelWithoutACopy(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Language, req.Channel = "hi", config.ChannelTelephony
+	c := resolve(t, req).Config
+
+	if c.Turn.Strategy != config.TurnProviderEndpointing {
+		t.Errorf("language axis lost under a channel overlay: %s", c.Turn.Strategy)
+	}
+	if c.Turn.SilenceMs != 900 {
+		t.Errorf("channel axis lost: silenceMs = %d, want 900", c.Turn.SilenceMs)
+	}
+	if c.Agent.Pipeline == nil || c.Agent.Pipeline.STT == nil || c.Agent.Pipeline.STT.Provider != "sarvam" {
+		t.Errorf("language pipeline lost: %+v", c.Agent.Pipeline)
+	}
+}
+
+func TestResolveIsDeterministic(t *testing.T) {
+	t.Parallel()
+	first, second := resolve(t, request()), resolve(t, request())
+	if !bytes.Equal(first.Document, second.Document) {
+		t.Fatalf("same input resolved to two documents:\n%s\n%s", first.Document, second.Document)
+	}
+}
+
+func resolveError(t *testing.T, req config.Request) *errs.Error {
+	t.Helper()
+	res, err := catalog().Resolve(req)
+	if err == nil {
+		t.Fatalf("resolution accepted a request it should reject: %s", res.Document)
+	}
+	var de *errs.Error
+	if !errors.As(err, &de) {
+		t.Fatalf("want *errs.Error, got %v", err)
+	}
+	return de
+}
+
+func TestResolveRejectsAnUnsupportedLanguage(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Language = "cy"
+	de := resolveError(t, req)
+	if de.Code != errs.CodeUnsupportedCapability {
+		t.Errorf("want %s, got %s", errs.CodeUnsupportedCapability, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/language") {
+		t.Errorf("no detail points at /language: %v", de)
+	}
+}
+
+func TestResolveRejectsAnUnsupportedChannel(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Channel = config.ChannelLongForm
+	de := resolveError(t, req)
+	if de.Code != errs.CodeUnsupportedCapability {
+		t.Errorf("want %s, got %s", errs.CodeUnsupportedCapability, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/channel") {
+		t.Errorf("no detail points at /channel: %v", de)
+	}
+}
+
+func TestResolveNamesEveryUnresolvableLayer(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.TenantID, req.Profile = "t_00000000", "nonexistent"
+	de := resolveError(t, req)
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{"/tenantId", "/profile"} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s; an operator fixes one layer per round trip\n%v", pointer, de)
+		}
+	}
+}
+
+func TestResolveRejectsConsumerSuppliedIdentity(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"sessionId": "s_deadbeef", "configHash": "` + strings.Repeat("0", 64) + `"}`)
+	de := resolveError(t, req)
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{"/sessionId", "/configHash"} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s; the control plane mints these\n%v", pointer, de)
+		}
+	}
+}
+
+func TestResolveRejectsAnOverrideThatBreaksACrossFieldRule(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"privacyMode": "sealed"}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodePrivacyModeForbids {
+		t.Errorf("want %s, got %s", errs.CodePrivacyModeForbids, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/agent/enabled") {
+		t.Errorf("no detail points at /agent/enabled: %v", de)
+	}
+}
+
+func TestResolveRejectsAnOverrideTheSchemaForbids(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"turn": {"silenceMs": 90000}, "budgets": {"turnGapP50Ms": 0}}`)
+	de := resolveError(t, req)
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{"/turn/silenceMs", "/budgets/turnGapP50Ms"} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s: %v", pointer, de)
+		}
 	}
 }

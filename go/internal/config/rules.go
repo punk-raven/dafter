@@ -1,8 +1,6 @@
 package config
 
 import (
-	"fmt"
-
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
 
@@ -50,7 +48,7 @@ func (c *ResolvedSessionConfig) validateCrossFieldRules() error {
 	}
 	e := errs.Errorf(broken[0].code, "%d rule(s) rejected session %s", len(broken), c.SessionID)
 	for _, rule := range broken {
-		e.Details = append(e.Details, fmt.Sprintf("at '%s': %s", rule.pointer, rule.because))
+		e.Details = append(e.Details, located(rule.pointer, rule.because))
 	}
 	return e
 }
