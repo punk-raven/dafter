@@ -41,8 +41,8 @@ __pycache__/
 *.egg-info/
 .mypy_cache/
 
-# Docker compose runtime
-dafter.db
+# Docker compose runtime (SQLite store plus its WAL and shared-memory sidecars)
+dafter.db*
 
 # Build and profiling output
 coverage.out
