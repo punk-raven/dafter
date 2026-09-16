@@ -93,6 +93,12 @@
       </select>
     </fieldset>
 
+    <fieldset>
+      <legend>Join existing room</legend>
+      <label>Room ID (leave empty to create new)</label>
+      <input id="room-id" placeholder="s_xxxxxxxx">
+    </fieldset>
+
     <button id="btn-join" class="btn-join" onclick="joinSession()">Create Session & Join</button>
     <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
 
@@ -146,35 +152,48 @@ async function joinSession() {
   btn.disabled = true;
 
   try {
-    log('Creating session via POST /sessions...');
-    const body = {
-      tenantId: document.getElementById('tenant').value,
-      language: document.getElementById('language').value,
-      channel: document.getElementById('channel').value,
-      role: document.getElementById('role').value,
-    };
-    const profile = document.getElementById('profile').value.trim();
-    if (profile) body.profile = profile;
+    const existingRoom = document.getElementById('room-id').value.trim();
+    let resp, data;
 
-    const resp = await fetch('/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json();
+    if (existingRoom) {
+      log(`Joining existing room ${existingRoom}...`);
+      resp = await fetch(`/sessions/${existingRoom}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: document.getElementById('role').value }),
+      });
+    } else {
+      log('Creating session via POST /sessions...');
+      const body = {
+        tenantId: document.getElementById('tenant').value,
+        language: document.getElementById('language').value,
+        channel: document.getElementById('channel').value,
+        role: document.getElementById('role').value,
+      };
+      const profile = document.getElementById('profile').value.trim();
+      if (profile) body.profile = profile;
+      resp = await fetch('/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
+    data = await resp.json();
 
     const responseBox = document.getElementById('session-response');
     responseBox.style.display = 'block';
     responseBox.textContent = JSON.stringify(data, null, 2);
 
     if (!resp.ok) {
-      log(`Session creation failed: ${data.code} - ${data.message}`, 'error');
+      log(`Failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
       return;
     }
 
-    log(`Session created: ${data.sessionId}`, 'success');
-    log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`);
+    log(`Session: ${data.sessionId} | Room: ${data.room}`, 'success');
+    log(`Share this Room ID with the other person: ${data.room}`, 'success');
+    log(`Hash: ${data.configHash.slice(0, 16)}...`);
     localParticipantId = data.participantId;
 
     const icePolicy = document.getElementById('ice-policy').value;
@@ -223,24 +242,35 @@ async function joinSession() {
       cleanup();
     });
 
-    // Convert ws:// to the http URL for the SDK if needed
-    let connectUrl = data.url;
-
     const rtcConfig = { iceTransportPolicy: icePolicy };
     if (hasICEServers) {
       rtcConfig.iceServers = data.iceServers;
     }
 
+    // The control plane reports the SFU address it knows; a remote browser
+    // reaches the SFU by whatever host it reached this page on.
+    const lkUrl = new URL(data.url);
+    lkUrl.hostname = window.location.hostname;
+    const connectUrl = lkUrl.toString();
+    log(`LiveKit endpoint: ${connectUrl}`);
+
     await room.connect(connectUrl, data.token, { rtcConfig });
 
     log('Connected! Publishing tracks...', 'success');
 
+    // Degrade one device at a time: a missing camera must not drop the mic.
     try {
       await room.localParticipant.enableCameraAndMicrophone();
       log('Camera and microphone published', 'success');
     } catch (mediaErr) {
-      log(`No camera/mic available (${mediaErr.message}), publishing synthetic test pattern...`, 'warn');
-      await publishTestPattern(room);
+      log(`No camera (${mediaErr.message}), trying microphone only...`, 'warn');
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        log('Microphone published (no camera)', 'success');
+      } catch (micErr) {
+        log(`No microphone either (${micErr.message}), publishing synthetic test pattern...`, 'warn');
+        await publishTestPattern(room);
+      }
     }
 
     // Attach local video
@@ -381,7 +411,11 @@ async function publishTestPattern(room) {
   vid.muted = true;
   vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
   tile.appendChild(vid);
-  tile.innerHTML += `<span class="label">${room.localParticipant.identity} (you - synthetic)</span>`;
+  // innerHTML += would re-parse the tile and detach the video's srcObject.
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = `${room.localParticipant.identity} (you - synthetic)`;
+  tile.appendChild(label);
   document.getElementById('video-grid').appendChild(tile);
 }
 
