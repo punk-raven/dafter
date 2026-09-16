@@ -23,6 +23,12 @@ type Session struct {
 
 var ErrNotFound = errors.New("state: no such session")
 
+type SessionStore interface {
+	CreateSession(ctx context.Context, sess Session) error
+	Session(ctx context.Context, sessionID string) (Session, error)
+	Close() error
+}
+
 type Store struct {
 	db *sql.DB
 }

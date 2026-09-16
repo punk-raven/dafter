@@ -17,7 +17,7 @@ import (
 
 type Service struct {
 	Catalog   *config.Catalog
-	Store     *state.Store
+	Store     state.SessionStore
 	Transport transport.Transport
 	TokenTTL  time.Duration
 	Log       *slog.Logger
