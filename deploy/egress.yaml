@@ -7,6 +7,9 @@ api_key: devkey
 api_secret: secret
 ws_url: ws://livekit:7880
 
+redis:
+  address: redis:6379
+
 s3:
   access_key: minioadmin
   secret: minioadmin
