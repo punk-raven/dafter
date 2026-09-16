@@ -93,7 +93,7 @@ func (f *Fetcher) FetchCredentials(ctx context.Context) ([]ICEServer, error) {
 		return nil, fmt.Errorf("read turn response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("turn api returned %d: %s", resp.StatusCode, raw)
 	}
 

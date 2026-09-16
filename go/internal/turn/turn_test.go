@@ -35,6 +35,7 @@ func TestFetchCredentialsReturnsICEServers(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(map[string]any{"iceServers": want}); err != nil {
 			t.Errorf("encode response: %v", err)
 		}
