@@ -17,6 +17,7 @@ import (
 	"github.com/punk-raven/dafter/go/internal/control"
 	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
+	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
 //go:embed catalog.json
@@ -70,7 +71,15 @@ func run() error {
 		}
 	}()
 
-	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TokenTTL: *ttl}
+	turnFetcher := turn.NewFetcher(
+		os.Getenv("DAFTER_TURN_TOKEN_ID"),
+		os.Getenv("DAFTER_TURN_API_TOKEN"),
+	)
+	if turnFetcher.Enabled() {
+		slog.Info("cloudflare TURN credentials enabled")
+	}
+
+	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl}
 	handler := svc.Handler()
 	server := &http.Server{
 		Addr: *addr,

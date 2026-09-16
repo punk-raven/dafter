@@ -100,10 +100,12 @@
 
     <div id="ice-info" class="ice-info" style="display:none">
       <dl>
+        <dt>Type</dt><dd id="ice-type">-</dd>
         <dt>ICE state</dt><dd id="ice-state">-</dd>
         <dt>Candidate</dt><dd id="ice-candidate">-</dd>
         <dt>Protocol</dt><dd id="ice-protocol">-</dd>
         <dt>Remote</dt><dd id="ice-remote">-</dd>
+        <dt>TURN</dt><dd id="ice-turn-status">-</dd>
       </dl>
     </div>
   </div>
@@ -176,6 +178,12 @@ async function joinSession() {
     localParticipantId = data.participantId;
 
     const icePolicy = document.getElementById('ice-policy').value;
+    const hasICEServers = data.iceServers && data.iceServers.length > 0;
+    if (hasICEServers) {
+      log(`TURN credentials received (${data.iceServers[0].urls.length} URLs)`, 'success');
+    } else {
+      log('No ICE servers in response (TURN not configured)', 'warn');
+    }
     log(`Connecting to ${data.url} (ICE policy: ${icePolicy})...`);
     setBadge('connecting');
 
@@ -218,11 +226,12 @@ async function joinSession() {
     // Convert ws:// to the http URL for the SDK if needed
     let connectUrl = data.url;
 
-    await room.connect(connectUrl, data.token, {
-      rtcConfig: {
-        iceTransportPolicy: icePolicy,
-      },
-    });
+    const rtcConfig = { iceTransportPolicy: icePolicy };
+    if (hasICEServers) {
+      rtcConfig.iceServers = data.iceServers;
+    }
+
+    await room.connect(connectUrl, data.token, { rtcConfig });
 
     log('Connected! Publishing tracks...', 'success');
 
@@ -396,11 +405,13 @@ async function monitorICE() {
           if (report.type === 'candidate-pair' && report.state === 'succeeded') {
             document.getElementById('ice-state').textContent = report.state;
 
-            // Find the local candidate
             stats.forEach(s => {
               if (s.type === 'local-candidate' && s.id === report.localCandidateId) {
-                document.getElementById('ice-candidate').textContent = s.candidateType || '-';
+                const ctype = s.candidateType || '-';
+                document.getElementById('ice-candidate').textContent = ctype;
                 document.getElementById('ice-protocol').textContent = `${s.protocol || '-'} (${s.address || '-'}:${s.port || '-'})`;
+                document.getElementById('ice-type').textContent = ctype;
+                document.getElementById('ice-turn-status').textContent = ctype === 'relay' ? 'active (relay)' : 'not used (' + ctype + ')';
               }
               if (s.type === 'remote-candidate' && s.id === report.remoteCandidateId) {
                 document.getElementById('ice-remote').textContent = `${s.candidateType || '-'} ${s.address || '-'}:${s.port || '-'}`;

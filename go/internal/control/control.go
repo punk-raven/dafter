@@ -13,12 +13,14 @@ import (
 	"github.com/punk-raven/dafter/go/internal/ids"
 	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
+	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
 type Service struct {
 	Catalog   *config.Catalog
 	Store     state.SessionStore
 	Transport transport.Transport
+	TURN      *turn.Fetcher
 	TokenTTL  time.Duration
 	Log       *slog.Logger
 }
@@ -39,14 +41,15 @@ type createSessionRequest struct {
 }
 
 type createSessionResponse struct {
-	SessionID     string          `json:"sessionId"`
-	ParticipantID string          `json:"participantId"`
-	Room          string          `json:"room"`
-	ConfigHash    string          `json:"configHash"`
-	Config        json.RawMessage `json:"config"`
-	Token         string          `json:"token"`
-	URL           string          `json:"url"`
-	ExpiresAt     time.Time       `json:"expiresAt"`
+	SessionID     string           `json:"sessionId"`
+	ParticipantID string           `json:"participantId"`
+	Room          string           `json:"room"`
+	ConfigHash    string           `json:"configHash"`
+	Config        json.RawMessage  `json:"config"`
+	Token         string           `json:"token"`
+	URL           string           `json:"url"`
+	ExpiresAt     time.Time        `json:"expiresAt"`
+	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 }
 
 func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +111,16 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var iceServers []turn.ICEServer
+	if s.TURN != nil && s.TURN.Enabled() {
+		servers, err := s.TURN.FetchCredentials(r.Context())
+		if err != nil {
+			s.log().Warn("turn credential fetch failed, proceeding without ice servers", "error", err)
+		} else {
+			iceServers = servers
+		}
+	}
+
 	s.write(w, http.StatusCreated, createSessionResponse{
 		SessionID:     sessionID,
 		ParticipantID: participantID,
@@ -117,6 +130,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		Token:         token.JWT,
 		URL:           token.URL,
 		ExpiresAt:     token.ExpiresAt,
+		ICEServers:    iceServers,
 	})
 }
 
