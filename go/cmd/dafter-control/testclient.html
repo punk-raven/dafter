@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dafter POC - Test Client</title>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
+  .header { padding: 16px 24px; border-bottom: 1px solid #222; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .header .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .badge-disconnected { background: #3a1c1c; color: #f87171; }
+  .badge-connecting { background: #3a2f1c; color: #fbbf24; }
+  .badge-connected { background: #1c3a1c; color: #4ade80; }
+
+  .layout { display: flex; height: calc(100vh - 57px); }
+  .sidebar { width: 320px; min-width: 320px; border-right: 1px solid #222; overflow-y: auto; padding: 16px; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  .video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
+  .video-tile { position: relative; background: #1a1a1a; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
+  .log-panel { height: 180px; min-height: 100px; border-top: 1px solid #222; overflow-y: auto; padding: 8px 12px; font-family: monospace; font-size: 12px; line-height: 1.6; }
+  .log-panel .ts { color: #666; margin-right: 8px; }
+  .log-panel .info { color: #60a5fa; }
+  .log-panel .success { color: #4ade80; }
+  .log-panel .warn { color: #fbbf24; }
+  .log-panel .error { color: #f87171; }
+
+  fieldset { border: 1px solid #333; border-radius: 6px; padding: 12px; margin: 0 0 12px; }
+  legend { font-size: 12px; font-weight: 600; color: #888; padding: 0 4px; }
+  label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; margin-top: 8px; }
+  label:first-child { margin-top: 0; }
+  input, select { width: 100%; padding: 6px 8px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
+  input:focus, select:focus { outline: none; border-color: #555; }
+  button { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; width: 100%; }
+  .btn-join { background: #2563eb; color: white; margin-top: 12px; }
+  .btn-join:hover { background: #1d4ed8; }
+  .btn-join:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .btn-leave { background: #dc2626; color: white; margin-top: 8px; }
+  .btn-leave:hover { background: #b91c1c; }
+
+  .ice-info { margin-top: 12px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; line-height: 1.6; }
+  .ice-info dt { color: #888; float: left; width: 100px; clear: left; }
+  .ice-info dd { margin-left: 104px; color: #e0e0e0; }
+
+  .response-box { margin-top: 8px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Dafter POC</h1>
+  <span id="status-badge" class="badge badge-disconnected">disconnected</span>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <fieldset>
+      <legend>Session</legend>
+      <label>Tenant ID</label>
+      <input id="tenant" value="t_9c21a4be">
+      <label>Language</label>
+      <select id="language">
+        <option value="en-IN" selected>en-IN (English)</option>
+        <option value="hi">hi (Hindi)</option>
+      </select>
+      <label>Channel</label>
+      <select id="channel">
+        <option value="webrtc" selected>webrtc</option>
+        <option value="telephony">telephony</option>
+      </select>
+      <label>Profile (optional)</label>
+      <input id="profile" value="support">
+      <label>Role</label>
+      <select id="role">
+        <option value="participant" selected>participant</option>
+        <option value="presenter">presenter</option>
+        <option value="observer">observer</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Connection</legend>
+      <label>Force relay (TURN only)</label>
+      <select id="ice-policy">
+        <option value="all" selected>all (normal)</option>
+        <option value="relay">relay only (TURN test)</option>
+      </select>
+    </fieldset>
+
+    <button id="btn-join" class="btn-join" onclick="joinSession()">Create Session & Join</button>
+    <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
+
+    <div id="session-response" class="response-box" style="display:none"></div>
+
+    <div id="ice-info" class="ice-info" style="display:none">
+      <dl>
+        <dt>ICE state</dt><dd id="ice-state">-</dd>
+        <dt>Candidate</dt><dd id="ice-candidate">-</dd>
+        <dt>Protocol</dt><dd id="ice-protocol">-</dd>
+        <dt>Remote</dt><dd id="ice-remote">-</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="video-grid" class="video-grid"></div>
+    <div id="log" class="log-panel"></div>
+  </div>
+</div>
+
+<script>
+const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
+
+let room = null;
+let localParticipantId = null;
+
+function log(msg, level = 'info') {
+  const el = document.getElementById('log');
+  const ts = new Date().toISOString().slice(11, 23);
+  el.innerHTML += `<div><span class="ts">${ts}</span><span class="${level}">${escapeHtml(msg)}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function setBadge(state) {
+  const el = document.getElementById('status-badge');
+  el.textContent = state;
+  el.className = 'badge badge-' + (state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : 'disconnected');
+}
+
+async function joinSession() {
+  const btn = document.getElementById('btn-join');
+  btn.disabled = true;
+
+  try {
+    log('Creating session via POST /sessions...');
+    const body = {
+      tenantId: document.getElementById('tenant').value,
+      language: document.getElementById('language').value,
+      channel: document.getElementById('channel').value,
+      role: document.getElementById('role').value,
+    };
+    const profile = document.getElementById('profile').value.trim();
+    if (profile) body.profile = profile;
+
+    const resp = await fetch('/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+
+    const responseBox = document.getElementById('session-response');
+    responseBox.style.display = 'block';
+    responseBox.textContent = JSON.stringify(data, null, 2);
+
+    if (!resp.ok) {
+      log(`Session creation failed: ${data.code} - ${data.message}`, 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    log(`Session created: ${data.sessionId}`, 'success');
+    log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`);
+    localParticipantId = data.participantId;
+
+    const icePolicy = document.getElementById('ice-policy').value;
+    log(`Connecting to ${data.url} (ICE policy: ${icePolicy})...`);
+    setBadge('connecting');
+
+    room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    });
+
+    room.on(RoomEvent.ConnectionStateChanged, (state) => {
+      log(`Connection state: ${state}`);
+      setBadge(state === ConnectionState.Connected ? 'connected' : state === ConnectionState.Connecting || state === ConnectionState.Reconnecting ? 'connecting' : 'disconnected');
+    });
+
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      log(`Subscribed to ${track.kind} from ${participant.identity}`);
+      attachTrack(track, participant);
+    });
+
+    room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      log(`Unsubscribed from ${track.kind} of ${participant.identity}`);
+      detachTrack(track, participant);
+    });
+
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      log(`Participant joined: ${participant.identity}`, 'success');
+    });
+
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      log(`Participant left: ${participant.identity}`, 'warn');
+      removeTile(participant.identity);
+    });
+
+    room.on(RoomEvent.Disconnected, (reason) => {
+      log(`Disconnected: ${reason || 'unknown'}`, 'warn');
+      setBadge('disconnected');
+      cleanup();
+    });
+
+    // Convert ws:// to the http URL for the SDK if needed
+    let connectUrl = data.url;
+
+    await room.connect(connectUrl, data.token, {
+      rtcConfig: {
+        iceTransportPolicy: icePolicy,
+      },
+    });
+
+    log('Connected! Publishing camera and microphone...', 'success');
+
+    await room.localParticipant.enableCameraAndMicrophone();
+    log('Local tracks published', 'success');
+
+    // Attach local video
+    const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
+    if (localVideoTrack && localVideoTrack.track) {
+      attachTrack(localVideoTrack.track, room.localParticipant, true);
+    }
+
+    document.getElementById('btn-join').style.display = 'none';
+    document.getElementById('btn-leave').style.display = 'block';
+
+    // Start ICE monitoring
+    monitorICE();
+
+  } catch (err) {
+    log(`Error: ${err.message}`, 'error');
+    btn.disabled = false;
+    setBadge('disconnected');
+  }
+}
+
+async function leaveSession() {
+  if (room) {
+    await room.disconnect();
+  }
+  cleanup();
+}
+
+function cleanup() {
+  room = null;
+  document.getElementById('video-grid').innerHTML = '';
+  document.getElementById('btn-join').style.display = 'block';
+  document.getElementById('btn-join').disabled = false;
+  document.getElementById('btn-leave').style.display = 'none';
+  document.getElementById('ice-info').style.display = 'none';
+}
+
+function attachTrack(track, participant, isLocal = false) {
+  const tileId = `tile-${participant.identity}-${track.kind}`;
+  let tile = document.getElementById(tileId);
+
+  if (track.kind === 'video') {
+    if (!tile) {
+      tile = document.createElement('div');
+      tile.id = tileId;
+      tile.className = 'video-tile';
+      tile.innerHTML = `<span class="label">${participant.identity}${isLocal ? ' (you)' : ''}</span>`;
+      document.getElementById('video-grid').appendChild(tile);
+    }
+    const el = track.attach();
+    el.style.width = '100%';
+    el.style.height = '100%';
+    el.style.objectFit = 'cover';
+    if (isLocal) el.style.transform = 'scaleX(-1)';
+    tile.insertBefore(el, tile.firstChild);
+  }
+
+  if (track.kind === 'audio' && !isLocal) {
+    const el = track.attach();
+    el.id = `audio-${participant.identity}`;
+    document.body.appendChild(el);
+  }
+}
+
+function detachTrack(track, participant) {
+  track.detach().forEach(el => el.remove());
+  if (track.kind === 'video') {
+    const tile = document.getElementById(`tile-${participant.identity}-video`);
+    if (tile) tile.remove();
+  }
+}
+
+function removeTile(identity) {
+  document.querySelectorAll(`[id^="tile-${identity}"]`).forEach(el => el.remove());
+  const audio = document.getElementById(`audio-${identity}`);
+  if (audio) audio.remove();
+}
+
+async function monitorICE() {
+  const infoEl = document.getElementById('ice-info');
+  infoEl.style.display = 'block';
+
+  const poll = async () => {
+    if (!room || room.state !== ConnectionState.Connected) return;
+
+    try {
+      const pc = room.engine?.pcManager?.publisher?.getStats
+        ? room.engine.pcManager.publisher
+        : null;
+
+      // Try to get stats from the underlying peer connection
+      const sender = room.engine?.pcManager?.publisher?.pc;
+      if (sender) {
+        const stats = await sender.getStats();
+        stats.forEach(report => {
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            document.getElementById('ice-state').textContent = report.state;
+
+            // Find the local candidate
+            stats.forEach(s => {
+              if (s.type === 'local-candidate' && s.id === report.localCandidateId) {
+                document.getElementById('ice-candidate').textContent = s.candidateType || '-';
+                document.getElementById('ice-protocol').textContent = `${s.protocol || '-'} (${s.address || '-'}:${s.port || '-'})`;
+              }
+              if (s.type === 'remote-candidate' && s.id === report.remoteCandidateId) {
+                document.getElementById('ice-remote').textContent = `${s.candidateType || '-'} ${s.address || '-'}:${s.port || '-'}`;
+              }
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // Stats not available yet
+    }
+    setTimeout(poll, 2000);
+  };
+  poll();
+}
+</script>
+</body>
+</html>

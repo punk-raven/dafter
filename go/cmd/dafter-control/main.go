@@ -22,6 +22,9 @@ import (
 //go:embed catalog.json
 var embeddedCatalog []byte
 
+//go:embed testclient.html
+var testClientHTML []byte
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("dafter-control stopped", "error", err)
@@ -68,9 +71,19 @@ func run() error {
 	}()
 
 	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TokenTTL: *ttl}
+	handler := svc.Handler()
 	server := &http.Server{
-		Addr:              *addr,
-		Handler:           svc.Handler(),
+		Addr: *addr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet && r.URL.Path == "/" {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				if _, err := w.Write(testClientHTML); err != nil {
+					slog.Error("write test client", "error", err)
+				}
+				return
+			}
+			handler.ServeHTTP(w, r)
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
