@@ -224,10 +224,15 @@ async function joinSession() {
       },
     });
 
-    log('Connected! Publishing camera and microphone...', 'success');
+    log('Connected! Publishing tracks...', 'success');
 
-    await room.localParticipant.enableCameraAndMicrophone();
-    log('Local tracks published', 'success');
+    try {
+      await room.localParticipant.enableCameraAndMicrophone();
+      log('Camera and microphone published', 'success');
+    } catch (mediaErr) {
+      log(`No camera/mic available (${mediaErr.message}), publishing synthetic test pattern...`, 'warn');
+      await publishTestPattern(room);
+    }
 
     // Attach local video
     const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
@@ -303,6 +308,72 @@ function removeTile(identity) {
   document.querySelectorAll(`[id^="tile-${identity}"]`).forEach(el => el.remove());
   const audio = document.getElementById(`audio-${identity}`);
   if (audio) audio.remove();
+}
+
+async function publishTestPattern(room) {
+  const { LocalVideoTrack, LocalAudioTrack } = LivekitClient;
+
+  // Synthetic video: animated color bars with a timestamp
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  const colors = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c'];
+  const barW = canvas.width / colors.length;
+
+  function drawFrame() {
+    for (let i = 0; i < colors.length; i++) {
+      ctx.fillStyle = colors[i];
+      ctx.fillRect(i * barW, 0, barW, canvas.height);
+    }
+    const now = new Date();
+    const ts = now.toISOString().slice(11, 23);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Dafter POC  ${ts}`, canvas.width / 2, canvas.height - 16);
+    // Animate: shift bars slowly
+    const shift = (Date.now() / 50) % canvas.height;
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0, shift - 5, canvas.width, 10);
+  }
+  setInterval(drawFrame, 1000 / 30);
+  drawFrame();
+
+  const videoStream = canvas.captureStream(30);
+  const videoTrack = new LocalVideoTrack(videoStream.getVideoTracks()[0]);
+  await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
+  log('Synthetic video track published (color bars + timestamp)', 'success');
+
+  // Synthetic audio: 440Hz sine wave at low volume
+  const audioCtx = new AudioContext();
+  const osc = audioCtx.createOscillator();
+  osc.frequency.value = 440;
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.05;
+  osc.connect(gain);
+  const dest = audioCtx.createMediaStreamDestination();
+  gain.connect(dest);
+  osc.start();
+
+  const audioTrack = new LocalAudioTrack(dest.stream.getAudioTracks()[0]);
+  await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
+  log('Synthetic audio track published (440Hz tone)', 'success');
+
+  // Show local video tile from the canvas stream
+  const tile = document.createElement('div');
+  tile.id = `tile-${room.localParticipant.identity}-video`;
+  tile.className = 'video-tile';
+  const vid = document.createElement('video');
+  vid.srcObject = videoStream;
+  vid.autoplay = true;
+  vid.muted = true;
+  vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  tile.appendChild(vid);
+  tile.innerHTML += `<span class="label">${room.localParticipant.identity} (you - synthetic)</span>`;
+  document.getElementById('video-grid').appendChild(tile);
 }
 
 async function monitorICE() {

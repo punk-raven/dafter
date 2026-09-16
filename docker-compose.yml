@@ -68,6 +68,7 @@ services:
     image: livekit/egress:latest
     environment:
       EGRESS_CONFIG_FILE: /etc/egress.yaml
+    network_mode: host
     depends_on:
       livekit:
         condition: service_started
