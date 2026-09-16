@@ -41,6 +41,9 @@ __pycache__/
 *.egg-info/
 .mypy_cache/
 
+# Docker compose runtime
+dafter.db
+
 # Build and profiling output
 coverage.out
 *.prof

@@ -39,9 +39,13 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 
 depguard in `go/.golangci.yml` holds the whole graph: core below everything, state and transport siblings above it, control above them. `github.com/livekit/*` is denied outside `go/internal/transport`, which is the seam every media server concern goes behind. Target graph: `docs/dafter.md` section 5.
 
+## POC infrastructure
+
+`make poc` from a clean clone brings up the full stack: LiveKit SFU, Redis, MinIO (recordings), Jaeger (tracing). `make poc-down` tears it down. Config lives in `deploy/livekit.yaml` and `deploy/egress.yaml`; dev credentials are `devkey`/`secret`.
+
 ## Running the control plane
 
-`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <file>` replaces the catalog embedded in the binary, `go/cmd/dafter-control/catalog.json`. For a local media server, `livekit-server --dev` serves `devkey`/`secret` on `127.0.0.1:7880`.
+`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <file>` replaces the catalog embedded in the binary, `go/cmd/dafter-control/catalog.json`. With the POC stack running, use `devkey`/`secret` on `ws://127.0.0.1:7880`.
 
 ## Commits
 

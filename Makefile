@@ -96,3 +96,23 @@ setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Pyth
 
 .PHONY: check
 check: generate-check vet lint test py-lint py-test ## What CI runs
+
+# ---------------------------------------------------------------------------
+# POC infrastructure
+# ---------------------------------------------------------------------------
+
+.PHONY: poc
+poc: setup ## Bring up the full POC stack from a clean clone
+	docker compose up -d
+	@echo ""
+	@echo "  LiveKit SFU   ws://127.0.0.1:7880"
+	@echo "  MinIO console http://127.0.0.1:9001  (minioadmin/minioadmin)"
+	@echo "  Jaeger UI     http://127.0.0.1:16686"
+	@echo ""
+	@echo "  Control plane:"
+	@echo "    cd go && DAFTER_LIVEKIT_API_KEY=devkey DAFTER_LIVEKIT_API_SECRET=secret go run ./cmd/dafter-control"
+	@echo ""
+
+.PHONY: poc-down
+poc-down: ## Tear down the POC stack and volumes
+	docker compose down -v

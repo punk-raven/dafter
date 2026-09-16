@@ -1,0 +1,90 @@
+# Dafter POC infrastructure
+#
+# Brings up everything needed for a local proof of concept:
+#   - LiveKit SFU (media routing, egress, ingress)
+#   - Redis (LiveKit's coordination store)
+#   - MinIO (S3-compatible recording storage)
+#   - Jaeger (distributed tracing)
+#
+# Usage:
+#   make poc          bring everything up from a clean clone
+#   docker compose up start the infrastructure
+#   docker compose down -v tear down, including volumes
+#
+# LiveKit dev credentials: devkey / secret (matching livekit.yaml)
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 5
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/dafter-recordings &&
+      mc anonymous set download local/dafter-recordings
+      "
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+
+  egress:
+    image: livekit/egress:latest
+    environment:
+      EGRESS_CONFIG_FILE: /etc/egress.yaml
+    depends_on:
+      livekit:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./deploy/egress.yaml:/etc/egress.yaml:ro
+    cap_add:
+      - SYS_ADMIN
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+volumes:
+  minio-data:
