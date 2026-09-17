@@ -97,6 +97,33 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      control:
+        condition: service_started
+      livekit:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+
   tunnel:
     image: cloudflare/cloudflared:latest
     command: tunnel --no-autoupdate run --token ${DAFTER_CF_TUNNEL_TOKEN}

@@ -222,6 +222,7 @@ func (s *Service) fail(w http.ResponseWriter, err error) {
 	if !errors.As(err, &de) {
 		de = errs.Wrap(errs.CodeInternal, err, "request failed")
 	}
+	incError(de.Code)
 	s.log().Warn("request rejected", "code", de.Code, "details", de.Details)
 	s.write(w, statusFor(de.Code), de)
 }

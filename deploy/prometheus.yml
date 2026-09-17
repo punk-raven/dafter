@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: dafter-control
+    static_configs:
+      - targets: ["control:8080"]
+  - job_name: livekit
+    static_configs:
+      - targets: ["livekit:7880"]
+    metrics_path: /metrics

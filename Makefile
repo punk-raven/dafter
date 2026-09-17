@@ -109,7 +109,16 @@ dev: setup ## Build and start the full dev stack
 	@echo "  LiveKit SFU   ws://127.0.0.1:7880"
 	@echo "  MinIO console http://127.0.0.1:9001  (minioadmin/minioadmin)"
 	@echo "  Jaeger UI     http://127.0.0.1:16686"
+	@echo "  Prometheus    http://127.0.0.1:9090"
+	@echo "  Grafana       http://127.0.0.1:3000  (admin/admin)"
 	@echo ""
+
+.PHONY: loadtest
+loadtest: ## Run the load test against the dev stack (USERS=100 DURATION=60s)
+	cd $(GO_DIR) && go run ./cmd/dafter-loadtest \
+		-target http://127.0.0.1:8080 \
+		-users $${USERS:-100} \
+		-duration $${DURATION:-60s}
 
 .PHONY: dev-down
 dev-down: ## Tear down the dev stack and volumes

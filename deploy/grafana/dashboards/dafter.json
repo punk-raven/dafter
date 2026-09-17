@@ -1,0 +1,148 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "Session Creation Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(dafter_sessions_created_total[1m])",
+          "legendFormat": "creates/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Session Join Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(dafter_sessions_joined_total[1m])",
+          "legendFormat": "joins/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Request Latency Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 5 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate by Code",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(dafter_errors_total[1m])",
+          "legendFormat": "{{ code }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Request Rate by Status",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (status_code) (rate(http_requests_total[1m]))",
+          "legendFormat": "{{ status_code }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "LiveKit Rooms",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "livekit_room_count",
+          "legendFormat": "rooms",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["dafter"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Dafter",
+  "uid": "dafter-overview",
+  "version": 1
+}

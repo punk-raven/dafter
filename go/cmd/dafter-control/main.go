@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/control"
 	"github.com/punk-raven/dafter/go/internal/state"
@@ -80,7 +82,8 @@ func run() error {
 	}
 
 	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl}
-	handler := svc.Handler()
+	handler := svc.MetricsHandler()
+	metricsHandler := promhttp.Handler()
 	server := &http.Server{
 		Addr: *addr,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +92,10 @@ func run() error {
 				if _, err := w.Write(testClientHTML); err != nil {
 					slog.Error("write test client", "error", err)
 				}
+				return
+			}
+			if r.Method == http.MethodGet && r.URL.Path == "/metrics" {
+				metricsHandler.ServeHTTP(w, r)
 				return
 			}
 			handler.ServeHTTP(w, r)
