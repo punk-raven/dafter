@@ -220,9 +220,9 @@ func (s *Service) write(w http.ResponseWriter, status int, body any) {
 func (s *Service) fail(w http.ResponseWriter, err error) {
 	var de *errs.Error
 	if !errors.As(err, &de) {
-		de = errs.Wrap(errs.CodeInternal, err, "session create failed")
+		de = errs.Wrap(errs.CodeInternal, err, "request failed")
 	}
-	s.log().Warn("session create rejected", "code", de.Code, "details", de.Details)
+	s.log().Warn("request rejected", "code", de.Code, "details", de.Details)
 	s.write(w, statusFor(de.Code), de)
 }
 

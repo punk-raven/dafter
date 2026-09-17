@@ -37,18 +37,28 @@
   label:first-child { margin-top: 0; }
   input, select { width: 100%; padding: 6px 8px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
   input:focus, select:focus { outline: none; border-color: #555; }
-  button { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; width: 100%; }
-  .btn-join { background: #2563eb; color: white; margin-top: 12px; }
+  button { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; width: 100%; margin-top: 8px; }
+  .btn-create { background: #7c3aed; color: white; }
+  .btn-create:hover { background: #6d28d9; }
+  .btn-create:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .btn-join { background: #2563eb; color: white; }
   .btn-join:hover { background: #1d4ed8; }
   .btn-join:disabled { background: #333; color: #666; cursor: not-allowed; }
-  .btn-leave { background: #dc2626; color: white; margin-top: 8px; }
+  .btn-copy { background: #059669; color: white; }
+  .btn-copy:hover { background: #047857; }
+  .btn-leave { background: #dc2626; color: white; }
   .btn-leave:hover { background: #b91c1c; }
+  .divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
 
   .ice-info { margin-top: 12px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; line-height: 1.6; }
   .ice-info dt { color: #888; float: left; width: 100px; clear: left; }
   .ice-info dd { margin-left: 104px; color: #e0e0e0; }
 
   .response-box { margin-top: 8px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #888; }
+
+  .session-created { margin-top: 8px; padding: 10px; background: #1a2e1a; border: 1px solid #2d5a2d; border-radius: 6px; font-size: 12px; }
+  .session-created .room-id { font-family: monospace; font-size: 14px; font-weight: 600; color: #4ade80; }
+
 </style>
 </head>
 <body>
@@ -60,46 +70,57 @@
 
 <div class="layout">
   <div class="sidebar">
-    <fieldset>
-      <legend>Session</legend>
-      <label>Tenant ID</label>
-      <input id="tenant" value="t_9c21a4be">
-      <label>Language</label>
-      <select id="language">
-        <option value="en-IN" selected>en-IN (English)</option>
-        <option value="hi">hi (Hindi)</option>
-      </select>
-      <label>Channel</label>
-      <select id="channel">
-        <option value="webrtc" selected>webrtc</option>
-        <option value="telephony">telephony</option>
-      </select>
-      <label>Profile (optional)</label>
-      <input id="profile" value="support">
-      <label>Role</label>
-      <select id="role">
-        <option value="participant" selected>participant</option>
-        <option value="presenter">presenter</option>
-        <option value="observer">observer</option>
-      </select>
-    </fieldset>
+    <div id="panel-create">
+      <fieldset>
+        <legend>Create Session</legend>
+        <label>Tenant ID</label>
+        <input id="tenant" value="t_9c21a4be">
+        <label>Language</label>
+        <select id="language">
+          <option value="en-IN" selected>en-IN (English)</option>
+          <option value="hi">hi (Hindi)</option>
+        </select>
+        <label>Channel</label>
+        <select id="channel">
+          <option value="webrtc" selected>webrtc</option>
+          <option value="telephony">telephony</option>
+        </select>
+        <label>Profile (optional)</label>
+        <input id="profile" value="support">
+      </fieldset>
+      <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
+    </div>
 
-    <fieldset>
-      <legend>Connection</legend>
-      <label>Force relay (TURN only)</label>
-      <select id="ice-policy">
-        <option value="all" selected>all (normal)</option>
-        <option value="relay">relay only (TURN test)</option>
-      </select>
-    </fieldset>
+    <div id="session-created-info" class="session-created" style="display:none">
+      <div>Session created</div>
+      <div style="margin-top:6px">Room: <span id="created-room-id" class="room-id"></span></div>
+      <div style="margin-top:6px;font-size:11px;color:#888">Share this link to join:</div>
+      <input id="join-link" readonly style="margin-top:4px;font-size:11px;color:#4ade80;background:#0f1f0f;border-color:#2d5a2d;cursor:pointer" onclick="this.select();copyJoinLink()">
+      <button id="btn-copy-link" class="btn-copy" onclick="copyJoinLink()">Copy join link</button>
+    </div>
 
-    <fieldset>
-      <legend>Join existing room</legend>
-      <label>Room ID (leave empty to create new)</label>
-      <input id="room-id" placeholder="s_xxxxxxxx">
-    </fieldset>
+    <hr class="divider">
 
-    <button id="btn-join" class="btn-join" onclick="joinSession()">Create Session & Join</button>
+    <div id="panel-join">
+      <fieldset>
+        <legend>Join Room</legend>
+        <label>Room ID</label>
+        <input id="room-id" placeholder="s_xxxxxxxx">
+        <label>Role</label>
+        <select id="role">
+          <option value="participant" selected>participant</option>
+          <option value="presenter">presenter</option>
+          <option value="observer">observer</option>
+        </select>
+        <label>ICE transport</label>
+        <select id="ice-policy">
+          <option value="all" selected>all (normal)</option>
+          <option value="relay">relay only (TURN test)</option>
+        </select>
+      </fieldset>
+      <button id="btn-join" class="btn-join" onclick="joinRoom()">Join Room</button>
+    </div>
+
     <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
 
     <div id="session-response" class="response-box" style="display:none"></div>
@@ -127,6 +148,9 @@ const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
 
 let room = null;
 let localParticipantId = null;
+let syntheticIntervalId = null;
+let syntheticAudioCtx = null;
+let lastRoomId = null;
 
 function log(msg, level = 'info') {
   const el = document.getElementById('log');
@@ -147,53 +171,83 @@ function setBadge(state) {
   el.className = 'badge badge-' + (state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : 'disconnected');
 }
 
-async function joinSession() {
-  const btn = document.getElementById('btn-join');
+function showResponse(data) {
+  const box = document.getElementById('session-response');
+  box.style.display = 'block';
+  box.textContent = JSON.stringify(data, null, 2);
+}
+
+async function createSession() {
+  const btn = document.getElementById('btn-create');
   btn.disabled = true;
 
   try {
-    const existingRoom = document.getElementById('room-id').value.trim();
-    let resp, data;
+    log('Creating session via POST /sessions...');
+    const body = {
+      tenantId: document.getElementById('tenant').value,
+      language: document.getElementById('language').value,
+      channel: document.getElementById('channel').value,
+    };
+    const profile = document.getElementById('profile').value.trim();
+    if (profile) body.profile = profile;
 
-    if (existingRoom) {
-      log(`Joining existing room ${existingRoom}...`);
-      resp = await fetch(`/sessions/${existingRoom}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: document.getElementById('role').value }),
-      });
-    } else {
-      log('Creating session via POST /sessions...');
-      const body = {
-        tenantId: document.getElementById('tenant').value,
-        language: document.getElementById('language').value,
-        channel: document.getElementById('channel').value,
-        role: document.getElementById('role').value,
-      };
-      const profile = document.getElementById('profile').value.trim();
-      if (profile) body.profile = profile;
-      resp = await fetch('/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-    }
-
-    data = await resp.json();
-
-    const responseBox = document.getElementById('session-response');
-    responseBox.style.display = 'block';
-    responseBox.textContent = JSON.stringify(data, null, 2);
+    const resp = await fetch('/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    showResponse(data);
 
     if (!resp.ok) {
-      log(`Failed: ${data.code} - ${data.message}`, 'error');
+      log(`Create failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
       return;
     }
 
-    log(`Session: ${data.sessionId} | Room: ${data.room}`, 'success');
-    log(`Share this Room ID with the other person: ${data.room}`, 'success');
-    log(`Hash: ${data.configHash.slice(0, 16)}...`);
+    lastRoomId = data.room;
+    log(`Session created: ${data.sessionId}`, 'success');
+    log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
+
+    const joinUrl = `${window.location.origin}?room=${data.room}`;
+    document.getElementById('created-room-id').textContent = data.room;
+    document.getElementById('join-link').value = joinUrl;
+    document.getElementById('session-created-info').style.display = 'block';
+    document.getElementById('room-id').value = data.room;
+
+  } catch (err) {
+    log(`Error: ${err.message}`, 'error');
+  }
+  btn.disabled = false;
+}
+
+async function joinRoom() {
+  const roomId = document.getElementById('room-id').value.trim();
+  if (!roomId) {
+    log('Enter a Room ID or create a session first', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-join');
+  btn.disabled = true;
+
+  try {
+    log(`Joining room ${roomId}...`);
+    const resp = await fetch(`/sessions/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: document.getElementById('role').value }),
+    });
+    const data = await resp.json();
+    showResponse(data);
+
+    if (!resp.ok) {
+      log(`Join failed: ${data.code} - ${data.message}`, 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    log(`Joined session: ${data.sessionId} | Participant: ${data.participantId}`, 'success');
     localParticipantId = data.participantId;
 
     const icePolicy = document.getElementById('ice-policy').value;
@@ -203,7 +257,7 @@ async function joinSession() {
     } else {
       log('No ICE servers in response (TURN not configured)', 'warn');
     }
-    log(`Connecting to ${data.url} (ICE policy: ${icePolicy})...`);
+
     setBadge('connecting');
 
     room = new Room({
@@ -247,18 +301,15 @@ async function joinSession() {
       rtcConfig.iceServers = data.iceServers;
     }
 
-    // The control plane reports the SFU address it knows; a remote browser
-    // reaches the SFU by whatever host it reached this page on.
     const lkUrl = new URL(data.url);
     lkUrl.hostname = window.location.hostname;
     const connectUrl = lkUrl.toString();
-    log(`LiveKit endpoint: ${connectUrl}`);
+    log(`LiveKit endpoint: ${connectUrl} (ICE policy: ${icePolicy})`);
 
     await room.connect(connectUrl, data.token, { rtcConfig });
 
     log('Connected! Publishing tracks...', 'success');
 
-    // Degrade one device at a time: a missing camera must not drop the mic.
     try {
       await room.localParticipant.enableCameraAndMicrophone();
       log('Camera and microphone published', 'success');
@@ -273,16 +324,16 @@ async function joinSession() {
       }
     }
 
-    // Attach local video
     const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
     if (localVideoTrack && localVideoTrack.track) {
       attachTrack(localVideoTrack.track, room.localParticipant, true);
     }
 
-    document.getElementById('btn-join').style.display = 'none';
+    document.getElementById('panel-create').style.display = 'none';
+    document.getElementById('panel-join').style.display = 'none';
+    document.getElementById('session-created-info').style.display = 'none';
     document.getElementById('btn-leave').style.display = 'block';
 
-    // Start ICE monitoring
     monitorICE();
 
   } catch (err) {
@@ -300,9 +351,19 @@ async function leaveSession() {
 }
 
 function cleanup() {
+  if (syntheticIntervalId != null) {
+    clearInterval(syntheticIntervalId);
+    syntheticIntervalId = null;
+  }
+  if (syntheticAudioCtx) {
+    syntheticAudioCtx.close();
+    syntheticAudioCtx = null;
+  }
   room = null;
   document.getElementById('video-grid').innerHTML = '';
-  document.getElementById('btn-join').style.display = 'block';
+  document.getElementById('panel-create').style.display = 'block';
+  document.getElementById('panel-join').style.display = 'block';
+  document.getElementById('btn-create').disabled = false;
   document.getElementById('btn-join').disabled = false;
   document.getElementById('btn-leave').style.display = 'none';
   document.getElementById('ice-info').style.display = 'none';
@@ -352,7 +413,6 @@ function removeTile(identity) {
 async function publishTestPattern(room) {
   const { LocalVideoTrack, LocalAudioTrack } = LivekitClient;
 
-  // Synthetic video: animated color bars with a timestamp
   const canvas = document.createElement('canvas');
   canvas.width = 640;
   canvas.height = 360;
@@ -373,12 +433,11 @@ async function publishTestPattern(room) {
     ctx.font = 'bold 28px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(`Dafter POC  ${ts}`, canvas.width / 2, canvas.height - 16);
-    // Animate: shift bars slowly
     const shift = (Date.now() / 50) % canvas.height;
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fillRect(0, shift - 5, canvas.width, 10);
   }
-  setInterval(drawFrame, 1000 / 30);
+  syntheticIntervalId = setInterval(drawFrame, 1000 / 30);
   drawFrame();
 
   const videoStream = canvas.captureStream(30);
@@ -386,8 +445,8 @@ async function publishTestPattern(room) {
   await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
   log('Synthetic video track published (color bars + timestamp)', 'success');
 
-  // Synthetic audio: 440Hz sine wave at low volume
-  const audioCtx = new AudioContext();
+  syntheticAudioCtx = new AudioContext();
+  const audioCtx = syntheticAudioCtx;
   const osc = audioCtx.createOscillator();
   osc.frequency.value = 440;
   const gain = audioCtx.createGain();
@@ -401,7 +460,6 @@ async function publishTestPattern(room) {
   await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
   log('Synthetic audio track published (440Hz tone)', 'success');
 
-  // Show local video tile from the canvas stream
   const tile = document.createElement('div');
   tile.id = `tile-${room.localParticipant.identity}-video`;
   tile.className = 'video-tile';
@@ -411,7 +469,6 @@ async function publishTestPattern(room) {
   vid.muted = true;
   vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
   tile.appendChild(vid);
-  // innerHTML += would re-parse the tile and detach the video's srcObject.
   const label = document.createElement('span');
   label.className = 'label';
   label.textContent = `${room.localParticipant.identity} (you - synthetic)`;
@@ -427,11 +484,6 @@ async function monitorICE() {
     if (!room || room.state !== ConnectionState.Connected) return;
 
     try {
-      const pc = room.engine?.pcManager?.publisher?.getStats
-        ? room.engine.pcManager.publisher
-        : null;
-
-      // Try to get stats from the underlying peer connection
       const sender = room.engine?.pcManager?.publisher?.pc;
       if (sender) {
         const stats = await sender.getStats();
@@ -461,6 +513,27 @@ async function monitorICE() {
   };
   poll();
 }
+
+function copyJoinLink() {
+  if (!lastRoomId) return;
+  const url = `${window.location.origin}?room=${lastRoomId}`;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('btn-copy-link');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy join link'; }, 1500);
+  });
+}
+
+(function seedFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const roomParam = params.get('room');
+  if (roomParam) {
+    document.getElementById('room-id').value = roomParam;
+    if (confirm(`Join room ${roomParam}?`)) {
+      joinRoom();
+    }
+  }
+})();
 </script>
 </body>
 </html>
