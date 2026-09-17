@@ -301,9 +301,16 @@ async function joinRoom() {
       rtcConfig.iceServers = data.iceServers;
     }
 
-    const lkUrl = new URL(data.url);
-    lkUrl.hostname = window.location.hostname;
-    const connectUrl = lkUrl.toString();
+    let connectUrl;
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      const lkUrl = new URL(data.url);
+      lkUrl.hostname = window.location.hostname;
+      connectUrl = lkUrl.toString();
+    } else {
+      const parts = window.location.hostname.split('.');
+      parts[0] = 'sfu';
+      connectUrl = `wss://${parts.join('.')}`;
+    }
     log(`LiveKit endpoint: ${connectUrl} (ICE policy: ${icePolicy})`);
 
     await room.connect(connectUrl, data.token, { rtcConfig });
