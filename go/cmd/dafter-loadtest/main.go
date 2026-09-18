@@ -120,7 +120,10 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 	}
 
 	var wg sync.WaitGroup
-	deadline := time.After(cfg.duration)
+	// One context, not a shared time.After: a timer channel delivers to a
+	// single receiver, so every other goroutine waiting on it would run on.
+	runCtx, runCancel := context.WithTimeout(ctx, cfg.duration)
+	defer runCancel()
 
 	// Reporter goroutine
 	wg.Add(1)
@@ -152,9 +155,7 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 					now.Sub(st.startTime).Seconds(), rps,
 					p50c, p95c, p99c,
 					curSuccess, curErrors)
-			case <-ctx.Done():
-				return
-			case <-deadline:
+			case <-runCtx.Done():
 				return
 			}
 		}
@@ -173,30 +174,12 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 	})
 	joinBody := []byte(`{"role":"participant"}`)
 
-	userCtx, userCancel := context.WithCancel(ctx)
-
-	for i := 0; i < cfg.users; i++ {
-		select {
-		case <-deadline:
-			break
-		case <-ctx.Done():
-			break
-		default:
-		}
-
+	for i := 0; i < cfg.users && runCtx.Err() == nil; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for {
-				select {
-				case <-userCtx.Done():
-					return
-				case <-deadline:
-					return
-				default:
-				}
-
-				sessionID := doCreate(userCtx, client, cfg.target, createBody, st)
+			for runCtx.Err() == nil {
+				sessionID := doCreate(runCtx, client, cfg.target, createBody, st)
 				if sessionID == "" {
 					continue
 				}
@@ -206,7 +189,7 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 					jwg.Add(1)
 					go func() {
 						defer jwg.Done()
-						doJoin(userCtx, client, cfg.target, sessionID, joinBody, st)
+						doJoin(runCtx, client, cfg.target, sessionID, joinBody, st)
 					}()
 				}
 				jwg.Wait()
@@ -218,11 +201,7 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 		}
 	}
 
-	select {
-	case <-deadline:
-	case <-ctx.Done():
-	}
-	userCancel()
+	<-runCtx.Done()
 	wg.Wait()
 	return st
 }
@@ -246,7 +225,9 @@ func doCreate(ctx context.Context, client *http.Client, target string, body []by
 	resp, err := client.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		st.record(requestResult{op: "create", duration: elapsed, err: err})
+		if ctx.Err() == nil { // cut off by the end of the run is not a failure
+			st.record(requestResult{op: "create", duration: elapsed, err: err})
+		}
 		return ""
 	}
 	defer resp.Body.Close()
@@ -285,7 +266,9 @@ func doJoin(ctx context.Context, client *http.Client, target, sessionID string, 
 	resp, err := client.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		st.record(requestResult{op: "join", duration: elapsed, err: err})
+		if ctx.Err() == nil { // cut off by the end of the run is not a failure
+			st.record(requestResult{op: "join", duration: elapsed, err: err})
+		}
 		return
 	}
 	defer resp.Body.Close()
