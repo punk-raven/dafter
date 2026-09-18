@@ -6,11 +6,20 @@
 
 port: 7880
 rtc:
-  port_range_start: 7882
-  port_range_end: 7892
+  # One UDP port, multiplexed, because docker-compose publishes exactly that
+  # port. A port_range_start/end here would win over udp_port and hand every
+  # participant its own ephemeral port that nothing forwards.
   udp_port: 7882
   tcp_port: 7881
-  use_external_ip: true
+  # The address clients are told to send media to. docker-compose passes
+  # --node-ip (LIVEKIT_NODE_IP, default 127.0.0.1): the published ports on
+  # this machine, which every local client and test reaches. The STUN-found
+  # public IP is not reachable from the machine the container runs on, so
+  # with use_external_ip a local participant only connected when the SFU's
+  # own connectivity checks happened to open a path, and often did not. For
+  # participants on other machines set LIVEKIT_NODE_IP to an address that
+  # routes to this one and forward 7881/tcp and 7882/udp.
+  use_external_ip: false
 
 redis:
   address: redis:6379

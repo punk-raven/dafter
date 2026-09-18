@@ -6,8 +6,8 @@ scrape_configs:
     static_configs:
       - targets: ["control:8080"]
   # LiveKit only serves /metrics on prometheus.port (deploy/livekit.yaml);
-  # port 7880 answers every unknown path with a plain "OK" that is not a
-  # metrics exposition.
+  # on the API port 7880 the path is a 404, so the old livekit:7880 target
+  # never produced a sample.
   - job_name: livekit
     static_configs:
       - targets: ["livekit:6789"]

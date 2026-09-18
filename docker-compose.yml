@@ -46,7 +46,8 @@ services:
 
   livekit:
     image: livekit/livekit-server:latest
-    command: --config /etc/livekit.yaml
+    # --node-ip: the address advertised to clients for media, see deploy/livekit.yaml.
+    command: --config /etc/livekit.yaml --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1}
     ports:
       - "7880:7880"
       - "7881:7881"
