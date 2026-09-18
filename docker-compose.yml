@@ -51,6 +51,7 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+      - "6789:6789"
     depends_on:
       redis:
         condition: service_healthy

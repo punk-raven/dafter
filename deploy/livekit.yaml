@@ -18,6 +18,12 @@ redis:
 keys:
   devkey: secret
 
+# LiveKit's own Prometheus metrics (rooms, participants, tracks, packets,
+# loss, RTT, plus the Go process collectors for CPU and memory). The main
+# port (7880) does not serve /metrics; only this dedicated port does.
+prometheus:
+  port: 6789
+
 logging:
   level: info
   json: false

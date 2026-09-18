@@ -120,6 +120,10 @@ loadtest: ## Run the load test against the dev stack (USERS=100 DURATION=60s)
 		-users $${USERS:-100} \
 		-duration $${DURATION:-60s}
 
+.PHONY: loadtest-media
+loadtest-media: ## Concurrent video calls through the control plane and the SFU (ROOMS=100 DURATION=60s)
+	@./scripts/loadtest-media.sh
+
 .PHONY: dev-down
 dev-down: ## Tear down the dev stack and volumes
 	docker compose down -v

@@ -55,3 +55,6 @@ build/
 /go/internal/schema/schemas/
 /python/dafter_core/src/dafter_core/_schemas/
 /python/dafter_core/src/dafter_core/enums.py
+
+# Media load test output (scripts/loadtest-media.sh)
+.loadtest-media/

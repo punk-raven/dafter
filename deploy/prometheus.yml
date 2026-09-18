@@ -5,7 +5,9 @@ scrape_configs:
   - job_name: dafter-control
     static_configs:
       - targets: ["control:8080"]
+  # LiveKit only serves /metrics on prometheus.port (deploy/livekit.yaml);
+  # port 7880 answers every unknown path with a plain "OK" that is not a
+  # metrics exposition.
   - job_name: livekit
     static_configs:
-      - targets: ["livekit:7880"]
-    metrics_path: /metrics
+      - targets: ["livekit:6789"]
