@@ -230,7 +230,7 @@ func doCreate(ctx context.Context, client *http.Client, target string, body []by
 		}
 		return ""
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -271,8 +271,8 @@ func doJoin(ctx context.Context, client *http.Client, target, sessionID string, 
 		}
 		return
 	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	st.record(requestResult{op: "join", duration: elapsed, status: resp.StatusCode})
 }
