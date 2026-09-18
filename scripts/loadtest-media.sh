@@ -26,8 +26,8 @@ set -euo pipefail
 # at the first size that fails: this finds the ceiling of a box without
 # guessing at it.
 #
-# Requires: the dev stack (make dev), curl, and lk (livekit-cli) on PATH or
-# in $HOME/go/bin. Everything else is bash and coreutils.
+# Requires: the dev stack (make dev), curl, and lk (livekit-cli), fetched
+# into go/bin by make tools. Everything else is bash and coreutils.
 #
 # Usage: ROOMS=100 DURATION=60s scripts/loadtest-media.sh
 #        RAMP="10 25 50" scripts/loadtest-media.sh
@@ -135,15 +135,16 @@ fmt_bps() { awk -v b="$1" 'BEGIN { if (b>=1000000) printf "%.2f Mbps", b/1000000
 # Preflight
 # ---------------------------------------------------------------------------
 
+# The release binary from scripts/install-lk.sh (make tools) is preferred: a
+# go-installed lk embeds Git LFS pointers instead of its video clips and its
+# publishers send nothing.
 LK=${LK_BIN:-}
 if [ -z "$LK" ]; then
-  for candidate in lk livekit-cli "$HOME/go/bin/lk" "$HOME/go/bin/livekit-cli"; do
-    if have "$candidate" || [ -x "$candidate" ]; then LK=$candidate; break; fi
+  for candidate in "$(dirname "$0")/../go/bin/lk" lk "$HOME/go/bin/lk"; do
+    if [ -x "$candidate" ] || have "$candidate"; then LK=$candidate; break; fi
   done
 fi
-[ -n "$LK" ] || die "lk (livekit-cli) not found. Install it with:
-    go install github.com/livekit/livekit-cli/v2/cmd/lk@v2.13.2
-(newer tags need the portaudio submodule and do not build with go install)"
+[ -n "$LK" ] || die "lk (livekit-cli) not found; run 'make tools' to fetch the pinned release"
 have curl || die "curl not found"
 [ "$PUBLISHERS" -ge 1 ] 2>/dev/null || die "PUBLISHERS must be at least 1"
 [ "$SUBSCRIBERS" -ge 1 ] 2>/dev/null || die "SUBSCRIBERS must be at least 1"
@@ -329,8 +330,9 @@ run_size() {
       peak_gen_rss=$(( gen_rss > peak_gen_rss ? gen_rss : peak_gen_rss ))
       peak_gen_cpu=$(( gen_cpu > peak_gen_cpu ? gen_cpu : peak_gen_cpu ))
       peak_host_cpu=$(( host_cpu > peak_host_cpu ? host_cpu : peak_host_cpu ))
-      # One docker stats sample in the middle of the fully concurrent window.
-      if [ -z "$docker_stats" ] && [ "$elapsed" -ge $((ramp_s + duration_s / 2)) ] && have docker; then
+      # One docker stats sample in the middle of the fully concurrent window,
+      # which this loop enters once every room has been launched.
+      if [ -z "$docker_stats" ] && [ "$elapsed" -ge $((duration_s / 2)) ] && have docker; then
         docker_stats=$(docker stats --no-stream --format '{{.Name}} cpu={{.CPUPerc}} mem={{.MemUsage}} net={{.NetIO}}' 2>/dev/null \
           | grep -E 'livekit|control' || true)
       fi
