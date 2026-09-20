@@ -65,14 +65,14 @@ func closing(db *sql.DB, err error) error {
 
 func (s *Store) Close() error { return s.db.Close() }
 
-const rfc3339Micro = "2006-01-02T15:04:05.000000Z07:00"
+const rfc3339TimestampPattern = "2006-01-02T15:04:05.000000Z07:00"
 
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		sess.SessionID, sess.TenantID, sess.Room, sess.ConfigHash,
-		string(sess.Config), sess.CreatedAt.UTC().Format(rfc3339Micro))
+		string(sess.Config), sess.CreatedAt.UTC().Format(rfc3339TimestampPattern))
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "store session")
 	}
@@ -95,7 +95,7 @@ func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) 
 	}
 
 	sess.Config = json.RawMessage(config)
-	t, err := time.Parse(rfc3339Micro, createdAt)
+	t, err := time.Parse(rfc3339TimestampPattern, createdAt)
 	if err != nil {
 		return Session{}, errs.Wrap(errs.CodeInternal, err, "decode stored timestamp")
 	}
