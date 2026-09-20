@@ -7,6 +7,7 @@ Realtime AI media toolkit (agents, translation, transcription, sealed recording)
 - `schemas/`: the only source of truth. All language types are generated from it.
 - `go/` (control plane, state, egress, seal) and `python/` (agent runtime, providers, batch, evals). They touch only at the resolved config document and the event envelope.
 - `go/tools/enumgen`: emits enum constants for both halves. `Makefile` is the entry point; `.github/workflows/ci.yml` runs it.
+- `testdata/`: fixtures both halves read, so a cross-language claim is checked on both sides rather than asserted on one. Each directory has a README saying what it pins; `testdata/rfc8785/` is vendored verbatim and must never be edited or reformatted.
 
 ## Generated files: never hand-edit, never commit
 
@@ -27,12 +28,20 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 - Unknown fields rejected: schemas close with `unevaluatedProperties`; Go also uses `DisallowUnknownFields`.
 - Cross-field rules the schema cannot express are one table per half, `go/internal/config/rules.go` and `python/dafter_core/src/dafter_core/rules.py`, every broken rule reported with its pointer: sealed forbids agent; recording needs consent artifact; `session_create` start needs `room_composite` layout.
 - Error messages safe to log (no name, email, phone, transcript): `schemas/errors/v1/error.schema.json`. Report every problem, located by JSON pointer.
-- Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque.
+- Identifiers are opaque patterns (`schemas/common/v1/ids.schema.json`, minted in `go/internal/ids`); credentials are `secret://` refs; region tokens opaque. Real credentials reach the process through the environment only.
+- Config resolution is layers then axes, `go/internal/config/resolve.go`: defaults, tenant, profile, session overrides, then the language and channel overlays. The overlays land last, so a channel overlay wins over a session override.
+- The config hash is RFC 8785 then SHA-256 with `configHash` stripped, mirrored in `go/internal/config/hash.go` and `python/dafter_core/src/dafter_core/hashing.py`. Both halves are pinned to the vectors in `testdata/`; changing either without the other fails on its own side.
+- Token grants derive from the role and never from a client request, and no role is ever issued a room-admin, room-create, room-list, room-record or ingress grant: `grantsFor` in `go/internal/transport/livekit.go`. Every permission is stated rather than left unset, because the media server grants an absent permission by default.
+- A session is written to the store before its token is minted. A token issued for a room whose config was never stored lets a worker join a session nobody can explain afterwards.
 - Enum drift tested on both halves: `TestGeneratedEnumsMatchSchema` in each owning Go package and `python/dafter_core/tests/test_enums.py`; each Go package carries at most one test file, named after the package.
 
 ## Dependency graph
 
-depguard in `go/.golangci.yml` (also documents the graph and denies the media server SDK outside transport). Target graph: `docs/dafter.md` section 5.
+depguard in `go/.golangci.yml` holds the whole graph: core below everything, state and transport siblings above it, control above them. `github.com/livekit/*` is denied outside `go/internal/transport`, which is the seam every media server concern goes behind. Target graph: `docs/dafter.md` section 5.
+
+## Running the control plane
+
+`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <file>` replaces the catalog embedded in the binary, `go/cmd/dafter-control/catalog.json`. For a local media server, `livekit-server --dev` serves `devkey`/`secret` on `127.0.0.1:7880`.
 
 ## Commits
 
