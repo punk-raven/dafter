@@ -1,0 +1,25 @@
+# LiveKit Egress configuration for the Dafter POC.
+#
+# Egress captures room audio/video and writes recordings to MinIO.
+# Two layouts are tested: room_composite and track.
+
+api_key: devkey
+api_secret: secret
+ws_url: ws://127.0.0.1:7880
+insecure: true
+
+redis:
+  address: 127.0.0.1:6379
+
+s3:
+  access_key: minioadmin
+  secret: minioadmin
+  endpoint: http://127.0.0.1:9000
+  region: us-east-1
+  bucket: dafter-recordings
+  force_path_style: true
+
+log_level: info
+
+# Health check port for container readiness.
+health_port: 8080

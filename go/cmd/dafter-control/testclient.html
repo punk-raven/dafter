@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dafter POC - Test Client</title>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
+  .header { padding: 16px 24px; border-bottom: 1px solid #222; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .header .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .badge-disconnected { background: #3a1c1c; color: #f87171; }
+  .badge-connecting { background: #3a2f1c; color: #fbbf24; }
+  .badge-connected { background: #1c3a1c; color: #4ade80; }
+
+  .layout { display: flex; height: calc(100vh - 57px); }
+  .sidebar { width: 320px; min-width: 320px; border-right: 1px solid #222; overflow-y: auto; padding: 16px; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  .video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
+  .video-tile { position: relative; background: #1a1a1a; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
+  .log-panel { height: 180px; min-height: 100px; border-top: 1px solid #222; overflow-y: auto; padding: 8px 12px; font-family: monospace; font-size: 12px; line-height: 1.6; }
+  .log-panel .ts { color: #666; margin-right: 8px; }
+  .log-panel .info { color: #60a5fa; }
+  .log-panel .success { color: #4ade80; }
+  .log-panel .warn { color: #fbbf24; }
+  .log-panel .error { color: #f87171; }
+
+  fieldset { border: 1px solid #333; border-radius: 6px; padding: 12px; margin: 0 0 12px; }
+  legend { font-size: 12px; font-weight: 600; color: #888; padding: 0 4px; }
+  label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; margin-top: 8px; }
+  label:first-child { margin-top: 0; }
+  input, select { width: 100%; padding: 6px 8px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #e0e0e0; font-size: 13px; }
+  input:focus, select:focus { outline: none; border-color: #555; }
+  button { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; width: 100%; margin-top: 8px; }
+  .btn-create { background: #7c3aed; color: white; }
+  .btn-create:hover { background: #6d28d9; }
+  .btn-create:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .btn-join { background: #2563eb; color: white; }
+  .btn-join:hover { background: #1d4ed8; }
+  .btn-join:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .btn-copy { background: #059669; color: white; }
+  .btn-copy:hover { background: #047857; }
+  .btn-leave { background: #dc2626; color: white; }
+  .btn-leave:hover { background: #b91c1c; }
+  .divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
+
+  .ice-info { margin-top: 12px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; line-height: 1.6; }
+  .ice-info dt { color: #888; float: left; width: 100px; clear: left; }
+  .ice-info dd { margin-left: 104px; color: #e0e0e0; }
+
+  .response-box { margin-top: 8px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #888; }
+
+  .session-created { margin-top: 8px; padding: 10px; background: #1a2e1a; border: 1px solid #2d5a2d; border-radius: 6px; font-size: 12px; }
+  .session-created .room-id { font-family: monospace; font-size: 14px; font-weight: 600; color: #4ade80; }
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Dafter POC</h1>
+  <span id="status-badge" class="badge badge-disconnected">disconnected</span>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div id="panel-create">
+      <fieldset>
+        <legend>Create Session</legend>
+        <label>Tenant ID</label>
+        <input id="tenant" value="t_9c21a4be">
+        <label>Language</label>
+        <select id="language">
+          <option value="en-IN" selected>en-IN (English)</option>
+          <option value="hi">hi (Hindi)</option>
+        </select>
+        <label>Channel</label>
+        <select id="channel">
+          <option value="webrtc" selected>webrtc</option>
+          <option value="telephony">telephony</option>
+        </select>
+        <label>Profile (optional)</label>
+        <input id="profile" value="support">
+      </fieldset>
+      <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
+    </div>
+
+    <div id="session-created-info" class="session-created" style="display:none">
+      <div>Session created</div>
+      <div style="margin-top:6px">Room: <span id="created-room-id" class="room-id"></span></div>
+      <div style="margin-top:6px;font-size:11px;color:#888">Share this link to join:</div>
+      <input id="join-link" readonly style="margin-top:4px;font-size:11px;color:#4ade80;background:#0f1f0f;border-color:#2d5a2d;cursor:pointer" onclick="this.select();copyJoinLink()">
+      <button id="btn-copy-link" class="btn-copy" onclick="copyJoinLink()">Copy join link</button>
+    </div>
+
+    <hr class="divider">
+
+    <div id="panel-join">
+      <fieldset>
+        <legend>Join Room</legend>
+        <label>Room ID</label>
+        <input id="room-id" placeholder="s_xxxxxxxx">
+        <label>Role</label>
+        <select id="role">
+          <option value="participant" selected>participant</option>
+          <option value="presenter">presenter</option>
+          <option value="observer">observer</option>
+        </select>
+        <label>ICE transport</label>
+        <select id="ice-policy">
+          <option value="all" selected>all (normal)</option>
+          <option value="relay">relay only (TURN test)</option>
+        </select>
+      </fieldset>
+      <button id="btn-join" class="btn-join" onclick="joinRoom()">Join Room</button>
+    </div>
+
+    <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
+
+    <div id="session-response" class="response-box" style="display:none"></div>
+
+    <div id="ice-info" class="ice-info" style="display:none">
+      <dl>
+        <dt>Type</dt><dd id="ice-type">-</dd>
+        <dt>ICE state</dt><dd id="ice-state">-</dd>
+        <dt>Candidate</dt><dd id="ice-candidate">-</dd>
+        <dt>Protocol</dt><dd id="ice-protocol">-</dd>
+        <dt>Remote</dt><dd id="ice-remote">-</dd>
+        <dt>TURN</dt><dd id="ice-turn-status">-</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="video-grid" class="video-grid"></div>
+    <div id="log" class="log-panel"></div>
+  </div>
+</div>
+
+<script>
+const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
+
+let room = null;
+let localParticipantId = null;
+let syntheticIntervalId = null;
+let syntheticAudioCtx = null;
+let lastRoomId = null;
+
+function log(msg, level = 'info') {
+  const el = document.getElementById('log');
+  const ts = new Date().toISOString().slice(11, 23);
+  el.innerHTML += `<div><span class="ts">${ts}</span><span class="${level}">${escapeHtml(msg)}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function setBadge(state) {
+  const el = document.getElementById('status-badge');
+  el.textContent = state;
+  el.className = 'badge badge-' + (state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : 'disconnected');
+}
+
+function showResponse(data) {
+  const box = document.getElementById('session-response');
+  box.style.display = 'block';
+  box.textContent = JSON.stringify(data, null, 2);
+}
+
+async function createSession() {
+  const btn = document.getElementById('btn-create');
+  btn.disabled = true;
+
+  try {
+    log('Creating session via POST /sessions...');
+    const body = {
+      tenantId: document.getElementById('tenant').value,
+      language: document.getElementById('language').value,
+      channel: document.getElementById('channel').value,
+    };
+    const profile = document.getElementById('profile').value.trim();
+    if (profile) body.profile = profile;
+
+    const resp = await fetch('/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    showResponse(data);
+
+    if (!resp.ok) {
+      log(`Create failed: ${data.code} - ${data.message}`, 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    lastRoomId = data.room;
+    log(`Session created: ${data.sessionId}`, 'success');
+    log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
+
+    const joinUrl = `${window.location.origin}?room=${data.room}`;
+    document.getElementById('created-room-id').textContent = data.room;
+    document.getElementById('join-link').value = joinUrl;
+    document.getElementById('session-created-info').style.display = 'block';
+    document.getElementById('room-id').value = data.room;
+
+  } catch (err) {
+    log(`Error: ${err.message}`, 'error');
+  }
+  btn.disabled = false;
+}
+
+async function joinRoom() {
+  const roomId = document.getElementById('room-id').value.trim();
+  if (!roomId) {
+    log('Enter a Room ID or create a session first', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-join');
+  btn.disabled = true;
+
+  try {
+    log(`Joining room ${roomId}...`);
+    const resp = await fetch(`/sessions/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: document.getElementById('role').value }),
+    });
+    const data = await resp.json();
+    showResponse(data);
+
+    if (!resp.ok) {
+      log(`Join failed: ${data.code} - ${data.message}`, 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    log(`Joined session: ${data.sessionId} | Participant: ${data.participantId}`, 'success');
+    localParticipantId = data.participantId;
+
+    const icePolicy = document.getElementById('ice-policy').value;
+    const hasICEServers = data.iceServers && data.iceServers.length > 0;
+    if (hasICEServers) {
+      log(`TURN credentials received (${data.iceServers[0].urls.length} URLs)`, 'success');
+    } else {
+      log('No ICE servers in response (TURN not configured)', 'warn');
+    }
+
+    setBadge('connecting');
+
+    room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    });
+
+    room.on(RoomEvent.ConnectionStateChanged, (state) => {
+      log(`Connection state: ${state}`);
+      setBadge(state === ConnectionState.Connected ? 'connected' : state === ConnectionState.Connecting || state === ConnectionState.Reconnecting ? 'connecting' : 'disconnected');
+    });
+
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      log(`Subscribed to ${track.kind} from ${participant.identity}`);
+      attachTrack(track, participant);
+    });
+
+    room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      log(`Unsubscribed from ${track.kind} of ${participant.identity}`);
+      detachTrack(track, participant);
+    });
+
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      log(`Participant joined: ${participant.identity}`, 'success');
+    });
+
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      log(`Participant left: ${participant.identity}`, 'warn');
+      removeTile(participant.identity);
+    });
+
+    room.on(RoomEvent.Disconnected, (reason) => {
+      log(`Disconnected: ${reason || 'unknown'}`, 'warn');
+      setBadge('disconnected');
+      cleanup();
+    });
+
+    const rtcConfig = { iceTransportPolicy: icePolicy };
+    if (hasICEServers) {
+      rtcConfig.iceServers = data.iceServers;
+    }
+
+    let connectUrl;
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      const lkUrl = new URL(data.url);
+      lkUrl.hostname = window.location.hostname;
+      connectUrl = lkUrl.toString();
+    } else {
+      const parts = window.location.hostname.split('.');
+      parts[0] = 'sfu';
+      connectUrl = `wss://${parts.join('.')}`;
+    }
+    log(`LiveKit endpoint: ${connectUrl} (ICE policy: ${icePolicy})`);
+
+    await room.connect(connectUrl, data.token, { rtcConfig });
+
+    log('Connected! Publishing tracks...', 'success');
+
+    try {
+      await room.localParticipant.enableCameraAndMicrophone();
+      log('Camera and microphone published', 'success');
+    } catch (mediaErr) {
+      log(`No camera (${mediaErr.message}), trying microphone only...`, 'warn');
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        log('Microphone published (no camera)', 'success');
+      } catch (micErr) {
+        log(`No microphone either (${micErr.message}), publishing synthetic test pattern...`, 'warn');
+        await publishTestPattern(room);
+      }
+    }
+
+    const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
+    if (localVideoTrack && localVideoTrack.track) {
+      attachTrack(localVideoTrack.track, room.localParticipant, true);
+    }
+
+    document.getElementById('panel-create').style.display = 'none';
+    document.getElementById('panel-join').style.display = 'none';
+    document.getElementById('session-created-info').style.display = 'none';
+    document.getElementById('btn-leave').style.display = 'block';
+
+    monitorICE();
+
+  } catch (err) {
+    log(`Error: ${err.message}`, 'error');
+    btn.disabled = false;
+    setBadge('disconnected');
+  }
+}
+
+async function leaveSession() {
+  if (room) {
+    await room.disconnect();
+  }
+  cleanup();
+}
+
+function cleanup() {
+  if (syntheticIntervalId != null) {
+    clearInterval(syntheticIntervalId);
+    syntheticIntervalId = null;
+  }
+  if (syntheticAudioCtx) {
+    syntheticAudioCtx.close();
+    syntheticAudioCtx = null;
+  }
+  room = null;
+  document.getElementById('video-grid').innerHTML = '';
+  document.getElementById('panel-create').style.display = 'block';
+  document.getElementById('panel-join').style.display = 'block';
+  document.getElementById('btn-create').disabled = false;
+  document.getElementById('btn-join').disabled = false;
+  document.getElementById('btn-leave').style.display = 'none';
+  document.getElementById('ice-info').style.display = 'none';
+}
+
+function attachTrack(track, participant, isLocal = false) {
+  const tileId = `tile-${participant.identity}-${track.kind}`;
+  let tile = document.getElementById(tileId);
+
+  if (track.kind === 'video') {
+    if (!tile) {
+      tile = document.createElement('div');
+      tile.id = tileId;
+      tile.className = 'video-tile';
+      tile.innerHTML = `<span class="label">${participant.identity}${isLocal ? ' (you)' : ''}</span>`;
+      document.getElementById('video-grid').appendChild(tile);
+    }
+    const el = track.attach();
+    el.style.width = '100%';
+    el.style.height = '100%';
+    el.style.objectFit = 'cover';
+    if (isLocal) el.style.transform = 'scaleX(-1)';
+    tile.insertBefore(el, tile.firstChild);
+  }
+
+  if (track.kind === 'audio' && !isLocal) {
+    const el = track.attach();
+    el.id = `audio-${participant.identity}`;
+    document.body.appendChild(el);
+  }
+}
+
+function detachTrack(track, participant) {
+  track.detach().forEach(el => el.remove());
+  if (track.kind === 'video') {
+    const tile = document.getElementById(`tile-${participant.identity}-video`);
+    if (tile) tile.remove();
+  }
+}
+
+function removeTile(identity) {
+  document.querySelectorAll(`[id^="tile-${identity}"]`).forEach(el => el.remove());
+  const audio = document.getElementById(`audio-${identity}`);
+  if (audio) audio.remove();
+}
+
+async function publishTestPattern(room) {
+  const { LocalVideoTrack, LocalAudioTrack } = LivekitClient;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  const colors = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c'];
+  const barW = canvas.width / colors.length;
+
+  function drawFrame() {
+    for (let i = 0; i < colors.length; i++) {
+      ctx.fillStyle = colors[i];
+      ctx.fillRect(i * barW, 0, barW, canvas.height);
+    }
+    const now = new Date();
+    const ts = now.toISOString().slice(11, 23);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Dafter POC  ${ts}`, canvas.width / 2, canvas.height - 16);
+    const shift = (Date.now() / 50) % canvas.height;
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0, shift - 5, canvas.width, 10);
+  }
+  syntheticIntervalId = setInterval(drawFrame, 1000 / 30);
+  drawFrame();
+
+  const videoStream = canvas.captureStream(30);
+  const videoTrack = new LocalVideoTrack(videoStream.getVideoTracks()[0]);
+  await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
+  log('Synthetic video track published (color bars + timestamp)', 'success');
+
+  syntheticAudioCtx = new AudioContext();
+  const audioCtx = syntheticAudioCtx;
+  const osc = audioCtx.createOscillator();
+  osc.frequency.value = 440;
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.05;
+  osc.connect(gain);
+  const dest = audioCtx.createMediaStreamDestination();
+  gain.connect(dest);
+  osc.start();
+
+  const audioTrack = new LocalAudioTrack(dest.stream.getAudioTracks()[0]);
+  await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
+  log('Synthetic audio track published (440Hz tone)', 'success');
+
+  const tile = document.createElement('div');
+  tile.id = `tile-${room.localParticipant.identity}-video`;
+  tile.className = 'video-tile';
+  const vid = document.createElement('video');
+  vid.srcObject = videoStream;
+  vid.autoplay = true;
+  vid.muted = true;
+  vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  tile.appendChild(vid);
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = `${room.localParticipant.identity} (you - synthetic)`;
+  tile.appendChild(label);
+  document.getElementById('video-grid').appendChild(tile);
+}
+
+async function monitorICE() {
+  const infoEl = document.getElementById('ice-info');
+  infoEl.style.display = 'block';
+
+  const poll = async () => {
+    if (!room || room.state !== ConnectionState.Connected) return;
+
+    try {
+      const sender = room.engine?.pcManager?.publisher?.pc;
+      if (sender) {
+        const stats = await sender.getStats();
+        stats.forEach(report => {
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            document.getElementById('ice-state').textContent = report.state;
+
+            stats.forEach(s => {
+              if (s.type === 'local-candidate' && s.id === report.localCandidateId) {
+                const ctype = s.candidateType || '-';
+                document.getElementById('ice-candidate').textContent = ctype;
+                document.getElementById('ice-protocol').textContent = `${s.protocol || '-'} (${s.address || '-'}:${s.port || '-'})`;
+                document.getElementById('ice-type').textContent = ctype;
+                document.getElementById('ice-turn-status').textContent = ctype === 'relay' ? 'active (relay)' : 'not used (' + ctype + ')';
+              }
+              if (s.type === 'remote-candidate' && s.id === report.remoteCandidateId) {
+                document.getElementById('ice-remote').textContent = `${s.candidateType || '-'} ${s.address || '-'}:${s.port || '-'}`;
+              }
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // Stats not available yet
+    }
+    setTimeout(poll, 2000);
+  };
+  poll();
+}
+
+function copyJoinLink() {
+  if (!lastRoomId) return;
+  const url = `${window.location.origin}?room=${lastRoomId}`;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('btn-copy-link');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy join link'; }, 1500);
+  });
+}
+
+(function seedFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const roomParam = params.get('room');
+  if (roomParam) {
+    document.getElementById('room-id').value = roomParam;
+    if (confirm(`Join room ${roomParam}?`)) {
+      joinRoom();
+    }
+  }
+})();
+</script>
+</body>
+</html>

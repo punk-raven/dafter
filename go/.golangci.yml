@@ -71,6 +71,8 @@ linters:
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/transport
               desc: state and transport are siblings under control
+            - pkg: github.com/punk-raven/dafter/go/internal/turn
+              desc: state and turn are siblings under control
             - pkg: github.com/punk-raven/dafter/go/internal/control
               desc: control depends on state, never the other way round
 
@@ -81,8 +83,32 @@ linters:
           deny:
             - pkg: github.com/punk-raven/dafter/go/internal/state
               desc: state and transport are siblings under control
+            - pkg: github.com/punk-raven/dafter/go/internal/turn
+              desc: transport and turn are siblings under control
             - pkg: github.com/punk-raven/dafter/go/internal/control
               desc: control depends on transport, never the other way round
+
+        turn-depends-on-nothing:
+          files:
+            - "**/internal/turn/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/config
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/errs
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/schema
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/events
+              desc: turn is a leaf; it depends on no internal package
+            - pkg: github.com/punk-raven/dafter/go/internal/ids
+              desc: turn is a leaf; it depends on no internal package
 
         core-sits-below-everything:
           files:
@@ -97,6 +123,8 @@ linters:
               desc: state depends on core, never the other way round
             - pkg: github.com/punk-raven/dafter/go/internal/transport
               desc: transport depends on core, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/turn
+              desc: turn depends on core, never the other way round
             - pkg: github.com/punk-raven/dafter/go/internal/control
               desc: control depends on core, never the other way round
 

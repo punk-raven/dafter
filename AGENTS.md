@@ -39,9 +39,13 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 
 depguard in `go/.golangci.yml` holds the whole graph: core below everything, state and transport siblings above it, control above them. `github.com/livekit/*` is denied outside `go/internal/transport`, which is the seam every media server concern goes behind. Target graph: `docs/dafter.md` section 5.
 
-## Running the control plane
+## Dev stack
 
-`go run ./cmd/dafter-control` from `go/`, with `DAFTER_LIVEKIT_URL`, `DAFTER_LIVEKIT_API_KEY` and `DAFTER_LIVEKIT_API_SECRET` set; `-catalog <file>` replaces the catalog embedded in the binary, `go/cmd/dafter-control/catalog.json`. For a local media server, `livekit-server --dev` serves `devkey`/`secret` on `127.0.0.1:7880`.
+`make dev` from a clean clone builds and starts everything: control plane, LiveKit SFU, Redis, MinIO (recordings), Jaeger (tracing), Prometheus, Grafana, and CF tunnel (if configured). `make dev-down` tears it down. Config lives in `deploy/livekit.yaml` and `deploy/egress.yaml`; dev credentials are `devkey`/`secret`. The control plane is at `http://127.0.0.1:8080`.
+
+The SFU advertises `--node-ip` (`LIVEKIT_NODE_IP`, default 127.0.0.1) on the one published UDP port; anything else in `rtc` (a port range, `use_external_ip`) breaks local media, see the comments in `deploy/livekit.yaml`. LiveKit metrics are on port 6789, not 7880.
+
+Load tests: `make loadtest` (HTTP only, token minting) and `make loadtest-media` (real WebRTC participants through `lk load-test`, knobs and pass criteria in `scripts/loadtest-media.sh`). `lk` must be the release binary `make tools` fetches into `go/bin`; a go-installed one embeds Git LFS pointers instead of video and publishes nothing. Grafana dashboard: `deploy/grafana/dashboards/dafter.json` (uid `dafter`); a uid change needs the grafana container recreated.
 
 ## Commits
 

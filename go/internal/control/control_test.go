@@ -17,6 +17,7 @@ import (
 	"github.com/punk-raven/dafter/go/internal/schema"
 	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
+	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
 // The catalog the binary ships with, so what the tests resolve is what an
@@ -78,14 +79,15 @@ func serve(t *testing.T) *harness {
 }
 
 type sessionResponse struct {
-	SessionID     string          `json:"sessionId"`
-	ParticipantID string          `json:"participantId"`
-	Room          string          `json:"room"`
-	ConfigHash    string          `json:"configHash"`
-	Config        json.RawMessage `json:"config"`
-	Token         string          `json:"token"`
-	URL           string          `json:"url"`
-	ExpiresAt     time.Time       `json:"expiresAt"`
+	SessionID     string           `json:"sessionId"`
+	ParticipantID string           `json:"participantId"`
+	Room          string           `json:"room"`
+	ConfigHash    string           `json:"configHash"`
+	Config        json.RawMessage  `json:"config"`
+	Token         string           `json:"token"`
+	URL           string           `json:"url"`
+	ExpiresAt     time.Time        `json:"expiresAt"`
+	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 }
 
 func (h *harness) post(t *testing.T, body string) (int, []byte) {
@@ -307,5 +309,177 @@ func TestOnlyPostCreatesASession(t *testing.T) {
 	defer closeBody(t, resp)
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("GET /sessions returned %d, want %d", resp.StatusCode, http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *harness) join(t *testing.T, sessionID, body string) (int, []byte) {
+	t.Helper()
+	resp, err := h.server.Client().Post(h.server.URL+"/sessions/"+sessionID+"/join", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("post /sessions/%s/join: %v", sessionID, err)
+	}
+	defer closeBody(t, resp)
+	raw, err := readAll(resp)
+	if err != nil {
+		t.Fatalf("read response: %v", err)
+	}
+	return resp.StatusCode, raw
+}
+
+func TestJoinMintsAFreshParticipantForTheStoredRoom(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	created := h.create(t, request("en-IN", "webrtc"))
+
+	status, raw := h.join(t, created.SessionID, `{"role":"participant"}`)
+	if status != http.StatusOK {
+		t.Fatalf("POST /sessions/{id}/join returned %d: %s", status, raw)
+	}
+	var joined sessionResponse
+	if err := json.Unmarshal(raw, &joined); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if joined.SessionID != created.SessionID || joined.Room != created.Room {
+		t.Errorf("joined session %q room %q, want %q %q", joined.SessionID, joined.Room, created.SessionID, created.Room)
+	}
+	if joined.ParticipantID == "" || joined.ParticipantID == created.ParticipantID {
+		t.Errorf("participant %q is not fresh (creator was %q)", joined.ParticipantID, created.ParticipantID)
+	}
+	if joined.Token != "stub."+created.Room+"."+joined.ParticipantID {
+		t.Errorf("token was not minted for this room and participant: %q", joined.Token)
+	}
+	if h.transport.grant.Room != created.Room || h.transport.grant.Identity != joined.ParticipantID {
+		t.Errorf("grant was for room %q identity %q", h.transport.grant.Room, h.transport.grant.Identity)
+	}
+	if joined.ConfigHash != created.ConfigHash || !bytes.Equal(joined.Config, created.Config) {
+		t.Error("the joiner did not receive the stored session document")
+	}
+}
+
+func TestJoinDefaultsToTheParticipantRole(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	created := h.create(t, request("en-IN", "webrtc"))
+	if status, raw := h.join(t, created.SessionID, `{}`); status != http.StatusOK {
+		t.Fatalf("POST /sessions/{id}/join returned %d: %s", status, raw)
+	}
+	if h.transport.grant.Role != config.RoleParticipant {
+		t.Errorf("minted for role %q, want the default participant", h.transport.grant.Role)
+	}
+}
+
+func TestJoinRejectsSessionsItCannotExplain(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	created := h.create(t, request("en-IN", "webrtc"))
+	h.transport.grant = transport.Grant{}
+
+	cases := []struct {
+		name, sessionID, body string
+	}{
+		{"unknown session id", "s_00000000", `{}`},
+		{"malformed session id", "not-a-session", `{}`},
+		{"unknown request field", created.SessionID, `{"role":"participant","admin":true}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			status, raw := h.join(t, tc.sessionID, tc.body)
+			if status != http.StatusBadRequest {
+				t.Fatalf("returned %d, want %d: %s", status, http.StatusBadRequest, raw)
+			}
+			if err := schema.ValidateDocument(schema.Error, raw, errs.CodeInternal); err != nil {
+				t.Errorf("the error body does not satisfy the error schema: %v", err)
+			}
+			var de errs.Error
+			if err := json.Unmarshal(raw, &de); err != nil {
+				t.Fatalf("decode error body: %v", err)
+			}
+			if de.Code != errs.CodeInvalidConfig {
+				t.Errorf("want %s, got %s", errs.CodeInvalidConfig, de.Code)
+			}
+		})
+	}
+	if h.transport.grant.Room != "" {
+		t.Error("a token was minted for a join that was rejected")
+	}
+}
+
+func TestNoICEServersWhenTURNNotConfigured(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("en-IN", "webrtc"))
+	if got.ICEServers != nil {
+		t.Errorf("expected no iceServers, got %v", got.ICEServers)
+	}
+}
+
+func serveTURN(t *testing.T, turnServer *httptest.Server) *harness {
+	t.Helper()
+	raw, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("read catalog: %v", err)
+	}
+	catalog, err := config.LoadCatalog(raw)
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	store, err := state.Open(t.Context(), filepath.Join(t.TempDir(), "dafter.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	})
+
+	tport := &stubTransport{}
+	turnFetcher := turn.NewFetcherWithClient("test-id", "test-token", turnServer.Client())
+	turnFetcher.SetBaseURL(turnServer.URL)
+	svc := &control.Service{
+		Catalog: catalog, Store: store, Transport: tport,
+		TURN: turnFetcher, TokenTTL: 15 * time.Minute,
+	}
+	server := httptest.NewServer(svc.Handler())
+	t.Cleanup(server.Close)
+	return &harness{server: server, store: store, transport: tport}
+}
+
+func TestICEServersReturnedWhenTURNConfigured(t *testing.T) {
+	t.Parallel()
+
+	turnServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"iceServers":[{"urls":["turn:turn.example.com:3478"],"username":"u","credential":"c"}]}`))
+	}))
+	t.Cleanup(turnServer.Close)
+
+	h := serveTURN(t, turnServer)
+	got := h.create(t, request("en-IN", "webrtc"))
+	if len(got.ICEServers) != 1 {
+		t.Fatalf("want 1 ice server, got %d", len(got.ICEServers))
+	}
+	if got.ICEServers[0].Username != "u" {
+		t.Errorf("username = %q", got.ICEServers[0].Username)
+	}
+}
+
+func TestSessionCreatedEvenWhenTURNFails(t *testing.T) {
+	t.Parallel()
+
+	turnServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"service down"}`))
+	}))
+	t.Cleanup(turnServer.Close)
+
+	h := serveTURN(t, turnServer)
+	got := h.create(t, request("en-IN", "webrtc"))
+	if got.SessionID == "" {
+		t.Fatal("session was not created")
+	}
+	if got.ICEServers != nil {
+		t.Errorf("expected no iceServers on TURN failure, got %v", got.ICEServers)
 	}
 }

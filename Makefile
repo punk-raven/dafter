@@ -9,6 +9,8 @@ GO_SCHEMAS := $(GO_DIR)/internal/schema/schemas
 PY_SCHEMAS := $(PY_CORE)/_schemas
 LINT       := $(abspath $(GO_DIR)/bin/golangci-lint)
 VULN       := $(abspath $(GO_DIR)/bin/govulncheck)
+LK         := $(abspath $(GO_DIR)/bin/lk)
+LK_VERSION := 2.13.2
 GENERATED  := $(GO_SCHEMAS) $(PY_SCHEMAS) $(PY_CORE)/enums.py ':(glob)$(GO_DIR)/internal/**/*_gen.go'
 
 .PHONY: help
@@ -88,7 +90,7 @@ py-lint: generate ## Lint and type-check the Python packages
 	cd $(PY_DIR) && uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy
 
 .PHONY: tools
-tools: $(LINT) $(VULN) ## Build the pinned linter and vulnerability scanner
+tools: $(LINT) $(VULN) $(LK) ## Build the pinned linter and vulnerability scanner, fetch the pinned lk
 
 .PHONY: setup
 setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Python environment
@@ -96,3 +98,40 @@ setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Pyth
 
 .PHONY: check
 check: generate-check vet lint test py-lint py-test ## What CI runs
+
+# ---------------------------------------------------------------------------
+# Dev stack
+# ---------------------------------------------------------------------------
+
+.PHONY: dev
+dev: setup ## Build and start the full dev stack
+	docker compose up -d --build
+	@echo ""
+	@echo "  Test client   http://127.0.0.1:8080"
+	@echo "  LiveKit SFU   ws://127.0.0.1:7880"
+	@echo "  MinIO console http://127.0.0.1:9001  (minioadmin/minioadmin)"
+	@echo "  Jaeger UI     http://127.0.0.1:16686"
+	@echo "  Prometheus    http://127.0.0.1:9090"
+	@echo "  Grafana       http://127.0.0.1:3000  (admin/admin)"
+	@echo ""
+
+.PHONY: loadtest
+loadtest: ## Run the load test against the dev stack (USERS=100 DURATION=60s)
+	cd $(GO_DIR) && go run ./cmd/dafter-loadtest \
+		-target http://127.0.0.1:8080 \
+		-users $${USERS:-100} \
+		-duration $${DURATION:-60s}
+
+# lk is fetched as a release binary rather than go-installed: the video
+# clips its publishers loop are Git LFS objects, and a module-proxy build
+# embeds the LFS pointer files, so its publishers connect but send no frames.
+$(LK):
+	@./scripts/install-lk.sh "$(LK_VERSION)" "$(LK)"
+
+.PHONY: loadtest-media
+loadtest-media: $(LK) ## Concurrent video calls through the control plane and the SFU (ROOMS=100 DURATION=60s, or RAMP="10 25 50")
+	@LK_BIN=$(LK) ./scripts/loadtest-media.sh
+
+.PHONY: dev-down
+dev-down: ## Tear down the dev stack and volumes
+	docker compose down -v

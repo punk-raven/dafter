@@ -13,14 +13,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/control"
 	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
+	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
 //go:embed catalog.json
 var embeddedCatalog []byte
+
+//go:embed testclient.html
+var testClientHTML []byte
 
 func main() {
 	if err := run(); err != nil {
@@ -67,10 +73,33 @@ func run() error {
 		}
 	}()
 
-	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TokenTTL: *ttl}
+	turnFetcher := turn.NewFetcher(
+		os.Getenv("DAFTER_TURN_TOKEN_ID"),
+		os.Getenv("DAFTER_TURN_API_TOKEN"),
+	)
+	if turnFetcher.Enabled() {
+		slog.Info("cloudflare TURN credentials enabled")
+	}
+
+	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl}
+	handler := svc.MetricsHandler()
+	metricsHandler := promhttp.Handler()
 	server := &http.Server{
-		Addr:              *addr,
-		Handler:           svc.Handler(),
+		Addr: *addr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet && r.URL.Path == "/" {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				if _, err := w.Write(testClientHTML); err != nil {
+					slog.Error("write test client", "error", err)
+				}
+				return
+			}
+			if r.Method == http.MethodGet && r.URL.Path == "/metrics" {
+				metricsHandler.ServeHTTP(w, r)
+				return
+			}
+			handler.ServeHTTP(w, r)
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

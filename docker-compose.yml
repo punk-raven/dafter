@@ -1,0 +1,143 @@
+# Dafter POC stack
+#
+# One command to run everything:
+#   make dev       build and start the full stack
+#   make dev-down  tear down and remove volumes
+#
+# LiveKit dev credentials: devkey / secret (matching deploy/livekit.yaml)
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 5
+
+  minio-setup:
+    image: quay.io/minio/minio:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/dafter-recordings &&
+      mc anonymous set download local/dafter-recordings
+      "
+
+  livekit:
+    image: livekit/livekit-server:latest
+    # --node-ip: the address advertised to clients for media, see deploy/livekit.yaml.
+    command: --config /etc/livekit.yaml --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1}
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "6789:6789"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+
+  control:
+    build:
+      context: ./go
+    ports:
+      - "8080:8080"
+    environment:
+      DAFTER_ADDR: 0.0.0.0:8080
+      DAFTER_LIVEKIT_URL: ws://livekit:7880
+      DAFTER_LIVEKIT_API_KEY: devkey
+      DAFTER_LIVEKIT_API_SECRET: secret
+      DAFTER_TURN_TOKEN_ID: ${DAFTER_TURN_TOKEN_ID:-}
+      DAFTER_TURN_API_TOKEN: ${DAFTER_TURN_API_TOKEN:-}
+    depends_on:
+      livekit:
+        condition: service_started
+    restart: unless-stopped
+
+  egress:
+    image: livekit/egress:latest
+    environment:
+      EGRESS_CONFIG_FILE: /etc/egress.yaml
+    network_mode: host
+    depends_on:
+      livekit:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./deploy/egress.yaml:/etc/egress.yaml:ro
+    cap_add:
+      - SYS_ADMIN
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      control:
+        condition: service_started
+      livekit:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${DAFTER_CF_TUNNEL_TOKEN}
+    depends_on:
+      control:
+        condition: service_started
+      livekit:
+        condition: service_started
+    links:
+      - livekit
+      - control
+    restart: unless-stopped
+
+volumes:
+  minio-data:

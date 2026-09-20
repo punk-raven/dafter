@@ -13,12 +13,14 @@ import (
 	"github.com/punk-raven/dafter/go/internal/ids"
 	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
+	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
 type Service struct {
 	Catalog   *config.Catalog
 	Store     state.SessionStore
 	Transport transport.Transport
+	TURN      *turn.Fetcher
 	TokenTTL  time.Duration
 	Log       *slog.Logger
 }
@@ -26,6 +28,7 @@ type Service struct {
 func (s *Service) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /sessions", s.createSession)
+	mux.HandleFunc("POST /sessions/{sessionID}/join", s.joinSession)
 	return mux
 }
 
@@ -39,14 +42,15 @@ type createSessionRequest struct {
 }
 
 type createSessionResponse struct {
-	SessionID     string          `json:"sessionId"`
-	ParticipantID string          `json:"participantId"`
-	Room          string          `json:"room"`
-	ConfigHash    string          `json:"configHash"`
-	Config        json.RawMessage `json:"config"`
-	Token         string          `json:"token"`
-	URL           string          `json:"url"`
-	ExpiresAt     time.Time       `json:"expiresAt"`
+	SessionID     string           `json:"sessionId"`
+	ParticipantID string           `json:"participantId"`
+	Room          string           `json:"room"`
+	ConfigHash    string           `json:"configHash"`
+	Config        json.RawMessage  `json:"config"`
+	Token         string           `json:"token"`
+	URL           string           `json:"url"`
+	ExpiresAt     time.Time        `json:"expiresAt"`
+	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 }
 
 func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +112,16 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var iceServers []turn.ICEServer
+	if s.TURN != nil && s.TURN.Enabled() {
+		servers, err := s.TURN.FetchCredentials(r.Context())
+		if err != nil {
+			s.log().Warn("turn credential fetch failed, proceeding without ice servers", "error", err)
+		} else {
+			iceServers = servers
+		}
+	}
+
 	s.write(w, http.StatusCreated, createSessionResponse{
 		SessionID:     sessionID,
 		ParticipantID: participantID,
@@ -117,6 +131,75 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		Token:         token.JWT,
 		URL:           token.URL,
 		ExpiresAt:     token.ExpiresAt,
+		ICEServers:    iceServers,
+	})
+}
+
+type joinSessionRequest struct {
+	Role config.Role `json:"role,omitempty"`
+}
+
+func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionID")
+	if err := ids.ValidateID(ids.PrefixSession, sessionID); err != nil {
+		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "invalid session id"))
+		return
+	}
+
+	sess, err := s.Store.Session(r.Context(), sessionID)
+	if err != nil {
+		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "session not found"))
+		return
+	}
+
+	var req joinSessionRequest
+	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&req); err != nil {
+		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "decode join request"))
+		return
+	}
+	if req.Role == "" {
+		req.Role = config.RoleParticipant
+	}
+
+	participantID, err := ids.NewID(ids.PrefixParticipant)
+	if err != nil {
+		s.fail(w, errs.Wrap(errs.CodeInternal, err, "mint participant id"))
+		return
+	}
+
+	token, err := s.Transport.MintToken(transport.Grant{
+		Room:     sess.Room,
+		Identity: participantID,
+		Role:     req.Role,
+		TTL:      s.TokenTTL,
+	})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+
+	var iceServers []turn.ICEServer
+	if s.TURN != nil && s.TURN.Enabled() {
+		servers, err := s.TURN.FetchCredentials(r.Context())
+		if err != nil {
+			s.log().Warn("turn credential fetch failed, proceeding without ice servers", "error", err)
+		} else {
+			iceServers = servers
+		}
+	}
+
+	s.write(w, http.StatusOK, createSessionResponse{
+		SessionID:     sessionID,
+		ParticipantID: participantID,
+		Room:          sess.Room,
+		ConfigHash:    sess.ConfigHash,
+		Config:        sess.Config,
+		Token:         token.JWT,
+		URL:           token.URL,
+		ExpiresAt:     token.ExpiresAt,
+		ICEServers:    iceServers,
 	})
 }
 
@@ -137,9 +220,10 @@ func (s *Service) write(w http.ResponseWriter, status int, body any) {
 func (s *Service) fail(w http.ResponseWriter, err error) {
 	var de *errs.Error
 	if !errors.As(err, &de) {
-		de = errs.Wrap(errs.CodeInternal, err, "session create failed")
+		de = errs.Wrap(errs.CodeInternal, err, "request failed")
 	}
-	s.log().Warn("session create rejected", "code", de.Code, "details", de.Details)
+	incError(de.Code)
+	s.log().Warn("request rejected", "code", de.Code, "details", de.Details)
 	s.write(w, statusFor(de.Code), de)
 }
 
