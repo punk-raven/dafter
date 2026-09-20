@@ -28,6 +28,9 @@
 # Go
 /go/bin/
 *.test
+*.db
+*.db-wal
+*.db-shm
 
 # Python
 __pycache__/
