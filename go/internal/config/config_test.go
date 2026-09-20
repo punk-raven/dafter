@@ -405,7 +405,7 @@ func TestCanonicalizeMatchesTheReferenceVectors(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want, err := os.ReadFile(filepath.Join(rfc8785Vectors, "output", filepath.Base(in)))
+			want, err := os.ReadFile(filepath.Join(rfc8785Vectors, "expected", filepath.Base(in)))
 			if err != nil {
 				t.Fatal(err)
 			}

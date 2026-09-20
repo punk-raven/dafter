@@ -25,7 +25,7 @@ CROSS_LANGUAGE_CONFIG_HASH = "83e6309ac80b7060f9cffb62db49e7f18a810a36418ce7ebf3
     "vector", sorted((RFC8785_VECTORS / "input").glob("*.json")), ids=lambda p: p.name
 )
 def test_canonicalize_matches_the_reference_vectors(vector: Path) -> None:
-    want = (RFC8785_VECTORS / "output" / vector.name).read_bytes()
+    want = (RFC8785_VECTORS / "expected" / vector.name).read_bytes()
     assert canonicalize(vector.read_bytes()) == want
 
 

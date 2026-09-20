@@ -3,7 +3,7 @@
 From the JSON Canonicalization Scheme reference implementation
 (`github.com/cyberphone/json-canonicalization`, `testdata/`), the common ancestor of the
 Go (`github.com/gowebpki/jcs`) and Python (`rfc8785`) libraries Dafter uses. Both halves
-canonicalize `input/<name>.json` and must produce `output/<name>.json` byte for byte,
+canonicalize `input/<name>.json` and must produce `expected/<name>.json` byte for byte,
 which is what makes the cross-language config hash a checked claim rather than an
 assumption that two upstreams agree.
 
@@ -13,6 +13,6 @@ tidying those erases the rule each one exercises and leaves the check passing wh
 proving nothing. Do not reformat, do not fix newlines, do not merge them into one
 document.
 
-They change only by being re-copied from upstream. Diff against the reference suite's
-`testdata/input` and `testdata/output`; its `testdata/outhex/` settles any argument about
-encoding.
+They change only by being re-copied from upstream. Diff `input/` against the reference
+suite's `testdata/input` and `expected/` against its `testdata/output`; its
+`testdata/outhex/` settles any argument about encoding.
