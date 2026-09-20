@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 	room        TEXT NOT NULL,
 	config_hash TEXT NOT NULL,
 	config      TEXT NOT NULL,
-	created_at  TEXT NOT NULL
+	created_at  INTEGER NOT NULL
 ) STRICT;
 `
 
@@ -65,14 +65,12 @@ func closing(db *sql.DB, err error) error {
 
 func (s *Store) Close() error { return s.db.Close() }
 
-const rfc3339TimestampPattern = "2006-01-02T15:04:05.000000Z07:00"
-
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		sess.SessionID, sess.TenantID, sess.Room, sess.ConfigHash,
-		string(sess.Config), sess.CreatedAt.UTC().Format(rfc3339TimestampPattern))
+		string(sess.Config), sess.CreatedAt.UnixMicro())
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "store session")
 	}
@@ -85,7 +83,8 @@ func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) 
 		 FROM sessions WHERE session_id = ?`, sessionID)
 
 	var sess Session
-	var config, createdAt string
+	var config string
+	var createdAt int64
 	switch err := row.Scan(&sess.SessionID, &sess.TenantID, &sess.Room,
 		&sess.ConfigHash, &config, &createdAt); {
 	case errors.Is(err, sql.ErrNoRows):
@@ -95,10 +94,6 @@ func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) 
 	}
 
 	sess.Config = json.RawMessage(config)
-	t, err := time.Parse(rfc3339TimestampPattern, createdAt)
-	if err != nil {
-		return Session{}, errs.Wrap(errs.CodeInternal, err, "decode stored timestamp")
-	}
-	sess.CreatedAt = t
+	sess.CreatedAt = time.UnixMicro(createdAt).UTC()
 	return sess, nil
 }

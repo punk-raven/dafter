@@ -34,6 +34,8 @@ const storedDocument = `{"b": "\u00e5 \u0906",
   "a": [1, 2.50, null, "</script>"],
   "nested": {"quote": "\"", "slash": "a/b", "": "empty key"}}`
 
+var stampedIn = time.FixedZone("+05:30", 5*60*60+30*60)
+
 func session(t *testing.T) state.Session {
 	t.Helper()
 	return state.Session{
@@ -42,7 +44,7 @@ func session(t *testing.T) state.Session {
 		Room:       "dafter-s_7f3a9c21",
 		ConfigHash: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
 		Config:     json.RawMessage(storedDocument),
-		CreatedAt:  time.Date(2026, 9, 15, 12, 34, 56, 789012000, time.UTC),
+		CreatedAt:  time.Date(2026, 9, 15, 18, 4, 56, 789012000, stampedIn),
 	}
 }
 
@@ -66,6 +68,9 @@ func TestSessionRoundTripsTheResolvedDocument(t *testing.T) {
 	}
 	if !got.CreatedAt.Equal(want.CreatedAt) {
 		t.Errorf("created at %s, want %s", got.CreatedAt, want.CreatedAt)
+	}
+	if got.CreatedAt.Location() != time.UTC {
+		t.Errorf("created at came back in %s; a stored instant reads back as UTC, or every caller normalizes it instead", got.CreatedAt.Location())
 	}
 }
 
