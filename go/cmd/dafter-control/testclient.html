@@ -856,14 +856,11 @@ function copyJoinLink() {
 }
 
 (function seedFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  const roomParam = params.get('room');
-  if (roomParam) {
-    document.getElementById('room-id').value = roomParam;
-    if (confirm(`Join room ${roomParam}?`)) {
-      joinRoom();
-    }
-  }
+  const roomParam = new URLSearchParams(window.location.search).get('room');
+  if (!roomParam) return;
+  document.getElementById('room-id').value = roomParam;
+  log(`Join link for ${roomParam}`);
+  joinRoom();
 })();
 </script>
 </body>
