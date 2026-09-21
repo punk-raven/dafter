@@ -10,7 +10,7 @@ PY_SCHEMAS := $(PY_CORE)/_schemas
 LINT       := $(abspath $(GO_DIR)/bin/golangci-lint)
 VULN       := $(abspath $(GO_DIR)/bin/govulncheck)
 LK         := $(abspath $(GO_DIR)/bin/lk)
-LK_VERSION := 2.13.2
+LK_VERSION := 2.18.7
 GENERATED  := $(GO_SCHEMAS) $(PY_SCHEMAS) $(PY_CORE)/enums.py ':(glob)$(GO_DIR)/internal/**/*_gen.go'
 
 .PHONY: help
