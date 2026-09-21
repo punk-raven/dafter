@@ -19,6 +19,26 @@
         "resumeFalseInterruption": true
       }
     },
+    "media": {
+      "video": {
+        "enabled": true,
+        "codec": "vp9",
+        "backupCodec": "h264",
+        "scalabilityMode": "L3T3_KEY",
+        "resolution": "h720",
+        "maxBitrate": 1700000,
+        "maxFramerate": 30,
+        "simulcast": true,
+        "dynacast": true,
+        "adaptiveStream": true
+      },
+      "audio": {
+        "red": true,
+        "dtx": true,
+        "echoCancellation": true,
+        "noiseCancellation": "native"
+      }
+    },
     "recording": { "enabled": false },
     "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500 }
   },
