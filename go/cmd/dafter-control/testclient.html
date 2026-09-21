@@ -24,6 +24,26 @@
   .video-tile video { width: 100%; height: 100%; object-fit: cover; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
+  .stats-panel { border-top: 1px solid #222; background: #0c0c0c; max-height: 320px; display: flex; flex-direction: column; }
+  .stats-head { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #1c1c1c; flex-wrap: wrap; }
+  .stats-head strong { font-size: 12px; font-weight: 600; }
+  .stats-profile { font-family: monospace; font-size: 11px; color: #a78bfa; }
+  .stats-totals { font-family: monospace; font-size: 11px; color: #4ade80; }
+  .stats-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .stats-actions button { width: auto; margin: 0; padding: 4px 10px; font-size: 11px; background: #1f2937; color: #cbd5e1; }
+  .stats-actions button:hover { background: #374151; }
+  .stats-actions .count { font-size: 11px; color: #666; font-family: monospace; }
+  .stats-body { overflow: auto; }
+  table.stats { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; }
+  table.stats th { text-align: left; padding: 5px 8px; color: #777; font-weight: 600; position: sticky; top: 0; background: #0c0c0c; border-bottom: 1px solid #1c1c1c; white-space: nowrap; }
+  table.stats td { padding: 4px 8px; border-bottom: 1px solid #151515; white-space: nowrap; }
+  table.stats tr.up td { color: #e0e0e0; }
+  table.stats tr.down td { color: #9ca3af; }
+  table.stats .num { text-align: right; }
+  table.stats .over { color: #f87171; font-weight: 600; }
+  table.stats .paused { color: #60a5fa; }
+  table.stats .empty td { color: #555; text-align: center; padding: 14px; }
+
   .log-panel { height: 180px; min-height: 100px; border-top: 1px solid #222; overflow-y: auto; padding: 8px 12px; font-family: monospace; font-size: 12px; line-height: 1.6; }
   .log-panel .ts { color: #666; margin-right: 8px; }
   .log-panel .info { color: #60a5fa; }
@@ -139,6 +159,34 @@
 
   <div class="main">
     <div id="video-grid" class="video-grid"></div>
+
+    <div id="stats-panel" class="stats-panel" style="display:none">
+      <div class="stats-head">
+        <strong>Live media</strong>
+        <span id="stats-profile" class="stats-profile"></span>
+        <span id="stats-totals" class="stats-totals"></span>
+        <span class="stats-actions">
+          <span id="stats-count" class="count"></span>
+          <button onclick="downloadStats('json')">Download JSON</button>
+          <button onclick="downloadStats('csv')">Download CSV</button>
+        </span>
+      </div>
+      <div class="stats-body">
+        <table class="stats">
+          <thead>
+            <tr>
+              <th></th><th>Participant</th><th>Kind</th><th>Layer</th><th>Codec</th>
+              <th>Size</th><th class="num">FPS</th><th class="num">kbps</th>
+              <th class="num">Target</th><th class="num">Lost</th><th>State</th>
+            </tr>
+          </thead>
+          <tbody id="stats-rows">
+            <tr class="empty"><td colspan="11">waiting for the first sample...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="log" class="log-panel"></div>
   </div>
 </div>
@@ -218,6 +266,220 @@ function roomOptionsFrom(config) {
 function videoEnabled(config) {
   const video = (config && config.media && config.media.video) || {};
   return video.enabled !== false;
+}
+
+const STATS_INTERVAL_MS = 1000;
+const STATS_MAX_SAMPLES = 3600;   // one hour at one per second
+
+let statsTimer = null;
+let statsSamples = [];
+let statsPrev = new Map();        // stream key -> { bytes, at } from the previous tick
+let statsContext = null;          // session id, config hash, and the profile ceilings
+
+function startStats(data) {
+  stopStats();
+  const video = (data.config && data.config.media && data.config.media.video) || {};
+  const audio = (data.config && data.config.media && data.config.media.audio) || {};
+  statsContext = {
+    sessionId: data.sessionId,
+    room: data.room,
+    participantId: data.participantId,
+    configHash: data.configHash,
+    profile: { video, audio },
+  };
+  statsSamples = [];
+  statsPrev = new Map();
+
+  const ceiling = [
+    video.codec,
+    video.resolution,
+    video.maxBitrate ? `<=${Math.round(video.maxBitrate / 1000)} kbps` : null,
+    video.maxFramerate ? `<=${video.maxFramerate} fps` : null,
+  ].filter(Boolean).join(' · ');
+  document.getElementById('stats-profile').textContent = ceiling ? `profile: ${ceiling}` : 'profile: none';
+  document.getElementById('stats-panel').style.display = 'flex';
+
+  statsTimer = setInterval(collectStats, STATS_INTERVAL_MS);
+  collectStats();
+}
+
+function stopStats() {
+  if (statsTimer) clearInterval(statsTimer);
+  statsTimer = null;
+}
+
+function tracksToSample() {
+  const out = [];
+  if (!room) return out;
+  room.localParticipant.trackPublications.forEach((pub) => {
+    if (pub.track) out.push({ dir: 'up', who: 'you', track: pub.track });
+  });
+  room.remoteParticipants.forEach((p) => {
+    p.trackPublications.forEach((pub) => {
+      if (pub.track) out.push({ dir: 'down', who: p.identity, track: pub.track });
+    });
+  });
+  return out;
+}
+
+async function collectStats() {
+  const at = Date.now();
+  const rows = [];
+
+  for (const { dir, who, track } of tracksToSample()) {
+    let report;
+    try {
+      report = await track.getRTCStatsReport();
+    } catch (err) {
+      continue;   // a track can go away mid-sample; that is not an error worth logging
+    }
+    if (!report) continue;
+
+    const byId = new Map();
+    report.forEach((s) => byId.set(s.id, s));
+
+    report.forEach((s) => {
+      const outbound = s.type === 'outbound-rtp';
+      const inbound = s.type === 'inbound-rtp';
+      if (!outbound && !inbound) return;
+
+      const key = `${dir}:${who}:${s.id}`;
+      const bytes = outbound ? s.bytesSent : s.bytesReceived;
+      const prev = statsPrev.get(key);
+      let kbps = null;
+      if (prev && bytes >= prev.bytes && at > prev.at) {
+        kbps = Math.round(((bytes - prev.bytes) * 8) / (at - prev.at));
+      }
+      statsPrev.set(key, { bytes, at });
+
+      let lost = null;
+      if (outbound) {
+        report.forEach((r) => {
+          if (r.type === 'remote-inbound-rtp' && r.localId === s.id) lost = r.packetsLost;
+        });
+      } else {
+        lost = s.packetsLost;
+      }
+
+      const codec = byId.get(s.codecId);
+      const source = s.mediaSourceId ? byId.get(s.mediaSourceId) : null;
+      const pick = (own, fromSource) => (own != null ? own : (source ? fromSource(source) : null));
+      const fps = pick(s.framesPerSecond, (m) => m.framesPerSecond);
+
+      rows.push({
+        dir,
+        who,
+        kind: s.kind || track.kind,
+        layer: s.rid || s.scalabilityMode || '',
+        codec: codec && codec.mimeType ? codec.mimeType.replace(/^(video|audio)\//, '') : '',
+        width: pick(s.frameWidth, (m) => m.width),
+        height: pick(s.frameHeight, (m) => m.height),
+        fps: fps != null ? Math.round(fps) : null,
+        kbps,
+        targetKbps: s.targetBitrate ? Math.round(s.targetBitrate / 1000) : null,
+        lost,
+        active: outbound ? s.active !== false : null,
+        limitedBy: s.qualityLimitationReason && s.qualityLimitationReason !== 'none' ? s.qualityLimitationReason : '',
+        bytes,
+      });
+    });
+  }
+
+  const sample = { at, iso: new Date(at).toISOString(), rows };
+  statsSamples.push(sample);
+  if (statsSamples.length > STATS_MAX_SAMPLES) statsSamples.shift();
+  renderStats(sample);
+}
+
+function renderStats(sample) {
+  const tbody = document.getElementById('stats-rows');
+  const ceiling = statsContext ? statsContext.profile.video : {};
+  const maxKbps = ceiling.maxBitrate ? ceiling.maxBitrate / 1000 : null;
+  const maxFps = ceiling.maxFramerate || null;
+
+  if (!sample.rows.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="11">no streams yet</td></tr>';
+  } else {
+    tbody.innerHTML = sample.rows.map((r) => {
+      const overRate = r.kind === 'video' && maxKbps && r.kbps != null && r.kbps > maxKbps;
+      const overFps = r.kind === 'video' && maxFps && r.fps != null && r.fps > maxFps + 1;
+      const cell = (v, cls) => `<td class="num ${cls || ''}">${v == null ? '-' : v}</td>`;
+      return `<tr class="${r.dir}">
+        <td>${r.dir === 'up' ? '&uarr;' : '&darr;'}</td>
+        <td>${escapeHtml(r.who)}</td>
+        <td>${r.kind}</td>
+        <td>${escapeHtml(r.layer)}</td>
+        <td>${escapeHtml(r.codec)}</td>
+        <td>${r.width ? `${r.width}x${r.height}` : '-'}</td>
+        ${cell(r.fps, overFps ? 'over' : '')}
+        ${cell(r.kbps, overRate ? 'over' : '')}
+        ${cell(r.targetKbps)}
+        ${cell(r.lost)}
+        <td>${r.active === false ? '<span class="paused">paused (dynacast)</span>' : escapeHtml(r.limitedBy)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const sum = (dir) => sample.rows
+    .filter((r) => r.dir === dir && r.kbps != null)
+    .reduce((t, r) => t + r.kbps, 0);
+  const up = sum('up');
+  const down = sum('down');
+
+  const upSeries = statsSamples
+    .map((s) => s.rows.filter((r) => r.dir === 'up' && r.kbps != null).reduce((t, r) => t + r.kbps, 0))
+    .filter((v, i) => i > 0);   // the first tick has no delta to measure
+  const peak = upSeries.length ? Math.max(...upSeries) : 0;
+  const mean = upSeries.length ? Math.round(upSeries.reduce((a, b) => a + b, 0) / upSeries.length) : 0;
+
+  document.getElementById('stats-totals').textContent =
+    `up ${up} kbps (peak ${peak}, mean ${mean}) · down ${down} kbps`;
+  document.getElementById('stats-count').textContent = `${statsSamples.length} samples`;
+}
+
+function downloadStats(format) {
+  if (!statsSamples.length) {
+    log('No stats captured yet', 'warn');
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const base = `dafter-stats-${(statsContext && statsContext.sessionId) || 'session'}-${stamp}`;
+
+  let body, type, name;
+  if (format === 'csv') {
+    const cols = ['iso', 'dir', 'who', 'kind', 'layer', 'codec', 'width', 'height', 'fps', 'kbps', 'targetKbps', 'lost', 'active', 'limitedBy', 'bytes'];
+    const lines = [cols.join(',')];
+    for (const s of statsSamples) {
+      for (const r of s.rows) {
+        lines.push(cols.map((c) => {
+          const v = c === 'iso' ? s.iso : r[c];
+          if (v == null) return '';
+          return /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v;
+        }).join(','));
+      }
+    }
+    body = lines.join('\n');
+    type = 'text/csv';
+    name = `${base}.csv`;
+  } else {
+    body = JSON.stringify({
+      capturedAt: new Date().toISOString(),
+      client: 'livekit-client@2.13.5',
+      session: statsContext,
+      sampleIntervalMs: STATS_INTERVAL_MS,
+      samples: statsSamples,
+    }, null, 2);
+    type = 'application/json';
+    name = `${base}.json`;
+  }
+
+  const url = URL.createObjectURL(new Blob([body], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+  log(`Downloaded ${name} (${statsSamples.length} samples)`, 'success');
 }
 
 async function createSession() {
@@ -398,6 +660,7 @@ async function joinRoom() {
     document.getElementById('session-created-info').style.display = 'none';
     document.getElementById('btn-leave').style.display = 'block';
 
+    startStats(data);
     monitorICE();
 
   } catch (err) {
@@ -415,6 +678,7 @@ async function leaveSession() {
 }
 
 function cleanup() {
+  stopStats();
   if (syntheticIntervalId != null) {
     clearInterval(syntheticIntervalId);
     syntheticIntervalId = null;
