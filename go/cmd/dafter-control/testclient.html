@@ -197,6 +197,7 @@ const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
 let room = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
+let syntheticVideo = false;   // the test pattern is not a selfie view, so it is never mirrored
 let syntheticAudioCtx = null;
 let lastRoomId = null;
 
@@ -652,7 +653,7 @@ async function joinRoom() {
 
     const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
     if (localVideoTrack && localVideoTrack.track) {
-      attachTrack(localVideoTrack.track, room.localParticipant, true);
+      attachTrack(localVideoTrack.track, room.localParticipant, true, !syntheticVideo);
     }
 
     document.getElementById('panel-create').style.display = 'none';
@@ -679,6 +680,7 @@ async function leaveSession() {
 
 function cleanup() {
   stopStats();
+  syntheticVideo = false;
   if (syntheticIntervalId != null) {
     clearInterval(syntheticIntervalId);
     syntheticIntervalId = null;
@@ -697,7 +699,7 @@ function cleanup() {
   document.getElementById('ice-info').style.display = 'none';
 }
 
-function attachTrack(track, participant, isLocal = false) {
+function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
   const tileId = `tile-${participant.identity}-${track.kind}`;
   let tile = document.getElementById(tileId);
 
@@ -713,7 +715,7 @@ function attachTrack(track, participant, isLocal = false) {
     el.style.width = '100%';
     el.style.height = '100%';
     el.style.objectFit = 'cover';
-    if (isLocal) el.style.transform = 'scaleX(-1)';
+    if (mirror) el.style.transform = 'scaleX(-1)';
     tile.insertBefore(el, tile.firstChild);
   }
 
@@ -769,6 +771,7 @@ async function publishTestPattern(room) {
   drawFrame();
 
   const videoStream = canvas.captureStream(30);
+  syntheticVideo = true;
   const videoTrack = new LocalVideoTrack(videoStream.getVideoTracks()[0]);
   await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
   log('Synthetic video track published (color bars + timestamp)', 'success');
