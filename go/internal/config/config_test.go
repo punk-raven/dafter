@@ -477,7 +477,7 @@ func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "83e6309ac80b7060f9cffb62db49e7f18a810a36418ce7ebf311d5f5aeb5829e"
+	const want = "e2cbfc6025890c0d0318fc2f734115aa0de90b27465906981f0124be808997f4"
 	got, err := config.HashDocument(raw)
 	if err != nil {
 		t.Fatal(err)
