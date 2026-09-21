@@ -175,6 +175,15 @@ func catalog() *config.Catalog {
 			"privacyMode": "open",
 			"agent": {"enabled": true, "pool": "dafter-py", "mode": "cascaded"},
 			"turn": {"strategy": "auto", "silenceMs": 500, "minSpeechMs": 120},
+			"media": {
+				"video": {
+					"enabled": true, "codec": "vp9", "backupCodec": "h264",
+					"scalabilityMode": "L3T3_KEY", "resolution": "h720",
+					"maxBitrate": 1700000, "maxFramerate": 30,
+					"simulcast": true, "dynacast": true, "adaptiveStream": true
+				},
+				"audio": {"red": true, "dtx": true, "echoCancellation": true, "noiseCancellation": "native"}
+			},
 			"recording": {"enabled": false},
 			"budgets": {"turnGapP50Ms": 800, "turnGapP95Ms": 1500}
 		}`),
@@ -198,8 +207,14 @@ func catalog() *config.Catalog {
 			}`),
 		},
 		Channels: map[config.Channel]json.RawMessage{
-			config.ChannelWebRTC:    json.RawMessage(`{"turn": {"endpointingDelayMs": 0}}`),
-			config.ChannelTelephony: json.RawMessage(`{"turn": {"silenceMs": 900}}`),
+			config.ChannelWebRTC: json.RawMessage(`{"turn": {"endpointingDelayMs": 0}}`),
+			config.ChannelTelephony: json.RawMessage(`{
+				"turn": {"silenceMs": 900},
+				"media": {"video": {"enabled": false}}
+			}`),
+			config.ChannelLongForm: json.RawMessage(`{
+				"media": {"video": {"resolution": "h540", "maxBitrate": 800000, "maxFramerate": 25}}
+			}`),
 		},
 	}
 }
@@ -243,6 +258,38 @@ func TestResolveAppliesLayersInOrder(t *testing.T) {
 	}
 	if c.SessionID != sessionID || c.TenantID != tenantID {
 		t.Errorf("identity not stamped from the request: %s/%s", c.SessionID, c.TenantID)
+	}
+}
+
+func TestResolveTakesTheMediaProfileFromTheChannelAxis(t *testing.T) {
+	t.Parallel()
+	web := resolve(t, request()).Config
+
+	if !web.VideoEnabled() {
+		t.Fatal("webrtc resolved without video")
+	}
+	if web.Media.Video.Codec != config.CodecVp9 || web.Media.Video.BackupCodec != config.CodecH264 {
+		t.Errorf("defaults layer lost: codec %s, backup %s", web.Media.Video.Codec, web.Media.Video.BackupCodec)
+	}
+	if web.Media.Video.MaxBitrate != 1700000 || web.Media.Video.Resolution != config.ResolutionH720 {
+		t.Errorf("720p ceiling lost: %s at %d bps", web.Media.Video.Resolution, web.Media.Video.MaxBitrate)
+	}
+
+	tel := request()
+	tel.Language = "hi"
+	tel.Channel = config.ChannelTelephony
+	if telephony := resolve(t, tel).Config; telephony.VideoEnabled() {
+		t.Error("telephony resolved with video; the channel carries 8 kHz audio and no video at all")
+	}
+
+	long := request()
+	long.Channel = config.ChannelLongForm
+	lf := resolve(t, long).Config
+	if lf.Media.Video.Resolution != config.ResolutionH540 || lf.Media.Video.MaxBitrate != 800000 {
+		t.Errorf("long_form overlay lost: %s at %d bps", lf.Media.Video.Resolution, lf.Media.Video.MaxBitrate)
+	}
+	if lf.Media.Video.Codec != config.CodecVp9 {
+		t.Errorf("long_form overlay replaced the profile instead of overlaying it: codec = %s", lf.Media.Video.Codec)
 	}
 }
 
@@ -297,7 +344,12 @@ func TestResolveIsDeterministic(t *testing.T) {
 
 func resolveError(t *testing.T, req config.Request) *errs.Error {
 	t.Helper()
-	res, err := catalog().Resolve(req)
+	return resolveErrorIn(t, catalog(), req)
+}
+
+func resolveErrorIn(t *testing.T, cat *config.Catalog, req config.Request) *errs.Error {
+	t.Helper()
+	res, err := cat.Resolve(req)
 	if err == nil {
 		t.Fatalf("resolution accepted a request it should reject: %s", res.Document)
 	}
@@ -323,9 +375,12 @@ func TestResolveRejectsAnUnsupportedLanguage(t *testing.T) {
 
 func TestResolveRejectsAnUnsupportedChannel(t *testing.T) {
 	t.Parallel()
+	cat := catalog()
+	delete(cat.Channels, config.ChannelLongForm)
+
 	req := request()
 	req.Channel = config.ChannelLongForm
-	de := resolveError(t, req)
+	de := resolveErrorIn(t, cat, req)
 	if de.Code != errs.CodeUnsupportedCapability {
 		t.Errorf("want %s, got %s", errs.CodeUnsupportedCapability, de.Code)
 	}

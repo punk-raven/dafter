@@ -130,6 +130,19 @@
         "silenceMs": 900,
         "endpointingDelayMs": 200,
         "interruption": { "minWords": 3 }
+      },
+      "media": {
+        "video": { "enabled": false }
+      }
+    },
+
+    "long_form": {
+      "media": {
+        "video": {
+          "resolution": "h540",
+          "maxBitrate": 800000,
+          "maxFramerate": 25
+        }
       }
     }
   }
