@@ -332,6 +332,24 @@ func TestResolveTakesTheMediaProfileFromTheChannelAxis(t *testing.T) {
 	}
 }
 
+func TestResolveDefersResolutionToTheClientWithoutDeferringBandwidth(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"media": {"video": {"resolution": "auto"}}}`)
+	c := resolve(t, req).Config
+
+	if c.Media.Video.Resolution != config.ResolutionAuto {
+		t.Fatalf("resolution = %s, want %s", c.Media.Video.Resolution, config.ResolutionAuto)
+	}
+	if c.Media.Video.MaxBitrate != 1700000 || c.Media.Video.MaxFramerate != 30 {
+		t.Errorf("caps lost with an auto resolution: %d bps, %d fps",
+			c.Media.Video.MaxBitrate, c.Media.Video.MaxFramerate)
+	}
+	if c.Media.Video.Codec != config.CodecVp9 {
+		t.Errorf("rest of the profile lost: codec = %s", c.Media.Video.Codec)
+	}
+}
+
 func TestResolveTakesTurnStrategyFromTheLanguageAxis(t *testing.T) {
 	t.Parallel()
 	hi := request()

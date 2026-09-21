@@ -132,6 +132,21 @@ hold, at the 540p preset triple rather than an invented one.
 Two cross-field rules, one table per half, each located by JSON pointer: video
 on telephony, and a scalability mode without a layered codec.
 
+**Delegating the size.** `resolution` also accepts `auto`, which hands that one
+choice to the publishing client - often the only party that knows what its
+camera and its hardware encoder do well, and a laptop, a phone and a kiosk on
+one tenant do not agree. It is a stated value rather than an absent one, and
+the difference is the whole point: an absent field is a decision nobody made,
+while `auto` is a decision to delegate and lands in the hashed document like
+any other, so a session that let the client choose still says so afterwards.
+
+The bitrate and framerate ceilings still apply on top of it. Delegating the
+size never delegates the bandwidth, so a client that picks a size its ceiling
+cannot carry gets a soft picture rather than a bigger bill. Both halves pin
+that, because the tempting reading of `auto` is that it switches everything
+off. The shipped default stays `h720`; opting out has to be asked for, by a
+tenant, a profile, a channel or a single request.
+
 ### Stage 3 - make it real on the wire (done)
 
 The test client reads `config.media` off the session response and maps it onto

@@ -107,6 +107,16 @@
         </select>
         <label>Profile (optional)</label>
         <input id="profile" value="support">
+        <label>Video resolution</label>
+        <select id="resolution">
+          <option value="" selected>profile default (h720)</option>
+          <option value="auto">auto - let this client choose</option>
+          <option value="h180">h180</option>
+          <option value="h360">h360</option>
+          <option value="h540">h540</option>
+          <option value="h720">h720</option>
+          <option value="h1080">h1080</option>
+        </select>
       </fieldset>
       <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
     </div>
@@ -249,10 +259,14 @@ function roomOptionsFrom(config) {
     if (video.maxFramerate !== undefined) publish.videoEncoding.maxFramerate = video.maxFramerate;
   }
 
-  const preset = VideoPresets[video.resolution];
-  if (preset) options.videoCaptureDefaults = { resolution: preset.resolution };
-  else if (video.resolution !== undefined) {
-    log(`Profile names resolution ${video.resolution}, which this client SDK has no preset for`, 'warn');
+  if (video.resolution === 'auto') {
+    log('Profile defers resolution to this client; bitrate and framerate ceilings still apply');
+  } else {
+    const preset = VideoPresets[video.resolution];
+    if (preset) options.videoCaptureDefaults = { resolution: preset.resolution };
+    else if (video.resolution !== undefined) {
+      log(`Profile names resolution ${video.resolution}, which this client SDK has no preset for`, 'warn');
+    }
   }
 
   const capture = {};
@@ -496,6 +510,9 @@ async function createSession() {
     };
     const profile = document.getElementById('profile').value.trim();
     if (profile) body.profile = profile;
+
+    const resolution = document.getElementById('resolution').value;
+    if (resolution) body.overrides = { media: { video: { resolution } } };
 
     const resp = await fetch('/sessions', {
       method: 'POST',

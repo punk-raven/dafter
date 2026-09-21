@@ -5,7 +5,14 @@ from typing import Any
 
 import pytest
 from dafter_core.config import parse
-from dafter_core.enums import Channel, EgressLayout, ErrorCode, PrivacyMode, TurnStrategy
+from dafter_core.enums import (
+    Channel,
+    EgressLayout,
+    ErrorCode,
+    PrivacyMode,
+    TurnStrategy,
+    VideoResolution,
+)
 from dafter_core.errors import DafterError
 
 MINIMAL: dict[str, Any] = {
@@ -124,6 +131,12 @@ def test_telephony_refuses_a_video_profile() -> None:
     assert err.code is ErrorCode.INVALID_CONFIG
     assert "/media/video/enabled" in "\n".join(err.details)
     assert parse(doc(channel="telephony", media={"video": {"enabled": False}}))
+
+
+def test_resolution_can_be_deferred_to_the_client() -> None:
+    cfg = parse(doc(media={"video": {"resolution": "auto", "maxBitrate": 1700000}}))
+    assert cfg.media.video.resolution is VideoResolution.AUTO
+    assert cfg.media.video.max_bitrate == 1700000
 
 
 def test_scalability_mode_needs_a_layered_codec() -> None:

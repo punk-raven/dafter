@@ -165,8 +165,8 @@
         },
         "resolution": {
           "type": "string",
-          "description": "Capture and publish size, named rather than given as a width and height so it stays one token that a bitrate and framerate can be matched against.",
-          "enum": ["h180", "h360", "h540", "h720", "h1080"],
+          "description": "Capture and publish size, named rather than given as a width and height so it stays one token that a bitrate and framerate can be matched against. 'auto' hands the choice to the publishing client, which is the only party that knows what its camera and its hardware encoder actually do well. That is different from leaving this field out: an absent field is a decision nobody made, while 'auto' is a decision to delegate, and it is recorded in the hashed document like any other. The bitrate and framerate ceilings still apply, so delegating the size never delegates the bandwidth - a client that picks a size its ceiling cannot carry gets a soft picture rather than a bigger bill.",
+          "enum": ["auto", "h180", "h360", "h540", "h720", "h1080"],
           "default": "h720"
         },
         "maxBitrate": {
