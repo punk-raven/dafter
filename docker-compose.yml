@@ -64,7 +64,10 @@ services:
       context: ./go
     ports:
       - "8080:8080"
+    volumes:
+      - control-data:/var/lib/dafter
     environment:
+      DAFTER_DB: /var/lib/dafter/dafter.db
       DAFTER_ADDR: 0.0.0.0:8080
       DAFTER_LIVEKIT_URL: ws://livekit:7880
       DAFTER_LIVEKIT_API_KEY: devkey
@@ -140,4 +143,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  control-data:
   minio-data:
