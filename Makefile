@@ -89,8 +89,11 @@ py-test: generate ## Run the Python tests
 py-lint: generate ## Lint and type-check the Python packages
 	cd $(PY_DIR) && uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy
 
+.PHONY: check-tools
+check-tools: $(LINT) $(VULN) ## Build the pinned linter and vulnerability scanner
+
 .PHONY: tools
-tools: $(LINT) $(VULN) $(LK) ## Build the pinned linter and vulnerability scanner, fetch the pinned lk
+tools: check-tools $(LK) ## check-tools, plus the pinned lk used by the media load test
 
 .PHONY: setup
 setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Python environment

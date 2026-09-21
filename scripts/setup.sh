@@ -134,7 +134,7 @@ echo '==> resolving the Python environment from python/uv.lock'
 (cd python && uv sync --frozen)
 
 echo '==> building the pinned linter and vulnerability scanner'
-make tools
+make check-tools
 
 cat <<DONE
 
