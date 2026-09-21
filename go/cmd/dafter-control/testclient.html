@@ -151,6 +151,22 @@
       <button id="btn-join" class="btn-join" onclick="joinRoom()">Join Room</button>
     </div>
 
+    <div id="panel-myvideo">
+      <fieldset>
+        <legend>My video</legend>
+        <label>Capture resolution</label>
+        <select id="my-resolution" onchange="applyMyResolution()">
+          <option value="" selected>follow the session profile</option>
+          <option value="auto">auto - let my browser choose</option>
+          <option value="h180">h180</option>
+          <option value="h360">h360</option>
+          <option value="h540">h540</option>
+          <option value="h720">h720</option>
+          <option value="h1080">h1080</option>
+        </select>
+      </fieldset>
+    </div>
+
     <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
 
     <div id="session-response" class="response-box" style="display:none"></div>
@@ -208,6 +224,7 @@ let room = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
 let syntheticVideo = false;   // the test pattern is not a selfie view, so it is never mirrored
+let lastConfig = null;        // the joined session's resolved document, for returning to its profile
 let syntheticAudioCtx = null;
 let lastRoomId = null;
 
@@ -283,6 +300,56 @@ function videoEnabled(config) {
   return video.enabled !== false;
 }
 
+function myResolution() {
+  return document.getElementById('my-resolution').value;
+}
+
+function applyLocalPreference(options) {
+  const pref = myResolution();
+  if (!pref) return options;
+  if (pref === 'auto') {
+    delete options.videoCaptureDefaults;
+    log('Your capture size: browser default, overriding the session profile', 'warn');
+  } else if (VideoPresets[pref]) {
+    options.videoCaptureDefaults = { resolution: VideoPresets[pref].resolution };
+    log(`Your capture size: ${pref}, overriding the session profile`, 'warn');
+  }
+  return options;
+}
+
+async function applyMyResolution() {
+  if (statsContext) statsContext.clientResolution = myResolution() || null;
+  if (!room) return;
+
+  const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+  if (!pub || !pub.track) {
+    log('No camera track to change', 'warn');
+    return;
+  }
+  if (syntheticVideo) {
+    log('The synthetic test pattern is drawn at a fixed size; this applies to a real camera', 'warn');
+    return;
+  }
+
+  const pref = myResolution();
+  try {
+    if (!pref) {
+      const fromProfile = (lastConfig && lastConfig.media && lastConfig.media.video) || {};
+      const preset = VideoPresets[fromProfile.resolution];
+      await pub.track.restartTrack(preset ? { resolution: preset.resolution } : {});
+      log('Capture size back to the session profile', 'success');
+    } else if (pref === 'auto') {
+      await pub.track.restartTrack({});
+      log('Capture size now the browser default', 'success');
+    } else {
+      await pub.track.restartTrack({ resolution: VideoPresets[pref].resolution });
+      log(`Capture size now ${pref}`, 'success');
+    }
+  } catch (err) {
+    log(`Could not change capture size: ${err.message}`, 'error');
+  }
+}
+
 const STATS_INTERVAL_MS = 1000;
 const STATS_MAX_SAMPLES = 3600;   // one hour at one per second
 
@@ -301,6 +368,7 @@ function startStats(data) {
     participantId: data.participantId,
     configHash: data.configHash,
     profile: { video, audio },
+    clientResolution: myResolution() || null,
   };
   statsSamples = [];
   statsPrev = new Map();
@@ -311,7 +379,10 @@ function startStats(data) {
     video.maxBitrate ? `<=${Math.round(video.maxBitrate / 1000)} kbps` : null,
     video.maxFramerate ? `<=${video.maxFramerate} fps` : null,
   ].filter(Boolean).join(' · ');
-  document.getElementById('stats-profile').textContent = ceiling ? `profile: ${ceiling}` : 'profile: none';
+  const override = statsContext.clientResolution;
+  document.getElementById('stats-profile').textContent =
+    (ceiling ? `profile: ${ceiling}` : 'profile: none') +
+    (override ? `  ·  you chose ${override}` : '');
   document.getElementById('stats-panel').style.display = 'flex';
 
   statsTimer = setInterval(collectStats, STATS_INTERVAL_MS);
@@ -447,6 +518,11 @@ function renderStats(sample) {
   const peak = upSeries.length ? Math.max(...upSeries) : 0;
   const mean = upSeries.length ? Math.round(upSeries.reduce((a, b) => a + b, 0) / upSeries.length) : 0;
 
+  if (statsContext) {
+    const ceilingText = document.getElementById('stats-profile').textContent.split('  ·  you chose ')[0];
+    document.getElementById('stats-profile').textContent =
+      ceilingText + (statsContext.clientResolution ? `  ·  you chose ${statsContext.clientResolution}` : '');
+  }
   document.getElementById('stats-totals').textContent =
     `up ${up} kbps (peak ${peak}, mean ${mean}) · down ${down} kbps`;
   document.getElementById('stats-count').textContent = `${statsSamples.length} samples`;
@@ -583,8 +659,9 @@ async function joinRoom() {
 
     setBadge('connecting');
 
+    lastConfig = data.config;
     const publishesVideo = videoEnabled(data.config);
-    const roomOptions = roomOptionsFrom(data.config);
+    const roomOptions = applyLocalPreference(roomOptionsFrom(data.config));
     if (data.config && data.config.media) {
       const v = data.config.media.video || {};
       log(`Media profile: ${publishesVideo ? `${v.codec || 'sdk default'} ${v.resolution || ''} ${v.maxBitrate ? `${Math.round(v.maxBitrate / 1000)} kbps` : ''}`.trim() : 'audio only'} (config ${data.configHash.slice(0, 12)})`, 'success');
