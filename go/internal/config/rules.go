@@ -34,6 +34,23 @@ var crossFieldRules = []crossFieldRule{
 		pointer: "/recording/layout",
 		because: "capture at session creation needs a room composite, because a track egress attaches to a published track and cannot start before one exists",
 	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Channel == ChannelTelephony && c.VideoEnabled()
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/media/video/enabled",
+		because: "telephony carries narrowband audio and no video at all, so a video profile on this channel describes a stream that cannot exist",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			v := c.video()
+			return v != nil && v.ScalabilityMode != "" && !v.Codec.Layered()
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/media/video/scalabilityMode",
+		because: "a scalability mode names spatial and temporal layers that only a layered codec produces, so with this codec it promises layering the session will not get",
+	},
 }
 
 func (c *ResolvedSessionConfig) validateCrossFieldRules() error {

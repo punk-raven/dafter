@@ -119,6 +119,20 @@ def test_sealed_session_refuses_an_agent() -> None:
     assert parse(doc(privacyMode="sealed", agent={"enabled": False, "pool": "dafter-py"}))
 
 
+def test_telephony_refuses_a_video_profile() -> None:
+    err = refuse(doc(channel="telephony"))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/media/video/enabled" in "\n".join(err.details)
+    assert parse(doc(channel="telephony", media={"video": {"enabled": False}}))
+
+
+def test_scalability_mode_needs_a_layered_codec() -> None:
+    err = refuse(doc(media={"video": {"codec": "h264", "scalabilityMode": "L3T3_KEY"}}))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/media/video/scalabilityMode" in "\n".join(err.details)
+    assert parse(doc(media={"video": {"codec": "vp9", "scalabilityMode": "L3T3_KEY"}}))
+
+
 def test_recording_requires_consent() -> None:
     assert refuse(doc(recording={"enabled": True})).code is ErrorCode.CONSENT_REQUIRED
 

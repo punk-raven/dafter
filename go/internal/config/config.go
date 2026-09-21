@@ -109,6 +109,13 @@ func (c *ResolvedSessionConfig) VideoEnabled() bool {
 	return *c.Media.Video.Enabled
 }
 
+func (c *ResolvedSessionConfig) video() *VideoProfile {
+	if c.Media == nil {
+		return nil
+	}
+	return c.Media.Video
+}
+
 func (v VideoCodec) Layered() bool {
 	return v == CodecVp9 || v == CodecAv1
 }

@@ -127,15 +127,15 @@ class Agent:
 @dataclass(frozen=True, slots=True)
 class VideoProfile:
     enabled: bool = True
-    codec: VideoCodec = VideoCodec.VP9
-    backup_codec: VideoCodec = VideoCodec.H264
-    scalability_mode: str = "L3T3_KEY"
-    resolution: VideoResolution = VideoResolution.H720
+    codec: VideoCodec | None = None
+    backup_codec: VideoCodec | None = None
+    scalability_mode: str = ""
+    resolution: VideoResolution | None = None
     max_bitrate: int = 0
     max_framerate: int = 0
-    simulcast: bool = True
-    dynacast: bool = True
-    adaptive_stream: bool = True
+    simulcast: bool | None = None
+    dynacast: bool | None = None
+    adaptive_stream: bool | None = None
 
     @property
     def layered(self) -> bool:
@@ -143,36 +143,40 @@ class VideoProfile:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> VideoProfile:
+        def codec(key: str) -> VideoCodec | None:
+            v = d.get(key)
+            return VideoCodec(v) if v else None
+
+        resolution = d.get("resolution")
         return cls(
             enabled=d.get("enabled", True),
-            codec=VideoCodec(d.get("codec", VideoCodec.VP9)),
-            backup_codec=VideoCodec(d.get("backupCodec", VideoCodec.H264)),
-            scalability_mode=d.get("scalabilityMode", "L3T3_KEY"),
-            resolution=VideoResolution(d.get("resolution", VideoResolution.H720)),
+            codec=codec("codec"),
+            backup_codec=codec("backupCodec"),
+            scalability_mode=d.get("scalabilityMode", ""),
+            resolution=VideoResolution(resolution) if resolution else None,
             max_bitrate=d.get("maxBitrate", 0),
             max_framerate=d.get("maxFramerate", 0),
-            simulcast=d.get("simulcast", True),
-            dynacast=d.get("dynacast", True),
-            adaptive_stream=d.get("adaptiveStream", True),
+            simulcast=d.get("simulcast"),
+            dynacast=d.get("dynacast"),
+            adaptive_stream=d.get("adaptiveStream"),
         )
 
 
 @dataclass(frozen=True, slots=True)
 class AudioProfile:
-    red: bool = True
-    dtx: bool = True
-    echo_cancellation: bool = True
-    noise_cancellation: NoiseCancellation = NoiseCancellation.NATIVE
+    red: bool | None = None
+    dtx: bool | None = None
+    echo_cancellation: bool | None = None
+    noise_cancellation: NoiseCancellation | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> AudioProfile:
+        noise = d.get("noiseCancellation")
         return cls(
-            red=d.get("red", True),
-            dtx=d.get("dtx", True),
-            echo_cancellation=d.get("echoCancellation", True),
-            noise_cancellation=NoiseCancellation(
-                d.get("noiseCancellation", NoiseCancellation.NATIVE)
-            ),
+            red=d.get("red"),
+            dtx=d.get("dtx"),
+            echo_cancellation=d.get("echoCancellation"),
+            noise_cancellation=NoiseCancellation(noise) if noise else None,
         )
 
 

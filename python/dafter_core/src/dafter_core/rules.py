@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .enums import EgressLayout, ErrorCode, PrivacyMode, RecordingStart
+from .enums import Channel, EgressLayout, ErrorCode, PrivacyMode, RecordingStart
 
 if TYPE_CHECKING:
     from .config import ResolvedSessionConfig
@@ -45,6 +45,24 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         because=(
             "capture at session creation needs a room composite, because a track egress "
             "attaches to a published track and cannot start before one exists"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.channel is Channel.TELEPHONY and c.media.video.enabled,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/media/video/enabled",
+        because=(
+            "telephony carries narrowband audio and no video at all, so a video profile "
+            "on this channel describes a stream that cannot exist"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: bool(c.media.video.scalability_mode) and not c.media.video.layered,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/media/video/scalabilityMode",
+        because=(
+            "a scalability mode names spatial and temporal layers that only a layered "
+            "codec produces, so with this codec it promises layering the session will not get"
         ),
     ),
 )

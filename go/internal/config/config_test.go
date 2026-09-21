@@ -47,6 +47,45 @@ func TestValidateRejectsAgentInASealedSession(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsVideoOnTelephony(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Channel = config.ChannelTelephony
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("a telephony session kept video: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/video/enabled") {
+		t.Errorf("no detail points at /media/video/enabled: %v", de)
+	}
+
+	off := false
+	c.Media = &config.Media{Video: &config.VideoProfile{Enabled: &off}}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("telephony with video off rejected: %v", err)
+	}
+}
+
+func TestValidateRejectsScalabilityModeWithoutALayeredCodec(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Media = &config.Media{Video: &config.VideoProfile{
+		Codec: config.CodecH264, ScalabilityMode: "L3T3_KEY",
+	}}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("H.264 kept a scalability mode: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/video/scalabilityMode") {
+		t.Errorf("no detail points at /media/video/scalabilityMode: %v", de)
+	}
+
+	c.Media.Video.Codec = config.CodecVp9
+	if err := c.Validate(); err != nil {
+		t.Fatalf("VP9 with a scalability mode rejected: %v", err)
+	}
+}
+
 func TestValidateRejectsRecordingWithoutConsent(t *testing.T) {
 	t.Parallel()
 	c := validConfig(t)
