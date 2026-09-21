@@ -9,9 +9,12 @@ from .enums import (
     Channel,
     EgressLayout,
     ErrorCode,
+    NoiseCancellation,
     PrivacyMode,
     RecordingStart,
     TurnStrategy,
+    VideoCodec,
+    VideoResolution,
 )
 from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
@@ -122,6 +125,71 @@ class Agent:
 
 
 @dataclass(frozen=True, slots=True)
+class VideoProfile:
+    enabled: bool = True
+    codec: VideoCodec = VideoCodec.VP9
+    backup_codec: VideoCodec = VideoCodec.H264
+    scalability_mode: str = "L3T3_KEY"
+    resolution: VideoResolution = VideoResolution.H720
+    max_bitrate: int = 0
+    max_framerate: int = 0
+    simulcast: bool = True
+    dynacast: bool = True
+    adaptive_stream: bool = True
+
+    @property
+    def layered(self) -> bool:
+        return self.codec in (VideoCodec.VP9, VideoCodec.AV1)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> VideoProfile:
+        return cls(
+            enabled=d.get("enabled", True),
+            codec=VideoCodec(d.get("codec", VideoCodec.VP9)),
+            backup_codec=VideoCodec(d.get("backupCodec", VideoCodec.H264)),
+            scalability_mode=d.get("scalabilityMode", "L3T3_KEY"),
+            resolution=VideoResolution(d.get("resolution", VideoResolution.H720)),
+            max_bitrate=d.get("maxBitrate", 0),
+            max_framerate=d.get("maxFramerate", 0),
+            simulcast=d.get("simulcast", True),
+            dynacast=d.get("dynacast", True),
+            adaptive_stream=d.get("adaptiveStream", True),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AudioProfile:
+    red: bool = True
+    dtx: bool = True
+    echo_cancellation: bool = True
+    noise_cancellation: NoiseCancellation = NoiseCancellation.NATIVE
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> AudioProfile:
+        return cls(
+            red=d.get("red", True),
+            dtx=d.get("dtx", True),
+            echo_cancellation=d.get("echoCancellation", True),
+            noise_cancellation=NoiseCancellation(
+                d.get("noiseCancellation", NoiseCancellation.NATIVE)
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Media:
+    video: VideoProfile = field(default_factory=VideoProfile)
+    audio: AudioProfile = field(default_factory=AudioProfile)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Media:
+        return cls(
+            video=VideoProfile.from_dict(d.get("video") or {}),
+            audio=AudioProfile.from_dict(d.get("audio") or {}),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Recording:
     enabled: bool
     layout: EgressLayout = EgressLayout.TRACK
@@ -167,6 +235,7 @@ class ResolvedSessionConfig:
     turn: Turn
     recording: Recording
     budgets: Budgets
+    media: Media = field(default_factory=Media)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
 
@@ -197,6 +266,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         turn=Turn.from_dict(doc["turn"]),
         recording=Recording.from_dict(doc["recording"]),
         budgets=Budgets.from_dict(doc["budgets"]),
+        media=Media.from_dict(doc.get("media") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
     )

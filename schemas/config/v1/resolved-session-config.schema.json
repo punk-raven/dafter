@@ -65,6 +65,7 @@
       }
     },
     "turn": { "$ref": "#/$defs/Turn" },
+    "media": { "$ref": "#/$defs/Media" },
     "recording": { "$ref": "#/$defs/Recording" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
@@ -123,6 +124,98 @@
             "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
             "resumeFalseInterruption": { "type": "boolean", "default": true }
           }
+        }
+      }
+    },
+    "Media": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How a participant publishes. Every one of these is applied by the publishing client and the media server only routes what it is handed, which is exactly why the platform states them: an unset knob is a library default nobody chose, and a session whose profile is not in the resolved document cannot be explained after the call.",
+      "properties": {
+        "video": { "$ref": "#/$defs/VideoProfile" },
+        "audio": { "$ref": "#/$defs/AudioProfile" }
+      }
+    },
+    "VideoProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Off for a channel that carries no video. Stated rather than omitted because overlays compose by merging, and a merge can override a key but cannot delete one.",
+          "default": true
+        },
+        "codec": {
+          "type": "string",
+          "description": "VP9 and AV1 compress substantially better than VP8 and H.264 at equal quality, and both are layered rather than simulcast. The cost is encode time on the publisher's device, which is why the choice is config and not a constant.",
+          "enum": ["vp8", "h264", "vp9", "av1"],
+          "default": "vp9"
+        },
+        "backupCodec": {
+          "type": "string",
+          "description": "Published alongside the primary codec for subscribers that cannot decode it. Restricted to the two codecs every endpoint can decode.",
+          "enum": ["vp8", "h264"],
+          "default": "h264"
+        },
+        "scalabilityMode": {
+          "type": "string",
+          "description": "Spatial and temporal layer count for a layered codec, as L<spatial>T<temporal> with an optional key-frame suffix. Meaningless without VP9 or AV1, which is a cross-field rule rather than something this pattern can express.",
+          "pattern": "^L[1-3]T[1-3](h|_KEY|_KEY_SHIFT)?$",
+          "default": "L3T3_KEY"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Capture and publish size, named rather than given as a width and height so it stays one token that a bitrate and framerate can be matched against.",
+          "enum": ["h180", "h360", "h540", "h720", "h1080"],
+          "default": "h720"
+        },
+        "maxBitrate": {
+          "type": "integer",
+          "description": "Bits per second, the actual uplink ceiling. Paired with a resolution: a ceiling far below what a preset needs degrades continuously instead of failing, which is worse than refusing it.",
+          "minimum": 1
+        },
+        "maxFramerate": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "simulcast": {
+          "type": "boolean",
+          "description": "Publish several bitrate versions so a subscriber pulls the size it needs. A layered codec supersedes this for its own stream, so it governs the backup codec's path.",
+          "default": true
+        },
+        "dynacast": {
+          "type": "boolean",
+          "description": "Pause layers nobody subscribes to, which saves publisher uplink rather than subscriber downlink.",
+          "default": true
+        },
+        "adaptiveStream": {
+          "type": "boolean",
+          "description": "Subscribe-side: drop quality by how large the video actually renders.",
+          "default": true
+        }
+      }
+    },
+    "AudioProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "red": {
+          "type": "boolean",
+          "description": "Redundant encoding: survives packet loss by roughly doubling audio bitrate.",
+          "default": true
+        },
+        "dtx": {
+          "type": "boolean",
+          "description": "Stop sending during silence. Voice is mostly silence, so this is the cheapest audio saving there is.",
+          "default": true
+        },
+        "echoCancellation": {
+          "type": "boolean",
+          "description": "Stated rather than left to the browser default, so the resolved document records what a session actually ran with.",
+          "default": true
+        },
+        "noiseCancellation": {
+          "type": "string",
+          "description": "Only the platform's own native suppression is offered. A vendor filter would be a third value here, and is deliberately absent until something implements it: an enum member with no mechanism behind it is a guarantee nobody enforces.",
+          "enum": ["off", "native"],
+          "default": "native"
         }
       }
     },

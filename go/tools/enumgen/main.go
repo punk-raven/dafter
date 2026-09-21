@@ -68,6 +68,21 @@ var targets = []target{
 		Out: "internal/config/turn_gen.go", AllName: "AllTurnStrategies",
 	},
 	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "VideoProfile", "properties", "codec", "enum"},
+		Package: "config", Type: "VideoCodec", Prefix: "Codec",
+		Out: "internal/config/codecs_gen.go", AllName: "AllVideoCodecs",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "VideoProfile", "properties", "resolution", "enum"},
+		Package: "config", Type: "VideoResolution", Prefix: "Resolution",
+		Out: "internal/config/resolutions_gen.go", AllName: "AllVideoResolutions",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "AudioProfile", "properties", "noiseCancellation", "enum"},
+		Package: "config", Type: "NoiseCancellation", Prefix: "Noise",
+		Out: "internal/config/noise_gen.go", AllName: "AllNoiseCancellations",
+	},
+	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Recording", "properties", "layout", "enum"},
 		Package: "config", Type: "EgressLayout", Prefix: "Layout",
 		Out: "internal/config/layouts_gen.go", AllName: "AllEgressLayouts",

@@ -24,6 +24,7 @@ type ResolvedSessionConfig struct {
 	Residency *Residency `json:"residency,omitempty"`
 	Agent     Agent      `json:"agent"`
 	Turn      Turn       `json:"turn"`
+	Media     *Media     `json:"media,omitempty"`
 	Recording Recording  `json:"recording"`
 	Budgets   Budgets    `json:"budgets"`
 }
@@ -74,6 +75,42 @@ type Interruption struct {
 	MinWords                   int   `json:"minWords,omitempty"`
 	FalseInterruptionTimeoutMs int   `json:"falseInterruptionTimeoutMs,omitempty"`
 	ResumeFalseInterruption    *bool `json:"resumeFalseInterruption,omitempty"`
+}
+
+type Media struct {
+	Video *VideoProfile `json:"video,omitempty"`
+	Audio *AudioProfile `json:"audio,omitempty"`
+}
+
+type VideoProfile struct {
+	Enabled         *bool           `json:"enabled,omitempty"`
+	Codec           VideoCodec      `json:"codec,omitempty"`
+	BackupCodec     VideoCodec      `json:"backupCodec,omitempty"`
+	ScalabilityMode string          `json:"scalabilityMode,omitempty"`
+	Resolution      VideoResolution `json:"resolution,omitempty"`
+	MaxBitrate      int             `json:"maxBitrate,omitempty"`
+	MaxFramerate    int             `json:"maxFramerate,omitempty"`
+	Simulcast       *bool           `json:"simulcast,omitempty"`
+	Dynacast        *bool           `json:"dynacast,omitempty"`
+	AdaptiveStream  *bool           `json:"adaptiveStream,omitempty"`
+}
+
+type AudioProfile struct {
+	RED               *bool             `json:"red,omitempty"`
+	DTX               *bool             `json:"dtx,omitempty"`
+	EchoCancellation  *bool             `json:"echoCancellation,omitempty"`
+	NoiseCancellation NoiseCancellation `json:"noiseCancellation,omitempty"`
+}
+
+func (c *ResolvedSessionConfig) VideoEnabled() bool {
+	if c.Media == nil || c.Media.Video == nil || c.Media.Video.Enabled == nil {
+		return true
+	}
+	return *c.Media.Video.Enabled
+}
+
+func (v VideoCodec) Layered() bool {
+	return v == CodecVp9 || v == CodecAv1
 }
 
 type Recording struct {

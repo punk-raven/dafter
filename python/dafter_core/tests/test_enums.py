@@ -18,11 +18,14 @@ from dafter_core import (
     EgressLayout,
     ErrorCode,
     EventType,
+    NoiseCancellation,
     PrivacyMode,
     RecordingStart,
     Role,
     Stage,
     TurnStrategy,
+    VideoCodec,
+    VideoResolution,
     enums,
     schemas,
 )
@@ -39,6 +42,13 @@ CASES = [
     (PrivacyMode, CFG, ("properties", "privacyMode", "enum")),
     (AgentMode, CFG, ("properties", "agent", "properties", "mode", "enum")),
     (TurnStrategy, CFG, ("$defs", "Turn", "properties", "strategy", "enum")),
+    (VideoCodec, CFG, ("$defs", "VideoProfile", "properties", "codec", "enum")),
+    (VideoResolution, CFG, ("$defs", "VideoProfile", "properties", "resolution", "enum")),
+    (
+        NoiseCancellation,
+        CFG,
+        ("$defs", "AudioProfile", "properties", "noiseCancellation", "enum"),
+    ),
     (EgressLayout, CFG, ("$defs", "Recording", "properties", "layout", "enum")),
     (RecordingStart, CFG, ("$defs", "Recording", "properties", "startAt", "enum")),
 ]

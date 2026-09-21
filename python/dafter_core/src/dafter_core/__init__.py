@@ -6,11 +6,14 @@ from .enums import (
     EgressLayout,
     ErrorCode,
     EventType,
+    NoiseCancellation,
     PrivacyMode,
     RecordingStart,
     Role,
     Stage,
     TurnStrategy,
+    VideoCodec,
+    VideoResolution,
 )
 
 __all__ = [
@@ -20,11 +23,14 @@ __all__ = [
     "EgressLayout",
     "ErrorCode",
     "EventType",
+    "NoiseCancellation",
     "PrivacyMode",
     "RecordingStart",
     "Role",
     "Stage",
     "TurnStrategy",
+    "VideoCodec",
+    "VideoResolution",
     "enums",
     "schemas",
 ]
