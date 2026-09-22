@@ -3,8 +3,7 @@
 Scope: the real-time WebRTC media path - what a client publishes, what the SFU
 routes, what egress encodes. The agent runtime is out of scope.
 
-Stages 0-4 are built. Stage 5 is deferred by decision, stage 6 is the
-standing deferred list.
+Stages 0-5 are built. Stage 6 is the standing deferred list.
 
 ## 1. The gap this closed
 
@@ -69,9 +68,10 @@ Two further facts the analysis did not reach, both since fixed:
 
 | Question | Decision |
 |---|---|
-| Scope | Stages 0-3 only. Egress encoding and room encryption stay filed |
+| Scope | **Widened twice.** Stages 0-3, then stage 4 (egress encoding) and stage 5 (room encryption). Both were filed as later work and both were built; the rows below say why each was reversed |
 | Default codec | **VP9 primary, H.264 backup.** Most of the compression gain at broader hardware support than AV1 |
-| `sealed` privacy mode | Left exactly as it is for the POC and revisited in Phase 2. One tenant, no external consumer, nobody to mislead yet |
+| `sealed` privacy mode | **Reversed.** Built in stage 5 rather than deferred: a mode that names a guarantee and enforces none is the one thing worse than not offering it |
+| E2EE key model | **One random 256-bit key per session, minted and held by the control plane.** It proves encryption against the media server and the network, not against Dafter. The consumer-held key is Phase 2 |
 | Noise cancellation | The `noiseCancellation` field ships so the shape exists; WebRTC native is the only implementation. No Krisp |
 
 ## 5. Stages
@@ -282,27 +282,82 @@ consent capture, and the recording manifest entry that would carry the encode
 settings alongside the plaintext hash. The document already holds them; the
 manifest copies them out.
 
-### Stage 5 - room encryption (deferred to Phase 2)
+**What stage 5 takes away from this.** None of it runs on an end-to-end
+encrypted session. The egress reads the same ciphertext the SFU does, so a
+`sealed` or `trusted_agent` session is refused `recording.enabled` outright at
+`/recording/enabled` rather than recording something unplayable. Every encode
+setting above applies to `open` sessions, which is every session that can be
+recorded at all.
 
-`privacyMode` is policy with no mechanism: `sealed` is enforced by refusing an
-agent, and no LiveKit encryption is wired into the room. That is acceptable
-while the POC has one tenant and no external consumer, which is why this is
-deferred rather than reserved or built.
+### Stage 5 - room encryption (done)
 
-**What makes it urgent again:** the first consumer who can select `sealed`. At
-that point the mode claims a guarantee nothing enforces, and the choice is build
-the mechanism or refuse the mode at the API - not leave it.
+`privacyMode` was policy with no mechanism: `sealed` was enforced by refusing an
+agent, and no encryption was wired into the room. It is now the mode that
+decides how the media is encrypted, stated in the hashed document and applied
+on the wire.
 
-Three consequences to accept in writing first, because end-to-end encryption
-removes capabilities rather than adding a flag:
+**`media.encryption`** is a closed profile with `mode` (`transport | e2ee`) and
+`keyModel` (`server_shared`). Resolution derives the mode from the privacy mode
+- `open` is `transport`, `sealed` and `trusted_agent` are `e2ee` - and stamps it
+wherever the layers left it unsaid, so the document states how the session was
+encrypted instead of leaving a reader to infer it from the privacy mode a year
+later. Only an absent value is filled in: a layer stating a contradicting mode
+keeps it and is refused at `/media/encryption/mode`, rather than being silently
+corrected. `keyModel` has one member on purpose - the enum exists so
+`consumer_held` is a second member later and not a change of shape.
 
-- the SFU sees ciphertext, so server-side egress cannot record or transcode -
-  `sealed` means client-side recording or none, which `docs/dafter.md` already
-  states and `rules.go` does not yet enforce
+**The key model, and what it does not prove.** One random 256-bit key per
+session, minted by the control plane at create when the mode is `e2ee`, stored
+with the session so every join is handed the same one, and returned beside the
+token as `encryptionKey` - never inside the resolved document, which is hashed,
+stored and shown to every joiner. Who receives it derives from the role and the
+mode, exactly like a token grant and never from the request: participant,
+presenter and observer under either end-to-end mode, the agent only under
+`trusted_agent`, a recorder never, and no role at all under `open`.
+
+This proves encryption against the media server and against the network. It does
+not prove encryption against Dafter, which mints and holds the key. The
+consumer-held key that `docs/dafter.md` promises for `trusted_agent` is a Phase 2
+follow-up, and saying so is the point: a key model that is not stated is one a
+consumer will assume.
+
+**The three consequences, now accepted rather than anticipated:**
+
+- the SFU sees ciphertext, so server-side egress cannot record or transcode.
+  `rules.go` and `rules.py` now refuse `recording.enabled` under either
+  end-to-end mode, at `/recording/enabled`, for every layout in the enum -
+  they are all server-side. `sealed` means client-side recording or none, and
+  that is now enforced rather than documented
 - encryption is enabled per participant in the SDK, so a participant who does
-  not enable it is not merely insecure, they are unintelligible
-- key distribution and rotation become Dafter's problem, shared-key or
-  per-participant, and that decision is the real work here
+  not enable it is unintelligible rather than merely insecure. The test client
+  demonstrates it deliberately: a join whose response carried no key builds no
+  cryptor, connects anyway, and decodes nobody
+- key distribution is Dafter's problem and is answered above. Rotation is not
+  answered, and is deferred with the rest below
+
+**On the wire.** The test client constructs the room with
+`ExternalE2EEKeyProvider` and the frame cryptor worker from the pinned
+`livekit-client@2.13.5`, loads the key and calls `setE2EEEnabled(true)` before
+publishing anything, so no plaintext frame is ever sent. It shows
+`Room.isE2EEEnabled` in a badge and logs every encryption status change.
+
+**Verified** against the dev stack in headless Chrome, three tabs in one sealed
+room: both keyed tabs report `E2EE on` with `isE2EEEnabled` true, `ENCRYPTED`
+fires for themselves and for each other, and each decodes every frame it
+receives from the other (467/467 and 472/472). The third tab, its key stripped
+from the join response, is reported `NOT ENCRYPTED` by the other two, receives
+266 frames and decodes 0 while their call continues. An open session carries no
+key, builds no `e2ee` room option and shows no badge. `sealed` with recording is
+refused at create with `/recording/enabled`.
+
+**Deferred, and why:**
+
+| Question | Why it waits |
+|---|---|
+| Consumer-held key (`keyModel: consumer_held`) | The mechanism that would make `trusted_agent` mean what `docs/dafter.md` says. It needs a key exchange that never reaches the control plane, which is a Phase 2 design, not a field |
+| Key rotation | The shared key lives as long as the session. Rotation needs a ratchet and a rekey trigger, and with no long-lived session and no participant churn to protect against yet, building it now would pin a scheme before there is a requirement |
+| Agent-side key use | `trusted_agent` discloses the key to the agent role and no Python worker exists to hold it. The disclosure rule is built and tested; the consumer of it is Phase 5 |
+| Recording under E2EE | Client-side recording, or an egress inside the trust boundary. Both are Phase 2 work behind the seal stage |
 
 ### Stage 6 - deferred, with reasons
 
@@ -316,8 +371,10 @@ removes capabilities rather than adding a flag:
 ## 6. Where this lands in the delivery plan
 
 Stages 0-3 are POC work and close the "video call" pass bar once the uplink
-number exists. Stage 4 is the recording-orchestration half of Phase 2; the
-seal stage and the manifest are the rest of it. Stage 5 is deferred there by
-decision. Stage 6 is Phase 7 or never.
+number exists. Stage 5 lands with them: it is POC work because the mechanism is
+small and the alternative was a mode that promised what nothing enforced. Stage
+4 is the recording-orchestration half of Phase 2; the seal stage and the
+manifest are the rest of it, alongside the consumer-held key and rotation.
+Stage 6 is Phase 7 or never.
 
 Nothing here is on the agent runtime's critical path.
