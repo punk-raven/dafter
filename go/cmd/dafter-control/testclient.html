@@ -68,6 +68,10 @@
   .btn-copy:hover { background: #047857; }
   .btn-leave { background: #dc2626; color: white; }
   .btn-leave:hover { background: #b91c1c; }
+  .btn-record { background: #b45309; color: white; }
+  .btn-record:hover { background: #92400e; }
+  .btn-record:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .recording-status { margin-top: 8px; font-family: monospace; font-size: 11px; color: #fbbf24; line-height: 1.6; word-break: break-all; }
   .divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
 
   .ice-info { margin-top: 12px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; line-height: 1.6; }
@@ -117,6 +121,13 @@
           <option value="h720">h720</option>
           <option value="h1080">h1080</option>
         </select>
+        <label>Recording</label>
+        <select id="recording-layout">
+          <option value="" selected>off</option>
+          <option value="room_composite">room_composite</option>
+          <option value="track_composite">track_composite</option>
+          <option value="track">track</option>
+        </select>
       </fieldset>
       <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
     </div>
@@ -164,6 +175,15 @@
           <option value="h720">h720</option>
           <option value="h1080">h1080</option>
         </select>
+      </fieldset>
+    </div>
+
+    <div id="panel-recording" style="display:none">
+      <fieldset>
+        <legend>Recording</legend>
+        <button id="btn-record-start" class="btn-record" onclick="startRecording()">Start recording</button>
+        <button id="btn-record-stop" class="btn-record" onclick="stopRecording()">Stop recording</button>
+        <div id="recording-status" class="recording-status">not started</div>
       </fieldset>
     </div>
 
@@ -590,6 +610,14 @@ async function createSession() {
     const resolution = document.getElementById('resolution').value;
     if (resolution) body.overrides = { media: { video: { resolution } } };
 
+    // A consent artifact is a gate the control plane enforces; the test
+    // client hands it a placeholder id, which is all a POC can do.
+    const layout = document.getElementById('recording-layout').value;
+    if (layout) {
+      body.overrides = body.overrides || {};
+      body.overrides.recording = { enabled: true, layout, consentArtifactId: 'consent_testclient' };
+    }
+
     const resp = await fetch('/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -754,6 +782,7 @@ async function joinRoom() {
     document.getElementById('panel-join').style.display = 'none';
     document.getElementById('session-created-info').style.display = 'none';
     document.getElementById('btn-leave').style.display = 'block';
+    showRecordingPanel(data);
 
     startStats(data);
     monitorICE();
@@ -791,6 +820,88 @@ function cleanup() {
   document.getElementById('btn-join').disabled = false;
   document.getElementById('btn-leave').style.display = 'none';
   document.getElementById('ice-info').style.display = 'none';
+  document.getElementById('panel-recording').style.display = 'none';
+}
+
+// --- recording ---
+//
+// Start and stop call the control plane, which starts the egress from the
+// session's stored config. The client only supplies the track ids the track
+// layouts attach to, because it is the one party that knows them.
+
+let recordingSessionId = null;
+
+function showRecordingPanel(data) {
+  const rec = (data.config && data.config.recording) || {};
+  recordingSessionId = rec.enabled ? data.sessionId : null;
+  document.getElementById('panel-recording').style.display = rec.enabled ? 'block' : 'none';
+  if (rec.enabled) {
+    document.getElementById('recording-status').textContent = `layout ${rec.layout || 'track'} - not started`;
+  }
+}
+
+function setRecordingStatus(text) {
+  document.getElementById('recording-status').textContent = text;
+}
+
+function localTrackIds() {
+  const ids = {};
+  if (!room) return ids;
+  const mic = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+  const cam = room.localParticipant.getTrackPublication(Track.Source.Camera);
+  if (mic) ids.audioTrackId = mic.trackSid;
+  if (cam) ids.videoTrackId = cam.trackSid;
+  return ids;
+}
+
+async function recordingCall(action, body) {
+  const resp = await fetch(`/sessions/${recordingSessionId}/recording/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    const detail = (data.details || []).join('; ');
+    log(`Recording ${action} failed: ${data.code} - ${data.message}${detail ? ` (${detail})` : ''}`, 'error');
+    setRecordingStatus(`${action} refused: ${data.code}`);
+    return null;
+  }
+  return data;
+}
+
+async function startRecording() {
+  if (!recordingSessionId) return;
+  const layout = ((lastConfig && lastConfig.recording) || {}).layout || 'track';
+  const ids = localTrackIds();
+  let body = {};
+  if (layout === 'track_composite') body = ids;
+  if (layout === 'track') body = { trackId: ids.audioTrackId || ids.videoTrackId };
+
+  document.getElementById('btn-record-start').disabled = true;
+  try {
+    const data = await recordingCall('start', body);
+    if (!data) return;
+    const rec = data.recordings[0];
+    log(`Recording started: ${rec.egressId} (${rec.status})`, 'success');
+    setRecordingStatus(`${rec.egressId} ${rec.status}`);
+  } finally {
+    document.getElementById('btn-record-start').disabled = false;
+  }
+}
+
+async function stopRecording() {
+  if (!recordingSessionId) return;
+  document.getElementById('btn-record-stop').disabled = true;
+  try {
+    const data = await recordingCall('stop', {});
+    if (!data) return;
+    const lines = data.recordings.map((rec) => `${rec.egressId} ${rec.status}`);
+    log(`Recording stopped: ${lines.join(', ')}`, 'success');
+    setRecordingStatus(lines.join('\n'));
+  } finally {
+    document.getElementById('btn-record-stop').disabled = false;
+  }
 }
 
 function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
