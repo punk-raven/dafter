@@ -124,3 +124,73 @@ func TestTheStoreSurvivesReopening(t *testing.T) {
 		t.Errorf("hash came back %q after reopening", got.ConfigHash)
 	}
 }
+
+func TestEgressesAreKeptPerSessionInStartOrder(t *testing.T) {
+	t.Parallel()
+	s, sess := store(t), session(t)
+	if err := s.CreateSession(t.Context(), sess); err != nil {
+		t.Fatal(err)
+	}
+	first := state.Egress{EgressID: "EG_first", SessionID: sess.SessionID, Layout: "track",
+		StartedAt: time.Date(2026, 9, 15, 18, 5, 0, 0, time.UTC)}
+	second := state.Egress{EgressID: "EG_second", SessionID: sess.SessionID, Layout: "track",
+		StartedAt: first.StartedAt.Add(time.Second)}
+	for _, e := range []state.Egress{second, first} {
+		if err := s.AddEgress(t.Context(), e); err != nil {
+			t.Fatalf("add egress: %v", err)
+		}
+	}
+
+	stoppedAt := second.StartedAt.Add(time.Minute)
+	if err := s.StopEgress(t.Context(), first.EgressID, stoppedAt); err != nil {
+		t.Fatalf("stop egress: %v", err)
+	}
+
+	got, err := s.Egresses(t.Context(), sess.SessionID)
+	if err != nil {
+		t.Fatalf("list egresses: %v", err)
+	}
+	if len(got) != 2 || got[0].EgressID != first.EgressID || got[1].EgressID != second.EgressID {
+		t.Fatalf("egresses came back as %+v; a reader expects start order", got)
+	}
+	if got[0].Active() || !got[0].StoppedAt.Equal(stoppedAt) {
+		t.Errorf("the stopped egress reads back as %+v", got[0])
+	}
+	if !got[1].Active() {
+		t.Errorf("the running egress reads back as stopped: %+v", got[1])
+	}
+	if got[1].StartedAt.Location() != time.UTC {
+		t.Errorf("started at came back in %s", got[1].StartedAt.Location())
+	}
+}
+
+func TestAnEgressIsStoppedOnceAndBelongsToAStoredSession(t *testing.T) {
+	t.Parallel()
+	s, sess := store(t), session(t)
+	if err := s.CreateSession(t.Context(), sess); err != nil {
+		t.Fatal(err)
+	}
+	orphan := state.Egress{EgressID: "EG_orphan", SessionID: "s_00000000", Layout: "track", StartedAt: time.Now()}
+	if err := s.AddEgress(t.Context(), orphan); err == nil {
+		t.Error("an egress was recorded for a session nobody can explain")
+	}
+
+	e := state.Egress{EgressID: "EG_once", SessionID: sess.SessionID, Layout: "room_composite", StartedAt: time.Now()}
+	if err := s.AddEgress(t.Context(), e); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.StopEgress(t.Context(), e.EgressID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.StopEgress(t.Context(), e.EgressID, time.Now()); !errors.Is(err, state.ErrNotFound) {
+		t.Errorf("a second stop moved the stop time: %v", err)
+	}
+	if err := s.StopEgress(t.Context(), "EG_unknown", time.Now()); !errors.Is(err, state.ErrNotFound) {
+		t.Errorf("stopping an unknown egress: want %v, got %v", state.ErrNotFound, err)
+	}
+
+	none, err := s.Egresses(t.Context(), "s_00000000")
+	if err != nil || len(none) != 0 {
+		t.Errorf("an unknown session lists %v, %v", none, err)
+	}
+}

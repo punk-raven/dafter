@@ -21,11 +21,27 @@ type Session struct {
 	CreatedAt  time.Time
 }
 
+// Egress is one recording the control plane started for a session. The
+// media server's own id is the key; a track layout starts one per track and
+// a stopped recording may be followed by another, so a session holds many.
+type Egress struct {
+	EgressID  string
+	SessionID string
+	Layout    string
+	StartedAt time.Time
+	StoppedAt time.Time // zero while running
+}
+
+func (e Egress) Active() bool { return e.StoppedAt.IsZero() }
+
 var ErrNotFound = errors.New("state: no such session")
 
 type SessionStore interface {
 	CreateSession(ctx context.Context, sess Session) error
 	Session(ctx context.Context, sessionID string) (Session, error)
+	AddEgress(ctx context.Context, e Egress) error
+	StopEgress(ctx context.Context, egressID string, at time.Time) error
+	Egresses(ctx context.Context, sessionID string) ([]Egress, error)
 	Close() error
 }
 
@@ -42,6 +58,14 @@ CREATE TABLE IF NOT EXISTS sessions (
 	config      TEXT NOT NULL,
 	created_at  INTEGER NOT NULL
 ) STRICT;
+CREATE TABLE IF NOT EXISTS egresses (
+	egress_id   TEXT PRIMARY KEY,
+	session_id  TEXT NOT NULL REFERENCES sessions(session_id),
+	layout      TEXT NOT NULL,
+	started_at  INTEGER NOT NULL,
+	stopped_at  INTEGER
+) STRICT;
+CREATE INDEX IF NOT EXISTS egresses_by_session ON egresses(session_id, started_at);
 `
 
 func Open(ctx context.Context, path string) (*Store, error) {
@@ -96,4 +120,57 @@ func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) 
 	sess.Config = json.RawMessage(config)
 	sess.CreatedAt = time.UnixMicro(createdAt).UTC()
 	return sess, nil
+}
+
+func (s *Store) AddEgress(ctx context.Context, e Egress) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO egresses (egress_id, session_id, layout, started_at, stopped_at)
+		 VALUES (?, ?, ?, ?, NULL)`,
+		e.EgressID, e.SessionID, e.Layout, e.StartedAt.UnixMicro())
+	if err != nil {
+		return errs.Wrap(errs.CodeInternal, err, "store egress")
+	}
+	return nil
+}
+
+func (s *Store) StopEgress(ctx context.Context, egressID string, at time.Time) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE egresses SET stopped_at = ? WHERE egress_id = ? AND stopped_at IS NULL`,
+		at.UnixMicro(), egressID)
+	if err != nil {
+		return errs.Wrap(errs.CodeInternal, err, "mark egress stopped")
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) Egresses(ctx context.Context, sessionID string) ([]Egress, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT egress_id, session_id, layout, started_at, stopped_at
+		 FROM egresses WHERE session_id = ? ORDER BY started_at, egress_id`, sessionID)
+	if err != nil {
+		return nil, errs.Wrap(errs.CodeInternal, err, "list egresses")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Egress
+	for rows.Next() {
+		var e Egress
+		var startedAt int64
+		var stoppedAt sql.NullInt64
+		if err := rows.Scan(&e.EgressID, &e.SessionID, &e.Layout, &startedAt, &stoppedAt); err != nil {
+			return nil, errs.Wrap(errs.CodeInternal, err, "read egress")
+		}
+		e.StartedAt = time.UnixMicro(startedAt).UTC()
+		if stoppedAt.Valid {
+			e.StoppedAt = time.UnixMicro(stoppedAt.Int64).UTC()
+		}
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errs.Wrap(errs.CodeInternal, err, "list egresses")
+	}
+	return out, nil
 }
