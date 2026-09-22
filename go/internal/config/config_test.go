@@ -134,6 +134,134 @@ func TestValidateRejectsVideoEncodeSettingsOnAnAudioOnlyRecording(t *testing.T) 
 	}
 }
 
+func sealedConfig(t *testing.T) *config.ResolvedSessionConfig {
+	t.Helper()
+	c := validConfig(t)
+	c.PrivacyMode = config.PrivacySealed
+	c.Agent.Enabled = false
+	c.Media = &config.Media{Encryption: &config.EncryptionProfile{
+		Mode: config.EncryptionE2EE, KeyModel: config.KeyModelServerShared,
+	}}
+	return c
+}
+
+func TestValidateAcceptsASealedSessionThatStatesEndToEndEncryption(t *testing.T) {
+	t.Parallel()
+	if err := sealedConfig(t).Validate(); err != nil {
+		t.Fatalf("sealed session with e2ee stated rejected: %v", err)
+	}
+	if !sealedConfig(t).MintsSharedKey() {
+		t.Error("the control plane would mint no key for a sealed session under the server_shared model")
+	}
+}
+
+func TestValidateRejectsAnEncryptionModeThatContradictsThePrivacyMode(t *testing.T) {
+	t.Parallel()
+	cases := map[string]*config.ResolvedSessionConfig{
+		"sealed stating transport": func() *config.ResolvedSessionConfig {
+			c := sealedConfig(t)
+			c.Media.Encryption.Mode = config.EncryptionTransport
+			return c
+		}(),
+		"sealed stating nothing": func() *config.ResolvedSessionConfig {
+			c := sealedConfig(t)
+			c.Media = nil
+			return c
+		}(),
+		"trusted_agent stating transport": func() *config.ResolvedSessionConfig {
+			c := sealedConfig(t)
+			c.PrivacyMode = config.PrivacyTrustedAgent
+			c.Agent.Enabled = true
+			c.Media.Encryption.Mode = config.EncryptionTransport
+			return c
+		}(),
+		"open stating e2ee": func() *config.ResolvedSessionConfig {
+			c := validConfig(t)
+			c.Media = &config.Media{Encryption: &config.EncryptionProfile{Mode: config.EncryptionE2EE}}
+			return c
+		}(),
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var de *errs.Error
+			if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+				t.Fatalf("want %s, got %v", errs.CodeInvalidConfig, err)
+			}
+			if !strings.Contains(strings.Join(de.Details, "\n"), "/media/encryption/mode") {
+				t.Errorf("no detail points at /media/encryption/mode: %v", de)
+			}
+		})
+	}
+
+	open := validConfig(t)
+	if open.EncryptionMode() != config.EncryptionTransport {
+		t.Errorf("an open session stating nothing reads as %s, want transport", open.EncryptionMode())
+	}
+	if err := open.Validate(); err != nil {
+		t.Fatalf("open session stating nothing rejected: %v", err)
+	}
+	if open.MintsSharedKey() {
+		t.Error("the control plane would mint a key for an open session")
+	}
+}
+
+func TestValidateRefusesServerSideRecordingUnderEndToEndEncryption(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []config.PrivacyMode{config.PrivacySealed, config.PrivacyTrustedAgent} {
+		for _, layout := range config.AllEgressLayouts {
+			t.Run(string(mode)+"/"+string(layout), func(t *testing.T) {
+				t.Parallel()
+				c := sealedConfig(t)
+				c.PrivacyMode = mode
+				c.Recording = config.Recording{Enabled: true, Layout: layout, ConsentArtifactID: "consent_1"}
+				if layout == config.LayoutRoomComposite {
+					c.Recording.StartAt = config.StartAtSessionCreate
+				}
+				var de *errs.Error
+				if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodePrivacyModeForbids {
+					t.Fatalf("want %s, got %v", errs.CodePrivacyModeForbids, err)
+				}
+				if !strings.Contains(strings.Join(de.Details, "\n"), "/recording/enabled") {
+					t.Errorf("no detail points at /recording/enabled: %v", de)
+				}
+			})
+		}
+	}
+
+	c := validConfig(t)
+	c.Recording = config.Recording{Enabled: true, Layout: config.LayoutTrack, ConsentArtifactID: "consent_1"}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("an open session with recording rejected: %v", err)
+	}
+}
+
+func TestKeyDisclosureFollowsThePrivacyModeAndTheRole(t *testing.T) {
+	t.Parallel()
+	humans := []config.Role{config.RoleParticipant, config.RolePresenter, config.RoleObserver}
+	for _, role := range config.AllRoles {
+		if config.PrivacyOpen.DisclosesKeyTo(role) {
+			t.Errorf("open discloses a key to %s; there is none", role)
+		}
+	}
+	for _, role := range humans {
+		if !config.PrivacySealed.DisclosesKeyTo(role) || !config.PrivacyTrustedAgent.DisclosesKeyTo(role) {
+			t.Errorf("%s is not handed the key in an end-to-end encrypted session", role)
+		}
+	}
+	if config.PrivacySealed.DisclosesKeyTo(config.RoleAgent) {
+		t.Error("sealed handed the key to an agent; the mode exists so that only the humans can decrypt")
+	}
+	if !config.PrivacyTrustedAgent.DisclosesKeyTo(config.RoleAgent) {
+		t.Error("trusted_agent withheld the key from the agent it names")
+	}
+	for _, mode := range config.AllPrivacyModes {
+		if mode.DisclosesKeyTo(config.RoleRecorder) {
+			t.Errorf("%s handed the key to a recorder; a server-side egress sees only ciphertext by design", mode)
+		}
+	}
+}
+
 func TestValidateRejectsRecordingWithoutConsent(t *testing.T) {
 	t.Parallel()
 	c := validConfig(t)
@@ -239,6 +367,8 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"NoiseCancellation", cfg, []string{"$defs", "AudioProfile", "properties", "noiseCancellation", "enum"}, schema.Names(config.AllNoiseCancellations)},
 		{"EgressPreset", cfg, []string{"$defs", "EgressProfile", "properties", "preset", "enum"}, schema.Names(config.AllEgressPresets)},
 		{"EgressVideoCodec", cfg, []string{"$defs", "EgressProfile", "properties", "videoCodec", "enum"}, schema.Names(config.AllEgressVideoCodecs)},
+		{"EncryptionMode", cfg, []string{"$defs", "EncryptionProfile", "properties", "mode", "enum"}, schema.Names(config.AllEncryptionModes)},
+		{"KeyModel", cfg, []string{"$defs", "EncryptionProfile", "properties", "keyModel", "enum"}, schema.Names(config.AllKeyModels)},
 		{"EgressLayout", cfg, []string{"$defs", "Recording", "properties", "layout", "enum"}, schema.Names(config.AllEgressLayouts)},
 		{"RecordingStart", cfg, []string{"$defs", "Recording", "properties", "startAt", "enum"}, schema.Names(config.AllRecordingStarts)},
 	}
@@ -438,6 +568,71 @@ func TestResolveDefersResolutionToTheClientWithoutDeferringBandwidth(t *testing.
 	}
 	if c.Media.Video.Codec != config.CodecVp9 {
 		t.Errorf("rest of the profile lost: codec = %s", c.Media.Video.Codec)
+	}
+}
+
+func TestResolveStatesTheEncryptionModeThePrivacyModeImplies(t *testing.T) {
+	t.Parallel()
+	open := resolve(t, request()).Config
+	if open.Media.Encryption == nil || open.Media.Encryption.Mode != config.EncryptionTransport {
+		t.Fatalf("an open session resolved without stating transport encryption: %+v", open.Media.Encryption)
+	}
+	if open.Media.Encryption.KeyModel != "" {
+		t.Errorf("an open session names a key model %q; there is no key", open.Media.Encryption.KeyModel)
+	}
+
+	req := request()
+	req.Overrides = json.RawMessage(`{"privacyMode": "sealed", "agent": {"enabled": false}}`)
+	sealed := resolve(t, req).Config
+	if sealed.Media.Encryption == nil || sealed.Media.Encryption.Mode != config.EncryptionE2EE {
+		t.Fatalf("a sealed session resolved without stating e2ee: %+v", sealed.Media.Encryption)
+	}
+	if sealed.Media.Encryption.KeyModel != config.KeyModelServerShared {
+		t.Errorf("key model %q, want %s", sealed.Media.Encryption.KeyModel, config.KeyModelServerShared)
+	}
+	if !sealed.MintsSharedKey() {
+		t.Error("the resolved sealed session would get no key minted")
+	}
+	if sealed.Media.Video == nil || sealed.Media.Video.Codec != config.CodecVp9 {
+		t.Error("stamping the encryption mode replaced the media profile instead of adding to it")
+	}
+
+	req.Overrides = json.RawMessage(`{"privacyMode": "trusted_agent"}`)
+	trusted := resolve(t, req).Config
+	if trusted.Media.Encryption == nil || trusted.Media.Encryption.Mode != config.EncryptionE2EE || !trusted.Agent.Enabled {
+		t.Errorf("trusted_agent resolved as %+v with agent %v", trusted.Media.Encryption, trusted.Agent.Enabled)
+	}
+}
+
+func TestResolveRefusesALayerThatContradictsThePrivacyMode(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{
+		"privacyMode": "sealed", "agent": {"enabled": false},
+		"media": {"encryption": {"mode": "transport"}}
+	}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodeInvalidConfig {
+		t.Errorf("want %s, got %s", errs.CodeInvalidConfig, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/encryption/mode") {
+		t.Errorf("no detail points at /media/encryption/mode: %v", de)
+	}
+}
+
+func TestResolveRefusesRecordingInASealedSession(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{
+		"privacyMode": "sealed", "agent": {"enabled": false},
+		"recording": {"enabled": true, "layout": "track", "consentArtifactId": "consent_1"}
+	}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodePrivacyModeForbids {
+		t.Errorf("want %s, got %s", errs.CodePrivacyModeForbids, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/recording/enabled") {
+		t.Errorf("no detail points at /recording/enabled: %v", de)
 	}
 }
 
@@ -680,7 +875,7 @@ func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "ef78983a74be44b82029a492662ac14e6ab23ca75f0e40fc977ddb2e01f5c7b3"
+	const want = "afbac94fda3552ab176ee1fa701f7d9f30023591d92ef2f2aceeea5a32a9d156"
 	got, err := config.HashDocument(raw)
 	if err != nil {
 		t.Fatal(err)

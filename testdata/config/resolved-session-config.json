@@ -9,7 +9,7 @@
   "apiVersion": "dafter.dev/v1",
   "sessionId": "s_7f3a9c21",
   "tenantId": "t_9c21a4be",
-  "configHash": "ef78983a74be44b82029a492662ac14e6ab23ca75f0e40fc977ddb2e01f5c7b3",
+  "configHash": "afbac94fda3552ab176ee1fa701f7d9f30023591d92ef2f2aceeea5a32a9d156",
   "privacyMode": "open",
   "language": "hi",
   "channel": "telephony",
@@ -32,6 +32,7 @@
   },
   "media": {
     "audio": { "red": false, "dtx": true, "echoCancellation": true, "noiseCancellation": "native" },
+    "encryption": { "mode": "transport" },
     "video": { "enabled": false },
     "egress": { "audioBitrate": 64 }
   },

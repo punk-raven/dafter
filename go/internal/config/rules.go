@@ -68,6 +68,22 @@ var crossFieldRules = []crossFieldRule{
 		pointer: "/media/egress",
 		because: "the session publishes no video, so an egress profile that names a video size, framerate, bitrate, codec or preset describes an encode of a stream that does not exist",
 	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.EncryptionMode() != c.PrivacyMode.Encryption()
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/media/encryption/mode",
+		because: "the privacy mode decides the encryption mode, open is transport only and sealed or trusted_agent is end to end, so a media profile stating otherwise promises a guarantee the session will not get",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.PrivacyMode != PrivacyOpen && c.Recording.Enabled
+		},
+		code:    errs.CodePrivacyModeForbids,
+		pointer: "/recording/enabled",
+		because: "every recording layout is a server-side egress, and under end-to-end encryption the media server and its egress see only ciphertext, so this session is recorded client-side or not at all",
+	},
 }
 
 func (c *ResolvedSessionConfig) validateCrossFieldRules() error {

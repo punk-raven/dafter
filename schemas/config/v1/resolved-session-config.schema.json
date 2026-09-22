@@ -134,7 +134,8 @@
       "properties": {
         "video": { "$ref": "#/$defs/VideoProfile" },
         "audio": { "$ref": "#/$defs/AudioProfile" },
-        "egress": { "$ref": "#/$defs/EgressProfile" }
+        "egress": { "$ref": "#/$defs/EgressProfile" },
+        "encryption": { "$ref": "#/$defs/EncryptionProfile" }
       }
     },
     "EgressProfile": {
@@ -156,6 +157,23 @@
           "type": "string",
           "description": "H.264 only, in its three profiles. The egress service transcodes to nothing else through this field: its enum also names VP8, which the service accepts and then ignores, and VP9 and AV1 are not in it at all. A member here that the recording could not actually be encoded with would be a guarantee nobody enforces. The publish codec is a separate choice; VP9 in the room and H.264 in the file is the normal case.",
           "enum": ["h264_baseline", "h264_main", "h264_high"]
+        }
+      }
+    },
+    "EncryptionProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How media is encrypted between participants. Derived from privacyMode at resolution so the hashed document states it rather than implying it: open is transport encryption only, sealed and trusted_agent are end to end. A layer that says otherwise contradicts the privacy mode, which is a cross-field rule.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "transport: the media server terminates encryption and sees plaintext, so agents and server-side egress work. e2ee: frames are encrypted by the publishing client and the media server forwards ciphertext, so every participant must hold a key and nothing server-side can record or transcode.",
+          "enum": ["transport", "e2ee"]
+        },
+        "keyModel": {
+          "type": "string",
+          "description": "Who mints and holds the end-to-end key. server_shared: one random key per session, minted by the control plane and handed to the roles the privacy mode allows, which proves encryption against the media server and the network but not against the control plane. A consumer-held key is the follow-up, and it is a second member here rather than a change of shape.",
+          "enum": ["server_shared"]
         }
       }
     },

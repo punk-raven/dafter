@@ -78,9 +78,10 @@ type Interruption struct {
 }
 
 type Media struct {
-	Video  *VideoProfile  `json:"video,omitempty"`
-	Audio  *AudioProfile  `json:"audio,omitempty"`
-	Egress *EgressProfile `json:"egress,omitempty"`
+	Video      *VideoProfile      `json:"video,omitempty"`
+	Audio      *AudioProfile      `json:"audio,omitempty"`
+	Egress     *EgressProfile     `json:"egress,omitempty"`
+	Encryption *EncryptionProfile `json:"encryption,omitempty"`
 }
 
 type VideoProfile struct {
@@ -152,6 +153,54 @@ func (c *ResolvedSessionConfig) Egress() *EgressProfile {
 		return nil
 	}
 	return c.Media.Egress
+}
+
+type EncryptionProfile struct {
+	Mode     EncryptionMode `json:"mode,omitempty"`
+	KeyModel KeyModel       `json:"keyModel,omitempty"`
+}
+
+// Encryption is the mode the privacy mode implies. Resolution stamps it into
+// the media profile, and a layer stating a different one is a cross-field error.
+func (m PrivacyMode) Encryption() EncryptionMode {
+	if m == PrivacyOpen {
+		return EncryptionTransport
+	}
+	return EncryptionE2EE
+}
+
+// DisclosesKeyTo reports whether a participant in this role is handed the
+// session's shared media key. The agent role gets it only where the mode says
+// so by name: trusted_agent is the disclosed exception, and sealed means the
+// humans alone can decrypt.
+func (m PrivacyMode) DisclosesKeyTo(role Role) bool {
+	switch role {
+	case RoleParticipant, RolePresenter, RoleObserver:
+		return m != PrivacyOpen
+	case RoleAgent:
+		return m == PrivacyTrustedAgent
+	default:
+		return false
+	}
+}
+
+// EncryptionMode is what the media profile states, transport when it states
+// nothing, because transport encryption is what a media server does unasked.
+func (c *ResolvedSessionConfig) EncryptionMode() EncryptionMode {
+	if c.Media == nil || c.Media.Encryption == nil || c.Media.Encryption.Mode == "" {
+		return EncryptionTransport
+	}
+	return c.Media.Encryption.Mode
+}
+
+// MintsSharedKey reports whether the control plane mints this session's media
+// key: end-to-end encryption under the server_shared key model. Another key
+// model is one nobody but the consumer holds, and the control plane mints
+// nothing for it.
+func (c *ResolvedSessionConfig) MintsSharedKey() bool {
+	return c.EncryptionMode() == EncryptionE2EE &&
+		c.Media != nil && c.Media.Encryption != nil &&
+		c.Media.Encryption.KeyModel == KeyModelServerShared
 }
 
 type Recording struct {

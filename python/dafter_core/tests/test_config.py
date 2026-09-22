@@ -4,17 +4,21 @@ import json
 from typing import Any
 
 import pytest
-from dafter_core.config import parse
+from dafter_core.config import discloses_key_to, parse
 from dafter_core.enums import (
     Channel,
     EgressLayout,
     EgressPreset,
+    EncryptionMode,
     ErrorCode,
+    KeyModel,
     PrivacyMode,
+    Role,
     TurnStrategy,
     VideoResolution,
 )
 from dafter_core.errors import DafterError
+from dafter_core.rules import required_encryption
 
 MINIMAL: dict[str, Any] = {
     "apiVersion": "dafter.dev/v1",
@@ -121,10 +125,72 @@ def test_reports_every_problem_at_once() -> None:
         assert field in joined, f"{field} not named in:\n{joined}"
 
 
+E2EE = {"encryption": {"mode": "e2ee", "keyModel": "server_shared"}}
+TRANSPORT = {"encryption": {"mode": "transport"}}
+NO_AGENT = {"enabled": False, "pool": "dafter-py"}
+
+
 def test_sealed_session_refuses_an_agent() -> None:
-    err = refuse(doc(privacyMode="sealed"))
+    err = refuse(doc(privacyMode="sealed", media=E2EE))
     assert err.code is ErrorCode.PRIVACY_MODE_FORBIDS
-    assert parse(doc(privacyMode="sealed", agent={"enabled": False, "pool": "dafter-py"}))
+    assert parse(doc(privacyMode="sealed", agent=NO_AGENT, media=E2EE))
+
+
+def test_the_privacy_mode_decides_the_encryption_mode() -> None:
+    assert required_encryption(PrivacyMode.OPEN) is EncryptionMode.TRANSPORT
+    assert required_encryption(PrivacyMode.SEALED) is EncryptionMode.E2EE
+    assert required_encryption(PrivacyMode.TRUSTED_AGENT) is EncryptionMode.E2EE
+
+    sealed = parse(doc(privacyMode="sealed", agent=NO_AGENT, media=E2EE))
+    assert sealed.media.encryption.mode is EncryptionMode.E2EE
+    assert sealed.media.encryption.key_model is KeyModel.SERVER_SHARED
+    assert sealed.media.encryption.mints_shared_key
+
+    open_ = parse(doc())
+    assert open_.media.encryption.mode is None
+    assert open_.media.encryption.stated_mode is EncryptionMode.TRANSPORT
+    assert not open_.media.encryption.mints_shared_key
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"privacyMode": "sealed", "agent": NO_AGENT, "media": TRANSPORT},
+        {"privacyMode": "sealed", "agent": NO_AGENT},
+        {"privacyMode": "trusted_agent", "media": TRANSPORT},
+        {"media": {"encryption": {"mode": "e2ee"}}},
+    ],
+    ids=["sealed-transport", "sealed-unstated", "trusted_agent-transport", "open-e2ee"],
+)
+def test_an_encryption_mode_that_contradicts_the_privacy_mode_is_refused(
+    overrides: dict[str, Any],
+) -> None:
+    err = refuse(doc(**overrides))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/media/encryption/mode" in "\n".join(err.details)
+
+
+@pytest.mark.parametrize("privacy_mode", ["sealed", "trusted_agent"])
+@pytest.mark.parametrize("layout", [m.value for m in EgressLayout])
+def test_server_side_recording_is_refused_under_end_to_end_encryption(
+    privacy_mode: str, layout: str
+) -> None:
+    recording: dict[str, Any] = {"enabled": True, "layout": layout, "consentArtifactId": "c_1"}
+    if layout == "room_composite":
+        recording["startAt"] = "session_create"
+    err = refuse(doc(privacyMode=privacy_mode, agent=NO_AGENT, media=E2EE, recording=recording))
+    assert err.code is ErrorCode.PRIVACY_MODE_FORBIDS
+    assert "/recording/enabled" in "\n".join(err.details)
+
+
+def test_key_disclosure_follows_the_privacy_mode_and_the_role() -> None:
+    humans = (Role.PARTICIPANT, Role.PRESENTER, Role.OBSERVER)
+    assert not any(discloses_key_to(PrivacyMode.OPEN, role) for role in Role)
+    assert all(discloses_key_to(PrivacyMode.SEALED, role) for role in humans)
+    assert all(discloses_key_to(PrivacyMode.TRUSTED_AGENT, role) for role in humans)
+    assert not discloses_key_to(PrivacyMode.SEALED, Role.AGENT)
+    assert discloses_key_to(PrivacyMode.TRUSTED_AGENT, Role.AGENT)
+    assert not any(discloses_key_to(mode, Role.RECORDER) for mode in PrivacyMode)
 
 
 def test_telephony_refuses_a_video_profile() -> None:
@@ -192,7 +258,13 @@ def test_reports_every_broken_rule_located_by_pointer() -> None:
         )
     )
     joined = "\n".join(err.details)
-    for pointer in ("/agent/enabled", "/recording/consentArtifactId", "/recording/layout"):
+    for pointer in (
+        "/agent/enabled",
+        "/recording/consentArtifactId",
+        "/recording/layout",
+        "/media/encryption/mode",
+        "/recording/enabled",
+    ):
         assert pointer in joined, f"{pointer} not named in:\n{joined}"
 
 

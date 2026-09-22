@@ -4,10 +4,24 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .enums import Channel, EgressLayout, ErrorCode, PrivacyMode, RecordingStart
+from .enums import (
+    Channel,
+    EgressLayout,
+    EncryptionMode,
+    ErrorCode,
+    PrivacyMode,
+    RecordingStart,
+)
 
 if TYPE_CHECKING:
     from .config import ResolvedSessionConfig
+
+
+def required_encryption(mode: PrivacyMode) -> EncryptionMode:
+    """The encryption mode a privacy mode implies. The control plane stamps it
+    into the media profile at resolution, and a layer stating a different one
+    is refused here."""
+    return EncryptionMode.TRANSPORT if mode is PrivacyMode.OPEN else EncryptionMode.E2EE
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +100,26 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
             "the session publishes no video, so an egress profile that names a video size, "
             "framerate, bitrate, codec or preset describes an encode of a stream that does "
             "not exist"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.media.encryption.stated_mode is not required_encryption(c.privacy_mode),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/media/encryption/mode",
+        because=(
+            "the privacy mode decides the encryption mode, open is transport only and sealed "
+            "or trusted_agent is end to end, so a media profile stating otherwise promises a "
+            "guarantee the session will not get"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.privacy_mode is not PrivacyMode.OPEN and c.recording.enabled,
+        code=ErrorCode.PRIVACY_MODE_FORBIDS,
+        pointer="/recording/enabled",
+        because=(
+            "every recording layout is a server-side egress, and under end-to-end encryption "
+            "the media server and its egress see only ciphertext, so this session is recorded "
+            "client-side or not at all"
         ),
     ),
 )

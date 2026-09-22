@@ -10,10 +10,13 @@ from .enums import (
     EgressLayout,
     EgressPreset,
     EgressVideoCodec,
+    EncryptionMode,
     ErrorCode,
+    KeyModel,
     NoiseCancellation,
     PrivacyMode,
     RecordingStart,
+    Role,
     TurnStrategy,
     VideoCodec,
     VideoResolution,
@@ -235,10 +238,39 @@ class EgressProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class EncryptionProfile:
+    mode: EncryptionMode | None = None
+    key_model: KeyModel | None = None
+
+    @property
+    def stated_mode(self) -> EncryptionMode:
+        """What the profile states, transport when it states nothing: that is
+        what a media server does unasked."""
+        return self.mode if self.mode is not None else EncryptionMode.TRANSPORT
+
+    @property
+    def mints_shared_key(self) -> bool:
+        """Whether the control plane mints this session's media key: end to end
+        under the server_shared model. Any other model is a key the control
+        plane never sees."""
+        return self.stated_mode is EncryptionMode.E2EE and self.key_model is KeyModel.SERVER_SHARED
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> EncryptionProfile:
+        mode = d.get("mode")
+        key_model = d.get("keyModel")
+        return cls(
+            mode=EncryptionMode(mode) if mode else None,
+            key_model=KeyModel(key_model) if key_model else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Media:
     video: VideoProfile = field(default_factory=VideoProfile)
     audio: AudioProfile = field(default_factory=AudioProfile)
     egress: EgressProfile = field(default_factory=EgressProfile)
+    encryption: EncryptionProfile = field(default_factory=EncryptionProfile)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Media:
@@ -246,7 +278,19 @@ class Media:
             video=VideoProfile.from_dict(d.get("video") or {}),
             audio=AudioProfile.from_dict(d.get("audio") or {}),
             egress=EgressProfile.from_dict(d.get("egress") or {}),
+            encryption=EncryptionProfile.from_dict(d.get("encryption") or {}),
         )
+
+
+def discloses_key_to(mode: PrivacyMode, role: Role) -> bool:
+    """Whether a participant in this role is handed the session's shared media
+    key. The agent gets it only where the mode says so by name: trusted_agent is
+    the disclosed exception, and sealed means the humans alone can decrypt."""
+    if role in (Role.PARTICIPANT, Role.PRESENTER, Role.OBSERVER):
+        return mode is not PrivacyMode.OPEN
+    if role is Role.AGENT:
+        return mode is PrivacyMode.TRUSTED_AGENT
+    return False
 
 
 @dataclass(frozen=True, slots=True)

@@ -93,6 +93,16 @@ var targets = []target{
 		Out: "internal/config/egress_codecs_gen.go", AllName: "AllEgressVideoCodecs",
 	},
 	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EncryptionProfile", "properties", "mode", "enum"},
+		Package: "config", Type: "EncryptionMode", Prefix: "Encryption",
+		Out: "internal/config/encryption_gen.go", AllName: "AllEncryptionModes",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EncryptionProfile", "properties", "keyModel", "enum"},
+		Package: "config", Type: "KeyModel", Prefix: "KeyModel",
+		Out: "internal/config/keymodels_gen.go", AllName: "AllKeyModels",
+	},
+	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Recording", "properties", "layout", "enum"},
 		Package: "config", Type: "EgressLayout", Prefix: "Layout",
 		Out: "internal/config/layouts_gen.go", AllName: "AllEgressLayouts",
@@ -107,6 +117,7 @@ var targets = []target{
 var initialisms = map[string]string{
 	"vad": "VAD", "stt": "STT", "tts": "TTS", "llm": "LLM", "mt": "MT",
 	"webrtc": "WebRTC", "api": "API", "id": "ID", "url": "URL", "json": "JSON",
+	"e2ee": "E2EE",
 }
 
 func goName(prefix, value string) string {
