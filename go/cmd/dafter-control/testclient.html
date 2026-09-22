@@ -14,6 +14,9 @@
   .badge-disconnected { background: #3a1c1c; color: #f87171; }
   .badge-connecting { background: #3a2f1c; color: #fbbf24; }
   .badge-connected { background: #1c3a1c; color: #4ade80; }
+  .badge-e2ee-on { background: #1c2e3a; color: #38bdf8; }
+  .badge-e2ee-pending { background: #3a2f1c; color: #fbbf24; }
+  .badge-e2ee-nokey { background: #3a1c1c; color: #f87171; }
 
   .layout { display: flex; height: calc(100vh - 57px); }
   .sidebar { width: 320px; min-width: 320px; border-right: 1px solid #222; overflow-y: auto; padding: 16px; }
@@ -90,6 +93,7 @@
 <div class="header">
   <h1>Dafter POC</h1>
   <span id="status-badge" class="badge badge-disconnected">disconnected</span>
+  <span id="e2ee-badge" class="badge" style="display:none" title="Room.isE2EEEnabled"></span>
 </div>
 
 <div class="layout">
@@ -111,6 +115,12 @@
         </select>
         <label>Profile (optional)</label>
         <input id="profile" value="support">
+        <label>Privacy mode</label>
+        <select id="privacy-mode">
+          <option value="" selected>open - transport encryption only</option>
+          <option value="sealed">sealed - end to end, no agent</option>
+          <option value="trusted_agent">trusted_agent - end to end, agent holds the key</option>
+        </select>
         <label>Video resolution</label>
         <select id="resolution">
           <option value="" selected>profile default (h720)</option>
@@ -199,6 +209,7 @@
         <dt>Protocol</dt><dd id="ice-protocol">-</dd>
         <dt>Remote</dt><dd id="ice-remote">-</dd>
         <dt>TURN</dt><dd id="ice-turn-status">-</dd>
+        <dt>E2EE</dt><dd id="e2ee-state">-</dd>
       </dl>
     </div>
   </div>
@@ -238,9 +249,15 @@
 </div>
 
 <script>
-const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
+const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider } = LivekitClient;
+
+// The frame cryptor runs in a worker shipped beside the pinned bundle. A Worker
+// script must be same-origin, so the source is fetched from the CDN, which
+// allows it cross-origin, and started from a blob URL on this origin.
+const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.e2ee.worker.mjs';
 
 let room = null;
+let e2eeWorker = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
 let syntheticVideo = false;   // the test pattern is not a selfie view, so it is never mirrored
@@ -271,6 +288,58 @@ function showResponse(data) {
   const box = document.getElementById('session-response');
   box.style.display = 'block';
   box.textContent = JSON.stringify(data, null, 2);
+}
+
+function encryptionOf(config) {
+  return (config && config.media && config.media.encryption) || {};
+}
+
+function setE2EEBadge(state, text) {
+  const el = document.getElementById('e2ee-badge');
+  if (!state) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'inline';
+  el.textContent = text;
+  el.className = 'badge badge-e2ee-' + state;
+}
+
+function refreshE2EEBadge() {
+  if (!room || !room.options.e2ee) return;
+  if (room.isE2EEEnabled) setE2EEBadge('on', 'E2EE on');
+  else setE2EEBadge('pending', 'E2EE pending');
+}
+
+function base64urlToBytes(s) {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4);
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+async function startE2EEWorker() {
+  const resp = await fetch(E2EE_WORKER_URL);
+  if (!resp.ok) throw new Error(`E2EE worker fetch failed: HTTP ${resp.status}`);
+  const source = await resp.text();
+  const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+  return new Worker(url, { type: 'module' });
+}
+
+// The room's e2ee option, or nothing. A session encrypted end to end whose join
+// carried no key is deliberately joined without one: the participant lands in
+// the room and cannot decode anyone, which is what a missing key must look like.
+async function e2eeOptionsFor(data) {
+  const encryption = encryptionOf(data.config);
+  if (encryption.mode !== 'e2ee') return null;
+  if (!data.encryptionKey) {
+    log('Session is end-to-end encrypted and this join carried no key: remote media will be undecodable', 'error');
+    setE2EEBadge('nokey', 'E2EE no key');
+    return null;
+  }
+  e2eeWorker = await startE2EEWorker();
+  const keyProvider = new ExternalE2EEKeyProvider();
+  log(`Session is end-to-end encrypted (key model ${encryption.keyModel || 'unstated'}); starting the frame cryptor`, 'success');
+  setE2EEBadge('pending', 'E2EE pending');
+  return { keyProvider, worker: e2eeWorker };
 }
 
 function roomOptionsFrom(config) {
@@ -387,7 +456,7 @@ function startStats(data) {
     room: data.room,
     participantId: data.participantId,
     configHash: data.configHash,
-    profile: { video, audio },
+    profile: { video, audio, encryption: encryptionOf(data.config) },
     clientResolution: myResolution() || null,
   };
   statsSamples = [];
@@ -398,6 +467,7 @@ function startStats(data) {
     video.resolution,
     video.maxBitrate ? `<=${Math.round(video.maxBitrate / 1000)} kbps` : null,
     video.maxFramerate ? `<=${video.maxFramerate} fps` : null,
+    encryptionOf(data.config).mode || null,
   ].filter(Boolean).join(' · ');
   const override = statsContext.clientResolution;
   document.getElementById('stats-profile').textContent =
@@ -607,8 +677,18 @@ async function createSession() {
     const profile = document.getElementById('profile').value.trim();
     if (profile) body.profile = profile;
 
+    const overrides = {};
     const resolution = document.getElementById('resolution').value;
-    if (resolution) body.overrides = { media: { video: { resolution } } };
+    if (resolution) overrides.media = { video: { resolution } };
+    const privacyMode = document.getElementById('privacy-mode').value;
+    if (privacyMode) {
+      overrides.privacyMode = privacyMode;
+      if (privacyMode === 'sealed') {
+        overrides.agent = { enabled: false };
+        log('sealed refuses an agent at the API, so the override disables it');
+      }
+    }
+    if (Object.keys(overrides).length) body.overrides = overrides;
 
     // A consent artifact is a gate the control plane enforces; the test
     // client hands it a placeholder id, which is all a POC can do.
@@ -692,12 +772,31 @@ async function joinRoom() {
     const roomOptions = applyLocalPreference(roomOptionsFrom(data.config));
     if (data.config && data.config.media) {
       const v = data.config.media.video || {};
-      log(`Media profile: ${publishesVideo ? `${v.codec || 'sdk default'} ${v.resolution || ''} ${v.maxBitrate ? `${Math.round(v.maxBitrate / 1000)} kbps` : ''}`.trim() : 'audio only'} (config ${data.configHash.slice(0, 12)})`, 'success');
+      const encryption = encryptionOf(data.config).mode || 'unstated';
+      log(`Media profile: ${publishesVideo ? `${v.codec || 'sdk default'} ${v.resolution || ''} ${v.maxBitrate ? `${Math.round(v.maxBitrate / 1000)} kbps` : ''}`.trim() : 'audio only'} · encryption ${encryption} (config ${data.configHash.slice(0, 12)})`, 'success');
     } else {
       log('No media profile in the session document; publishing at the SDK defaults', 'warn');
     }
 
+    const e2ee = await e2eeOptionsFor(data);
+    if (e2ee) roomOptions.e2ee = e2ee;
+
     room = new Room(roomOptions);
+
+    room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
+      const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
+      log(`Encryption status: ${who} ${enabled ? 'ENCRYPTED' : 'NOT ENCRYPTED'}`, enabled ? 'success' : 'warn');
+      refreshE2EEBadge();
+    });
+
+    room.on(RoomEvent.EncryptionError, (err) => {
+      log(`Encryption error: ${err && err.message ? err.message : err}`, 'error');
+    });
+
+    if (e2ee) {
+      await e2ee.keyProvider.setKey(base64urlToBytes(data.encryptionKey));
+      log('Session key loaded into the key provider');
+    }
 
     room.on(RoomEvent.ConnectionStateChanged, (state) => {
       log(`Connection state: ${state}`);
@@ -747,6 +846,12 @@ async function joinRoom() {
     log(`LiveKit endpoint: ${connectUrl} (ICE policy: ${icePolicy})`);
 
     await room.connect(connectUrl, data.token, { rtcConfig });
+
+    if (e2ee) {
+      await room.setE2EEEnabled(true);
+      log(`End-to-end encryption enabled before publishing (Room.isE2EEEnabled=${room.isE2EEEnabled})`, 'success');
+      refreshE2EEBadge();
+    }
 
     log('Connected! Publishing tracks...', 'success');
 
@@ -813,6 +918,11 @@ function cleanup() {
     syntheticAudioCtx = null;
   }
   room = null;
+  if (e2eeWorker) {
+    e2eeWorker.terminate();
+    e2eeWorker = null;
+  }
+  setE2EEBadge(null);
   document.getElementById('video-grid').innerHTML = '';
   document.getElementById('panel-create').style.display = 'block';
   document.getElementById('panel-join').style.display = 'block';
@@ -1018,6 +1128,11 @@ async function monitorICE() {
 
   const poll = async () => {
     if (!room || room.state !== ConnectionState.Connected) return;
+
+    document.getElementById('e2ee-state').textContent = room.options.e2ee
+      ? `isE2EEEnabled=${room.isE2EEEnabled}`
+      : (encryptionOf(lastConfig).mode === 'e2ee' ? 'no key: joined without a cryptor' : 'transport only');
+    refreshE2EEBadge();
 
     try {
       const sender = room.engine?.pcManager?.publisher?.pc;
