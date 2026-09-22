@@ -3,6 +3,13 @@ set -euo pipefail
 
 # Measure the capture-start gap for each egress layout.
 #
+# This drives lk directly, at the egress service's default encode, because it
+# measures both layouts against one room and a session's layout is fixed in
+# its config. Recordings themselves are started by the control plane
+# (POST /sessions/{id}/recording/start), which encodes from the session's
+# stored profile; see docs/media-plan.md, stage 4. Use this script only for
+# the gap number.
+#
 # Requires:
 #   - The POC stack running (make poc)
 #   - The control plane running

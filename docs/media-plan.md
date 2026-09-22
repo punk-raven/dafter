@@ -3,8 +3,8 @@
 Scope: the real-time WebRTC media path - what a client publishes, what the SFU
 routes, what egress encodes. The agent runtime is out of scope.
 
-Stages 0-3 are built. Stage 4 is Phase 2 work, stage 5 is deferred by decision,
-stage 6 is the standing deferred list.
+Stages 0-4 are built. Stage 5 is deferred by decision, stage 6 is the
+standing deferred list.
 
 ## 1. The gap this closed
 
@@ -42,7 +42,9 @@ already receives. Delivery needed no token `RoomConfiguration`, no new endpoint,
 and no new method on `Transport`.
 
 Egress is the one part that adds a control-side operation, and control-side
-operations are exactly what decision 9 admits.
+operations are exactly what decision 9 admits. Stage 4 widened `Transport` by
+exactly that: `StartEgress` and `StopEgress`, driven over the media server's
+own Twirp API with no vendor SDK, and nothing else.
 
 ## 3. Corrections to the gap analysis this came from
 
@@ -168,21 +170,117 @@ and verified against a running control plane, but the bandwidth claim is not
 evidence until that number exists. A profile that does not move it is not doing
 anything.
 
-### Stage 4 - egress encoding (Phase 2)
+### Stage 4 - egress encoding (done)
 
-Server-side, fully Dafter-owned, and absent in both halves.
+Server-side and fully Dafter-owned. The control plane starts and stops
+recordings from the session's stored config, and the encode settings a
+recording got are in the same hashed document that says what the room
+published.
 
-1. Build egress orchestration in Go, inside `go/internal/transport` - depguard
-   denies `github.com/livekit/*` everywhere else, and that is the correct home.
-   Today the only thing that starts an egress is `lk` in
-   `scripts/measure-egress.sh`.
-2. Set encoding options from resolved config on each egress request:
-   resolution, video bitrate, framerate, codec.
-3. Vary them by layout and `retentionClass` - an evidence-grade room composite
-   and a per-track audio archive do not want the same encode.
+**The profile.** `media.egress`, beside the publish profile: `width`,
+`height`, `framerate`, `videoBitrate` and `audioBitrate` in kbps (the unit the
+egress API takes, deliberately not the bps of `maxBitrate`), `videoCodec`, or
+a `preset` naming one of the media server's own. Two enums generate to both
+halves with drift coverage on each side.
 
-**Deliverable:** a recording whose encode settings came from the session's own
-stored config, recorded in its manifest.
+The codec enum is H.264 in its three profiles and nothing else. This was
+verified against the egress service's source rather than its protocol file:
+the protocol enum also names VP8, which `applyAdvanced` accepts and then
+ignores, and VP9 and AV1 are not in it at all. A member the file could not
+actually be encoded with would be a setting the manifest records and the
+recording does not have. The publish codec is a separate choice, and VP9 in
+the room with H.264 in the file is the normal case.
+
+**The default.** 1280x720 at 30 fps, 3000 kbps H.264 main, 128 kbps audio.
+This is the media server's own `H264_720P_30` preset spelled out, so a reader
+of the document sees the size and rate rather than a name to look up. 720p
+matches the publish profile's `h720`, so the composite renders tiles at the
+size they arrive rather than upscaling; 3000 kbps sits comfortably above the
+1.7 Mbps the room publishes at, so the re-encode is not the quality floor;
+H.264 main is what every player decodes. Telephony gets 64 kbps audio and no
+video fields at all.
+
+The video encode lives on the channel overlays rather than in `defaults`.
+Layers merge and a merge cannot delete a key, so a video encode in
+`defaults` would reach telephony and break the audio-only rule below.
+Whether a recording has a picture is a channel property anyway.
+
+**Layout rules.**
+
+| Layout | Request | Encode |
+|---|---|---|
+| `room_composite` | `StartRoomCompositeEgress` | from `media.egress`; `audio_only` when the session publishes no video; MP4, or the container the service picks for audio-only |
+| `track_composite` | `StartTrackCompositeEgress` | the same; the client supplies the track ids, being the only party that knows them |
+| `track` | `StartTrackEgress` | **none**. The service copies the published bytes and there is nothing to set, so the profile is not consulted and the request carries no encoding even when the document has one |
+
+Files land at `{sessionId}/{layout}-{utc}` (`track-{trackId}-{utc}` for a
+track), so one session's recordings share a prefix and each object says its
+layout. `retentionClass` is not varied: it is a free-form pattern with no
+defined members, and giving an undefined class an encode would be inventing
+semantics. The hook is the channel overlay; a class-keyed axis can be added
+to the catalog when the classes exist.
+
+**Cross-field rules**, one table entry per half, each located by pointer:
+
+- a preset beside explicit fields is refused at `/media/egress/preset`. The
+  API takes one or the other, and a document carrying both has given two
+  answers to one question. Because the merge cannot delete a key and the
+  shipped catalog states explicit fields, a preset is only reachable from a
+  catalog built the other way round; the field exists so the shape is there
+- video encode settings on a recording whose session publishes no video are
+  refused at `/media/egress`, but only when recording is enabled. An inert
+  profile on a session that records nothing is not an error
+
+**The endpoints.** `POST /sessions/{id}/recording/start` and `/stop`, and
+`GET /sessions/{id}` to read a session with its recordings (egress id, layout,
+start and stop times). The stored document decides everything at every call,
+not only at resolution: a session that resolved without recording is refused
+at `/recording/enabled`, a missing consent artifact at
+`/recording/consentArtifactId`. `startAt: session_create` is honored in the
+create path: the room is created and the composite started after the session
+is stored and before its first token is minted, so nobody can publish into an
+unrecorded room, and a start the server refuses fails the create before a
+token exists.
+
+The media server refuses an egress on a room nobody has joined, which is why
+the create path creates the room first; an on-demand start does not, so a
+start on a room that has since closed is refused rather than quietly
+recording an empty one. The service token for these calls carries
+`roomRecord` or `roomCreate`, one grant per call, lives for a minute and is
+never returned to anything. Participant grants are untouched.
+
+Egress storage is `DAFTER_EGRESS_S3_*` in the environment, set in
+`docker-compose.yml` to match `deploy/egress.yaml`. `scripts/measure-egress.sh`
+still drives `lk` directly, because it measures both layouts against one room
+and a session's layout is fixed in its config; it stays for the gap number
+and the endpoint supersedes it for everything else.
+
+**What was verified**, on the dev stack (livekit-server v1.13.7, egress
+v1.14.1, MinIO), with the test client publishing a synthetic pattern from
+headless Chrome and the recording started and stopped from its own buttons:
+
+| Layout | `ListEgress` while running | File in MinIO | `ffprobe` |
+|---|---|---|---|
+| `room_composite` | `EGRESS_ACTIVE`, `advanced: {width: 1280, height: 720, framerate: 30, audio_bitrate: 128, video_codec: H264_MAIN, video_bitrate: 3000}` | `s_9f1facd2/room_composite-20260922103213509.mp4`, 4.8 MB, 24.9 s | h264 Main 1280x720 30/1, aac 124 kbps |
+| `track_composite` | `EGRESS_ACTIVE`, same `advanced`, both track ids | `s_4b4b7c88/track_composite-20260922103326958.mp4`, 3.8 MB, 19.6 s | h264 Main 1280x720 30/1, aac 124 kbps |
+| `track` (audio) | `EGRESS_ACTIVE`, no encoding in the request | `.../track-TR_AMvyF8icsgpiJ9-20260922103425192.ogg`, 182 KB, 11.4 s | opus 48 kHz, ogg: the published bytes |
+| `room_composite`, `startAt: session_create` | started at create, 16 s before the first join | `s_ed98ef45/room_composite-20260922103706140.mp4`, 13.8 s | h264 Main 1280x720 30/1 |
+
+The measured video bitrate came out at 1.4 Mbps against the 3000 kbps target,
+which is the encoder not needing its budget for colour bars; the target is a
+ceiling, not a constant rate.
+
+The last row is the capture-start gap made visible: the egress was accepted
+at session creation, but the room composite's own pipeline waits for the
+first published track, so the file covers the 14 s after the join and not
+the 16 s before it. The guarantee `docs/dafter.md` gives is that this gap is
+a measured number in the manifest, not that it is zero; the manifest is the
+seal stage's work.
+
+**Not in scope here:** the seal stage, the manifest, retention enforcement,
+consent capture, and the recording manifest entry that would carry the encode
+settings alongside the plaintext hash. The document already holds them; the
+manifest copies them out.
 
 ### Stage 5 - room encryption (deferred to Phase 2)
 
@@ -218,7 +316,8 @@ removes capabilities rather than adding a flag:
 ## 6. Where this lands in the delivery plan
 
 Stages 0-3 are POC work and close the "video call" pass bar once the uplink
-number exists. Stage 4 ships with recording orchestration in Phase 2. Stage 5 is
-deferred there by decision. Stage 6 is Phase 7 or never.
+number exists. Stage 4 is the recording-orchestration half of Phase 2; the
+seal stage and the manifest are the rest of it. Stage 5 is deferred there by
+decision. Stage 6 is Phase 7 or never.
 
 Nothing here is on the agent runtime's critical path.
