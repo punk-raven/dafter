@@ -12,6 +12,7 @@ from dafter_core.enums import (
     EncryptionMode,
     ErrorCode,
     KeyModel,
+    NoiseCancellation,
     PrivacyMode,
     Role,
     TurnStrategy,
@@ -204,6 +205,15 @@ def test_resolution_can_be_deferred_to_the_client() -> None:
     cfg = parse(doc(media={"video": {"resolution": "auto", "maxBitrate": 1700000}}))
     assert cfg.media.video.resolution is VideoResolution.AUTO
     assert cfg.media.video.max_bitrate == 1700000
+
+
+def test_the_noise_filter_is_a_closed_set_with_a_mechanism_behind_each_member() -> None:
+    for member in NoiseCancellation:
+        cfg = parse(doc(media={"audio": {"noiseCancellation": str(member)}}))
+        assert cfg.media.audio.noise_cancellation is member
+    err = refuse(doc(media={"audio": {"noiseCancellation": "krisp"}}))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/media/audio/noiseCancellation" in "\n".join(err.details)
 
 
 def test_scalability_mode_needs_a_layered_codec() -> None:

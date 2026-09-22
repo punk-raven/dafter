@@ -254,8 +254,8 @@
         },
         "noiseCancellation": {
           "type": "string",
-          "description": "Only the platform's own native suppression is offered. A vendor filter would be a third value here, and is deliberately absent until something implements it: an enum member with no mechanism behind it is a guarantee nobody enforces.",
-          "enum": ["off", "native"],
+          "description": "Which filter the publishing client puts in front of its microphone. off asks for no suppression at all; native is the browser's own suppression, applied as a capture constraint; rnnoise is the RNNoise WASM filter attached to the track as a processor, with the browser's own suppression turned off, because two suppressors in series fight each other. Echo cancellation is separate and stays on in every mode. Every member has something implementing it: a member with no mechanism behind it is a guarantee nobody enforces.",
+          "enum": ["off", "native", "rnnoise"],
           "default": "native"
         }
       }

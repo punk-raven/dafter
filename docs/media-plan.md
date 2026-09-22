@@ -3,7 +3,7 @@
 Scope: the real-time WebRTC media path - what a client publishes, what the SFU
 routes, what egress encodes. The agent runtime is out of scope.
 
-Stages 0-5 are built. Stage 6 is the standing deferred list.
+Stages 0-6 are built. Stage 7 is the standing deferred list.
 
 ## 1. The gap this closed
 
@@ -72,7 +72,7 @@ Two further facts the analysis did not reach, both since fixed:
 | Default codec | **VP9 primary, H.264 backup.** Most of the compression gain at broader hardware support than AV1 |
 | `sealed` privacy mode | **Reversed.** Built in stage 5 rather than deferred: a mode that names a guarantee and enforces none is the one thing worse than not offering it |
 | E2EE key model | **One random 256-bit key per session, minted and held by the control plane.** It proves encryption against the media server and the network, not against Dafter. The consumer-held key is Phase 2 |
-| Noise cancellation | The `noiseCancellation` field ships so the shape exists; WebRTC native is the only implementation. No Krisp |
+| Noise cancellation | **Reversed.** A free filter ships in stage 6 rather than the field shipping empty: `rnnoise` is a third member with a WASM implementation behind it, and the setting is now an extension point a licence holder extends with one enum member and one registry entry. Krisp and ai-coustics stay a procurement question |
 
 ## 5. Stages
 
@@ -110,9 +110,11 @@ coverage on each side. Scalability mode stays a pattern: its grammar is open
 enough that the client library parses it with a regex rather than publishing a
 closed set, and inventing one here would be a set that drifts.
 
-`noiseCancellation` is `off | native` only. A vendor filter would be a third
-member with nothing implementing it, which is the same failure as a privacy
-mode that promises encryption and checks a flag.
+`noiseCancellation` shipped as `off | native` only. A vendor filter would have
+been a third member with nothing implementing it, which is the same failure as
+a privacy mode that promises encryption and checks a flag. The rule was kept
+rather than dropped: stage 6 adds `rnnoise` together with the thing that
+implements it.
 
 Video and audio fields are pointers in Go and optional in Python, because a
 profile is the product of merged layers where a `false` a layer set cannot be
@@ -158,8 +160,8 @@ cancellation and noise suppression. A field the profile omits is omitted there
 too, so the library default stands rather than being overwritten by a guess.
 
 Native echo and noise suppression stop being browser defaults here and become a
-stated choice, which by the recorded decision is the whole of the
-noise-cancellation work.
+stated choice. At this stage that was the whole of the noise-cancellation work;
+stage 6 makes the setting choose between three implemented filters instead.
 
 The permanent home is `client-core` in Phase 3. The test client proves the
 profile survives the trip in the meantime.
@@ -359,11 +361,138 @@ refused at create with `/recording/enabled`.
 | Agent-side key use | `trusted_agent` discloses the key to the agent role and no Python worker exists to hold it. The disclosure rule is built and tested; the consumer of it is Phase 5 |
 | Recording under E2EE | Client-side recording, or an egress inside the trust boundary. Both are Phase 2 work behind the seal stage |
 
-### Stage 6 - deferred, with reasons
+### Stage 6 - the noise filter (done)
+
+`noiseCancellation` was the one field in the media profile whose members did
+not all have a mechanism. `off` and `native` did; a third member would not
+have, which is why stage 1 refused to add one. A free filter now ships, so the
+setting is a real choice between three implemented behaviours and an extension
+point a licence holder can extend without changing the platform.
+
+**The three members, and what each one does to the audio path.**
+
+| Value | Capture constraint | Processor | What the room receives |
+|---|---|---|---|
+| `off` | `noiseSuppression: false` | none | the microphone, unfiltered |
+| `native` | `noiseSuppression: true` | none | whatever the browser's own suppression produces |
+| `rnnoise` | `noiseSuppression: false` | RNNoise WASM, attached before publish | the filter's output; the capture track is never published |
+
+The browser's own suppression is off under `rnnoise` deliberately. Two
+suppressors in series make each one's output the other's input, and a model
+trained on speech plus noise, fed speech that has already been gated, removes
+syllables rather than noise; LiveKit's own noise-cancellation documentation
+warns about exactly this. Echo cancellation is a different job - it subtracts
+the far end from the near end - and stays on in every mode, under its own
+`echoCancellation` field.
+
+**What was added, and its licence.** `@sapphi-red/web-noise-suppressor@0.4.1`,
+MIT, no dependencies, verified from the published tarball rather than from its
+README: it wraps `xiph/rnnoise` (BSD) as an AudioWorklet node plus a WASM
+binary, and exposes `loadRnnoise` and `RnnoiseWorkletNode`. Nothing in it
+requires payment or an attribution this MIT repo cannot meet. The worklet
+assumes a 48 kHz graph, so the client builds its `AudioContext` at that rate.
+
+**Where the assets come from.** A pinned jsDelivr URL, the same shape as the
+`livekit-client@2.13.5` pin above it, and for the same reason: the test client
+is one embedded HTML file with no build step, so a version lives in a URL or it
+lives nowhere. The alternative was vendoring `rnnoise.wasm`, `rnnoise_simd.wasm`
+and the worklet into the control plane's embedded assets - about 370 KB of
+binary that no check in this repo can tell from upstream, in a repo whose whole
+argument is that a reader can verify what it claims. The URL names the package,
+the version and the file. The cost is a runtime dependency on a CDN, and that
+cost is exactly what the fallback below exists to absorb. When the client moves
+to `client-core` in Phase 3 it gets a bundler and the assets get bundled with
+it.
+
+**The extension point.** `NOISE_FILTERS` in
+`go/cmd/dafter-control/testclient.html` is a registry keyed by the enum member:
+
+```js
+const NOISE_FILTERS = {
+  off:     { label: 'off',            nativeSuppression: false, createProcessor: null },
+  native:  { label: 'browser native', nativeSuppression: true,  createProcessor: null },
+  rnnoise: { label: 'rnnoise (wasm)', nativeSuppression: false, createProcessor: createRnnoiseProcessor },
+};
+```
+
+`createProcessor` is `async () => TrackProcessor`, where a `TrackProcessor` has
+`name`, `init({ track, audioContext })` - which must leave the filtered track on
+`this.processedTrack` - `restart` and `destroy`. `null` means the entry needs no
+processor and the capture constraint is the whole of it.
+
+To add Krisp or ai-coustics, a fork or a licence holder changes three things
+and nothing else:
+
+1. one member on the `noiseCancellation` enum in
+   `schemas/config/v1/resolved-session-config.schema.json`, then `make generate`
+2. one entry in `NOISE_FILTERS` whose `createProcessor` returns their package's
+   processor. `@livekit/krisp-noise-filter@0.4.5` already exports exactly this
+   shape - `KrispNoiseFilter(options?)` returns a track processor that runs on
+   the local microphone capture - so the entry body is a dynamic `import` and a
+   call. Its licence is LiveKit's terms of service, not an open one, which is
+   why it is a fork's line to add and not this repo's
+3. their own dependency, licence and credentials, which is the part this repo
+   deliberately does not carry
+
+No other file in the client knows the member names: the create form is built
+from the registry keys, the capture constraint comes from the entry, and the
+status line shows the entry's label.
+
+**The fallback, and why it is loud.** A filter that quietly did nothing is the
+failure this setting exists to avoid, so every way the filter can fail - no
+`AudioWorklet`, assets that do not load, a worklet that will not build - is
+caught, logged as an error naming the reason, and falls back to `native`. The
+status line then reads `noise browser native (fallback from rnnoise)` rather
+than `noise rnnoise`, so the fallback is visible to whoever is looking at the
+session and not only to whoever reads the log.
+
+**Attached before publish, never after.** The microphone is created, given the
+processor and only then published, which is why the client no longer calls
+`enableCameraAndMicrophone` - that creates and publishes in one step. Attaching
+afterwards would work, through `replaceTrack`, and would put unfiltered audio in
+the room for as long as it took.
+
+**What was verified**, on the dev stack (livekit-server v1.13.7), two headless
+Chrome tabs in one room, both publishing the same 20 s file through
+`--use-file-for-fake-audio-capture` (voiced harmonics with syllable-rate
+modulation, one silent second in five, over a constant broadband noise floor):
+
+| Session resolved to | Processor on the published track | Capture constraints | Track handed to the peer connection | Received over 20 s |
+|---|---|---|---|---|
+| `rnnoise` | `rnnoise` | `noiseSuppression: false`, `echoCancellation: true` | the processor's output; the `getUserMedia` track id never appears, and no `replaceTrack` follows | 121 120 B, 48.4 kbps, 1000 packets, 0 lost |
+| `native` | none | `noiseSuppression: true`, `echoCancellation: true` | the `getUserMedia` track | 206 396 B, 82.6 kbps, 869 packets, 0 lost |
+| `off` | none | `noiseSuppression: false`, `echoCancellation: true` | the `getUserMedia` track | 230 733 B, 92.3 kbps, 1000 packets, 0 lost |
+| `rnnoise`, `AudioWorkletNode` deleted | none, fallback to `native` | `noiseSuppression: true` | the `getUserMedia` track | 205 431 B, 0 lost |
+| `rnnoise`, `addModule` made to fail | none, fallback to `native` | second capture with `noiseSuppression: true`; the first, unfiltered capture track was stopped and never published | 216 948 B, 0 lost |
+
+The `getUserMedia` call, `RTCPeerConnection.addTrack`, `addTransceiver` and
+`RTCRtpSender.replaceTrack` were all instrumented from outside the page, so
+"the unfiltered track was never published" is a statement about what the peer
+connection was handed rather than about what the client logged.
+
+**The one signal measurement, and its limit.** Raw capture and filter output
+were measured over the same eight-second window of the same track, inside the
+publishing page: RMS 0.05047 unfiltered against 0.02422 filtered, -6.4 dB, and
+-6.9 dB on a second run. That is a measurement of what the filter does to this
+input, not a claim about speech quality, which was not measured and cannot be
+from a synthetic file.
+
+The received bitrate above is offered as the same kind of fact: on this input
+`rnnoise` published roughly half the audio bytes `native` did - 48.4 kbps on
+both `rnnoise` runs against 82.6 and 92.3 - which is what removing a constant
+noise floor does to DTX and to a variable-rate codec. Receiver-side audio
+energy is *not* reported as a quality number, because auto gain control and the
+phase of the looping file move it between runs by more than the filter does.
+
+**Not changed:** the shipped default stays `native`, in `catalog.json`. This
+stage proves the extension point; making every session run a WASM filter by
+default is a product decision, and a different one.
+
+### Stage 7 - deferred, with reasons
 
 | Question | Why it waits |
 |---|---|
-| Krisp browser noise filter | Closed, not open. Enhanced Krisp and background-voice cancellation are LiveKit Cloud only and the reference topology is self-hosted OSS. The `noiseCancellation` field keeps the door open at no cost; the license path is a procurement question nobody has asked |
+| Licensed noise filters (Krisp, ai-coustics) | Not blocked, just not bought. Both are metered through a vendor cloud and this reference topology is self-hosted, so the platform ships the free filter and leaves the licensed one an addition rather than a change: stage 6 says exactly which three things a licence holder adds. The licence itself is a procurement question nobody has asked |
 | Hi-fi audio (up to 510 kbps stereo) | No known consumer. Voice defaults suffice until one exists |
 | Ingress (OBS, external stream import) | Nothing in the delivery plan asks for it |
 | Raw-track processing, frame metadata | Client-SDK capability, Phase 3 at the earliest |
@@ -371,10 +500,10 @@ refused at create with `/recording/enabled`.
 ## 6. Where this lands in the delivery plan
 
 Stages 0-3 are POC work and close the "video call" pass bar once the uplink
-number exists. Stage 5 lands with them: it is POC work because the mechanism is
-small and the alternative was a mode that promised what nothing enforced. Stage
-4 is the recording-orchestration half of Phase 2; the seal stage and the
-manifest are the rest of it, alongside the consumer-held key and rotation.
-Stage 6 is Phase 7 or never.
+number exists. Stages 5 and 6 land with them: both are POC work because the
+mechanism is small and the alternative in each case was a setting that promised
+what nothing enforced. Stage 4 is the recording-orchestration half of Phase 2;
+the seal stage and the manifest are the rest of it, alongside the consumer-held
+key and rotation. Stage 7 is Phase 7 or never.
 
 Nothing here is on the agent runtime's critical path.

@@ -131,6 +131,10 @@
           <option value="h720">h720</option>
           <option value="h1080">h1080</option>
         </select>
+        <label>Noise filter</label>
+        <select id="noise-cancellation">
+          <option value="" selected>follow the catalog</option>
+        </select>
         <label>Recording</label>
         <select id="recording-layout">
           <option value="" selected>off</option>
@@ -249,7 +253,7 @@
 </div>
 
 <script>
-const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider } = LivekitClient;
+const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
 // The frame cryptor runs in a worker shipped beside the pinned bundle. A Worker
 // script must be same-origin, so the source is fetched from the CDN, which
@@ -264,6 +268,8 @@ let syntheticVideo = false;   // the test pattern is not a selfie view, so it is
 let lastConfig = null;        // the joined session's resolved document, for returning to its profile
 let syntheticAudioCtx = null;
 let lastRoomId = null;
+let noiseAudioCtx = null;     // 48 kHz, the rate the RNNoise worklet assumes
+let activeNoiseFilter = null; // what is actually in the audio path, which a fallback changes
 
 function log(msg, level = 'info') {
   const el = document.getElementById('log');
@@ -342,6 +348,158 @@ async function e2eeOptionsFor(data) {
   return { keyProvider, worker: e2eeWorker };
 }
 
+// --- noise filters ------------------------------------------------------
+//
+// One entry per member of `media.audio.noiseCancellation`, and that is the
+// whole extension point. An entry says two things: whether the browser's own
+// suppression is asked for as a capture constraint, and, for a filter that is
+// not the browser's, how to build the track processor that runs instead.
+//
+// Adding a licensed filter is one enum member in
+// schemas/config/v1/resolved-session-config.schema.json and one entry here.
+// Nothing else in this client knows the member names.
+//
+// The two are never both on. Stacking suppressors makes each one's output the
+// other's input, and a filter trained on speech-plus-noise fed already-gated
+// speech removes syllables. Echo cancellation is a different job and stays on
+// in every mode; it is the `echoCancellation` field, not this one.
+
+// Pinned exactly like the SDK above, and for the same reason: this client is
+// one file with no build step, so a version lives in a URL or it lives
+// nowhere. @sapphi-red/web-noise-suppressor is MIT with no dependencies and
+// wraps xiph/rnnoise (BSD).
+const RNNOISE_PKG = '@sapphi-red/web-noise-suppressor@0.4.1';
+const RNNOISE_BASE = `https://cdn.jsdelivr.net/npm/${RNNOISE_PKG}/dist`;
+
+const NOISE_FILTERS = {
+  off: {
+    label: 'off',
+    nativeSuppression: false,
+    createProcessor: null,
+  },
+  native: {
+    label: 'browser native',
+    nativeSuppression: true,
+    createProcessor: null,
+  },
+  rnnoise: {
+    label: 'rnnoise (wasm)',
+    nativeSuppression: false,
+    createProcessor: createRnnoiseProcessor,
+  },
+};
+
+// The create form offers exactly what the registry can serve, so registering a
+// filter is the only edit a new member needs on this side.
+function fillNoiseFilterChoices() {
+  const el = document.getElementById('noise-cancellation');
+  for (const [value, entry] of Object.entries(NOISE_FILTERS)) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = `${value} - ${entry.label}`;
+    el.appendChild(opt);
+  }
+}
+
+// A member the schema allows and this client has no entry for is the one case
+// the registry cannot answer. It is not silently treated as `off`: the caller
+// says so, and the status line carries the value the document asked for.
+function noiseFilterFor(value) {
+  if (value === undefined) return null;
+  return NOISE_FILTERS[value] ||
+    { label: `${value} (no entry in this client)`, nativeSuppression: false, createProcessor: null, unknown: true };
+}
+
+// A LiveKit audio TrackProcessor: `init` is handed the unpublished capture
+// track and must leave `processedTrack` on the processor, which is what gets
+// published. The graph is capture -> RNNoise worklet -> destination, so the
+// only track the room ever sees is the filtered one.
+async function createRnnoiseProcessor() {
+  if (typeof AudioWorkletNode === 'undefined') {
+    throw new Error('this browser has no AudioWorklet');
+  }
+  const wns = await import(`${RNNOISE_BASE}/index.js`);
+  const wasmBinary = await wns.loadRnnoise({
+    url: `${RNNOISE_BASE}/rnnoise.wasm`,
+    simdUrl: `${RNNOISE_BASE}/rnnoise_simd.wasm`,
+  });
+
+  let source = null;
+  let node = null;
+  let sink = null;
+
+  return {
+    name: 'rnnoise',
+    async init(opts) {
+      const ctx = opts.audioContext;
+      if (!ctx) throw new Error('no audio context on the track');
+      await ctx.audioWorklet.addModule(`${RNNOISE_BASE}/rnnoise/workletProcessor.js`);
+      source = ctx.createMediaStreamSource(new MediaStream([opts.track]));
+      node = new wns.RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary });
+      sink = ctx.createMediaStreamDestination();
+      source.connect(node);
+      node.connect(sink);
+      this.processedTrack = sink.stream.getAudioTracks()[0];
+    },
+    async restart(opts) {
+      await this.destroy();
+      await this.init(opts);
+    },
+    async destroy() {
+      if (node) { node.destroy(); node.disconnect(); node = null; }
+      if (source) { source.disconnect(); source = null; }
+      sink = null;
+      this.processedTrack = undefined;
+    },
+  };
+}
+
+// Publishes the microphone with whatever the profile's filter entry says. A
+// processor is attached to the capture track before `publishTrack`, never
+// after, so no unfiltered frame reaches the room. Everything that can fail -
+// no AudioWorklet, a CDN that does not answer, a worklet that will not build -
+// falls back to the browser's own suppression and says so in the log and in
+// the status line, because a filter that quietly did nothing is the failure
+// this setting exists to avoid.
+async function publishMicrophone(room) {
+  const capture = Object.assign({}, room.options.audioCaptureDefaults);
+  const requested = ((lastConfig && lastConfig.media && lastConfig.media.audio) || {}).noiseCancellation;
+  const entry = noiseFilterFor(requested);
+  activeNoiseFilter = entry ? entry.label : 'sdk default';
+
+  if (entry && entry.unknown) {
+    log(`Profile names noise filter ${requested}, which this client has no entry for; publishing unfiltered`, 'error');
+  }
+  if (!entry || !entry.createProcessor) {
+    await room.localParticipant.setMicrophoneEnabled(true, capture);
+    log(`Microphone published; noise filter ${activeNoiseFilter}`, entry && entry.unknown ? 'warn' : 'success');
+    return;
+  }
+
+  let track = null;
+  try {
+    const processor = await entry.createProcessor();
+    track = await createLocalAudioTrack(capture);
+    noiseAudioCtx = new AudioContext({ sampleRate: 48000 });
+    await noiseAudioCtx.resume();   // a suspended graph publishes silence, not filtered audio
+    track.setAudioContext(noiseAudioCtx);
+    await track.setProcessor(processor);
+    if (!track.getProcessor() || !track.getProcessor().processedTrack) {
+      throw new Error('processor produced no track');
+    }
+    await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+    log(`Microphone published through ${requested} (${RNNOISE_PKG}); the browser's own suppression is off`, 'success');
+  } catch (err) {
+    log(`Noise filter ${requested} unavailable (${err.message}); falling back to the browser's own suppression`, 'error');
+    if (track) track.stop();
+    if (noiseAudioCtx) { noiseAudioCtx.close(); noiseAudioCtx = null; }
+    activeNoiseFilter = `${NOISE_FILTERS.native.label} (fallback from ${requested})`;
+    await room.localParticipant.setMicrophoneEnabled(
+      true, Object.assign({}, capture, { noiseSuppression: true }));
+    log(`Microphone published; noise filter ${activeNoiseFilter}`, 'warn');
+  }
+}
+
 function roomOptionsFrom(config) {
   const media = (config && config.media) || {};
   const video = media.video || {};
@@ -377,7 +535,8 @@ function roomOptionsFrom(config) {
 
   const capture = {};
   if (audio.echoCancellation !== undefined) capture.echoCancellation = audio.echoCancellation;
-  if (audio.noiseCancellation !== undefined) capture.noiseSuppression = audio.noiseCancellation === 'native';
+  const filter = noiseFilterFor(audio.noiseCancellation);
+  if (filter) capture.noiseSuppression = filter.nativeSuppression;
   if (Object.keys(capture).length) options.audioCaptureDefaults = capture;
 
   if (Object.keys(publish).length) options.publishDefaults = publish;
@@ -456,7 +615,7 @@ function startStats(data) {
     room: data.room,
     participantId: data.participantId,
     configHash: data.configHash,
-    profile: { video, audio, encryption: encryptionOf(data.config) },
+    profile: { video, audio, encryption: encryptionOf(data.config), noiseFilter: activeNoiseFilter },
     clientResolution: myResolution() || null,
   };
   statsSamples = [];
@@ -468,6 +627,7 @@ function startStats(data) {
     video.maxBitrate ? `<=${Math.round(video.maxBitrate / 1000)} kbps` : null,
     video.maxFramerate ? `<=${video.maxFramerate} fps` : null,
     encryptionOf(data.config).mode || null,
+    activeNoiseFilter ? `noise ${activeNoiseFilter}` : null,
   ].filter(Boolean).join(' · ');
   const override = statsContext.clientResolution;
   document.getElementById('stats-profile').textContent =
@@ -680,6 +840,8 @@ async function createSession() {
     const overrides = {};
     const resolution = document.getElementById('resolution').value;
     if (resolution) overrides.media = { video: { resolution } };
+    const noise = document.getElementById('noise-cancellation').value;
+    if (noise) overrides.media = Object.assign(overrides.media || {}, { audio: { noiseCancellation: noise } });
     const privacyMode = document.getElementById('privacy-mode').value;
     if (privacyMode) {
       overrides.privacyMode = privacyMode;
@@ -855,27 +1017,33 @@ async function joinRoom() {
 
     log('Connected! Publishing tracks...', 'success');
 
-    if (!publishesVideo) {
+    // The microphone is published on its own rather than with the camera,
+    // because the profile's noise filter has to be attached to the capture
+    // track before it is published and enableCameraAndMicrophone does both in
+    // one step.
+    let micPublished = false;
+    try {
+      await publishMicrophone(room);
+      micPublished = true;
+    } catch (micErr) {
+      log(`No microphone (${micErr.message})`, publishesVideo ? 'warn' : 'error');
+      activeNoiseFilter = null;
+    }
+
+    if (publishesVideo) {
       try {
-        await room.localParticipant.setMicrophoneEnabled(true);
-        log('Microphone published; this channel carries no video', 'success');
-      } catch (micErr) {
-        log(`No microphone (${micErr.message})`, 'error');
-      }
-    } else {
-      try {
-        await room.localParticipant.enableCameraAndMicrophone();
-        log('Camera and microphone published', 'success');
-      } catch (mediaErr) {
-        log(`No camera (${mediaErr.message}), trying microphone only...`, 'warn');
-        try {
-          await room.localParticipant.setMicrophoneEnabled(true);
-          log('Microphone published (no camera)', 'success');
-        } catch (micErr) {
-          log(`No microphone either (${micErr.message}), publishing synthetic test pattern...`, 'warn');
+        await room.localParticipant.setCameraEnabled(true);
+        log('Camera published', 'success');
+      } catch (camErr) {
+        log(`No camera (${camErr.message})`, 'warn');
+        if (!micPublished) {
+          log('No microphone either, publishing synthetic test pattern...', 'warn');
           await publishTestPattern(room);
+          activeNoiseFilter = 'none (synthetic audio)';
         }
       }
+    } else if (micPublished) {
+      log('This channel carries no video', 'success');
     }
 
     const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
@@ -917,6 +1085,11 @@ function cleanup() {
     syntheticAudioCtx.close();
     syntheticAudioCtx = null;
   }
+  if (noiseAudioCtx) {
+    noiseAudioCtx.close();
+    noiseAudioCtx = null;
+  }
+  activeNoiseFilter = null;
   room = null;
   if (e2eeWorker) {
     e2eeWorker.terminate();
@@ -1174,6 +1347,8 @@ function copyJoinLink() {
     setTimeout(() => { btn.textContent = 'Copy join link'; }, 1500);
   });
 }
+
+fillNoiseFilterChoices();
 
 (function seedFromURL() {
   const roomParam = new URLSearchParams(window.location.search).get('room');
