@@ -23,8 +23,11 @@
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
   .video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
-  .video-tile { position: relative; background: #1a1a1a; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-  .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .video-tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  /* contain, not cover: a portrait publisher is letterboxed rather than
+     centre-cropped, so the tile shows the frame that was actually published
+     and matches what a composite recording of the same track looks like. */
+  .video-tile video { width: 100%; height: 100%; object-fit: contain; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
   .stats-panel { border-top: 1px solid #222; background: #0c0c0c; max-height: 320px; display: flex; flex-direction: column; }
@@ -1202,7 +1205,6 @@ function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
     const el = track.attach();
     el.style.width = '100%';
     el.style.height = '100%';
-    el.style.objectFit = 'cover';
     if (mirror) el.style.transform = 'scaleX(-1)';
     tile.insertBefore(el, tile.firstChild);
   }
@@ -1286,7 +1288,7 @@ async function publishTestPattern(room) {
   vid.srcObject = videoStream;
   vid.autoplay = true;
   vid.muted = true;
-  vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  vid.style.cssText = 'width:100%;height:100%';
   tile.appendChild(vid);
   const label = document.createElement('span');
   label.className = 'label';
