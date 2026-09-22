@@ -8,6 +8,8 @@ from .enums import (
     AgentMode,
     Channel,
     EgressLayout,
+    EgressPreset,
+    EgressVideoCodec,
     ErrorCode,
     NoiseCancellation,
     PrivacyMode,
@@ -181,15 +183,69 @@ class AudioProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class EgressProfile:
+    """How a composite recording is encoded. Bitrates are kbps, the unit the
+    egress API takes, and are not the bps of VideoProfile."""
+
+    preset: EgressPreset | None = None
+    width: int = 0
+    height: int = 0
+    framerate: int = 0
+    video_bitrate: int = 0
+    audio_bitrate: int = 0
+    video_codec: EgressVideoCodec | None = None
+
+    @property
+    def states_video(self) -> bool:
+        """Names any video encode setting, the preset included: every preset
+        is a video preset."""
+        return bool(
+            self.preset is not None
+            or self.width
+            or self.height
+            or self.framerate
+            or self.video_bitrate
+            or self.video_codec is not None
+        )
+
+    @property
+    def states_explicit_fields(self) -> bool:
+        return bool(
+            self.width
+            or self.height
+            or self.framerate
+            or self.video_bitrate
+            or self.audio_bitrate
+            or self.video_codec is not None
+        )
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> EgressProfile:
+        preset = d.get("preset")
+        codec = d.get("videoCodec")
+        return cls(
+            preset=EgressPreset(preset) if preset else None,
+            width=d.get("width", 0),
+            height=d.get("height", 0),
+            framerate=d.get("framerate", 0),
+            video_bitrate=d.get("videoBitrate", 0),
+            audio_bitrate=d.get("audioBitrate", 0),
+            video_codec=EgressVideoCodec(codec) if codec else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Media:
     video: VideoProfile = field(default_factory=VideoProfile)
     audio: AudioProfile = field(default_factory=AudioProfile)
+    egress: EgressProfile = field(default_factory=EgressProfile)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Media:
         return cls(
             video=VideoProfile.from_dict(d.get("video") or {}),
             audio=AudioProfile.from_dict(d.get("audio") or {}),
+            egress=EgressProfile.from_dict(d.get("egress") or {}),
         )
 
 

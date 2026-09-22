@@ -16,6 +16,8 @@ from dafter_core import (
     AgentState,
     Channel,
     EgressLayout,
+    EgressPreset,
+    EgressVideoCodec,
     ErrorCode,
     EventType,
     NoiseCancellation,
@@ -49,6 +51,8 @@ CASES = [
         CFG,
         ("$defs", "AudioProfile", "properties", "noiseCancellation", "enum"),
     ),
+    (EgressPreset, CFG, ("$defs", "EgressProfile", "properties", "preset", "enum")),
+    (EgressVideoCodec, CFG, ("$defs", "EgressProfile", "properties", "videoCodec", "enum")),
     (EgressLayout, CFG, ("$defs", "Recording", "properties", "layout", "enum")),
     (RecordingStart, CFG, ("$defs", "Recording", "properties", "startAt", "enum")),
 ]

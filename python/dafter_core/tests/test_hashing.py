@@ -18,7 +18,7 @@ SHARED_CONFIG = TESTDATA / "config" / "resolved-session-config.json"
 
 # Pinned to the same literal in go/internal/config/config_test.go. Either half
 # drifting fails on its own side rather than at a consumer's audit.
-CROSS_LANGUAGE_CONFIG_HASH = "e2cbfc6025890c0d0318fc2f734115aa0de90b27465906981f0124be808997f4"
+CROSS_LANGUAGE_CONFIG_HASH = "ef78983a74be44b82029a492662ac14e6ab23ca75f0e40fc977ddb2e01f5c7b3"
 
 
 @pytest.mark.parametrize(

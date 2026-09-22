@@ -83,6 +83,16 @@ var targets = []target{
 		Out: "internal/config/noise_gen.go", AllName: "AllNoiseCancellations",
 	},
 	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EgressProfile", "properties", "preset", "enum"},
+		Package: "config", Type: "EgressPreset", Prefix: "Preset",
+		Out: "internal/config/presets_gen.go", AllName: "AllEgressPresets",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EgressProfile", "properties", "videoCodec", "enum"},
+		Package: "config", Type: "EgressVideoCodec", Prefix: "EgressCodec",
+		Out: "internal/config/egress_codecs_gen.go", AllName: "AllEgressVideoCodecs",
+	},
+	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Recording", "properties", "layout", "enum"},
 		Package: "config", Type: "EgressLayout", Prefix: "Layout",
 		Out: "internal/config/layouts_gen.go", AllName: "AllEgressLayouts",

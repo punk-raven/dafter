@@ -86,6 +86,54 @@ func TestValidateRejectsScalabilityModeWithoutALayeredCodec(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsAPresetBesideExplicitEncodeFields(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Media = &config.Media{Egress: &config.EgressProfile{
+		Preset: config.PresetH264720p30, VideoBitrate: 3000,
+	}}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("a preset and a bitrate were both accepted: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/egress/preset") {
+		t.Errorf("no detail points at /media/egress/preset: %v", de)
+	}
+
+	c.Media.Egress.VideoBitrate = 0
+	if err := c.Validate(); err != nil {
+		t.Fatalf("a preset on its own was rejected: %v", err)
+	}
+}
+
+func TestValidateRejectsVideoEncodeSettingsOnAnAudioOnlyRecording(t *testing.T) {
+	t.Parallel()
+	off := false
+	c := validConfig(t)
+	c.Channel = config.ChannelTelephony
+	c.Media = &config.Media{
+		Video:  &config.VideoProfile{Enabled: &off},
+		Egress: &config.EgressProfile{Width: 1280, Height: 720, AudioBitrate: 64},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("recording is off, so the profile is inert and must pass: %v", err)
+	}
+
+	c.Recording = config.Recording{Enabled: true, Layout: config.LayoutRoomComposite, ConsentArtifactID: "consent_1"}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("an audio-only recording kept a video size: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/egress") {
+		t.Errorf("no detail points at /media/egress: %v", de)
+	}
+
+	c.Media.Egress = &config.EgressProfile{AudioBitrate: 64}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("an audio-only encode on an audio-only recording was rejected: %v", err)
+	}
+}
+
 func TestValidateRejectsRecordingWithoutConsent(t *testing.T) {
 	t.Parallel()
 	c := validConfig(t)
@@ -189,6 +237,8 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"VideoCodec", cfg, []string{"$defs", "VideoProfile", "properties", "codec", "enum"}, schema.Names(config.AllVideoCodecs)},
 		{"VideoResolution", cfg, []string{"$defs", "VideoProfile", "properties", "resolution", "enum"}, schema.Names(config.AllVideoResolutions)},
 		{"NoiseCancellation", cfg, []string{"$defs", "AudioProfile", "properties", "noiseCancellation", "enum"}, schema.Names(config.AllNoiseCancellations)},
+		{"EgressPreset", cfg, []string{"$defs", "EgressProfile", "properties", "preset", "enum"}, schema.Names(config.AllEgressPresets)},
+		{"EgressVideoCodec", cfg, []string{"$defs", "EgressProfile", "properties", "videoCodec", "enum"}, schema.Names(config.AllEgressVideoCodecs)},
 		{"EgressLayout", cfg, []string{"$defs", "Recording", "properties", "layout", "enum"}, schema.Names(config.AllEgressLayouts)},
 		{"RecordingStart", cfg, []string{"$defs", "Recording", "properties", "startAt", "enum"}, schema.Names(config.AllRecordingStarts)},
 	}
@@ -221,7 +271,8 @@ func catalog() *config.Catalog {
 					"maxBitrate": 1700000, "maxFramerate": 30,
 					"simulcast": true, "dynacast": true, "adaptiveStream": true
 				},
-				"audio": {"red": true, "dtx": true, "echoCancellation": true, "noiseCancellation": "native"}
+				"audio": {"red": true, "dtx": true, "echoCancellation": true, "noiseCancellation": "native"},
+				"egress": {"audioBitrate": 128}
 			},
 			"recording": {"enabled": false},
 			"budgets": {"turnGapP50Ms": 800, "turnGapP95Ms": 1500}
@@ -246,13 +297,19 @@ func catalog() *config.Catalog {
 			}`),
 		},
 		Channels: map[config.Channel]json.RawMessage{
-			config.ChannelWebRTC: json.RawMessage(`{"turn": {"endpointingDelayMs": 0}}`),
+			config.ChannelWebRTC: json.RawMessage(`{
+				"turn": {"endpointingDelayMs": 0},
+				"media": {"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}}
+			}`),
 			config.ChannelTelephony: json.RawMessage(`{
 				"turn": {"silenceMs": 900},
-				"media": {"video": {"enabled": false}}
+				"media": {"video": {"enabled": false}, "egress": {"audioBitrate": 64}}
 			}`),
 			config.ChannelLongForm: json.RawMessage(`{
-				"media": {"video": {"resolution": "h540", "maxBitrate": 800000, "maxFramerate": 25}}
+				"media": {
+					"video": {"resolution": "h540", "maxBitrate": 800000, "maxFramerate": 25},
+					"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}
+				}
 			}`),
 		},
 	}
@@ -329,6 +386,40 @@ func TestResolveTakesTheMediaProfileFromTheChannelAxis(t *testing.T) {
 	}
 	if lf.Media.Video.Codec != config.CodecVp9 {
 		t.Errorf("long_form overlay replaced the profile instead of overlaying it: codec = %s", lf.Media.Video.Codec)
+	}
+}
+
+func TestResolveTakesTheEgressProfileFromTheChannelAxis(t *testing.T) {
+	t.Parallel()
+	web := resolve(t, request()).Config
+	e := web.Egress()
+	if e == nil || e.Width != 1280 || e.Height != 720 || e.Framerate != 30 || e.VideoBitrate != 3000 {
+		t.Fatalf("webrtc resolved without the composite encode: %+v", e)
+	}
+	if e.VideoCodec != config.EgressCodecH264Main || e.AudioBitrate != 128 {
+		t.Errorf("codec %s at %d kbps audio; the defaults layer or the channel overlay was lost", e.VideoCodec, e.AudioBitrate)
+	}
+
+	tel := request()
+	tel.Language, tel.Channel = "hi", config.ChannelTelephony
+	tel.Overrides = json.RawMessage(`{"recording": {"enabled": true, "layout": "room_composite", "consentArtifactId": "consent_1"}}`)
+	telephony := resolve(t, tel).Config
+	if te := telephony.Egress(); te == nil || te.StatesVideo() || te.AudioBitrate != 64 {
+		t.Errorf("a telephony recording resolved with a video encode: %+v; the merge cannot delete a key, so the video encode has to live on the channels that carry video", te)
+	}
+}
+
+func TestResolveRejectsAVideoEncodeOnATelephonyRecording(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Language, req.Channel = "hi", config.ChannelTelephony
+	req.Overrides = json.RawMessage(`{
+		"recording": {"enabled": true, "layout": "room_composite", "consentArtifactId": "consent_1"},
+		"media": {"egress": {"width": 1280, "height": 720}}
+	}`)
+	de := resolveError(t, req)
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/egress") {
+		t.Errorf("no detail points at /media/egress: %v", de)
 	}
 }
 
@@ -589,7 +680,7 @@ func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "e2cbfc6025890c0d0318fc2f734115aa0de90b27465906981f0124be808997f4"
+	const want = "ef78983a74be44b82029a492662ac14e6ab23ca75f0e40fc977ddb2e01f5c7b3"
 	got, err := config.HashDocument(raw)
 	if err != nil {
 		t.Fatal(err)

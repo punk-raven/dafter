@@ -8,6 +8,7 @@ from dafter_core.config import parse
 from dafter_core.enums import (
     Channel,
     EgressLayout,
+    EgressPreset,
     ErrorCode,
     PrivacyMode,
     TurnStrategy,
@@ -144,6 +145,39 @@ def test_scalability_mode_needs_a_layered_codec() -> None:
     assert err.code is ErrorCode.INVALID_CONFIG
     assert "/media/video/scalabilityMode" in "\n".join(err.details)
     assert parse(doc(media={"video": {"codec": "vp9", "scalabilityMode": "L3T3_KEY"}}))
+
+
+def test_a_preset_beside_explicit_encode_fields_is_refused() -> None:
+    err = refuse(doc(media={"egress": {"preset": "h264_720p_30", "videoBitrate": 3000}}))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/media/egress/preset" in "\n".join(err.details)
+    cfg = parse(doc(media={"egress": {"preset": "h264_720p_30"}}))
+    assert cfg.media.egress.preset is EgressPreset.H264_720P_30
+
+
+def test_an_audio_only_recording_refuses_a_video_encode() -> None:
+    recording = {"enabled": True, "layout": "room_composite", "consentArtifactId": "consent_1"}
+    audio_only = {"video": {"enabled": False}}
+    video_encode = {"width": 1280, "height": 720, "audioBitrate": 64}
+
+    inert = parse(doc(channel="telephony", media={**audio_only, "egress": video_encode}))
+    assert inert.media.egress.width == 1280
+
+    err = refuse(
+        doc(channel="telephony", recording=recording, media={**audio_only, "egress": video_encode})
+    )
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/media/egress" in "\n".join(err.details)
+
+    ok = parse(
+        doc(
+            channel="telephony",
+            recording=recording,
+            media={**audio_only, "egress": {"audioBitrate": 64}},
+        )
+    )
+    assert ok.media.egress.audio_bitrate == 64
+    assert ok.media.egress.video_codec is None
 
 
 def test_recording_requires_consent() -> None:

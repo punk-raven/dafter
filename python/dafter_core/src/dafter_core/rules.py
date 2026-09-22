@@ -65,4 +65,27 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
             "codec produces, so with this codec it promises layering the session will not get"
         ),
     ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.media.egress.preset is not None and c.media.egress.states_explicit_fields
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/media/egress/preset",
+        because=(
+            "a preset and explicit encode fields are two answers to one question, and the "
+            "recording can only be encoded one way"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.recording.enabled and not c.media.video.enabled and c.media.egress.states_video
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/media/egress",
+        because=(
+            "the session publishes no video, so an egress profile that names a video size, "
+            "framerate, bitrate, codec or preset describes an encode of a stream that does "
+            "not exist"
+        ),
+    ),
 )

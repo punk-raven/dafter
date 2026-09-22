@@ -78,8 +78,9 @@ type Interruption struct {
 }
 
 type Media struct {
-	Video *VideoProfile `json:"video,omitempty"`
-	Audio *AudioProfile `json:"audio,omitempty"`
+	Video  *VideoProfile  `json:"video,omitempty"`
+	Audio  *AudioProfile  `json:"audio,omitempty"`
+	Egress *EgressProfile `json:"egress,omitempty"`
 }
 
 type VideoProfile struct {
@@ -118,6 +119,39 @@ func (c *ResolvedSessionConfig) video() *VideoProfile {
 
 func (v VideoCodec) Layered() bool {
 	return v == CodecVp9 || v == CodecAv1
+}
+
+// EgressProfile is how a composite recording is encoded. Bitrates are in
+// kbps, the unit the egress API takes, and are not the bps of VideoProfile.
+type EgressProfile struct {
+	Preset       EgressPreset     `json:"preset,omitempty"`
+	Width        int              `json:"width,omitempty"`
+	Height       int              `json:"height,omitempty"`
+	Framerate    int              `json:"framerate,omitempty"`
+	VideoBitrate int              `json:"videoBitrate,omitempty"`
+	AudioBitrate int              `json:"audioBitrate,omitempty"`
+	VideoCodec   EgressVideoCodec `json:"videoCodec,omitempty"`
+}
+
+// StatesVideo reports whether the profile names any video encode setting,
+// the preset included: every preset is a video preset.
+func (e *EgressProfile) StatesVideo() bool {
+	return e != nil && (e.Preset != "" || e.Width != 0 || e.Height != 0 ||
+		e.Framerate != 0 || e.VideoBitrate != 0 || e.VideoCodec != "")
+}
+
+// StatesExplicitFields reports whether the profile spells out any encode
+// setting rather than naming a preset.
+func (e *EgressProfile) StatesExplicitFields() bool {
+	return e != nil && (e.Width != 0 || e.Height != 0 || e.Framerate != 0 ||
+		e.VideoBitrate != 0 || e.AudioBitrate != 0 || e.VideoCodec != "")
+}
+
+func (c *ResolvedSessionConfig) Egress() *EgressProfile {
+	if c.Media == nil {
+		return nil
+	}
+	return c.Media.Egress
 }
 
 type Recording struct {
