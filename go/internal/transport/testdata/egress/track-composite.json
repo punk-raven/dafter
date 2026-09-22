@@ -1,0 +1,27 @@
+{
+  "roomName": "s_7f3a9c21",
+  "audioTrackId": "TR_AMabc123",
+  "videoTrackId": "TR_VCdef456",
+  "advanced": {
+    "width": 1280,
+    "height": 720,
+    "framerate": 30,
+    "audioBitrate": 128,
+    "videoCodec": "H264_MAIN",
+    "videoBitrate": 3000
+  },
+  "fileOutputs": [
+    {
+      "fileType": "MP4",
+      "filepath": "s_7f3a9c21/track_composite-{utc}",
+      "s3": {
+        "accessKey": "minioadmin",
+        "secret": "minioadmin",
+        "region": "us-east-1",
+        "endpoint": "http://127.0.0.1:9000",
+        "bucket": "dafter-recordings",
+        "forcePathStyle": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "roomName": "s_7f3a9c21",
+  "trackId": "TR_AMabc123",
+  "file": {
+    "filepath": "s_7f3a9c21/track-TR_AMabc123-{utc}",
+    "s3": {
+      "accessKey": "minioadmin",
+      "secret": "minioadmin",
+      "region": "us-east-1",
+      "endpoint": "http://127.0.0.1:9000",
+      "bucket": "dafter-recordings",
+      "forcePathStyle": true
+    }
+  }
+}
