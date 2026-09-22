@@ -19,6 +19,14 @@ type Session struct {
 	ConfigHash string
 	Config     json.RawMessage
 	CreatedAt  time.Time
+
+	// The session's shared media key under end-to-end encryption, base64url,
+	// empty for a session encrypted in transport only. It is stored so every
+	// join to the session is handed the same key, and it is a secret: the
+	// control plane holds it, which is exactly the limit of what this key
+	// model proves, so it is never logged and never placed in the resolved
+	// document, whose hash and contents are handed to anyone who joins.
+	EncryptionKey string
 }
 
 // Egress is one recording the control plane started for a session. The
@@ -51,12 +59,13 @@ type Store struct {
 
 const migration = `
 CREATE TABLE IF NOT EXISTS sessions (
-	session_id  TEXT PRIMARY KEY,
-	tenant_id   TEXT NOT NULL,
-	room        TEXT NOT NULL,
-	config_hash TEXT NOT NULL,
-	config      TEXT NOT NULL,
-	created_at  INTEGER NOT NULL
+	session_id     TEXT PRIMARY KEY,
+	tenant_id      TEXT NOT NULL,
+	room           TEXT NOT NULL,
+	config_hash    TEXT NOT NULL,
+	config         TEXT NOT NULL,
+	created_at     INTEGER NOT NULL,
+	encryption_key TEXT NOT NULL DEFAULT ''
 ) STRICT;
 CREATE TABLE IF NOT EXISTS egresses (
 	egress_id   TEXT PRIMARY KEY,
@@ -67,6 +76,13 @@ CREATE TABLE IF NOT EXISTS egresses (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS egresses_by_session ON egresses(session_id, started_at);
 `
+
+// Columns added after a store may already exist on disk, each applied only
+// when the table lacks it. The dev stack keeps its store across rebuilds, so
+// a fresh CREATE TABLE alone would leave an older file one column short.
+var addedColumns = []struct{ name, definition string }{
+	{"encryption_key", "TEXT NOT NULL DEFAULT ''"},
+}
 
 func Open(ctx context.Context, path string) (*Store, error) {
 	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
@@ -80,7 +96,37 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if _, err := db.ExecContext(ctx, migration); err != nil {
 		return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
 	}
+	if err := addMissingColumns(ctx, db); err != nil {
+		return nil, closing(db, err)
+	}
 	return &Store{db: db}, nil
+}
+
+func addMissingColumns(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info('sessions')`)
+	if err != nil {
+		return errs.Wrap(errs.CodeInternal, err, "inspect session store")
+	}
+	present := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return errors.Join(errs.Wrap(errs.CodeInternal, err, "inspect session store"), rows.Close())
+		}
+		present[name] = true
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return errs.Wrap(errs.CodeInternal, err, "inspect session store")
+	}
+	for _, c := range addedColumns {
+		if present[c.name] {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, `ALTER TABLE sessions ADD COLUMN `+c.name+` `+c.definition); err != nil {
+			return errs.Wrap(errs.CodeInternal, err, "migrate session store")
+		}
+	}
+	return nil
 }
 
 func closing(db *sql.DB, err error) error {
@@ -91,10 +137,10 @@ func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at, encryption_key)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		sess.SessionID, sess.TenantID, sess.Room, sess.ConfigHash,
-		string(sess.Config), sess.CreatedAt.UnixMicro())
+		string(sess.Config), sess.CreatedAt.UnixMicro(), sess.EncryptionKey)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "store session")
 	}
@@ -103,14 +149,14 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 
 func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT session_id, tenant_id, room, config_hash, config, created_at
+		`SELECT session_id, tenant_id, room, config_hash, config, created_at, encryption_key
 		 FROM sessions WHERE session_id = ?`, sessionID)
 
 	var sess Session
 	var config string
 	var createdAt int64
 	switch err := row.Scan(&sess.SessionID, &sess.TenantID, &sess.Room,
-		&sess.ConfigHash, &config, &createdAt); {
+		&sess.ConfigHash, &config, &createdAt, &sess.EncryptionKey); {
 	case errors.Is(err, sql.ErrNoRows):
 		return Session{}, ErrNotFound
 	case err != nil:

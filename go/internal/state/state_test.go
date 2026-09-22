@@ -3,6 +3,7 @@ package state_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -71,6 +72,85 @@ func TestSessionRoundTripsTheResolvedDocument(t *testing.T) {
 	}
 	if got.CreatedAt.Location() != time.UTC {
 		t.Errorf("created at came back in %s; a stored instant reads back as UTC, or every caller normalizes it instead", got.CreatedAt.Location())
+	}
+}
+
+func TestSessionKeepsTheEncryptionKeyOutOfTheDocument(t *testing.T) {
+	t.Parallel()
+	s := store(t)
+	keyed := session(t)
+	keyed.EncryptionKey = "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+	if err := s.CreateSession(t.Context(), keyed); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	got, err := s.Session(t.Context(), keyed.SessionID)
+	if err != nil {
+		t.Fatalf("read session: %v", err)
+	}
+	if got.EncryptionKey != keyed.EncryptionKey {
+		t.Errorf("key came back as %q; every join to this session must be handed the same key", got.EncryptionKey)
+	}
+	if bytes.Contains(got.Config, []byte(keyed.EncryptionKey)) {
+		t.Error("the key leaked into the stored document, which is handed to every joiner")
+	}
+
+	plain := session(t)
+	plain.SessionID = "s_00000001"
+	if err := s.CreateSession(t.Context(), plain); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Session(t.Context(), plain.SessionID); err != nil || got.EncryptionKey != "" {
+		t.Errorf("a session without a key came back with %q (%v)", got.EncryptionKey, err)
+	}
+}
+
+// A store written before the key column existed. Opening it must add the
+// column rather than fail, because the dev stack keeps its store across
+// container rebuilds.
+func TestOpeningAnOlderStoreAddsTheKeyColumn(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "dafter.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.ExecContext(t.Context(), `
+		CREATE TABLE sessions (
+			session_id  TEXT PRIMARY KEY,
+			tenant_id   TEXT NOT NULL,
+			room        TEXT NOT NULL,
+			config_hash TEXT NOT NULL,
+			config      TEXT NOT NULL,
+			created_at  INTEGER NOT NULL
+		) STRICT;
+		INSERT INTO sessions VALUES ('s_7f3a9c21', 't_9c21a4be', 'room', 'hash', '{}', 0);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := state.Open(t.Context(), path)
+	if err != nil {
+		t.Fatalf("open an older store: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	})
+	got, err := s.Session(t.Context(), "s_7f3a9c21")
+	if err != nil {
+		t.Fatalf("read a session stored before the column existed: %v", err)
+	}
+	if got.EncryptionKey != "" {
+		t.Errorf("an older session reads back with key %q", got.EncryptionKey)
+	}
+	keyed := session(t)
+	keyed.SessionID, keyed.EncryptionKey = "s_00000002", "k"
+	if err := s.CreateSession(t.Context(), keyed); err != nil {
+		t.Fatalf("store a keyed session in a migrated store: %v", err)
 	}
 }
 

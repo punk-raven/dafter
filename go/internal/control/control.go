@@ -2,6 +2,8 @@ package control
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -54,6 +56,33 @@ type createSessionResponse struct {
 	URL           string           `json:"url"`
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
+
+	// The session's shared media key, present only under end-to-end
+	// encryption and only for a role the privacy mode discloses it to. It
+	// travels beside the token rather than inside the document, because the
+	// document is hashed, stored and shown to every joiner, and a key in it
+	// would be a key for whoever reads the session afterwards.
+	EncryptionKey string `json:"encryptionKey,omitempty"`
+}
+
+// The key is 256 bits from the platform's entropy source, base64url so it
+// survives a JSON round trip and a URL. It is minted once per session and
+// stored, so every join is handed the same one.
+func mintEncryptionKey() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", errs.Wrap(errs.CodeInternal, err, "mint encryption key")
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// keyFor is the key a participant in this role is handed, or nothing. Like a
+// token grant it derives from the role and the mode, never from the request.
+func keyFor(cfg *config.ResolvedSessionConfig, sess state.Session, role config.Role) string {
+	if sess.EncryptionKey == "" || !cfg.PrivacyMode.DisclosesKeyTo(role) {
+		return ""
+	}
+	return sess.EncryptionKey
 }
 
 func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +128,14 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ConfigHash: resolved.Hash,
 		Config:     resolved.Document,
 		CreatedAt:  time.Now().UTC(),
+	}
+	if resolved.Config.MintsSharedKey() {
+		key, err := mintEncryptionKey()
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		sess.EncryptionKey = key
 	}
 	if err := s.Store.CreateSession(r.Context(), sess); err != nil {
 		s.fail(w, err)
@@ -148,6 +185,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		URL:           token.URL,
 		ExpiresAt:     token.ExpiresAt,
 		ICEServers:    iceServers,
+		EncryptionKey: keyFor(resolved.Config, sess, req.Role),
 	})
 }
 
@@ -165,6 +203,13 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 	sess, err := s.Store.Session(r.Context(), sessionID)
 	if err != nil {
 		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "session not found"))
+		return
+	}
+	// The stored document decides what a joiner is handed, so it is read the
+	// way any consumer reads it rather than trusted as bytes.
+	cfg, err := config.Parse(sess.Config)
+	if err != nil {
+		s.fail(w, errs.Wrap(errs.CodeInternal, err, "stored session document"))
 		return
 	}
 
@@ -216,6 +261,7 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 		URL:           token.URL,
 		ExpiresAt:     token.ExpiresAt,
 		ICEServers:    iceServers,
+		EncryptionKey: keyFor(cfg, sess, req.Role),
 	})
 }
 
