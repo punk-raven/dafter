@@ -28,7 +28,10 @@ type Service struct {
 func (s *Service) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /sessions", s.createSession)
+	mux.HandleFunc("GET /sessions/{sessionID}", s.readSession)
 	mux.HandleFunc("POST /sessions/{sessionID}/join", s.joinSession)
+	mux.HandleFunc("POST /sessions/{sessionID}/recording/start", s.startRecording)
+	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
 	return mux
 }
 
@@ -89,16 +92,29 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.Store.CreateSession(r.Context(), state.Session{
+	sess := state.Session{
 		SessionID:  sessionID,
 		TenantID:   resolved.Config.TenantID,
 		Room:       sessionID,
 		ConfigHash: resolved.Hash,
 		Config:     resolved.Document,
 		CreatedAt:  time.Now().UTC(),
-	}); err != nil {
+	}
+	if err := s.Store.CreateSession(r.Context(), sess); err != nil {
 		s.fail(w, err)
 		return
+	}
+
+	// Evidence-grade coverage: the room is created and the composite is
+	// live before the first token exists, so nobody can publish into an
+	// unrecorded room. The rules guarantee the layout, and a start the server
+	// refuses fails the create before a token is issued, the same as a mint
+	// failure would.
+	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
+		if _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true); err != nil {
+			s.fail(w, err)
+			return
+		}
 	}
 
 	token, err := s.Transport.MintToken(transport.Grant{
@@ -243,6 +259,8 @@ func statusFor(code errs.ErrorCode) int {
 		return http.StatusUnauthorized
 	case errs.CodeQuotaExceeded, errs.CodeBudgetExceeded, errs.CodeRateLimited:
 		return http.StatusTooManyRequests
+	case errs.CodeProviderUnavailable, errs.CodeProviderTimeout:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

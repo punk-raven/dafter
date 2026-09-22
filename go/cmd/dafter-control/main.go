@@ -46,6 +46,7 @@ func run() error {
 		envOr("DAFTER_LIVEKIT_URL", "ws://127.0.0.1:7880"),
 		os.Getenv("DAFTER_LIVEKIT_API_KEY"),
 		os.Getenv("DAFTER_LIVEKIT_API_SECRET"),
+		egressOptions()...,
 	)
 	if err != nil {
 		return fmt.Errorf("media transport: %w", err)
@@ -117,6 +118,28 @@ func run() error {
 		return err
 	}
 	return nil
+}
+
+// Recording storage is opt-in: without a bucket the control plane runs and
+// refuses recording starts, rather than failing to boot for a deployment
+// that records nothing. The values match deploy/egress.yaml for the dev
+// stack; a real deployment sets them per environment.
+func egressOptions() []transport.Option {
+	bucket := os.Getenv("DAFTER_EGRESS_S3_BUCKET")
+	if bucket == "" {
+		slog.Info("recording disabled: DAFTER_EGRESS_S3_BUCKET is not set")
+		return nil
+	}
+	storage := transport.EgressStorage{
+		Bucket:         bucket,
+		Endpoint:       os.Getenv("DAFTER_EGRESS_S3_ENDPOINT"),
+		Region:         os.Getenv("DAFTER_EGRESS_S3_REGION"),
+		AccessKey:      os.Getenv("DAFTER_EGRESS_S3_ACCESS_KEY"),
+		Secret:         os.Getenv("DAFTER_EGRESS_S3_SECRET"),
+		ForcePathStyle: os.Getenv("DAFTER_EGRESS_S3_FORCE_PATH_STYLE") == "true",
+	}
+	slog.Info("recording enabled", "bucket", bucket, "endpoint", storage.Endpoint)
+	return []transport.Option{transport.WithEgressStorage(storage)}
 }
 
 func catalogBytes(path string) ([]byte, error) {
