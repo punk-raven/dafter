@@ -23,8 +23,8 @@
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
   .video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
-  .video-tile { position: relative; background: #1a1a1a; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-  .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .video-tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  .video-tile video { width: 100%; height: 100%; object-fit: contain; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
   .stats-panel { border-top: 1px solid #222; background: #0c0c0c; max-height: 320px; display: flex; flex-direction: column; }
@@ -130,6 +130,10 @@
           <option value="h540">h540</option>
           <option value="h720">h720</option>
           <option value="h1080">h1080</option>
+        </select>
+        <label>Noise filter</label>
+        <select id="noise-cancellation">
+          <option value="" selected>follow the catalog</option>
         </select>
         <label>Recording</label>
         <select id="recording-layout">
@@ -249,7 +253,7 @@
 </div>
 
 <script>
-const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider } = LivekitClient;
+const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
 const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.e2ee.worker.mjs';
 
@@ -261,6 +265,8 @@ let syntheticVideo = false;
 let lastConfig = null;
 let syntheticAudioCtx = null;
 let lastRoomId = null;
+let noiseAudioCtx = null;
+let activeNoiseFilter = null;
 
 function log(msg, level = 'info') {
   const el = document.getElementById('log');
@@ -336,6 +342,122 @@ async function e2eeOptionsFor(data) {
   return { keyProvider, worker: e2eeWorker };
 }
 
+const RNNOISE_PKG = '@sapphi-red/web-noise-suppressor@0.4.1';
+const RNNOISE_BASE = `https://cdn.jsdelivr.net/npm/${RNNOISE_PKG}/dist`;
+
+const NOISE_FILTERS = {
+  off: {
+    label: 'off',
+    nativeSuppression: false,
+    createProcessor: null,
+  },
+  native: {
+    label: 'browser native',
+    nativeSuppression: true,
+    createProcessor: null,
+  },
+  rnnoise: {
+    label: 'rnnoise (wasm)',
+    nativeSuppression: false,
+    createProcessor: createRnnoiseProcessor,
+  },
+};
+
+function fillNoiseFilterChoices() {
+  const el = document.getElementById('noise-cancellation');
+  for (const [value, entry] of Object.entries(NOISE_FILTERS)) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = `${value} - ${entry.label}`;
+    el.appendChild(opt);
+  }
+}
+
+function noiseFilterFor(value) {
+  if (value === undefined) return null;
+  return NOISE_FILTERS[value] ||
+    { label: `${value} (no entry in this client)`, nativeSuppression: false, createProcessor: null, unknown: true };
+}
+
+async function createRnnoiseProcessor() {
+  if (typeof AudioWorkletNode === 'undefined') {
+    throw new Error('this browser has no AudioWorklet');
+  }
+  const wns = await import(`${RNNOISE_BASE}/index.js`);
+  const wasmBinary = await wns.loadRnnoise({
+    url: `${RNNOISE_BASE}/rnnoise.wasm`,
+    simdUrl: `${RNNOISE_BASE}/rnnoise_simd.wasm`,
+  });
+
+  let source = null;
+  let node = null;
+  let sink = null;
+
+  return {
+    name: 'rnnoise',
+    async init(opts) {
+      const ctx = opts.audioContext;
+      if (!ctx) throw new Error('no audio context on the track');
+      await ctx.audioWorklet.addModule(`${RNNOISE_BASE}/rnnoise/workletProcessor.js`);
+      source = ctx.createMediaStreamSource(new MediaStream([opts.track]));
+      node = new wns.RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary });
+      sink = ctx.createMediaStreamDestination();
+      source.connect(node);
+      node.connect(sink);
+      this.processedTrack = sink.stream.getAudioTracks()[0];
+    },
+    async restart(opts) {
+      await this.destroy();
+      await this.init(opts);
+    },
+    async destroy() {
+      if (node) { node.destroy(); node.disconnect(); node = null; }
+      if (source) { source.disconnect(); source = null; }
+      sink = null;
+      this.processedTrack = undefined;
+    },
+  };
+}
+
+async function publishMicrophone(room) {
+  const capture = Object.assign({}, room.options.audioCaptureDefaults);
+  const requested = ((lastConfig && lastConfig.media && lastConfig.media.audio) || {}).noiseCancellation;
+  const entry = noiseFilterFor(requested);
+  activeNoiseFilter = entry ? entry.label : 'sdk default';
+
+  if (entry && entry.unknown) {
+    log(`Profile names noise filter ${requested}, which this client has no entry for; publishing unfiltered`, 'error');
+  }
+  if (!entry || !entry.createProcessor) {
+    await room.localParticipant.setMicrophoneEnabled(true, capture);
+    log(`Microphone published; noise filter ${activeNoiseFilter}`, entry && entry.unknown ? 'warn' : 'success');
+    return;
+  }
+
+  let track = null;
+  try {
+    const processor = await entry.createProcessor();
+    track = await createLocalAudioTrack(capture);
+    noiseAudioCtx = new AudioContext({ sampleRate: 48000 });
+    await noiseAudioCtx.resume();
+    track.setAudioContext(noiseAudioCtx);
+    await track.setProcessor(processor);
+    if (!track.getProcessor() || !track.getProcessor().processedTrack) {
+      throw new Error('processor produced no track');
+    }
+    await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+    log(`Microphone published through ${requested} (${RNNOISE_PKG}); the browser's own suppression is off`, 'success');
+  } catch (err) {
+    log(`Noise filter ${requested} unavailable (${err.message}); falling back to the browser's own suppression`, 'error');
+    if (track) track.stop();
+    if (noiseAudioCtx) { noiseAudioCtx.close(); noiseAudioCtx = null; }
+    activeNoiseFilter = `${NOISE_FILTERS.native.label} (fallback from ${requested})`;
+    await room.localParticipant.setMicrophoneEnabled(
+      true, Object.assign({}, capture, { noiseSuppression: true }));
+    log(`Microphone published; noise filter ${activeNoiseFilter}`, 'warn');
+  }
+}
+
 function roomOptionsFrom(config) {
   const media = (config && config.media) || {};
   const video = media.video || {};
@@ -371,7 +493,8 @@ function roomOptionsFrom(config) {
 
   const capture = {};
   if (audio.echoCancellation !== undefined) capture.echoCancellation = audio.echoCancellation;
-  if (audio.noiseCancellation !== undefined) capture.noiseSuppression = audio.noiseCancellation === 'native';
+  const filter = noiseFilterFor(audio.noiseCancellation);
+  if (filter) capture.noiseSuppression = filter.nativeSuppression;
   if (Object.keys(capture).length) options.audioCaptureDefaults = capture;
 
   if (Object.keys(publish).length) options.publishDefaults = publish;
@@ -450,7 +573,7 @@ function startStats(data) {
     room: data.room,
     participantId: data.participantId,
     configHash: data.configHash,
-    profile: { video, audio, encryption: encryptionOf(data.config) },
+    profile: { video, audio, encryption: encryptionOf(data.config), noiseFilter: activeNoiseFilter },
     clientResolution: myResolution() || null,
   };
   statsSamples = [];
@@ -462,6 +585,7 @@ function startStats(data) {
     video.maxBitrate ? `<=${Math.round(video.maxBitrate / 1000)} kbps` : null,
     video.maxFramerate ? `<=${video.maxFramerate} fps` : null,
     encryptionOf(data.config).mode || null,
+    activeNoiseFilter ? `noise ${activeNoiseFilter}` : null,
   ].filter(Boolean).join(' · ');
   const override = statsContext.clientResolution;
   document.getElementById('stats-profile').textContent =
@@ -674,6 +798,8 @@ async function createSession() {
     const overrides = {};
     const resolution = document.getElementById('resolution').value;
     if (resolution) overrides.media = { video: { resolution } };
+    const noise = document.getElementById('noise-cancellation').value;
+    if (noise) overrides.media = Object.assign(overrides.media || {}, { audio: { noiseCancellation: noise } });
     const privacyMode = document.getElementById('privacy-mode').value;
     if (privacyMode) {
       overrides.privacyMode = privacyMode;
@@ -847,27 +973,29 @@ async function joinRoom() {
 
     log('Connected! Publishing tracks...', 'success');
 
-    if (!publishesVideo) {
+    let micPublished = false;
+    try {
+      await publishMicrophone(room);
+      micPublished = true;
+    } catch (micErr) {
+      log(`No microphone (${micErr.message})`, publishesVideo ? 'warn' : 'error');
+      activeNoiseFilter = null;
+    }
+
+    if (publishesVideo) {
       try {
-        await room.localParticipant.setMicrophoneEnabled(true);
-        log('Microphone published; this channel carries no video', 'success');
-      } catch (micErr) {
-        log(`No microphone (${micErr.message})`, 'error');
-      }
-    } else {
-      try {
-        await room.localParticipant.enableCameraAndMicrophone();
-        log('Camera and microphone published', 'success');
-      } catch (mediaErr) {
-        log(`No camera (${mediaErr.message}), trying microphone only...`, 'warn');
-        try {
-          await room.localParticipant.setMicrophoneEnabled(true);
-          log('Microphone published (no camera)', 'success');
-        } catch (micErr) {
-          log(`No microphone either (${micErr.message}), publishing synthetic test pattern...`, 'warn');
+        await room.localParticipant.setCameraEnabled(true);
+        log('Camera published', 'success');
+      } catch (camErr) {
+        log(`No camera (${camErr.message})`, 'warn');
+        if (!micPublished) {
+          log('No microphone either, publishing synthetic test pattern...', 'warn');
           await publishTestPattern(room);
+          activeNoiseFilter = 'none (synthetic audio)';
         }
       }
+    } else if (micPublished) {
+      log('This channel carries no video', 'success');
     }
 
     const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
@@ -909,6 +1037,11 @@ function cleanup() {
     syntheticAudioCtx.close();
     syntheticAudioCtx = null;
   }
+  if (noiseAudioCtx) {
+    noiseAudioCtx.close();
+    noiseAudioCtx = null;
+  }
+  activeNoiseFilter = null;
   room = null;
   if (e2eeWorker) {
     e2eeWorker.terminate();
@@ -1015,7 +1148,6 @@ function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
     const el = track.attach();
     el.style.width = '100%';
     el.style.height = '100%';
-    el.style.objectFit = 'cover';
     if (mirror) el.style.transform = 'scaleX(-1)';
     tile.insertBefore(el, tile.firstChild);
   }
@@ -1099,7 +1231,7 @@ async function publishTestPattern(room) {
   vid.srcObject = videoStream;
   vid.autoplay = true;
   vid.muted = true;
-  vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  vid.style.cssText = 'width:100%;height:100%';
   tile.appendChild(vid);
   const label = document.createElement('span');
   label.className = 'label';
@@ -1159,6 +1291,8 @@ function copyJoinLink() {
     setTimeout(() => { btn.textContent = 'Copy join link'; }, 1500);
   });
 }
+
+fillNoiseFilterChoices();
 
 (function seedFromURL() {
   const roomParam = new URLSearchParams(window.location.search).get('room');
