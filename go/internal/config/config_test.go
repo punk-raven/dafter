@@ -86,6 +86,27 @@ func TestValidateRejectsScalabilityModeWithoutALayeredCodec(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsEveryNoiseFilterAndNothingElse(t *testing.T) {
+	t.Parallel()
+	for _, filter := range config.AllNoiseCancellations {
+		c := validConfig(t)
+		c.Media = &config.Media{Audio: &config.AudioProfile{NoiseCancellation: filter}}
+		if err := c.Validate(); err != nil {
+			t.Errorf("noise filter %s rejected: %v", filter, err)
+		}
+	}
+
+	c := validConfig(t)
+	c.Media = &config.Media{Audio: &config.AudioProfile{NoiseCancellation: "krisp"}}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("a filter nothing implements was accepted: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/audio/noiseCancellation") {
+		t.Errorf("no detail points at /media/audio/noiseCancellation: %v", de)
+	}
+}
+
 func TestValidateRejectsAPresetBesideExplicitEncodeFields(t *testing.T) {
 	t.Parallel()
 	c := validConfig(t)
