@@ -27,10 +27,6 @@ func store(t *testing.T) *state.Store {
 	return s
 }
 
-// The store keeps bytes and never reads them, so this is the test's own
-// document and not the shared cross-language vector, which belongs to the
-// config and hashing tests. It is spelled awkwardly on purpose: a store that
-// tidies what it was handed breaks the hash taken before the bytes arrived.
 const storedDocument = `{"b": "\u00e5 \u0906",
   "a": [1, 2.50, null, "</script>"],
   "nested": {"quote": "\"", "slash": "a/b", "": "empty key"}}`
@@ -104,9 +100,6 @@ func TestSessionKeepsTheEncryptionKeyOutOfTheDocument(t *testing.T) {
 	}
 }
 
-// A store written before the key column existed. Opening it must add the
-// column rather than fail, because the dev stack keeps its store across
-// container rebuilds.
 func TestOpeningAnOlderStoreAddsTheKeyColumn(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "dafter.db")

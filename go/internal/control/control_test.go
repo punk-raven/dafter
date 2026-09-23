@@ -24,8 +24,6 @@ import (
 	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
-// The catalog the binary ships with, so what the tests resolve is what an
-// operator gets rather than a fixture that agrees with them.
 const catalogPath = "../../cmd/dafter-control/catalog.json"
 
 const tenantID = "t_9c21a4be"
@@ -114,8 +112,6 @@ func serve(t *testing.T) *harness {
 	svc := &control.Service{
 		Catalog: catalog, Store: store, Transport: tport, TokenTTL: 15 * time.Minute,
 	}
-	// The binary serves MetricsHandler, so that is what the tests drive; a
-	// route on Handler alone would pass here and 404 in the container.
 	server := httptest.NewServer(svc.MetricsHandler())
 	t.Cleanup(server.Close)
 	return &harness{server: server, store: store, transport: tport}
@@ -257,8 +253,6 @@ func TestTheSameRequestResolvesToTheSameHash(t *testing.T) {
 	if first.SessionID == second.SessionID {
 		t.Fatal("two sessions were minted the same id")
 	}
-	// Only the identity fields differ, so the documents differ and the hashes
-	// with them; strip them and the same request must hash the same.
 	if stripIdentity(t, first.Config) != stripIdentity(t, second.Config) {
 		t.Fatal("the same request resolved to two different documents")
 	}
@@ -459,8 +453,6 @@ func trustedAgentRequest(language string) string {
 		"overrides":{"privacyMode":"trusted_agent"}}`
 }
 
-// joinAs is the raw join body, so a test can assert on the wire shape rather
-// than on what a decoder was willing to fill in.
 func (h *harness) joinAs(t *testing.T, sessionID string, role config.Role) (sessionResponse, []byte) {
 	t.Helper()
 	status, raw := h.join(t, sessionID, `{"role":"`+string(role)+`"}`)
@@ -689,8 +681,6 @@ func TestSessionCreatedEvenWhenTURNFails(t *testing.T) {
 		t.Errorf("expected no iceServers on TURN failure, got %v", got.ICEServers)
 	}
 }
-
-// --- recording ---
 
 type recordingView struct {
 	EgressID  string     `json:"egressId"`

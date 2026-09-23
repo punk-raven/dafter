@@ -251,17 +251,14 @@
 <script>
 const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider } = LivekitClient;
 
-// The frame cryptor runs in a worker shipped beside the pinned bundle. A Worker
-// script must be same-origin, so the source is fetched from the CDN, which
-// allows it cross-origin, and started from a blob URL on this origin.
 const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.e2ee.worker.mjs';
 
 let room = null;
 let e2eeWorker = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
-let syntheticVideo = false;   // the test pattern is not a selfie view, so it is never mirrored
-let lastConfig = null;        // the joined session's resolved document, for returning to its profile
+let syntheticVideo = false;
+let lastConfig = null;
 let syntheticAudioCtx = null;
 let lastRoomId = null;
 
@@ -324,9 +321,6 @@ async function startE2EEWorker() {
   return new Worker(url, { type: 'module' });
 }
 
-// The room's e2ee option, or nothing. A session encrypted end to end whose join
-// carried no key is deliberately joined without one: the participant lands in
-// the room and cannot decode anyone, which is what a missing key must look like.
 async function e2eeOptionsFor(data) {
   const encryption = encryptionOf(data.config);
   if (encryption.mode !== 'e2ee') return null;
@@ -440,12 +434,12 @@ async function applyMyResolution() {
 }
 
 const STATS_INTERVAL_MS = 1000;
-const STATS_MAX_SAMPLES = 3600;   // one hour at one per second
+const STATS_MAX_SAMPLES = 3600;
 
 let statsTimer = null;
 let statsSamples = [];
-let statsPrev = new Map();        // stream key -> { bytes, at } from the previous tick
-let statsContext = null;          // session id, config hash, and the profile ceilings
+let statsPrev = new Map();
+let statsContext = null;
 
 function startStats(data) {
   stopStats();
@@ -507,7 +501,7 @@ async function collectStats() {
     try {
       report = await track.getRTCStatsReport();
     } catch (err) {
-      continue;   // a track can go away mid-sample; that is not an error worth logging
+      continue;
     }
     if (!report) continue;
 
@@ -604,7 +598,7 @@ function renderStats(sample) {
 
   const upSeries = statsSamples
     .map((s) => s.rows.filter((r) => r.dir === 'up' && r.kbps != null).reduce((t, r) => t + r.kbps, 0))
-    .filter((v, i) => i > 0);   // the first tick has no delta to measure
+    .filter((v, i) => i > 0);
   const peak = upSeries.length ? Math.max(...upSeries) : 0;
   const mean = upSeries.length ? Math.round(upSeries.reduce((a, b) => a + b, 0) / upSeries.length) : 0;
 
@@ -690,8 +684,6 @@ async function createSession() {
     }
     if (Object.keys(overrides).length) body.overrides = overrides;
 
-    // A consent artifact is a gate the control plane enforces; the test
-    // client hands it a placeholder id, which is all a POC can do.
     const layout = document.getElementById('recording-layout').value;
     if (layout) {
       body.overrides = body.overrides || {};
@@ -933,12 +925,6 @@ function cleanup() {
   document.getElementById('panel-recording').style.display = 'none';
 }
 
-// --- recording ---
-//
-// Start and stop call the control plane, which starts the egress from the
-// session's stored config. The client only supplies the track ids the track
-// layouts attach to, because it is the one party that knows them.
-
 let recordingSessionId = null;
 
 function showRecordingPanel(data) {
@@ -1158,7 +1144,6 @@ async function monitorICE() {
         });
       }
     } catch (e) {
-      // Stats not available yet
     }
     setTimeout(poll, 2000);
   };

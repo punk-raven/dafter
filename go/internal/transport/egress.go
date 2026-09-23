@@ -16,12 +16,6 @@ import (
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
 
-// The egress service is driven over the media server's Twirp JSON API rather
-// than through its SDK, which stays out of this module by design. Field
-// names below are the protobuf JSON names from livekit_egress.proto at
-// protocol v1.50.1, the version the dev stack's egress v1.14.1 is built
-// against, and are pinned in testdata/egress.
-
 const (
 	twirpPrefix           = "/twirp/livekit.Egress/"
 	twirpRoomPrefix       = "/twirp/livekit.RoomService/"
@@ -32,15 +26,10 @@ const (
 	methodStop            = "StopEgress"
 	serviceTokenTTL       = time.Minute
 	fileTypeMP4           = "MP4"
-	filenameTimeToken     = "{utc}" // expanded by the egress service at write time
+	filenameTimeToken     = "{utc}"
 	filenameLayoutDivider = "-"
 )
 
-// A service token is minted per API call, lives for one minute and is never
-// returned to anything. It is the only token in the system that carries
-// roomRecord or roomCreate, each for the one call that needs it, and it is a
-// different type from the participant grant so that MintToken cannot be
-// talked into issuing it.
 type serviceGrant struct {
 	RoomRecord bool   `json:"roomRecord,omitempty"`
 	RoomCreate bool   `json:"roomCreate,omitempty"`
@@ -112,9 +101,6 @@ type stopEgressRequest struct {
 	EgressID string `json:"egressId"`
 }
 
-// protojson writes int64 as a JSON string; a hand-written server may write
-// a number. Both are accepted so the parse does not depend on which side of
-// that rule the server is on.
 type int64JSON int64
 
 func (n *int64JSON) UnmarshalJSON(b []byte) error {
@@ -131,10 +117,6 @@ func (n *int64JSON) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// The media server answers with the proto field names (egress_id), which
-// protojson permits alongside the lowerCamel names it accepts on input; the
-// SFU at v1.13.7 does the former. Both spellings are read so a server built
-// the other way still parses.
 type egressInfoJSON struct {
 	EgressID       string    `json:"egress_id"`
 	EgressIDCamel  string    `json:"egressId"`
@@ -203,9 +185,6 @@ func (l *LiveKit) StartEgress(ctx context.Context, req EgressRequest) (EgressInf
 	return l.egressCall(ctx, method, req.Room, body)
 }
 
-// createRoom is idempotent on the media server: an existing room of that
-// name is returned unchanged, so a create raced by the first participant
-// costs nothing.
 func (l *LiveKit) createRoom(ctx context.Context, room string) error {
 	token, err := l.serviceToken(serviceGrant{RoomCreate: true})
 	if err != nil {
@@ -253,8 +232,6 @@ func (l *LiveKit) egressRequest(req EgressRequest) (string, any, error) {
 		if req.TrackID == "" {
 			return "", nil, errs.Errorf(errs.CodeInvalidConfig, "a track egress needs a track id")
 		}
-		// No encode: the published bytes are written as they arrive and the
-		// service picks the container from the track's own codec.
 		return methodTrack, trackEgressRequest{
 			RoomName: req.Room,
 			TrackID:  req.TrackID,
@@ -291,18 +268,12 @@ func encoding(p *config.EgressProfile) (preset string, advanced *encodingOptions
 
 func encodedFile(req EgressRequest, upload *s3Upload) encodedFileOutput {
 	out := encodedFileOutput{Filepath: filename(req, ""), S3: upload}
-	// Audio-only is left to the service, which picks the container from the
-	// audio codec; naming MP4 there would transcode the audio to AAC for no
-	// reason.
 	if !req.AudioOnly {
 		out.FileType = fileTypeMP4
 	}
 	return out
 }
 
-// filename is {sessionId}/{layout}[-{discriminator}]-{utc}; the service
-// expands {utc} and appends the extension the container implies, so one
-// session's recordings share a prefix and each object says its layout.
 func filename(req EgressRequest, discriminator string) string {
 	parts := []string{string(req.Layout)}
 	if discriminator != "" {
@@ -340,8 +311,6 @@ func (l *LiveKit) serviceToken(grant serviceGrant) (string, error) {
 	return signed, nil
 }
 
-// call posts one Twirp request and returns the raw reply, or the service's
-// refusal mapped onto the platform taxonomy.
 func (l *LiveKit) call(ctx context.Context, path, token string, body any) ([]byte, error) {
 	method := path[strings.LastIndex(path, "/")+1:]
 	payload, err := json.Marshal(body)
@@ -398,9 +367,6 @@ func nanos(n int64) time.Time {
 	return time.Unix(0, n).UTC()
 }
 
-// Twirp error codes map onto the platform taxonomy; the service's message
-// goes into the details, where an operator reads it, and the top-level
-// message stays a fixed string.
 func twirpFailure(method string, status int, raw []byte) *errs.Error {
 	var te twirpError
 	_ = json.Unmarshal(raw, &te)

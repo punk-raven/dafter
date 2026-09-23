@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runs two ways:
-#   ./scripts/setup.sh                                   inside a checkout
-#   curl -fsSL <raw url of this file> | bash [-s -- -y]  before there is one
-# Piped, there is no file to locate the checkout from, so it clones into
-# $DAFTER_DIR (default ./dafter), at $DAFTER_REF if set, after the
-# prerequisites are in place.
 repo_url=https://github.com/punk-raven/dafter.git
 checkout=
 if [ -f "${BASH_SOURCE[0]:-}" ] && [ -f "$(dirname "${BASH_SOURCE[0]}")/../Makefile" ]; then
@@ -27,7 +21,6 @@ done
 have() { command -v "$1" >/dev/null 2>&1; }
 die() { printf 'setup: %s\n' "$*" >&2; exit 1; }
 
-# Asks on the terminal, not stdin: when piped from curl, stdin is this script.
 confirm() {
   if [ "$assume_yes" -eq 1 ]; then
     return 0
@@ -43,8 +36,6 @@ confirm() {
   esac
 }
 
-# Install command for this machine, or nothing when there is no package manager
-# it knows. Arguments: what the tool is called in apt, dnf and pacman.
 package_installer() {
   local apt=$1 dnf=$2 pacman=$3
   if [ "$(uname -s)" = Darwin ]; then
@@ -62,8 +53,6 @@ installer_for_git() { package_installer git git git; }
 installer_for_make() { package_installer build-essential make make; }
 installer_for_uv() { echo 'curl -LsSf https://astral.sh/uv/install.sh | sh'; }
 
-# `go test -race` links through cgo, which needs a C compiler. Go's default is
-# gcc on Linux and clang on macOS; either one, or whatever $CC names, will do.
 installer_for_cc() { package_installer build-essential gcc gcc; }
 
 installer_for_go() {
@@ -74,7 +63,6 @@ installer_for_go() {
   fi
 }
 
-# A tool is present when its own probe says so, or, failing one, when it is on PATH.
 present_cc() { have "${CC:-}" || have gcc || have clang || have cc; }
 present() {
   if declare -F "present_$1" >/dev/null; then "present_$1"; else have "$1"; fi

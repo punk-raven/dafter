@@ -18,9 +18,6 @@ if TYPE_CHECKING:
 
 
 def required_encryption(mode: PrivacyMode) -> EncryptionMode:
-    """The encryption mode a privacy mode implies. The control plane stamps it
-    into the media profile at resolution, and a layer stating a different one
-    is refused here."""
     return EncryptionMode.TRANSPORT if mode is PrivacyMode.OPEN else EncryptionMode.E2EE
 
 

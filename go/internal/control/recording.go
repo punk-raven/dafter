@@ -17,22 +17,18 @@ import (
 	"github.com/punk-raven/dafter/go/internal/transport"
 )
 
-// Ids minted by the media server. Opaque by construction, so they are safe
-// in a log line and in an object key.
 var (
 	trackIDPattern  = regexp.MustCompile(`^TR_[A-Za-z0-9]{1,64}$`)
 	egressIDPattern = regexp.MustCompile(`^EG_[A-Za-z0-9]{1,64}$`)
 )
 
 type startRecordingRequest struct {
-	// track_composite: one or both. track: exactly TrackID.
 	AudioTrackID string `json:"audioTrackId,omitempty"`
 	VideoTrackID string `json:"videoTrackId,omitempty"`
 	TrackID      string `json:"trackId,omitempty"`
 }
 
 type stopRecordingRequest struct {
-	// Empty stops every recording the session has running.
 	EgressID string `json:"egressId,omitempty"`
 }
 
@@ -83,10 +79,6 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// startEgress asks the media server for a recording of the session in its
-// stored layout, then records the answer. The row is written after the call
-// because the egress id is the server's to mint; a start the server refused
-// leaves nothing behind.
 func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, req startRecordingRequest, beforeFirstJoin bool) (transport.EgressInfo, error) {
 	layout := cfg.Recording.Layout
 	if layout == "" {
@@ -113,9 +105,6 @@ func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *conf
 	if err := s.Store.AddEgress(ctx, state.Egress{
 		EgressID: info.EgressID, SessionID: sess.SessionID, Layout: string(layout), StartedAt: startedAt,
 	}); err != nil {
-		// The server is recording something the store does not know about;
-		// that is worse than no recording, so undo it rather than report a
-		// success the read endpoint cannot corroborate.
 		if _, stopErr := s.Transport.StopEgress(ctx, info.EgressID); stopErr != nil {
 			s.log().Error("egress running but not recorded; stop failed", "egress", info.EgressID, "error", stopErr)
 		}
@@ -216,9 +205,6 @@ func (s *Service) storedSession(w http.ResponseWriter, r *http.Request) (state.S
 	return sess, true
 }
 
-// recordableSession is the consent gate, applied to the stored document at
-// every recording call and not only at resolution: a session that was
-// resolved without recording cannot be recorded by asking nicely later.
 func (s *Service) recordableSession(w http.ResponseWriter, r *http.Request) (state.Session, *config.ResolvedSessionConfig, bool) {
 	sess, ok := s.storedSession(w, r)
 	if !ok {
@@ -277,8 +263,6 @@ func located(code errs.ErrorCode, pointer, because string) *errs.Error {
 	return e
 }
 
-// decodeOptional reads a JSON body that may be absent; a recording call
-// with nothing to say sends nothing.
 func (s *Service) decodeOptional(w http.ResponseWriter, r *http.Request, into any, what string) bool {
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	d.DisallowUnknownFields()

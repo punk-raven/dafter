@@ -784,9 +784,6 @@ func TestResolveRejectsAnOverrideTheSchemaForbids(t *testing.T) {
 	}
 }
 
-// Shared with the Python half, which reads the same files. The RFC 8785 vectors are
-// vendored from the reference implementation both libraries descend from; see
-// testdata/rfc8785/README.md.
 const (
 	testdataDir    = "../../../testdata"
 	rfc8785Vectors = testdataDir + "/rfc8785"
@@ -866,9 +863,6 @@ func TestHashIgnoresInputSpellingButNotContent(t *testing.T) {
 	}
 }
 
-// The hash is the contract between the Go and Python halves, so it is pinned
-// here and to the same literal in python/dafter_core/tests/test_hashing.py.
-// Either half drifting fails on its own side rather than at a consumer's audit.
 func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile(sharedConfig)

@@ -58,3 +58,6 @@ build/
 
 # Media load test output (scripts/loadtest-media.sh)
 .loadtest-media/
+
+# Media plan, kept as a local document outside the repo
+/docs/media-plan.md

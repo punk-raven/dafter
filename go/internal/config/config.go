@@ -13,8 +13,6 @@ type ResolvedSessionConfig struct {
 	SessionID  string `json:"sessionId"`
 	TenantID   string `json:"tenantId"`
 
-	// SHA-256 over the RFC 8785 canonicalization, ConfigHash omitted. Swapping the
-	// scheme stops every issued hash reproducing.
 	ConfigHash string `json:"configHash,omitempty"`
 
 	PrivacyMode PrivacyMode `json:"privacyMode"`
@@ -122,8 +120,6 @@ func (v VideoCodec) Layered() bool {
 	return v == CodecVp9 || v == CodecAv1
 }
 
-// EgressProfile is how a composite recording is encoded. Bitrates are in
-// kbps, the unit the egress API takes, and are not the bps of VideoProfile.
 type EgressProfile struct {
 	Preset       EgressPreset     `json:"preset,omitempty"`
 	Width        int              `json:"width,omitempty"`
@@ -134,15 +130,11 @@ type EgressProfile struct {
 	VideoCodec   EgressVideoCodec `json:"videoCodec,omitempty"`
 }
 
-// StatesVideo reports whether the profile names any video encode setting,
-// the preset included: every preset is a video preset.
 func (e *EgressProfile) StatesVideo() bool {
 	return e != nil && (e.Preset != "" || e.Width != 0 || e.Height != 0 ||
 		e.Framerate != 0 || e.VideoBitrate != 0 || e.VideoCodec != "")
 }
 
-// StatesExplicitFields reports whether the profile spells out any encode
-// setting rather than naming a preset.
 func (e *EgressProfile) StatesExplicitFields() bool {
 	return e != nil && (e.Width != 0 || e.Height != 0 || e.Framerate != 0 ||
 		e.VideoBitrate != 0 || e.AudioBitrate != 0 || e.VideoCodec != "")
@@ -160,8 +152,6 @@ type EncryptionProfile struct {
 	KeyModel KeyModel       `json:"keyModel,omitempty"`
 }
 
-// Encryption is the mode the privacy mode implies. Resolution stamps it into
-// the media profile, and a layer stating a different one is a cross-field error.
 func (m PrivacyMode) Encryption() EncryptionMode {
 	if m == PrivacyOpen {
 		return EncryptionTransport
@@ -169,10 +159,6 @@ func (m PrivacyMode) Encryption() EncryptionMode {
 	return EncryptionE2EE
 }
 
-// DisclosesKeyTo reports whether a participant in this role is handed the
-// session's shared media key. The agent role gets it only where the mode says
-// so by name: trusted_agent is the disclosed exception, and sealed means the
-// humans alone can decrypt.
 func (m PrivacyMode) DisclosesKeyTo(role Role) bool {
 	switch role {
 	case RoleParticipant, RolePresenter, RoleObserver:
@@ -184,8 +170,6 @@ func (m PrivacyMode) DisclosesKeyTo(role Role) bool {
 	}
 }
 
-// EncryptionMode is what the media profile states, transport when it states
-// nothing, because transport encryption is what a media server does unasked.
 func (c *ResolvedSessionConfig) EncryptionMode() EncryptionMode {
 	if c.Media == nil || c.Media.Encryption == nil || c.Media.Encryption.Mode == "" {
 		return EncryptionTransport
@@ -193,10 +177,6 @@ func (c *ResolvedSessionConfig) EncryptionMode() EncryptionMode {
 	return c.Media.Encryption.Mode
 }
 
-// MintsSharedKey reports whether the control plane mints this session's media
-// key: end-to-end encryption under the server_shared key model. Another key
-// model is one nobody but the consumer holds, and the control plane mints
-// nothing for it.
 func (c *ResolvedSessionConfig) MintsSharedKey() bool {
 	return c.EncryptionMode() == EncryptionE2EE &&
 		c.Media != nil && c.Media.Encryption != nil &&
