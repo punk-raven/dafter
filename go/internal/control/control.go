@@ -57,17 +57,9 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	// The session's shared media key, present only under end-to-end
-	// encryption and only for a role the privacy mode discloses it to. It
-	// travels beside the token rather than inside the document, because the
-	// document is hashed, stored and shown to every joiner, and a key in it
-	// would be a key for whoever reads the session afterwards.
 	EncryptionKey string `json:"encryptionKey,omitempty"`
 }
 
-// The key is 256 bits from the platform's entropy source, base64url so it
-// survives a JSON round trip and a URL. It is minted once per session and
-// stored, so every join is handed the same one.
 func mintEncryptionKey() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -76,8 +68,6 @@ func mintEncryptionKey() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// keyFor is the key a participant in this role is handed, or nothing. Like a
-// token grant it derives from the role and the mode, never from the request.
 func keyFor(cfg *config.ResolvedSessionConfig, sess state.Session, role config.Role) string {
 	if sess.EncryptionKey == "" || !cfg.PrivacyMode.DisclosesKeyTo(role) {
 		return ""
@@ -142,11 +132,6 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Evidence-grade coverage: the room is created and the composite is
-	// live before the first token exists, so nobody can publish into an
-	// unrecorded room. The rules guarantee the layout, and a start the server
-	// refuses fails the create before a token is issued, the same as a mint
-	// failure would.
 	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
 		if _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true); err != nil {
 			s.fail(w, err)
@@ -205,8 +190,6 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "session not found"))
 		return
 	}
-	// The stored document decides what a joiner is handed, so it is read the
-	// way any consumer reads it rather than trusted as bytes.
 	cfg, err := config.Parse(sess.Config)
 	if err != nil {
 		s.fail(w, errs.Wrap(errs.CodeInternal, err, "stored session document"))

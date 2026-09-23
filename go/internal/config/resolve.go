@@ -115,17 +115,10 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 	return doc, nil
 }
 
-// stampEncryption writes the encryption mode the privacy mode implies into the
-// media profile, and the key model the control plane serves, wherever the
-// layers left them unsaid. Only what is absent is filled in: a layer that
-// states a contradicting mode keeps it, and the cross-field rules refuse the
-// document with the pointer at the contradiction rather than having it
-// silently corrected. The hashed document therefore says how the session was
-// encrypted, instead of leaving a reader to infer it from the privacy mode.
 func stampEncryption(doc map[string]any) {
 	mode, ok := doc["privacyMode"].(string)
 	if !ok || !PrivacyMode(mode).Valid() {
-		return // schema validation reports the privacy mode itself
+		return
 	}
 	media, _ := doc["media"].(map[string]any)
 	if media == nil {

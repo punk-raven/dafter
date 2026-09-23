@@ -24,9 +24,6 @@
 
   .video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
   .video-tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-  /* contain, not cover: a portrait publisher is letterboxed rather than
-     centre-cropped, so the tile shows the frame that was actually published
-     and matches what a composite recording of the same track looks like. */
   .video-tile video { width: 100%; height: 100%; object-fit: contain; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
@@ -258,21 +255,18 @@
 <script>
 const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
-// The frame cryptor runs in a worker shipped beside the pinned bundle. A Worker
-// script must be same-origin, so the source is fetched from the CDN, which
-// allows it cross-origin, and started from a blob URL on this origin.
 const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.e2ee.worker.mjs';
 
 let room = null;
 let e2eeWorker = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
-let syntheticVideo = false;   // the test pattern is not a selfie view, so it is never mirrored
-let lastConfig = null;        // the joined session's resolved document, for returning to its profile
+let syntheticVideo = false;
+let lastConfig = null;
 let syntheticAudioCtx = null;
 let lastRoomId = null;
-let noiseAudioCtx = null;     // 48 kHz, the rate the RNNoise worklet assumes
-let activeNoiseFilter = null; // what is actually in the audio path, which a fallback changes
+let noiseAudioCtx = null;
+let activeNoiseFilter = null;
 
 function log(msg, level = 'info') {
   const el = document.getElementById('log');
@@ -333,9 +327,6 @@ async function startE2EEWorker() {
   return new Worker(url, { type: 'module' });
 }
 
-// The room's e2ee option, or nothing. A session encrypted end to end whose join
-// carried no key is deliberately joined without one: the participant lands in
-// the room and cannot decode anyone, which is what a missing key must look like.
 async function e2eeOptionsFor(data) {
   const encryption = encryptionOf(data.config);
   if (encryption.mode !== 'e2ee') return null;
@@ -351,26 +342,6 @@ async function e2eeOptionsFor(data) {
   return { keyProvider, worker: e2eeWorker };
 }
 
-// --- noise filters ------------------------------------------------------
-//
-// One entry per member of `media.audio.noiseCancellation`, and that is the
-// whole extension point. An entry says two things: whether the browser's own
-// suppression is asked for as a capture constraint, and, for a filter that is
-// not the browser's, how to build the track processor that runs instead.
-//
-// Adding a licensed filter is one enum member in
-// schemas/config/v1/resolved-session-config.schema.json and one entry here.
-// Nothing else in this client knows the member names.
-//
-// The two are never both on. Stacking suppressors makes each one's output the
-// other's input, and a filter trained on speech-plus-noise fed already-gated
-// speech removes syllables. Echo cancellation is a different job and stays on
-// in every mode; it is the `echoCancellation` field, not this one.
-
-// Pinned exactly like the SDK above, and for the same reason: this client is
-// one file with no build step, so a version lives in a URL or it lives
-// nowhere. @sapphi-red/web-noise-suppressor is MIT with no dependencies and
-// wraps xiph/rnnoise (BSD).
 const RNNOISE_PKG = '@sapphi-red/web-noise-suppressor@0.4.1';
 const RNNOISE_BASE = `https://cdn.jsdelivr.net/npm/${RNNOISE_PKG}/dist`;
 
@@ -392,8 +363,6 @@ const NOISE_FILTERS = {
   },
 };
 
-// The create form offers exactly what the registry can serve, so registering a
-// filter is the only edit a new member needs on this side.
 function fillNoiseFilterChoices() {
   const el = document.getElementById('noise-cancellation');
   for (const [value, entry] of Object.entries(NOISE_FILTERS)) {
@@ -404,19 +373,12 @@ function fillNoiseFilterChoices() {
   }
 }
 
-// A member the schema allows and this client has no entry for is the one case
-// the registry cannot answer. It is not silently treated as `off`: the caller
-// says so, and the status line carries the value the document asked for.
 function noiseFilterFor(value) {
   if (value === undefined) return null;
   return NOISE_FILTERS[value] ||
     { label: `${value} (no entry in this client)`, nativeSuppression: false, createProcessor: null, unknown: true };
 }
 
-// A LiveKit audio TrackProcessor: `init` is handed the unpublished capture
-// track and must leave `processedTrack` on the processor, which is what gets
-// published. The graph is capture -> RNNoise worklet -> destination, so the
-// only track the room ever sees is the filtered one.
 async function createRnnoiseProcessor() {
   if (typeof AudioWorkletNode === 'undefined') {
     throw new Error('this browser has no AudioWorklet');
@@ -457,13 +419,6 @@ async function createRnnoiseProcessor() {
   };
 }
 
-// Publishes the microphone with whatever the profile's filter entry says. A
-// processor is attached to the capture track before `publishTrack`, never
-// after, so no unfiltered frame reaches the room. Everything that can fail -
-// no AudioWorklet, a CDN that does not answer, a worklet that will not build -
-// falls back to the browser's own suppression and says so in the log and in
-// the status line, because a filter that quietly did nothing is the failure
-// this setting exists to avoid.
 async function publishMicrophone(room) {
   const capture = Object.assign({}, room.options.audioCaptureDefaults);
   const requested = ((lastConfig && lastConfig.media && lastConfig.media.audio) || {}).noiseCancellation;
@@ -484,7 +439,7 @@ async function publishMicrophone(room) {
     const processor = await entry.createProcessor();
     track = await createLocalAudioTrack(capture);
     noiseAudioCtx = new AudioContext({ sampleRate: 48000 });
-    await noiseAudioCtx.resume();   // a suspended graph publishes silence, not filtered audio
+    await noiseAudioCtx.resume();
     track.setAudioContext(noiseAudioCtx);
     await track.setProcessor(processor);
     if (!track.getProcessor() || !track.getProcessor().processedTrack) {
@@ -602,12 +557,12 @@ async function applyMyResolution() {
 }
 
 const STATS_INTERVAL_MS = 1000;
-const STATS_MAX_SAMPLES = 3600;   // one hour at one per second
+const STATS_MAX_SAMPLES = 3600;
 
 let statsTimer = null;
 let statsSamples = [];
-let statsPrev = new Map();        // stream key -> { bytes, at } from the previous tick
-let statsContext = null;          // session id, config hash, and the profile ceilings
+let statsPrev = new Map();
+let statsContext = null;
 
 function startStats(data) {
   stopStats();
@@ -670,7 +625,7 @@ async function collectStats() {
     try {
       report = await track.getRTCStatsReport();
     } catch (err) {
-      continue;   // a track can go away mid-sample; that is not an error worth logging
+      continue;
     }
     if (!report) continue;
 
@@ -767,7 +722,7 @@ function renderStats(sample) {
 
   const upSeries = statsSamples
     .map((s) => s.rows.filter((r) => r.dir === 'up' && r.kbps != null).reduce((t, r) => t + r.kbps, 0))
-    .filter((v, i) => i > 0);   // the first tick has no delta to measure
+    .filter((v, i) => i > 0);
   const peak = upSeries.length ? Math.max(...upSeries) : 0;
   const mean = upSeries.length ? Math.round(upSeries.reduce((a, b) => a + b, 0) / upSeries.length) : 0;
 
@@ -855,8 +810,6 @@ async function createSession() {
     }
     if (Object.keys(overrides).length) body.overrides = overrides;
 
-    // A consent artifact is a gate the control plane enforces; the test
-    // client hands it a placeholder id, which is all a POC can do.
     const layout = document.getElementById('recording-layout').value;
     if (layout) {
       body.overrides = body.overrides || {};
@@ -1020,10 +973,6 @@ async function joinRoom() {
 
     log('Connected! Publishing tracks...', 'success');
 
-    // The microphone is published on its own rather than with the camera,
-    // because the profile's noise filter has to be attached to the capture
-    // track before it is published and enableCameraAndMicrophone does both in
-    // one step.
     let micPublished = false;
     try {
       await publishMicrophone(room);
@@ -1108,12 +1057,6 @@ function cleanup() {
   document.getElementById('ice-info').style.display = 'none';
   document.getElementById('panel-recording').style.display = 'none';
 }
-
-// --- recording ---
-//
-// Start and stop call the control plane, which starts the egress from the
-// session's stored config. The client only supplies the track ids the track
-// layouts attach to, because it is the one party that knows them.
 
 let recordingSessionId = null;
 
@@ -1333,7 +1276,6 @@ async function monitorICE() {
         });
       }
     } catch (e) {
-      // Stats not available yet
     }
     setTimeout(poll, 2000);
   };

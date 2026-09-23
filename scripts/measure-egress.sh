@@ -1,33 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Measure the capture-start gap for each egress layout.
-#
-# This drives lk directly, at the egress service's default encode, because it
-# measures both layouts against one room and a session's layout is fixed in
-# its config. Recordings themselves are started by the control plane
-# (POST /sessions/{id}/recording/start), which encodes from the session's
-# stored profile; see docs/media-plan.md, stage 4. Use this script only for
-# the gap number.
-#
-# Requires:
-#   - The POC stack running (make poc)
-#   - The control plane running
-#   - lk CLI (go install github.com/livekit/livekit-cli/cmd/lk@latest)
-#   - mc CLI (MinIO client, bundled in the minio/mc docker image)
-#   - An active room with at least one publishing participant
-#
-# Usage:
-#   ./scripts/measure-egress.sh <room-name>
-#
-# Measures:
-#   1. Room composite egress - one combined recording of all tracks
-#   2. Track egress - separate file per track
-#
-# The script starts each egress, polls MinIO for the first object, and
-# reports the wall-clock gap between the start request and the first
-# bytes arriving.
-
 ROOM="${1:?usage: measure-egress.sh <room-name>}"
 
 LK_URL="${DAFTER_LIVEKIT_URL:-ws://127.0.0.1:7880}"
@@ -46,7 +19,6 @@ mc_cmd() {
   docker compose exec -T minio mc "$@" 2>/dev/null
 }
 
-# Ensure MinIO alias is configured inside the minio container.
 docker compose exec -T minio mc alias set "$MINIO_ALIAS" http://localhost:9000 minioadmin minioadmin >/dev/null 2>&1 || true
 
 count_objects() {
@@ -83,7 +55,6 @@ echo "Room: $ROOM"
 echo "LiveKit: $LK_URL"
 echo ""
 
-# --- Room composite ---
 echo "--- Room composite egress ---"
 prefix_composite="composite-${ROOM}-$(date +%s)"
 
@@ -104,7 +75,6 @@ gap=$(wait_for_object "$prefix_composite" "$start_ms")
 echo "Room composite capture-start gap: ${gap}ms"
 echo ""
 
-# --- Track egress ---
 echo "--- Track egress ---"
 prefix_track="track-${ROOM}-$(date +%s)"
 

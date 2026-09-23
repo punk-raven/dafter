@@ -37,8 +37,6 @@ func livekit(t *testing.T) transport.Transport {
 	return lk
 }
 
-// Decoded and verified with the standard library rather than with a JWT
-// package, so the test cannot agree with the minter by sharing its bugs.
 func verified(t *testing.T, raw string) (header, payload map[string]any) {
 	t.Helper()
 	parts := strings.Split(raw, ".")
@@ -244,8 +242,6 @@ func TestTheAdapterRefusesAnUnusableConfiguration(t *testing.T) {
 	}
 }
 
-// --- egress ---
-
 const (
 	sessionID    = "s_7f3a9c21"
 	audioTrackID = "TR_AMabc123"
@@ -271,9 +267,6 @@ type twirpCall struct {
 	body   []byte
 }
 
-// A fake egress service that records what it was asked and answers as the
-// real one does: protojson, so int64 timestamps are strings and the status is
-// the enum's name.
 func egressServer(t *testing.T, reply string, status int) (*httptest.Server, *[]twirpCall) {
 	t.Helper()
 	calls := &[]twirpCall{}
@@ -305,8 +298,6 @@ func egressServer(t *testing.T, reply string, status int) (*httptest.Server, *[]
 	return srv, calls
 }
 
-// As the SFU at v1.13.7 answers: proto field names, int64 as strings, the
-// enum by name, and unset fields emitted.
 const startedReply = `{"egress_id":"EG_abc123","room_id":"RM_x","room_name":"s_7f3a9c21","source_type":"EGRESS_SOURCE_TYPE_WEB","status":"EGRESS_STARTING","started_at":"1758535200000000000","ended_at":"0","updated_at":"0","room_composite":{"room_name":"s_7f3a9c21"},"error":"","error_code":0}`
 
 func recorder(t *testing.T, srv *httptest.Server, opts ...transport.Option) transport.Transport {
@@ -360,8 +351,6 @@ func TestEachLayoutSendsExactlyItsPinnedRequest(t *testing.T) {
 			Room: room, SessionID: sessionID, Layout: config.LayoutTrackComposite, Encoding: compositeEncoding(),
 			AudioTrackID: audioTrackID, VideoTrackID: videoTrackID,
 		}},
-		// A track egress carries no encoding even when the profile has one:
-		// the service copies the published bytes and there is nothing to set.
 		{"track.json", "Egress/StartTrackEgress", transport.EgressRequest{
 			Room: room, SessionID: sessionID, Layout: config.LayoutTrack, Encoding: compositeEncoding(),
 			TrackID: audioTrackID,
@@ -444,7 +433,6 @@ func TestARoomCompositeStartedBeforeTheFirstJoinCreatesTheRoomFirst(t *testing.T
 		t.Errorf("create room request differs from the pinned fixture\n got: %s\nwant: %s", got, want)
 	}
 
-	// Each call carries the one grant it needs and nothing more.
 	_, create := verified(t, (*calls)[0].token)
 	_, start := verified(t, (*calls)[1].token)
 	if g := create["video"].(map[string]any); g["roomCreate"] != true || g["roomRecord"] != nil {
@@ -468,8 +456,6 @@ func TestARoomCompositeStartedBeforeTheFirstJoinCreatesTheRoomFirst(t *testing.T
 
 func TestStopSendsTheEgressID(t *testing.T) {
 	t.Parallel()
-	// The lowerCamel spelling protojson also permits, so a server built the
-	// other way still parses.
 	const reply = `{"egressId":"EG_abc123","roomName":"s_7f3a9c21","status":"EGRESS_ENDING","startedAt":"1758535200000000000","endedAt":"1758535260000000000"}`
 	srv, calls := egressServer(t, reply, http.StatusOK)
 	info, err := recorder(t, srv).StopEgress(t.Context(), egressID)

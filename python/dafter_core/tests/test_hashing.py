@@ -9,15 +9,10 @@ from dafter_core.enums import ErrorCode
 from dafter_core.errors import DafterError
 from dafter_core.hashing import canonicalize, hash_document, seal
 
-# Shared with the Go half, which reads the same files. The RFC 8785 vectors are
-# vendored from the reference implementation both libraries descend from; see
-# testdata/rfc8785/README.md.
 TESTDATA = Path(__file__).resolve().parents[3] / "testdata"
 RFC8785_VECTORS = TESTDATA / "rfc8785"
 SHARED_CONFIG = TESTDATA / "config" / "resolved-session-config.json"
 
-# Pinned to the same literal in go/internal/config/config_test.go. Either half
-# drifting fails on its own side rather than at a consumer's audit.
 CROSS_LANGUAGE_CONFIG_HASH = "afbac94fda3552ab176ee1fa701f7d9f30023591d92ef2f2aceeea5a32a9d156"
 
 

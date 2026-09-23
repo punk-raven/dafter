@@ -120,10 +120,6 @@ func run() error {
 	return nil
 }
 
-// Recording storage is opt-in: without a bucket the control plane runs and
-// refuses recording starts, rather than failing to boot for a deployment
-// that records nothing. The values match deploy/egress.yaml for the dev
-// stack; a real deployment sets them per environment.
 func egressOptions() []transport.Option {
 	bucket := os.Getenv("DAFTER_EGRESS_S3_BUCKET")
 	if bucket == "" {

@@ -18,15 +18,6 @@ help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_.-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-# ---------------------------------------------------------------------------
-# Codegen
-#
-# There is one definition of an event, ever, and it lives in schemas/. Go cannot
-# //go:embed across a module boundary and Python cannot read a resource outside
-# its package, so the schemas are copied into each one - here, at build time.
-# Nothing this target writes is committed, which is what generate-check proves.
-# ---------------------------------------------------------------------------
-
 .PHONY: generate
 generate: ## Refresh everything derived from schemas/
 	@cd $(GO_DIR) && go run ./tools/enumgen ../$(SCHEMA_DIR) . ../$(PY_CORE)/enums.py
@@ -46,10 +37,6 @@ generate-check: ## Fail if any generated output was committed
 		echo "$$tracked"; \
 		exit 1; \
 	fi
-
-# ---------------------------------------------------------------------------
-# Go
-# ---------------------------------------------------------------------------
 
 .PHONY: build
 build: generate ## Build
@@ -102,10 +89,6 @@ setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Pyth
 .PHONY: check
 check: generate-check vet lint test py-lint py-test ## What CI runs
 
-# ---------------------------------------------------------------------------
-# Dev stack
-# ---------------------------------------------------------------------------
-
 .PHONY: dev
 dev: setup ## Build and start the full dev stack
 	docker compose up -d --build
@@ -125,9 +108,6 @@ loadtest: ## Run the load test against the dev stack (USERS=100 DURATION=60s)
 		-users $${USERS:-100} \
 		-duration $${DURATION:-60s}
 
-# lk is fetched as a release binary rather than go-installed: the video
-# clips its publishers loop are Git LFS objects, and a module-proxy build
-# embeds the LFS pointer files, so its publishers connect but send no frames.
 $(LK):
 	@./scripts/install-lk.sh "$(LK_VERSION)" "$(LK)"
 

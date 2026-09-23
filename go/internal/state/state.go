@@ -20,24 +20,15 @@ type Session struct {
 	Config     json.RawMessage
 	CreatedAt  time.Time
 
-	// The session's shared media key under end-to-end encryption, base64url,
-	// empty for a session encrypted in transport only. It is stored so every
-	// join to the session is handed the same key, and it is a secret: the
-	// control plane holds it, which is exactly the limit of what this key
-	// model proves, so it is never logged and never placed in the resolved
-	// document, whose hash and contents are handed to anyone who joins.
 	EncryptionKey string
 }
 
-// Egress is one recording the control plane started for a session. The
-// media server's own id is the key; a track layout starts one per track and
-// a stopped recording may be followed by another, so a session holds many.
 type Egress struct {
 	EgressID  string
 	SessionID string
 	Layout    string
 	StartedAt time.Time
-	StoppedAt time.Time // zero while running
+	StoppedAt time.Time
 }
 
 func (e Egress) Active() bool { return e.StoppedAt.IsZero() }
@@ -77,9 +68,6 @@ CREATE TABLE IF NOT EXISTS egresses (
 CREATE INDEX IF NOT EXISTS egresses_by_session ON egresses(session_id, started_at);
 `
 
-// Columns added after a store may already exist on disk, each applied only
-// when the table lacks it. The dev stack keeps its store across rebuilds, so
-// a fresh CREATE TABLE alone would leave an older file one column short.
 var addedColumns = []struct{ name, definition string }{
 	{"encryption_key", "TEXT NOT NULL DEFAULT ''"},
 }

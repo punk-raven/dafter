@@ -187,9 +187,6 @@ class AudioProfile:
 
 @dataclass(frozen=True, slots=True)
 class EgressProfile:
-    """How a composite recording is encoded. Bitrates are kbps, the unit the
-    egress API takes, and are not the bps of VideoProfile."""
-
     preset: EgressPreset | None = None
     width: int = 0
     height: int = 0
@@ -200,8 +197,6 @@ class EgressProfile:
 
     @property
     def states_video(self) -> bool:
-        """Names any video encode setting, the preset included: every preset
-        is a video preset."""
         return bool(
             self.preset is not None
             or self.width
@@ -244,15 +239,10 @@ class EncryptionProfile:
 
     @property
     def stated_mode(self) -> EncryptionMode:
-        """What the profile states, transport when it states nothing: that is
-        what a media server does unasked."""
         return self.mode if self.mode is not None else EncryptionMode.TRANSPORT
 
     @property
     def mints_shared_key(self) -> bool:
-        """Whether the control plane mints this session's media key: end to end
-        under the server_shared model. Any other model is a key the control
-        plane never sees."""
         return self.stated_mode is EncryptionMode.E2EE and self.key_model is KeyModel.SERVER_SHARED
 
     @classmethod
@@ -283,9 +273,6 @@ class Media:
 
 
 def discloses_key_to(mode: PrivacyMode, role: Role) -> bool:
-    """Whether a participant in this role is handed the session's shared media
-    key. The agent gets it only where the mode says so by name: trusted_agent is
-    the disclosed exception, and sealed means the humans alone can decrypt."""
     if role in (Role.PARTICIPANT, Role.PRESENTER, Role.OBSERVER):
         return mode is not PrivacyMode.OPEN
     if role is Role.AGENT:

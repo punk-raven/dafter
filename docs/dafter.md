@@ -359,8 +359,7 @@ proves encryption against the media server and the network but not against
 Dafter; the consumer-held key the `trusted_agent` row names is Phase 2. And
 recording is refused outright under both end-to-end modes rather than falling
 back to a client-side or consumer-keyed path, because every egress layout the
-platform has is server-side and sees ciphertext. `docs/media-plan.md` stage 5
-carries the mechanism, the key model and the rest of the deferred list.
+platform has is server-side and sees ciphertext.
 
 **Envelope encryption.** Each recording gets a unique data key (fast, local); the data key is wrapped by the tenant master key and stored beside the object. This buys per-object isolation, cheap bulk crypto, revocation by disabling the master key, and rotation without re-encrypting media.
 

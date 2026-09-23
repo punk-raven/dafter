@@ -40,16 +40,12 @@ type LiveKit struct {
 	secret  string
 	now     func() time.Time
 
-	// Egress is off until storage is configured; a recording with nowhere to
-	// land is refused at the start call rather than failing in the service.
 	storage *EgressStorage
 	client  *http.Client
 }
 
 type Option func(*LiveKit) error
 
-// WithEgressStorage enables StartEgress. Validated here, at construction,
-// rather than on the first recording.
 func WithEgressStorage(s EgressStorage) Option {
 	return func(l *LiveKit) error {
 		if s.Bucket == "" || s.AccessKey == "" || s.Secret == "" {

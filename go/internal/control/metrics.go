@@ -91,7 +91,6 @@ func normalizePath(p string) string {
 	if !strings.HasPrefix(p, "/sessions/") {
 		return p
 	}
-	// Session ids are high-cardinality; every route under one collapses.
 	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
