@@ -69,7 +69,10 @@ func (r *statusRecorder) WriteHeader(code int) {
 func (s *Service) MetricsHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /sessions", s.metricsCreateSession)
+	mux.HandleFunc("GET /sessions/{sessionID}", s.readSession)
 	mux.HandleFunc("POST /sessions/{sessionID}/join", s.metricsJoinSession)
+	mux.HandleFunc("POST /sessions/{sessionID}/recording/start", s.startRecording)
+	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()
@@ -82,13 +85,18 @@ func (s *Service) MetricsHandler() http.Handler {
 }
 
 func normalizePath(p string) string {
-	if strings.HasPrefix(p, "/sessions/") && strings.HasSuffix(p, "/join") {
-		return "/sessions/{id}/join"
-	}
 	if p == "/sessions" {
 		return "/sessions"
 	}
-	return p
+	if !strings.HasPrefix(p, "/sessions/") {
+		return p
+	}
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop"} {
+		if strings.HasSuffix(p, suffix) {
+			return "/sessions/{id}" + suffix
+		}
+	}
+	return "/sessions/{id}"
 }
 
 func (s *Service) metricsCreateSession(w http.ResponseWriter, r *http.Request) {

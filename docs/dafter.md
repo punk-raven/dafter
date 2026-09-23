@@ -353,6 +353,14 @@ Tools carry two classifications. **`latency_class`** governs delay hiding: `fast
 | `sealed` | Full | **Refused at the API** | Client-side only, or none |
 | `trusted_agent` | Full, agent holds a key | Allowed, disclosed | Consumer-held key |
 
+**What ships today is narrower than that table, in two stated ways.** The
+end-to-end key is one per session, minted and held by the control plane, so it
+proves encryption against the media server and the network but not against
+Dafter; the consumer-held key the `trusted_agent` row names is Phase 2. And
+recording is refused outright under both end-to-end modes rather than falling
+back to a client-side or consumer-keyed path, because every egress layout the
+platform has is server-side and sees ciphertext.
+
 **Envelope encryption.** Each recording gets a unique data key (fast, local); the data key is wrapped by the tenant master key and stored beside the object. This buys per-object isolation, cheap bulk crypto, revocation by disabling the master key, and rotation without re-encrypting media.
 
 **The seal stage.** Egress writes to object storage directly and cannot apply the envelope itself, so sealing is an explicit stage in the processing plane:

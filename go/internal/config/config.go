@@ -76,8 +76,10 @@ type Interruption struct {
 }
 
 type Media struct {
-	Video *VideoProfile `json:"video,omitempty"`
-	Audio *AudioProfile `json:"audio,omitempty"`
+	Video      *VideoProfile      `json:"video,omitempty"`
+	Audio      *AudioProfile      `json:"audio,omitempty"`
+	Egress     *EgressProfile     `json:"egress,omitempty"`
+	Encryption *EncryptionProfile `json:"encryption,omitempty"`
 }
 
 type VideoProfile struct {
@@ -116,6 +118,69 @@ func (c *ResolvedSessionConfig) video() *VideoProfile {
 
 func (v VideoCodec) Layered() bool {
 	return v == CodecVp9 || v == CodecAv1
+}
+
+type EgressProfile struct {
+	Preset       EgressPreset     `json:"preset,omitempty"`
+	Width        int              `json:"width,omitempty"`
+	Height       int              `json:"height,omitempty"`
+	Framerate    int              `json:"framerate,omitempty"`
+	VideoBitrate int              `json:"videoBitrate,omitempty"`
+	AudioBitrate int              `json:"audioBitrate,omitempty"`
+	VideoCodec   EgressVideoCodec `json:"videoCodec,omitempty"`
+}
+
+func (e *EgressProfile) StatesVideo() bool {
+	return e != nil && (e.Preset != "" || e.Width != 0 || e.Height != 0 ||
+		e.Framerate != 0 || e.VideoBitrate != 0 || e.VideoCodec != "")
+}
+
+func (e *EgressProfile) StatesExplicitFields() bool {
+	return e != nil && (e.Width != 0 || e.Height != 0 || e.Framerate != 0 ||
+		e.VideoBitrate != 0 || e.AudioBitrate != 0 || e.VideoCodec != "")
+}
+
+func (c *ResolvedSessionConfig) Egress() *EgressProfile {
+	if c.Media == nil {
+		return nil
+	}
+	return c.Media.Egress
+}
+
+type EncryptionProfile struct {
+	Mode     EncryptionMode `json:"mode,omitempty"`
+	KeyModel KeyModel       `json:"keyModel,omitempty"`
+}
+
+func (m PrivacyMode) Encryption() EncryptionMode {
+	if m == PrivacyOpen {
+		return EncryptionTransport
+	}
+	return EncryptionE2EE
+}
+
+func (m PrivacyMode) DisclosesKeyTo(role Role) bool {
+	switch role {
+	case RoleParticipant, RolePresenter, RoleObserver:
+		return m != PrivacyOpen
+	case RoleAgent:
+		return m == PrivacyTrustedAgent
+	default:
+		return false
+	}
+}
+
+func (c *ResolvedSessionConfig) EncryptionMode() EncryptionMode {
+	if c.Media == nil || c.Media.Encryption == nil || c.Media.Encryption.Mode == "" {
+		return EncryptionTransport
+	}
+	return c.Media.Encryption.Mode
+}
+
+func (c *ResolvedSessionConfig) MintsSharedKey() bool {
+	return c.EncryptionMode() == EncryptionE2EE &&
+		c.Media != nil && c.Media.Encryption != nil &&
+		c.Media.Encryption.KeyModel == KeyModelServerShared
 }
 
 type Recording struct {

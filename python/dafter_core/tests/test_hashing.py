@@ -13,7 +13,7 @@ TESTDATA = Path(__file__).resolve().parents[3] / "testdata"
 RFC8785_VECTORS = TESTDATA / "rfc8785"
 SHARED_CONFIG = TESTDATA / "config" / "resolved-session-config.json"
 
-CROSS_LANGUAGE_CONFIG_HASH = "e2cbfc6025890c0d0318fc2f734115aa0de90b27465906981f0124be808997f4"
+CROSS_LANGUAGE_CONFIG_HASH = "afbac94fda3552ab176ee1fa701f7d9f30023591d92ef2f2aceeea5a32a9d156"
 
 
 @pytest.mark.parametrize(

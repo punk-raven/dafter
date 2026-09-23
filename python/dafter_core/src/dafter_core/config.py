@@ -8,10 +8,15 @@ from .enums import (
     AgentMode,
     Channel,
     EgressLayout,
+    EgressPreset,
+    EgressVideoCodec,
+    EncryptionMode,
     ErrorCode,
+    KeyModel,
     NoiseCancellation,
     PrivacyMode,
     RecordingStart,
+    Role,
     TurnStrategy,
     VideoCodec,
     VideoResolution,
@@ -181,16 +186,98 @@ class AudioProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class EgressProfile:
+    preset: EgressPreset | None = None
+    width: int = 0
+    height: int = 0
+    framerate: int = 0
+    video_bitrate: int = 0
+    audio_bitrate: int = 0
+    video_codec: EgressVideoCodec | None = None
+
+    @property
+    def states_video(self) -> bool:
+        return bool(
+            self.preset is not None
+            or self.width
+            or self.height
+            or self.framerate
+            or self.video_bitrate
+            or self.video_codec is not None
+        )
+
+    @property
+    def states_explicit_fields(self) -> bool:
+        return bool(
+            self.width
+            or self.height
+            or self.framerate
+            or self.video_bitrate
+            or self.audio_bitrate
+            or self.video_codec is not None
+        )
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> EgressProfile:
+        preset = d.get("preset")
+        codec = d.get("videoCodec")
+        return cls(
+            preset=EgressPreset(preset) if preset else None,
+            width=d.get("width", 0),
+            height=d.get("height", 0),
+            framerate=d.get("framerate", 0),
+            video_bitrate=d.get("videoBitrate", 0),
+            audio_bitrate=d.get("audioBitrate", 0),
+            video_codec=EgressVideoCodec(codec) if codec else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EncryptionProfile:
+    mode: EncryptionMode | None = None
+    key_model: KeyModel | None = None
+
+    @property
+    def stated_mode(self) -> EncryptionMode:
+        return self.mode if self.mode is not None else EncryptionMode.TRANSPORT
+
+    @property
+    def mints_shared_key(self) -> bool:
+        return self.stated_mode is EncryptionMode.E2EE and self.key_model is KeyModel.SERVER_SHARED
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> EncryptionProfile:
+        mode = d.get("mode")
+        key_model = d.get("keyModel")
+        return cls(
+            mode=EncryptionMode(mode) if mode else None,
+            key_model=KeyModel(key_model) if key_model else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Media:
     video: VideoProfile = field(default_factory=VideoProfile)
     audio: AudioProfile = field(default_factory=AudioProfile)
+    egress: EgressProfile = field(default_factory=EgressProfile)
+    encryption: EncryptionProfile = field(default_factory=EncryptionProfile)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Media:
         return cls(
             video=VideoProfile.from_dict(d.get("video") or {}),
             audio=AudioProfile.from_dict(d.get("audio") or {}),
+            egress=EgressProfile.from_dict(d.get("egress") or {}),
+            encryption=EncryptionProfile.from_dict(d.get("encryption") or {}),
         )
+
+
+def discloses_key_to(mode: PrivacyMode, role: Role) -> bool:
+    if role in (Role.PARTICIPANT, Role.PRESENTER, Role.OBSERVER):
+        return mode is not PrivacyMode.OPEN
+    if role is Role.AGENT:
+        return mode is PrivacyMode.TRUSTED_AGENT
+    return False
 
 
 @dataclass(frozen=True, slots=True)

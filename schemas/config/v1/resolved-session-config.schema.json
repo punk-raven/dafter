@@ -130,10 +130,51 @@
     "Media": {
       "type": "object",
       "unevaluatedProperties": false,
-      "description": "How a participant publishes. Every one of these is applied by the publishing client and the media server only routes what it is handed, which is exactly why the platform states them: an unset knob is a library default nobody chose, and a session whose profile is not in the resolved document cannot be explained after the call.",
+      "description": "How a participant publishes, and how a recording of the room is encoded. All but egress are applied by the publishing client and the media server only routes what it is handed, which is exactly why the platform states them: an unset knob is a library default nobody chose, and a session whose profile is not in the resolved document cannot be explained after the call.",
       "properties": {
         "video": { "$ref": "#/$defs/VideoProfile" },
-        "audio": { "$ref": "#/$defs/AudioProfile" }
+        "audio": { "$ref": "#/$defs/AudioProfile" },
+        "egress": { "$ref": "#/$defs/EgressProfile" },
+        "encryption": { "$ref": "#/$defs/EncryptionProfile" }
+      }
+    },
+    "EgressProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How a server-side recording is encoded. This is the one part of the media profile the platform applies itself rather than the publishing client: encoding is a per-request field on the media server's egress API, sent by the control plane when it starts a recording. It applies to the composite layouts only. A track egress copies the published bytes and encodes nothing, so this block is not consulted for it, and a recording whose layout is 'track' plays back at whatever the publisher sent. Every field here names something the egress service is known to honor, read from its source rather than its documentation: a field it would accept and ignore is a setting the manifest would record and the recording would not have.",
+      "properties": {
+        "preset": {
+          "type": "string",
+          "description": "One of the media server's named encoding presets, spelled in lower case. An alternative to the explicit fields, not a base for them: a document that carries both has given two answers to one question, which is a cross-field rule. Layers merge and a merge cannot delete a key, so a preset can only be set where no lower layer states an explicit field.",
+          "enum": ["h264_720p_30", "h264_720p_60", "h264_1080p_30", "h264_1080p_60", "portrait_h264_720p_30", "portrait_h264_720p_60", "portrait_h264_1080p_30", "portrait_h264_1080p_60"]
+        },
+        "width": { "type": "integer", "minimum": 16, "maximum": 7680, "multipleOf": 2, "description": "Pixels. Even, because the encoder subsamples chroma at 2x2 and refuses an odd dimension." },
+        "height": { "type": "integer", "minimum": 16, "maximum": 4320, "multipleOf": 2 },
+        "framerate": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "videoBitrate": { "type": "integer", "minimum": 1, "description": "Kilobits per second, the unit the egress API takes. Deliberately not the bits per second of the publish profile's maxBitrate: this is the recording's target rate, and the two answer different questions." },
+        "audioBitrate": { "type": "integer", "minimum": 1, "description": "Kilobits per second." },
+        "videoCodec": {
+          "type": "string",
+          "description": "H.264 only, in its three profiles. The egress service transcodes to nothing else through this field: its enum also names VP8, which the service accepts and then ignores, and VP9 and AV1 are not in it at all. A member here that the recording could not actually be encoded with would be a guarantee nobody enforces. The publish codec is a separate choice; VP9 in the room and H.264 in the file is the normal case.",
+          "enum": ["h264_baseline", "h264_main", "h264_high"]
+        }
+      }
+    },
+    "EncryptionProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How media is encrypted between participants. Derived from privacyMode at resolution so the hashed document states it rather than implying it: open is transport encryption only, sealed and trusted_agent are end to end. A layer that says otherwise contradicts the privacy mode, which is a cross-field rule.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "transport: the media server terminates encryption and sees plaintext, so agents and server-side egress work. e2ee: frames are encrypted by the publishing client and the media server forwards ciphertext, so every participant must hold a key and nothing server-side can record or transcode.",
+          "enum": ["transport", "e2ee"]
+        },
+        "keyModel": {
+          "type": "string",
+          "description": "Who mints and holds the end-to-end key. server_shared: one random key per session, minted by the control plane and handed to the roles the privacy mode allows, which proves encryption against the media server and the network but not against the control plane. A consumer-held key is the follow-up, and it is a second member here rather than a change of shape.",
+          "enum": ["server_shared"]
+        }
       }
     },
     "VideoProfile": {

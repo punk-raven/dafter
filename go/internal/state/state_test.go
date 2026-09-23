@@ -3,6 +3,7 @@ package state_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -26,10 +27,6 @@ func store(t *testing.T) *state.Store {
 	return s
 }
 
-// The store keeps bytes and never reads them, so this is the test's own
-// document and not the shared cross-language vector, which belongs to the
-// config and hashing tests. It is spelled awkwardly on purpose: a store that
-// tidies what it was handed breaks the hash taken before the bytes arrived.
 const storedDocument = `{"b": "\u00e5 \u0906",
   "a": [1, 2.50, null, "</script>"],
   "nested": {"quote": "\"", "slash": "a/b", "": "empty key"}}`
@@ -71,6 +68,82 @@ func TestSessionRoundTripsTheResolvedDocument(t *testing.T) {
 	}
 	if got.CreatedAt.Location() != time.UTC {
 		t.Errorf("created at came back in %s; a stored instant reads back as UTC, or every caller normalizes it instead", got.CreatedAt.Location())
+	}
+}
+
+func TestSessionKeepsTheEncryptionKeyOutOfTheDocument(t *testing.T) {
+	t.Parallel()
+	s := store(t)
+	keyed := session(t)
+	keyed.EncryptionKey = "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+	if err := s.CreateSession(t.Context(), keyed); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	got, err := s.Session(t.Context(), keyed.SessionID)
+	if err != nil {
+		t.Fatalf("read session: %v", err)
+	}
+	if got.EncryptionKey != keyed.EncryptionKey {
+		t.Errorf("key came back as %q; every join to this session must be handed the same key", got.EncryptionKey)
+	}
+	if bytes.Contains(got.Config, []byte(keyed.EncryptionKey)) {
+		t.Error("the key leaked into the stored document, which is handed to every joiner")
+	}
+
+	plain := session(t)
+	plain.SessionID = "s_00000001"
+	if err := s.CreateSession(t.Context(), plain); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Session(t.Context(), plain.SessionID); err != nil || got.EncryptionKey != "" {
+		t.Errorf("a session without a key came back with %q (%v)", got.EncryptionKey, err)
+	}
+}
+
+func TestOpeningAnOlderStoreAddsTheKeyColumn(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "dafter.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.ExecContext(t.Context(), `
+		CREATE TABLE sessions (
+			session_id  TEXT PRIMARY KEY,
+			tenant_id   TEXT NOT NULL,
+			room        TEXT NOT NULL,
+			config_hash TEXT NOT NULL,
+			config      TEXT NOT NULL,
+			created_at  INTEGER NOT NULL
+		) STRICT;
+		INSERT INTO sessions VALUES ('s_7f3a9c21', 't_9c21a4be', 'room', 'hash', '{}', 0);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := state.Open(t.Context(), path)
+	if err != nil {
+		t.Fatalf("open an older store: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close store: %v", err)
+		}
+	})
+	got, err := s.Session(t.Context(), "s_7f3a9c21")
+	if err != nil {
+		t.Fatalf("read a session stored before the column existed: %v", err)
+	}
+	if got.EncryptionKey != "" {
+		t.Errorf("an older session reads back with key %q", got.EncryptionKey)
+	}
+	keyed := session(t)
+	keyed.SessionID, keyed.EncryptionKey = "s_00000002", "k"
+	if err := s.CreateSession(t.Context(), keyed); err != nil {
+		t.Fatalf("store a keyed session in a migrated store: %v", err)
 	}
 }
 
@@ -122,5 +195,75 @@ func TestTheStoreSurvivesReopening(t *testing.T) {
 	}
 	if got.ConfigHash != sess.ConfigHash {
 		t.Errorf("hash came back %q after reopening", got.ConfigHash)
+	}
+}
+
+func TestEgressesAreKeptPerSessionInStartOrder(t *testing.T) {
+	t.Parallel()
+	s, sess := store(t), session(t)
+	if err := s.CreateSession(t.Context(), sess); err != nil {
+		t.Fatal(err)
+	}
+	first := state.Egress{EgressID: "EG_first", SessionID: sess.SessionID, Layout: "track",
+		StartedAt: time.Date(2026, 9, 15, 18, 5, 0, 0, time.UTC)}
+	second := state.Egress{EgressID: "EG_second", SessionID: sess.SessionID, Layout: "track",
+		StartedAt: first.StartedAt.Add(time.Second)}
+	for _, e := range []state.Egress{second, first} {
+		if err := s.AddEgress(t.Context(), e); err != nil {
+			t.Fatalf("add egress: %v", err)
+		}
+	}
+
+	stoppedAt := second.StartedAt.Add(time.Minute)
+	if err := s.StopEgress(t.Context(), first.EgressID, stoppedAt); err != nil {
+		t.Fatalf("stop egress: %v", err)
+	}
+
+	got, err := s.Egresses(t.Context(), sess.SessionID)
+	if err != nil {
+		t.Fatalf("list egresses: %v", err)
+	}
+	if len(got) != 2 || got[0].EgressID != first.EgressID || got[1].EgressID != second.EgressID {
+		t.Fatalf("egresses came back as %+v; a reader expects start order", got)
+	}
+	if got[0].Active() || !got[0].StoppedAt.Equal(stoppedAt) {
+		t.Errorf("the stopped egress reads back as %+v", got[0])
+	}
+	if !got[1].Active() {
+		t.Errorf("the running egress reads back as stopped: %+v", got[1])
+	}
+	if got[1].StartedAt.Location() != time.UTC {
+		t.Errorf("started at came back in %s", got[1].StartedAt.Location())
+	}
+}
+
+func TestAnEgressIsStoppedOnceAndBelongsToAStoredSession(t *testing.T) {
+	t.Parallel()
+	s, sess := store(t), session(t)
+	if err := s.CreateSession(t.Context(), sess); err != nil {
+		t.Fatal(err)
+	}
+	orphan := state.Egress{EgressID: "EG_orphan", SessionID: "s_00000000", Layout: "track", StartedAt: time.Now()}
+	if err := s.AddEgress(t.Context(), orphan); err == nil {
+		t.Error("an egress was recorded for a session nobody can explain")
+	}
+
+	e := state.Egress{EgressID: "EG_once", SessionID: sess.SessionID, Layout: "room_composite", StartedAt: time.Now()}
+	if err := s.AddEgress(t.Context(), e); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.StopEgress(t.Context(), e.EgressID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.StopEgress(t.Context(), e.EgressID, time.Now()); !errors.Is(err, state.ErrNotFound) {
+		t.Errorf("a second stop moved the stop time: %v", err)
+	}
+	if err := s.StopEgress(t.Context(), "EG_unknown", time.Now()); !errors.Is(err, state.ErrNotFound) {
+		t.Errorf("stopping an unknown egress: want %v, got %v", state.ErrNotFound, err)
+	}
+
+	none, err := s.Egresses(t.Context(), "s_00000000")
+	if err != nil || len(none) != 0 {
+		t.Errorf("an unknown session lists %v, %v", none, err)
 	}
 }

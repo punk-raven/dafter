@@ -63,6 +63,12 @@ services:
       DAFTER_LIVEKIT_URL: ws://livekit:7880
       DAFTER_LIVEKIT_API_KEY: devkey
       DAFTER_LIVEKIT_API_SECRET: secret
+      DAFTER_EGRESS_S3_BUCKET: dafter-recordings
+      DAFTER_EGRESS_S3_ENDPOINT: http://127.0.0.1:9000
+      DAFTER_EGRESS_S3_REGION: us-east-1
+      DAFTER_EGRESS_S3_ACCESS_KEY: minioadmin
+      DAFTER_EGRESS_S3_SECRET: minioadmin
+      DAFTER_EGRESS_S3_FORCE_PATH_STYLE: "true"
       DAFTER_TURN_TOKEN_ID: ${DAFTER_TURN_TOKEN_ID:-}
       DAFTER_TURN_API_TOKEN: ${DAFTER_TURN_API_TOKEN:-}
     depends_on:
