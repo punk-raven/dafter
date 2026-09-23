@@ -65,6 +65,7 @@
       }
     },
     "turn": { "$ref": "#/$defs/Turn" },
+    "media": { "$ref": "#/$defs/Media" },
     "recording": { "$ref": "#/$defs/Recording" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
@@ -123,6 +124,139 @@
             "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
             "resumeFalseInterruption": { "type": "boolean", "default": true }
           }
+        }
+      }
+    },
+    "Media": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How a participant publishes, and how a recording of the room is encoded. All but egress are applied by the publishing client and the media server only routes what it is handed, which is exactly why the platform states them: an unset knob is a library default nobody chose, and a session whose profile is not in the resolved document cannot be explained after the call.",
+      "properties": {
+        "video": { "$ref": "#/$defs/VideoProfile" },
+        "audio": { "$ref": "#/$defs/AudioProfile" },
+        "egress": { "$ref": "#/$defs/EgressProfile" },
+        "encryption": { "$ref": "#/$defs/EncryptionProfile" }
+      }
+    },
+    "EgressProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How a server-side recording is encoded. This is the one part of the media profile the platform applies itself rather than the publishing client: encoding is a per-request field on the media server's egress API, sent by the control plane when it starts a recording. It applies to the composite layouts only. A track egress copies the published bytes and encodes nothing, so this block is not consulted for it, and a recording whose layout is 'track' plays back at whatever the publisher sent. Every field here names something the egress service is known to honor, read from its source rather than its documentation: a field it would accept and ignore is a setting the manifest would record and the recording would not have.",
+      "properties": {
+        "preset": {
+          "type": "string",
+          "description": "One of the media server's named encoding presets, spelled in lower case. An alternative to the explicit fields, not a base for them: a document that carries both has given two answers to one question, which is a cross-field rule. Layers merge and a merge cannot delete a key, so a preset can only be set where no lower layer states an explicit field.",
+          "enum": ["h264_720p_30", "h264_720p_60", "h264_1080p_30", "h264_1080p_60", "portrait_h264_720p_30", "portrait_h264_720p_60", "portrait_h264_1080p_30", "portrait_h264_1080p_60"]
+        },
+        "width": { "type": "integer", "minimum": 16, "maximum": 7680, "multipleOf": 2, "description": "Pixels. Even, because the encoder subsamples chroma at 2x2 and refuses an odd dimension." },
+        "height": { "type": "integer", "minimum": 16, "maximum": 4320, "multipleOf": 2 },
+        "framerate": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "videoBitrate": { "type": "integer", "minimum": 1, "description": "Kilobits per second, the unit the egress API takes. Deliberately not the bits per second of the publish profile's maxBitrate: this is the recording's target rate, and the two answer different questions." },
+        "audioBitrate": { "type": "integer", "minimum": 1, "description": "Kilobits per second." },
+        "videoCodec": {
+          "type": "string",
+          "description": "H.264 only, in its three profiles. The egress service transcodes to nothing else through this field: its enum also names VP8, which the service accepts and then ignores, and VP9 and AV1 are not in it at all. A member here that the recording could not actually be encoded with would be a guarantee nobody enforces. The publish codec is a separate choice; VP9 in the room and H.264 in the file is the normal case.",
+          "enum": ["h264_baseline", "h264_main", "h264_high"]
+        }
+      }
+    },
+    "EncryptionProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How media is encrypted between participants. Derived from privacyMode at resolution so the hashed document states it rather than implying it: open is transport encryption only, sealed and trusted_agent are end to end. A layer that says otherwise contradicts the privacy mode, which is a cross-field rule.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "transport: the media server terminates encryption and sees plaintext, so agents and server-side egress work. e2ee: frames are encrypted by the publishing client and the media server forwards ciphertext, so every participant must hold a key and nothing server-side can record or transcode.",
+          "enum": ["transport", "e2ee"]
+        },
+        "keyModel": {
+          "type": "string",
+          "description": "Who mints and holds the end-to-end key. server_shared: one random key per session, minted by the control plane and handed to the roles the privacy mode allows, which proves encryption against the media server and the network but not against the control plane. A consumer-held key is the follow-up, and it is a second member here rather than a change of shape.",
+          "enum": ["server_shared"]
+        }
+      }
+    },
+    "VideoProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Off for a channel that carries no video. Stated rather than omitted because overlays compose by merging, and a merge can override a key but cannot delete one.",
+          "default": true
+        },
+        "codec": {
+          "type": "string",
+          "description": "VP9 and AV1 compress substantially better than VP8 and H.264 at equal quality, and both are layered rather than simulcast. The cost is encode time on the publisher's device, which is why the choice is config and not a constant.",
+          "enum": ["vp8", "h264", "vp9", "av1"],
+          "default": "vp9"
+        },
+        "backupCodec": {
+          "type": "string",
+          "description": "Published alongside the primary codec for subscribers that cannot decode it. Restricted to the two codecs every endpoint can decode.",
+          "enum": ["vp8", "h264"],
+          "default": "h264"
+        },
+        "scalabilityMode": {
+          "type": "string",
+          "description": "Spatial and temporal layer count for a layered codec, as L<spatial>T<temporal> with an optional key-frame suffix. Meaningless without VP9 or AV1, which is a cross-field rule rather than something this pattern can express.",
+          "pattern": "^L[1-3]T[1-3](h|_KEY|_KEY_SHIFT)?$",
+          "default": "L3T3_KEY"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Capture and publish size, named rather than given as a width and height so it stays one token that a bitrate and framerate can be matched against. 'auto' hands the choice to the publishing client, which is the only party that knows what its camera and its hardware encoder actually do well. That is different from leaving this field out: an absent field is a decision nobody made, while 'auto' is a decision to delegate, and it is recorded in the hashed document like any other. The bitrate and framerate ceilings still apply, so delegating the size never delegates the bandwidth - a client that picks a size its ceiling cannot carry gets a soft picture rather than a bigger bill.",
+          "enum": ["auto", "h180", "h360", "h540", "h720", "h1080"],
+          "default": "h720"
+        },
+        "maxBitrate": {
+          "type": "integer",
+          "description": "Bits per second, the actual uplink ceiling. Paired with a resolution: a ceiling far below what a preset needs degrades continuously instead of failing, which is worse than refusing it.",
+          "minimum": 1
+        },
+        "maxFramerate": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "simulcast": {
+          "type": "boolean",
+          "description": "Publish several bitrate versions so a subscriber pulls the size it needs. A layered codec supersedes this for its own stream, so it governs the backup codec's path.",
+          "default": true
+        },
+        "dynacast": {
+          "type": "boolean",
+          "description": "Pause layers nobody subscribes to, which saves publisher uplink rather than subscriber downlink.",
+          "default": true
+        },
+        "adaptiveStream": {
+          "type": "boolean",
+          "description": "Subscribe-side: drop quality by how large the video actually renders.",
+          "default": true
+        }
+      }
+    },
+    "AudioProfile": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "red": {
+          "type": "boolean",
+          "description": "Redundant encoding: survives packet loss by roughly doubling audio bitrate.",
+          "default": true
+        },
+        "dtx": {
+          "type": "boolean",
+          "description": "Stop sending during silence. Voice is mostly silence, so this is the cheapest audio saving there is.",
+          "default": true
+        },
+        "echoCancellation": {
+          "type": "boolean",
+          "description": "Stated rather than left to the browser default, so the resolved document records what a session actually ran with.",
+          "default": true
+        },
+        "noiseCancellation": {
+          "type": "string",
+          "description": "Which filter the publishing client puts in front of its microphone. off asks for no suppression at all; native is the browser's own suppression, applied as a capture constraint; rnnoise is the RNNoise WASM filter attached to the track as a processor, with the browser's own suppression turned off, because two suppressors in series fight each other. Echo cancellation is separate and stays on in every mode. Every member has something implementing it: a member with no mechanism behind it is a guarantee nobody enforces.",
+          "enum": ["off", "native", "rnnoise"],
+          "default": "native"
         }
       }
     },

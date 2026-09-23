@@ -1,10 +1,3 @@
-"""The generated enums must match the schemas they came from.
-
-The Go half runs the same checks against the same files. A generator bug passes
-generate-check, because the committed output matches what the generator
-produces, and fails here, because that output no longer matches the schema.
-"""
-
 from __future__ import annotations
 
 from enum import StrEnum
@@ -16,13 +9,20 @@ from dafter_core import (
     AgentState,
     Channel,
     EgressLayout,
+    EgressPreset,
+    EgressVideoCodec,
+    EncryptionMode,
     ErrorCode,
     EventType,
+    KeyModel,
+    NoiseCancellation,
     PrivacyMode,
     RecordingStart,
     Role,
     Stage,
     TurnStrategy,
+    VideoCodec,
+    VideoResolution,
     enums,
     schemas,
 )
@@ -39,6 +39,17 @@ CASES = [
     (PrivacyMode, CFG, ("properties", "privacyMode", "enum")),
     (AgentMode, CFG, ("properties", "agent", "properties", "mode", "enum")),
     (TurnStrategy, CFG, ("$defs", "Turn", "properties", "strategy", "enum")),
+    (VideoCodec, CFG, ("$defs", "VideoProfile", "properties", "codec", "enum")),
+    (VideoResolution, CFG, ("$defs", "VideoProfile", "properties", "resolution", "enum")),
+    (
+        NoiseCancellation,
+        CFG,
+        ("$defs", "AudioProfile", "properties", "noiseCancellation", "enum"),
+    ),
+    (EgressPreset, CFG, ("$defs", "EgressProfile", "properties", "preset", "enum")),
+    (EgressVideoCodec, CFG, ("$defs", "EgressProfile", "properties", "videoCodec", "enum")),
+    (EncryptionMode, CFG, ("$defs", "EncryptionProfile", "properties", "mode", "enum")),
+    (KeyModel, CFG, ("$defs", "EncryptionProfile", "properties", "keyModel", "enum")),
     (EgressLayout, CFG, ("$defs", "Recording", "properties", "layout", "enum")),
     (RecordingStart, CFG, ("$defs", "Recording", "properties", "startAt", "enum")),
 ]

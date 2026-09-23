@@ -8,10 +8,18 @@ from .enums import (
     AgentMode,
     Channel,
     EgressLayout,
+    EgressPreset,
+    EgressVideoCodec,
+    EncryptionMode,
     ErrorCode,
+    KeyModel,
+    NoiseCancellation,
     PrivacyMode,
     RecordingStart,
+    Role,
     TurnStrategy,
+    VideoCodec,
+    VideoResolution,
 )
 from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
@@ -122,6 +130,157 @@ class Agent:
 
 
 @dataclass(frozen=True, slots=True)
+class VideoProfile:
+    enabled: bool = True
+    codec: VideoCodec | None = None
+    backup_codec: VideoCodec | None = None
+    scalability_mode: str = ""
+    resolution: VideoResolution | None = None
+    max_bitrate: int = 0
+    max_framerate: int = 0
+    simulcast: bool | None = None
+    dynacast: bool | None = None
+    adaptive_stream: bool | None = None
+
+    @property
+    def layered(self) -> bool:
+        return self.codec in (VideoCodec.VP9, VideoCodec.AV1)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> VideoProfile:
+        def codec(key: str) -> VideoCodec | None:
+            v = d.get(key)
+            return VideoCodec(v) if v else None
+
+        resolution = d.get("resolution")
+        return cls(
+            enabled=d.get("enabled", True),
+            codec=codec("codec"),
+            backup_codec=codec("backupCodec"),
+            scalability_mode=d.get("scalabilityMode", ""),
+            resolution=VideoResolution(resolution) if resolution else None,
+            max_bitrate=d.get("maxBitrate", 0),
+            max_framerate=d.get("maxFramerate", 0),
+            simulcast=d.get("simulcast"),
+            dynacast=d.get("dynacast"),
+            adaptive_stream=d.get("adaptiveStream"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AudioProfile:
+    red: bool | None = None
+    dtx: bool | None = None
+    echo_cancellation: bool | None = None
+    noise_cancellation: NoiseCancellation | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> AudioProfile:
+        noise = d.get("noiseCancellation")
+        return cls(
+            red=d.get("red"),
+            dtx=d.get("dtx"),
+            echo_cancellation=d.get("echoCancellation"),
+            noise_cancellation=NoiseCancellation(noise) if noise else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EgressProfile:
+    preset: EgressPreset | None = None
+    width: int = 0
+    height: int = 0
+    framerate: int = 0
+    video_bitrate: int = 0
+    audio_bitrate: int = 0
+    video_codec: EgressVideoCodec | None = None
+
+    @property
+    def states_video(self) -> bool:
+        return bool(
+            self.preset is not None
+            or self.width
+            or self.height
+            or self.framerate
+            or self.video_bitrate
+            or self.video_codec is not None
+        )
+
+    @property
+    def states_explicit_fields(self) -> bool:
+        return bool(
+            self.width
+            or self.height
+            or self.framerate
+            or self.video_bitrate
+            or self.audio_bitrate
+            or self.video_codec is not None
+        )
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> EgressProfile:
+        preset = d.get("preset")
+        codec = d.get("videoCodec")
+        return cls(
+            preset=EgressPreset(preset) if preset else None,
+            width=d.get("width", 0),
+            height=d.get("height", 0),
+            framerate=d.get("framerate", 0),
+            video_bitrate=d.get("videoBitrate", 0),
+            audio_bitrate=d.get("audioBitrate", 0),
+            video_codec=EgressVideoCodec(codec) if codec else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EncryptionProfile:
+    mode: EncryptionMode | None = None
+    key_model: KeyModel | None = None
+
+    @property
+    def stated_mode(self) -> EncryptionMode:
+        return self.mode if self.mode is not None else EncryptionMode.TRANSPORT
+
+    @property
+    def mints_shared_key(self) -> bool:
+        return self.stated_mode is EncryptionMode.E2EE and self.key_model is KeyModel.SERVER_SHARED
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> EncryptionProfile:
+        mode = d.get("mode")
+        key_model = d.get("keyModel")
+        return cls(
+            mode=EncryptionMode(mode) if mode else None,
+            key_model=KeyModel(key_model) if key_model else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Media:
+    video: VideoProfile = field(default_factory=VideoProfile)
+    audio: AudioProfile = field(default_factory=AudioProfile)
+    egress: EgressProfile = field(default_factory=EgressProfile)
+    encryption: EncryptionProfile = field(default_factory=EncryptionProfile)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Media:
+        return cls(
+            video=VideoProfile.from_dict(d.get("video") or {}),
+            audio=AudioProfile.from_dict(d.get("audio") or {}),
+            egress=EgressProfile.from_dict(d.get("egress") or {}),
+            encryption=EncryptionProfile.from_dict(d.get("encryption") or {}),
+        )
+
+
+def discloses_key_to(mode: PrivacyMode, role: Role) -> bool:
+    if role in (Role.PARTICIPANT, Role.PRESENTER, Role.OBSERVER):
+        return mode is not PrivacyMode.OPEN
+    if role is Role.AGENT:
+        return mode is PrivacyMode.TRUSTED_AGENT
+    return False
+
+
+@dataclass(frozen=True, slots=True)
 class Recording:
     enabled: bool
     layout: EgressLayout = EgressLayout.TRACK
@@ -167,6 +326,7 @@ class ResolvedSessionConfig:
     turn: Turn
     recording: Recording
     budgets: Budgets
+    media: Media = field(default_factory=Media)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
 
@@ -197,6 +357,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         turn=Turn.from_dict(doc["turn"]),
         recording=Recording.from_dict(doc["recording"]),
         budgets=Budgets.from_dict(doc["budgets"]),
+        media=Media.from_dict(doc.get("media") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
     )

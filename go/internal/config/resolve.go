@@ -42,6 +42,7 @@ func (c *Catalog) Resolve(req Request) (*Resolution, error) {
 	doc["tenantId"] = req.TenantID
 	doc["language"] = req.Language
 	doc["channel"] = string(req.Channel)
+	stampEncryption(doc)
 
 	raw, err := json.Marshal(doc)
 	if err != nil {
@@ -112,6 +113,29 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 		doc = merge(doc, m)
 	}
 	return doc, nil
+}
+
+func stampEncryption(doc map[string]any) {
+	mode, ok := doc["privacyMode"].(string)
+	if !ok || !PrivacyMode(mode).Valid() {
+		return
+	}
+	media, _ := doc["media"].(map[string]any)
+	if media == nil {
+		media = map[string]any{}
+		doc["media"] = media
+	}
+	encryption, _ := media["encryption"].(map[string]any)
+	if encryption == nil {
+		encryption = map[string]any{}
+		media["encryption"] = encryption
+	}
+	if _, stated := encryption["mode"]; !stated {
+		encryption["mode"] = string(PrivacyMode(mode).Encryption())
+	}
+	if _, stated := encryption["keyModel"]; !stated && encryption["mode"] == string(EncryptionE2EE) {
+		encryption["keyModel"] = string(KeyModelServerShared)
+	}
 }
 
 func reservedProblems(overrides json.RawMessage) []string {

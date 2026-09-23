@@ -1,11 +1,3 @@
-# Dafter POC stack
-#
-# One command to run everything:
-#   make dev       build and start the full stack
-#   make dev-down  tear down and remove volumes
-#
-# LiveKit dev credentials: devkey / secret (matching deploy/livekit.yaml)
-
 services:
   redis:
     image: redis:7-alpine
@@ -46,7 +38,6 @@ services:
 
   livekit:
     image: livekit/livekit-server:latest
-    # --node-ip: the address advertised to clients for media, see deploy/livekit.yaml.
     command: --config /etc/livekit.yaml --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1}
     ports:
       - "7880:7880"
@@ -64,11 +55,20 @@ services:
       context: ./go
     ports:
       - "8080:8080"
+    volumes:
+      - control-data:/var/lib/dafter
     environment:
+      DAFTER_DB: /var/lib/dafter/dafter.db
       DAFTER_ADDR: 0.0.0.0:8080
       DAFTER_LIVEKIT_URL: ws://livekit:7880
       DAFTER_LIVEKIT_API_KEY: devkey
       DAFTER_LIVEKIT_API_SECRET: secret
+      DAFTER_EGRESS_S3_BUCKET: dafter-recordings
+      DAFTER_EGRESS_S3_ENDPOINT: http://127.0.0.1:9000
+      DAFTER_EGRESS_S3_REGION: us-east-1
+      DAFTER_EGRESS_S3_ACCESS_KEY: minioadmin
+      DAFTER_EGRESS_S3_SECRET: minioadmin
+      DAFTER_EGRESS_S3_FORCE_PATH_STYLE: "true"
       DAFTER_TURN_TOKEN_ID: ${DAFTER_TURN_TOKEN_ID:-}
       DAFTER_TURN_API_TOKEN: ${DAFTER_TURN_API_TOKEN:-}
     depends_on:
@@ -140,4 +140,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  control-data:
   minio-data:

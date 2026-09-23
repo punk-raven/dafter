@@ -47,6 +47,242 @@ func TestValidateRejectsAgentInASealedSession(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsVideoOnTelephony(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Channel = config.ChannelTelephony
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("a telephony session kept video: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/video/enabled") {
+		t.Errorf("no detail points at /media/video/enabled: %v", de)
+	}
+
+	off := false
+	c.Media = &config.Media{Video: &config.VideoProfile{Enabled: &off}}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("telephony with video off rejected: %v", err)
+	}
+}
+
+func TestValidateRejectsScalabilityModeWithoutALayeredCodec(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Media = &config.Media{Video: &config.VideoProfile{
+		Codec: config.CodecH264, ScalabilityMode: "L3T3_KEY",
+	}}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("H.264 kept a scalability mode: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/video/scalabilityMode") {
+		t.Errorf("no detail points at /media/video/scalabilityMode: %v", de)
+	}
+
+	c.Media.Video.Codec = config.CodecVp9
+	if err := c.Validate(); err != nil {
+		t.Fatalf("VP9 with a scalability mode rejected: %v", err)
+	}
+}
+
+func TestValidateAcceptsEveryNoiseFilterAndNothingElse(t *testing.T) {
+	t.Parallel()
+	for _, filter := range config.AllNoiseCancellations {
+		c := validConfig(t)
+		c.Media = &config.Media{Audio: &config.AudioProfile{NoiseCancellation: filter}}
+		if err := c.Validate(); err != nil {
+			t.Errorf("noise filter %s rejected: %v", filter, err)
+		}
+	}
+
+	c := validConfig(t)
+	c.Media = &config.Media{Audio: &config.AudioProfile{NoiseCancellation: "krisp"}}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("a filter nothing implements was accepted: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/audio/noiseCancellation") {
+		t.Errorf("no detail points at /media/audio/noiseCancellation: %v", de)
+	}
+}
+
+func TestValidateRejectsAPresetBesideExplicitEncodeFields(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Media = &config.Media{Egress: &config.EgressProfile{
+		Preset: config.PresetH264720p30, VideoBitrate: 3000,
+	}}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("a preset and a bitrate were both accepted: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/egress/preset") {
+		t.Errorf("no detail points at /media/egress/preset: %v", de)
+	}
+
+	c.Media.Egress.VideoBitrate = 0
+	if err := c.Validate(); err != nil {
+		t.Fatalf("a preset on its own was rejected: %v", err)
+	}
+}
+
+func TestValidateRejectsVideoEncodeSettingsOnAnAudioOnlyRecording(t *testing.T) {
+	t.Parallel()
+	off := false
+	c := validConfig(t)
+	c.Channel = config.ChannelTelephony
+	c.Media = &config.Media{
+		Video:  &config.VideoProfile{Enabled: &off},
+		Egress: &config.EgressProfile{Width: 1280, Height: 720, AudioBitrate: 64},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("recording is off, so the profile is inert and must pass: %v", err)
+	}
+
+	c.Recording = config.Recording{Enabled: true, Layout: config.LayoutRoomComposite, ConsentArtifactID: "consent_1"}
+	var de *errs.Error
+	if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+		t.Fatalf("an audio-only recording kept a video size: want %s, got %v", errs.CodeInvalidConfig, err)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/egress") {
+		t.Errorf("no detail points at /media/egress: %v", de)
+	}
+
+	c.Media.Egress = &config.EgressProfile{AudioBitrate: 64}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("an audio-only encode on an audio-only recording was rejected: %v", err)
+	}
+}
+
+func sealedConfig(t *testing.T) *config.ResolvedSessionConfig {
+	t.Helper()
+	c := validConfig(t)
+	c.PrivacyMode = config.PrivacySealed
+	c.Agent.Enabled = false
+	c.Media = &config.Media{Encryption: &config.EncryptionProfile{
+		Mode: config.EncryptionE2EE, KeyModel: config.KeyModelServerShared,
+	}}
+	return c
+}
+
+func TestValidateAcceptsASealedSessionThatStatesEndToEndEncryption(t *testing.T) {
+	t.Parallel()
+	if err := sealedConfig(t).Validate(); err != nil {
+		t.Fatalf("sealed session with e2ee stated rejected: %v", err)
+	}
+	if !sealedConfig(t).MintsSharedKey() {
+		t.Error("the control plane would mint no key for a sealed session under the server_shared model")
+	}
+}
+
+func TestValidateRejectsAnEncryptionModeThatContradictsThePrivacyMode(t *testing.T) {
+	t.Parallel()
+	cases := map[string]*config.ResolvedSessionConfig{
+		"sealed stating transport": func() *config.ResolvedSessionConfig {
+			c := sealedConfig(t)
+			c.Media.Encryption.Mode = config.EncryptionTransport
+			return c
+		}(),
+		"sealed stating nothing": func() *config.ResolvedSessionConfig {
+			c := sealedConfig(t)
+			c.Media = nil
+			return c
+		}(),
+		"trusted_agent stating transport": func() *config.ResolvedSessionConfig {
+			c := sealedConfig(t)
+			c.PrivacyMode = config.PrivacyTrustedAgent
+			c.Agent.Enabled = true
+			c.Media.Encryption.Mode = config.EncryptionTransport
+			return c
+		}(),
+		"open stating e2ee": func() *config.ResolvedSessionConfig {
+			c := validConfig(t)
+			c.Media = &config.Media{Encryption: &config.EncryptionProfile{Mode: config.EncryptionE2EE}}
+			return c
+		}(),
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var de *errs.Error
+			if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+				t.Fatalf("want %s, got %v", errs.CodeInvalidConfig, err)
+			}
+			if !strings.Contains(strings.Join(de.Details, "\n"), "/media/encryption/mode") {
+				t.Errorf("no detail points at /media/encryption/mode: %v", de)
+			}
+		})
+	}
+
+	open := validConfig(t)
+	if open.EncryptionMode() != config.EncryptionTransport {
+		t.Errorf("an open session stating nothing reads as %s, want transport", open.EncryptionMode())
+	}
+	if err := open.Validate(); err != nil {
+		t.Fatalf("open session stating nothing rejected: %v", err)
+	}
+	if open.MintsSharedKey() {
+		t.Error("the control plane would mint a key for an open session")
+	}
+}
+
+func TestValidateRefusesServerSideRecordingUnderEndToEndEncryption(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []config.PrivacyMode{config.PrivacySealed, config.PrivacyTrustedAgent} {
+		for _, layout := range config.AllEgressLayouts {
+			t.Run(string(mode)+"/"+string(layout), func(t *testing.T) {
+				t.Parallel()
+				c := sealedConfig(t)
+				c.PrivacyMode = mode
+				c.Recording = config.Recording{Enabled: true, Layout: layout, ConsentArtifactID: "consent_1"}
+				if layout == config.LayoutRoomComposite {
+					c.Recording.StartAt = config.StartAtSessionCreate
+				}
+				var de *errs.Error
+				if err := c.Validate(); !errors.As(err, &de) || de.Code != errs.CodePrivacyModeForbids {
+					t.Fatalf("want %s, got %v", errs.CodePrivacyModeForbids, err)
+				}
+				if !strings.Contains(strings.Join(de.Details, "\n"), "/recording/enabled") {
+					t.Errorf("no detail points at /recording/enabled: %v", de)
+				}
+			})
+		}
+	}
+
+	c := validConfig(t)
+	c.Recording = config.Recording{Enabled: true, Layout: config.LayoutTrack, ConsentArtifactID: "consent_1"}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("an open session with recording rejected: %v", err)
+	}
+}
+
+func TestKeyDisclosureFollowsThePrivacyModeAndTheRole(t *testing.T) {
+	t.Parallel()
+	humans := []config.Role{config.RoleParticipant, config.RolePresenter, config.RoleObserver}
+	for _, role := range config.AllRoles {
+		if config.PrivacyOpen.DisclosesKeyTo(role) {
+			t.Errorf("open discloses a key to %s; there is none", role)
+		}
+	}
+	for _, role := range humans {
+		if !config.PrivacySealed.DisclosesKeyTo(role) || !config.PrivacyTrustedAgent.DisclosesKeyTo(role) {
+			t.Errorf("%s is not handed the key in an end-to-end encrypted session", role)
+		}
+	}
+	if config.PrivacySealed.DisclosesKeyTo(config.RoleAgent) {
+		t.Error("sealed handed the key to an agent; the mode exists so that only the humans can decrypt")
+	}
+	if !config.PrivacyTrustedAgent.DisclosesKeyTo(config.RoleAgent) {
+		t.Error("trusted_agent withheld the key from the agent it names")
+	}
+	for _, mode := range config.AllPrivacyModes {
+		if mode.DisclosesKeyTo(config.RoleRecorder) {
+			t.Errorf("%s handed the key to a recorder; a server-side egress sees only ciphertext by design", mode)
+		}
+	}
+}
+
 func TestValidateRejectsRecordingWithoutConsent(t *testing.T) {
 	t.Parallel()
 	c := validConfig(t)
@@ -147,6 +383,13 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"PrivacyMode", cfg, []string{"properties", "privacyMode", "enum"}, schema.Names(config.AllPrivacyModes)},
 		{"AgentMode", cfg, []string{"properties", "agent", "properties", "mode", "enum"}, schema.Names(config.AllAgentModes)},
 		{"TurnStrategy", cfg, []string{"$defs", "Turn", "properties", "strategy", "enum"}, schema.Names(config.AllTurnStrategies)},
+		{"VideoCodec", cfg, []string{"$defs", "VideoProfile", "properties", "codec", "enum"}, schema.Names(config.AllVideoCodecs)},
+		{"VideoResolution", cfg, []string{"$defs", "VideoProfile", "properties", "resolution", "enum"}, schema.Names(config.AllVideoResolutions)},
+		{"NoiseCancellation", cfg, []string{"$defs", "AudioProfile", "properties", "noiseCancellation", "enum"}, schema.Names(config.AllNoiseCancellations)},
+		{"EgressPreset", cfg, []string{"$defs", "EgressProfile", "properties", "preset", "enum"}, schema.Names(config.AllEgressPresets)},
+		{"EgressVideoCodec", cfg, []string{"$defs", "EgressProfile", "properties", "videoCodec", "enum"}, schema.Names(config.AllEgressVideoCodecs)},
+		{"EncryptionMode", cfg, []string{"$defs", "EncryptionProfile", "properties", "mode", "enum"}, schema.Names(config.AllEncryptionModes)},
+		{"KeyModel", cfg, []string{"$defs", "EncryptionProfile", "properties", "keyModel", "enum"}, schema.Names(config.AllKeyModels)},
 		{"EgressLayout", cfg, []string{"$defs", "Recording", "properties", "layout", "enum"}, schema.Names(config.AllEgressLayouts)},
 		{"RecordingStart", cfg, []string{"$defs", "Recording", "properties", "startAt", "enum"}, schema.Names(config.AllRecordingStarts)},
 	}
@@ -172,6 +415,16 @@ func catalog() *config.Catalog {
 			"privacyMode": "open",
 			"agent": {"enabled": true, "pool": "dafter-py", "mode": "cascaded"},
 			"turn": {"strategy": "auto", "silenceMs": 500, "minSpeechMs": 120},
+			"media": {
+				"video": {
+					"enabled": true, "codec": "vp9", "backupCodec": "h264",
+					"scalabilityMode": "L3T3_KEY", "resolution": "h720",
+					"maxBitrate": 1700000, "maxFramerate": 30,
+					"simulcast": true, "dynacast": true, "adaptiveStream": true
+				},
+				"audio": {"red": true, "dtx": true, "echoCancellation": true, "noiseCancellation": "native"},
+				"egress": {"audioBitrate": 128}
+			},
 			"recording": {"enabled": false},
 			"budgets": {"turnGapP50Ms": 800, "turnGapP95Ms": 1500}
 		}`),
@@ -195,8 +448,20 @@ func catalog() *config.Catalog {
 			}`),
 		},
 		Channels: map[config.Channel]json.RawMessage{
-			config.ChannelWebRTC:    json.RawMessage(`{"turn": {"endpointingDelayMs": 0}}`),
-			config.ChannelTelephony: json.RawMessage(`{"turn": {"silenceMs": 900}}`),
+			config.ChannelWebRTC: json.RawMessage(`{
+				"turn": {"endpointingDelayMs": 0},
+				"media": {"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}}
+			}`),
+			config.ChannelTelephony: json.RawMessage(`{
+				"turn": {"silenceMs": 900},
+				"media": {"video": {"enabled": false}, "egress": {"audioBitrate": 64}}
+			}`),
+			config.ChannelLongForm: json.RawMessage(`{
+				"media": {
+					"video": {"resolution": "h540", "maxBitrate": 800000, "maxFramerate": 25},
+					"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}
+				}
+			}`),
 		},
 	}
 }
@@ -240,6 +505,155 @@ func TestResolveAppliesLayersInOrder(t *testing.T) {
 	}
 	if c.SessionID != sessionID || c.TenantID != tenantID {
 		t.Errorf("identity not stamped from the request: %s/%s", c.SessionID, c.TenantID)
+	}
+}
+
+func TestResolveTakesTheMediaProfileFromTheChannelAxis(t *testing.T) {
+	t.Parallel()
+	web := resolve(t, request()).Config
+
+	if !web.VideoEnabled() {
+		t.Fatal("webrtc resolved without video")
+	}
+	if web.Media.Video.Codec != config.CodecVp9 || web.Media.Video.BackupCodec != config.CodecH264 {
+		t.Errorf("defaults layer lost: codec %s, backup %s", web.Media.Video.Codec, web.Media.Video.BackupCodec)
+	}
+	if web.Media.Video.MaxBitrate != 1700000 || web.Media.Video.Resolution != config.ResolutionH720 {
+		t.Errorf("720p ceiling lost: %s at %d bps", web.Media.Video.Resolution, web.Media.Video.MaxBitrate)
+	}
+
+	tel := request()
+	tel.Language = "hi"
+	tel.Channel = config.ChannelTelephony
+	if telephony := resolve(t, tel).Config; telephony.VideoEnabled() {
+		t.Error("telephony resolved with video; the channel carries 8 kHz audio and no video at all")
+	}
+
+	long := request()
+	long.Channel = config.ChannelLongForm
+	lf := resolve(t, long).Config
+	if lf.Media.Video.Resolution != config.ResolutionH540 || lf.Media.Video.MaxBitrate != 800000 {
+		t.Errorf("long_form overlay lost: %s at %d bps", lf.Media.Video.Resolution, lf.Media.Video.MaxBitrate)
+	}
+	if lf.Media.Video.Codec != config.CodecVp9 {
+		t.Errorf("long_form overlay replaced the profile instead of overlaying it: codec = %s", lf.Media.Video.Codec)
+	}
+}
+
+func TestResolveTakesTheEgressProfileFromTheChannelAxis(t *testing.T) {
+	t.Parallel()
+	web := resolve(t, request()).Config
+	e := web.Egress()
+	if e == nil || e.Width != 1280 || e.Height != 720 || e.Framerate != 30 || e.VideoBitrate != 3000 {
+		t.Fatalf("webrtc resolved without the composite encode: %+v", e)
+	}
+	if e.VideoCodec != config.EgressCodecH264Main || e.AudioBitrate != 128 {
+		t.Errorf("codec %s at %d kbps audio; the defaults layer or the channel overlay was lost", e.VideoCodec, e.AudioBitrate)
+	}
+
+	tel := request()
+	tel.Language, tel.Channel = "hi", config.ChannelTelephony
+	tel.Overrides = json.RawMessage(`{"recording": {"enabled": true, "layout": "room_composite", "consentArtifactId": "consent_1"}}`)
+	telephony := resolve(t, tel).Config
+	if te := telephony.Egress(); te == nil || te.StatesVideo() || te.AudioBitrate != 64 {
+		t.Errorf("a telephony recording resolved with a video encode: %+v; the merge cannot delete a key, so the video encode has to live on the channels that carry video", te)
+	}
+}
+
+func TestResolveRejectsAVideoEncodeOnATelephonyRecording(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Language, req.Channel = "hi", config.ChannelTelephony
+	req.Overrides = json.RawMessage(`{
+		"recording": {"enabled": true, "layout": "room_composite", "consentArtifactId": "consent_1"},
+		"media": {"egress": {"width": 1280, "height": 720}}
+	}`)
+	de := resolveError(t, req)
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/egress") {
+		t.Errorf("no detail points at /media/egress: %v", de)
+	}
+}
+
+func TestResolveDefersResolutionToTheClientWithoutDeferringBandwidth(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"media": {"video": {"resolution": "auto"}}}`)
+	c := resolve(t, req).Config
+
+	if c.Media.Video.Resolution != config.ResolutionAuto {
+		t.Fatalf("resolution = %s, want %s", c.Media.Video.Resolution, config.ResolutionAuto)
+	}
+	if c.Media.Video.MaxBitrate != 1700000 || c.Media.Video.MaxFramerate != 30 {
+		t.Errorf("caps lost with an auto resolution: %d bps, %d fps",
+			c.Media.Video.MaxBitrate, c.Media.Video.MaxFramerate)
+	}
+	if c.Media.Video.Codec != config.CodecVp9 {
+		t.Errorf("rest of the profile lost: codec = %s", c.Media.Video.Codec)
+	}
+}
+
+func TestResolveStatesTheEncryptionModeThePrivacyModeImplies(t *testing.T) {
+	t.Parallel()
+	open := resolve(t, request()).Config
+	if open.Media.Encryption == nil || open.Media.Encryption.Mode != config.EncryptionTransport {
+		t.Fatalf("an open session resolved without stating transport encryption: %+v", open.Media.Encryption)
+	}
+	if open.Media.Encryption.KeyModel != "" {
+		t.Errorf("an open session names a key model %q; there is no key", open.Media.Encryption.KeyModel)
+	}
+
+	req := request()
+	req.Overrides = json.RawMessage(`{"privacyMode": "sealed", "agent": {"enabled": false}}`)
+	sealed := resolve(t, req).Config
+	if sealed.Media.Encryption == nil || sealed.Media.Encryption.Mode != config.EncryptionE2EE {
+		t.Fatalf("a sealed session resolved without stating e2ee: %+v", sealed.Media.Encryption)
+	}
+	if sealed.Media.Encryption.KeyModel != config.KeyModelServerShared {
+		t.Errorf("key model %q, want %s", sealed.Media.Encryption.KeyModel, config.KeyModelServerShared)
+	}
+	if !sealed.MintsSharedKey() {
+		t.Error("the resolved sealed session would get no key minted")
+	}
+	if sealed.Media.Video == nil || sealed.Media.Video.Codec != config.CodecVp9 {
+		t.Error("stamping the encryption mode replaced the media profile instead of adding to it")
+	}
+
+	req.Overrides = json.RawMessage(`{"privacyMode": "trusted_agent"}`)
+	trusted := resolve(t, req).Config
+	if trusted.Media.Encryption == nil || trusted.Media.Encryption.Mode != config.EncryptionE2EE || !trusted.Agent.Enabled {
+		t.Errorf("trusted_agent resolved as %+v with agent %v", trusted.Media.Encryption, trusted.Agent.Enabled)
+	}
+}
+
+func TestResolveRefusesALayerThatContradictsThePrivacyMode(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{
+		"privacyMode": "sealed", "agent": {"enabled": false},
+		"media": {"encryption": {"mode": "transport"}}
+	}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodeInvalidConfig {
+		t.Errorf("want %s, got %s", errs.CodeInvalidConfig, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/media/encryption/mode") {
+		t.Errorf("no detail points at /media/encryption/mode: %v", de)
+	}
+}
+
+func TestResolveRefusesRecordingInASealedSession(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{
+		"privacyMode": "sealed", "agent": {"enabled": false},
+		"recording": {"enabled": true, "layout": "track", "consentArtifactId": "consent_1"}
+	}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodePrivacyModeForbids {
+		t.Errorf("want %s, got %s", errs.CodePrivacyModeForbids, de.Code)
+	}
+	if !strings.Contains(strings.Join(de.Details, "\n"), "/recording/enabled") {
+		t.Errorf("no detail points at /recording/enabled: %v", de)
 	}
 }
 
@@ -294,7 +708,12 @@ func TestResolveIsDeterministic(t *testing.T) {
 
 func resolveError(t *testing.T, req config.Request) *errs.Error {
 	t.Helper()
-	res, err := catalog().Resolve(req)
+	return resolveErrorIn(t, catalog(), req)
+}
+
+func resolveErrorIn(t *testing.T, cat *config.Catalog, req config.Request) *errs.Error {
+	t.Helper()
+	res, err := cat.Resolve(req)
 	if err == nil {
 		t.Fatalf("resolution accepted a request it should reject: %s", res.Document)
 	}
@@ -320,9 +739,12 @@ func TestResolveRejectsAnUnsupportedLanguage(t *testing.T) {
 
 func TestResolveRejectsAnUnsupportedChannel(t *testing.T) {
 	t.Parallel()
+	cat := catalog()
+	delete(cat.Channels, config.ChannelLongForm)
+
 	req := request()
 	req.Channel = config.ChannelLongForm
-	de := resolveError(t, req)
+	de := resolveErrorIn(t, cat, req)
 	if de.Code != errs.CodeUnsupportedCapability {
 		t.Errorf("want %s, got %s", errs.CodeUnsupportedCapability, de.Code)
 	}
@@ -383,9 +805,6 @@ func TestResolveRejectsAnOverrideTheSchemaForbids(t *testing.T) {
 	}
 }
 
-// Shared with the Python half, which reads the same files. The RFC 8785 vectors are
-// vendored from the reference implementation both libraries descend from; see
-// testdata/rfc8785/README.md.
 const (
 	testdataDir    = "../../../testdata"
 	rfc8785Vectors = testdataDir + "/rfc8785"
@@ -465,16 +884,13 @@ func TestHashIgnoresInputSpellingButNotContent(t *testing.T) {
 	}
 }
 
-// The hash is the contract between the Go and Python halves, so it is pinned
-// here and to the same literal in python/dafter_core/tests/test_hashing.py.
-// Either half drifting fails on its own side rather than at a consumer's audit.
 func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile(sharedConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "83e6309ac80b7060f9cffb62db49e7f18a810a36418ce7ebf311d5f5aeb5829e"
+	const want = "afbac94fda3552ab176ee1fa701f7d9f30023591d92ef2f2aceeea5a32a9d156"
 	got, err := config.HashDocument(raw)
 	if err != nil {
 		t.Fatal(err)

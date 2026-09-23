@@ -14,15 +14,38 @@
   .badge-disconnected { background: #3a1c1c; color: #f87171; }
   .badge-connecting { background: #3a2f1c; color: #fbbf24; }
   .badge-connected { background: #1c3a1c; color: #4ade80; }
+  .badge-e2ee-on { background: #1c2e3a; color: #38bdf8; }
+  .badge-e2ee-pending { background: #3a2f1c; color: #fbbf24; }
+  .badge-e2ee-nokey { background: #3a1c1c; color: #f87171; }
 
   .layout { display: flex; height: calc(100vh - 57px); }
   .sidebar { width: 320px; min-width: 320px; border-right: 1px solid #222; overflow-y: auto; padding: 16px; }
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
   .video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
-  .video-tile { position: relative; background: #1a1a1a; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-  .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+  .video-tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  .video-tile video { width: 100%; height: 100%; object-fit: contain; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
+  .stats-panel { border-top: 1px solid #222; background: #0c0c0c; max-height: 320px; display: flex; flex-direction: column; }
+  .stats-head { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #1c1c1c; flex-wrap: wrap; }
+  .stats-head strong { font-size: 12px; font-weight: 600; }
+  .stats-profile { font-family: monospace; font-size: 11px; color: #a78bfa; }
+  .stats-totals { font-family: monospace; font-size: 11px; color: #4ade80; }
+  .stats-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .stats-actions button { width: auto; margin: 0; padding: 4px 10px; font-size: 11px; background: #1f2937; color: #cbd5e1; }
+  .stats-actions button:hover { background: #374151; }
+  .stats-actions .count { font-size: 11px; color: #666; font-family: monospace; }
+  .stats-body { overflow: auto; }
+  table.stats { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; }
+  table.stats th { text-align: left; padding: 5px 8px; color: #777; font-weight: 600; position: sticky; top: 0; background: #0c0c0c; border-bottom: 1px solid #1c1c1c; white-space: nowrap; }
+  table.stats td { padding: 4px 8px; border-bottom: 1px solid #151515; white-space: nowrap; }
+  table.stats tr.up td { color: #e0e0e0; }
+  table.stats tr.down td { color: #9ca3af; }
+  table.stats .num { text-align: right; }
+  table.stats .over { color: #f87171; font-weight: 600; }
+  table.stats .paused { color: #60a5fa; }
+  table.stats .empty td { color: #555; text-align: center; padding: 14px; }
 
   .log-panel { height: 180px; min-height: 100px; border-top: 1px solid #222; overflow-y: auto; padding: 8px 12px; font-family: monospace; font-size: 12px; line-height: 1.6; }
   .log-panel .ts { color: #666; margin-right: 8px; }
@@ -48,6 +71,10 @@
   .btn-copy:hover { background: #047857; }
   .btn-leave { background: #dc2626; color: white; }
   .btn-leave:hover { background: #b91c1c; }
+  .btn-record { background: #b45309; color: white; }
+  .btn-record:hover { background: #92400e; }
+  .btn-record:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .recording-status { margin-top: 8px; font-family: monospace; font-size: 11px; color: #fbbf24; line-height: 1.6; word-break: break-all; }
   .divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
 
   .ice-info { margin-top: 12px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; line-height: 1.6; }
@@ -66,6 +93,7 @@
 <div class="header">
   <h1>Dafter POC</h1>
   <span id="status-badge" class="badge badge-disconnected">disconnected</span>
+  <span id="e2ee-badge" class="badge" style="display:none" title="Room.isE2EEEnabled"></span>
 </div>
 
 <div class="layout">
@@ -87,6 +115,33 @@
         </select>
         <label>Profile (optional)</label>
         <input id="profile" value="support">
+        <label>Privacy mode</label>
+        <select id="privacy-mode">
+          <option value="" selected>open - transport encryption only</option>
+          <option value="sealed">sealed - end to end, no agent</option>
+          <option value="trusted_agent">trusted_agent - end to end, agent holds the key</option>
+        </select>
+        <label>Video resolution</label>
+        <select id="resolution">
+          <option value="" selected>profile default (h720)</option>
+          <option value="auto">auto - let this client choose</option>
+          <option value="h180">h180</option>
+          <option value="h360">h360</option>
+          <option value="h540">h540</option>
+          <option value="h720">h720</option>
+          <option value="h1080">h1080</option>
+        </select>
+        <label>Noise filter</label>
+        <select id="noise-cancellation">
+          <option value="" selected>follow the catalog</option>
+        </select>
+        <label>Recording</label>
+        <select id="recording-layout">
+          <option value="" selected>off</option>
+          <option value="room_composite">room_composite</option>
+          <option value="track_composite">track_composite</option>
+          <option value="track">track</option>
+        </select>
       </fieldset>
       <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
     </div>
@@ -121,6 +176,31 @@
       <button id="btn-join" class="btn-join" onclick="joinRoom()">Join Room</button>
     </div>
 
+    <div id="panel-myvideo">
+      <fieldset>
+        <legend>My video</legend>
+        <label>Capture resolution</label>
+        <select id="my-resolution" onchange="applyMyResolution()">
+          <option value="" selected>follow the session profile</option>
+          <option value="auto">auto - let my browser choose</option>
+          <option value="h180">h180</option>
+          <option value="h360">h360</option>
+          <option value="h540">h540</option>
+          <option value="h720">h720</option>
+          <option value="h1080">h1080</option>
+        </select>
+      </fieldset>
+    </div>
+
+    <div id="panel-recording" style="display:none">
+      <fieldset>
+        <legend>Recording</legend>
+        <button id="btn-record-start" class="btn-record" onclick="startRecording()">Start recording</button>
+        <button id="btn-record-stop" class="btn-record" onclick="stopRecording()">Stop recording</button>
+        <div id="recording-status" class="recording-status">not started</div>
+      </fieldset>
+    </div>
+
     <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
 
     <div id="session-response" class="response-box" style="display:none"></div>
@@ -133,24 +213,60 @@
         <dt>Protocol</dt><dd id="ice-protocol">-</dd>
         <dt>Remote</dt><dd id="ice-remote">-</dd>
         <dt>TURN</dt><dd id="ice-turn-status">-</dd>
+        <dt>E2EE</dt><dd id="e2ee-state">-</dd>
       </dl>
     </div>
   </div>
 
   <div class="main">
     <div id="video-grid" class="video-grid"></div>
+
+    <div id="stats-panel" class="stats-panel" style="display:none">
+      <div class="stats-head">
+        <strong>Live media</strong>
+        <span id="stats-profile" class="stats-profile"></span>
+        <span id="stats-totals" class="stats-totals"></span>
+        <span class="stats-actions">
+          <span id="stats-count" class="count"></span>
+          <button onclick="downloadStats('json')">Download JSON</button>
+          <button onclick="downloadStats('csv')">Download CSV</button>
+        </span>
+      </div>
+      <div class="stats-body">
+        <table class="stats">
+          <thead>
+            <tr>
+              <th></th><th>Participant</th><th>Kind</th><th>Layer</th><th>Codec</th>
+              <th>Size</th><th class="num">FPS</th><th class="num">kbps</th>
+              <th class="num">Target</th><th class="num">Lost</th><th>State</th>
+            </tr>
+          </thead>
+          <tbody id="stats-rows">
+            <tr class="empty"><td colspan="11">waiting for the first sample...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="log" class="log-panel"></div>
   </div>
 </div>
 
 <script>
-const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
+const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
+
+const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.e2ee.worker.mjs';
 
 let room = null;
+let e2eeWorker = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
+let syntheticVideo = false;
+let lastConfig = null;
 let syntheticAudioCtx = null;
 let lastRoomId = null;
+let noiseAudioCtx = null;
+let activeNoiseFilter = null;
 
 function log(msg, level = 'info') {
   const el = document.getElementById('log');
@@ -177,6 +293,494 @@ function showResponse(data) {
   box.textContent = JSON.stringify(data, null, 2);
 }
 
+function encryptionOf(config) {
+  return (config && config.media && config.media.encryption) || {};
+}
+
+function setE2EEBadge(state, text) {
+  const el = document.getElementById('e2ee-badge');
+  if (!state) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'inline';
+  el.textContent = text;
+  el.className = 'badge badge-e2ee-' + state;
+}
+
+function refreshE2EEBadge() {
+  if (!room || !room.options.e2ee) return;
+  if (room.isE2EEEnabled) setE2EEBadge('on', 'E2EE on');
+  else setE2EEBadge('pending', 'E2EE pending');
+}
+
+function base64urlToBytes(s) {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4);
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+async function startE2EEWorker() {
+  const resp = await fetch(E2EE_WORKER_URL);
+  if (!resp.ok) throw new Error(`E2EE worker fetch failed: HTTP ${resp.status}`);
+  const source = await resp.text();
+  const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+  return new Worker(url, { type: 'module' });
+}
+
+async function e2eeOptionsFor(data) {
+  const encryption = encryptionOf(data.config);
+  if (encryption.mode !== 'e2ee') return null;
+  if (!data.encryptionKey) {
+    log('Session is end-to-end encrypted and this join carried no key: remote media will be undecodable', 'error');
+    setE2EEBadge('nokey', 'E2EE no key');
+    return null;
+  }
+  e2eeWorker = await startE2EEWorker();
+  const keyProvider = new ExternalE2EEKeyProvider();
+  log(`Session is end-to-end encrypted (key model ${encryption.keyModel || 'unstated'}); starting the frame cryptor`, 'success');
+  setE2EEBadge('pending', 'E2EE pending');
+  return { keyProvider, worker: e2eeWorker };
+}
+
+const RNNOISE_PKG = '@sapphi-red/web-noise-suppressor@0.4.1';
+const RNNOISE_BASE = `https://cdn.jsdelivr.net/npm/${RNNOISE_PKG}/dist`;
+
+const NOISE_FILTERS = {
+  off: {
+    label: 'off',
+    nativeSuppression: false,
+    createProcessor: null,
+  },
+  native: {
+    label: 'browser native',
+    nativeSuppression: true,
+    createProcessor: null,
+  },
+  rnnoise: {
+    label: 'rnnoise (wasm)',
+    nativeSuppression: false,
+    createProcessor: createRnnoiseProcessor,
+  },
+};
+
+function fillNoiseFilterChoices() {
+  const el = document.getElementById('noise-cancellation');
+  for (const [value, entry] of Object.entries(NOISE_FILTERS)) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = `${value} - ${entry.label}`;
+    el.appendChild(opt);
+  }
+}
+
+function noiseFilterFor(value) {
+  if (value === undefined) return null;
+  return NOISE_FILTERS[value] ||
+    { label: `${value} (no entry in this client)`, nativeSuppression: false, createProcessor: null, unknown: true };
+}
+
+async function createRnnoiseProcessor() {
+  if (typeof AudioWorkletNode === 'undefined') {
+    throw new Error('this browser has no AudioWorklet');
+  }
+  const wns = await import(`${RNNOISE_BASE}/index.js`);
+  const wasmBinary = await wns.loadRnnoise({
+    url: `${RNNOISE_BASE}/rnnoise.wasm`,
+    simdUrl: `${RNNOISE_BASE}/rnnoise_simd.wasm`,
+  });
+
+  let source = null;
+  let node = null;
+  let sink = null;
+
+  return {
+    name: 'rnnoise',
+    async init(opts) {
+      const ctx = opts.audioContext;
+      if (!ctx) throw new Error('no audio context on the track');
+      await ctx.audioWorklet.addModule(`${RNNOISE_BASE}/rnnoise/workletProcessor.js`);
+      source = ctx.createMediaStreamSource(new MediaStream([opts.track]));
+      node = new wns.RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary });
+      sink = ctx.createMediaStreamDestination();
+      source.connect(node);
+      node.connect(sink);
+      this.processedTrack = sink.stream.getAudioTracks()[0];
+    },
+    async restart(opts) {
+      await this.destroy();
+      await this.init(opts);
+    },
+    async destroy() {
+      if (node) { node.destroy(); node.disconnect(); node = null; }
+      if (source) { source.disconnect(); source = null; }
+      sink = null;
+      this.processedTrack = undefined;
+    },
+  };
+}
+
+async function publishMicrophone(room) {
+  const capture = Object.assign({}, room.options.audioCaptureDefaults);
+  const requested = ((lastConfig && lastConfig.media && lastConfig.media.audio) || {}).noiseCancellation;
+  const entry = noiseFilterFor(requested);
+  activeNoiseFilter = entry ? entry.label : 'sdk default';
+
+  if (entry && entry.unknown) {
+    log(`Profile names noise filter ${requested}, which this client has no entry for; publishing unfiltered`, 'error');
+  }
+  if (!entry || !entry.createProcessor) {
+    await room.localParticipant.setMicrophoneEnabled(true, capture);
+    log(`Microphone published; noise filter ${activeNoiseFilter}`, entry && entry.unknown ? 'warn' : 'success');
+    return;
+  }
+
+  let track = null;
+  try {
+    const processor = await entry.createProcessor();
+    track = await createLocalAudioTrack(capture);
+    noiseAudioCtx = new AudioContext({ sampleRate: 48000 });
+    await noiseAudioCtx.resume();
+    track.setAudioContext(noiseAudioCtx);
+    await track.setProcessor(processor);
+    if (!track.getProcessor() || !track.getProcessor().processedTrack) {
+      throw new Error('processor produced no track');
+    }
+    await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
+    log(`Microphone published through ${requested} (${RNNOISE_PKG}); the browser's own suppression is off`, 'success');
+  } catch (err) {
+    log(`Noise filter ${requested} unavailable (${err.message}); falling back to the browser's own suppression`, 'error');
+    if (track) track.stop();
+    if (noiseAudioCtx) { noiseAudioCtx.close(); noiseAudioCtx = null; }
+    activeNoiseFilter = `${NOISE_FILTERS.native.label} (fallback from ${requested})`;
+    await room.localParticipant.setMicrophoneEnabled(
+      true, Object.assign({}, capture, { noiseSuppression: true }));
+    log(`Microphone published; noise filter ${activeNoiseFilter}`, 'warn');
+  }
+}
+
+function roomOptionsFrom(config) {
+  const media = (config && config.media) || {};
+  const video = media.video || {};
+  const audio = media.audio || {};
+  const options = {};
+  const publish = {};
+
+  if (video.adaptiveStream !== undefined) options.adaptiveStream = video.adaptiveStream;
+  if (video.dynacast !== undefined) options.dynacast = video.dynacast;
+
+  if (video.codec !== undefined) publish.videoCodec = video.codec;
+  if (video.backupCodec !== undefined) publish.backupCodec = { codec: video.backupCodec };
+  if (video.scalabilityMode !== undefined) publish.scalabilityMode = video.scalabilityMode;
+  if (video.simulcast !== undefined) publish.simulcast = video.simulcast;
+  if (audio.red !== undefined) publish.red = audio.red;
+  if (audio.dtx !== undefined) publish.dtx = audio.dtx;
+
+  if (video.maxBitrate !== undefined || video.maxFramerate !== undefined) {
+    publish.videoEncoding = {};
+    if (video.maxBitrate !== undefined) publish.videoEncoding.maxBitrate = video.maxBitrate;
+    if (video.maxFramerate !== undefined) publish.videoEncoding.maxFramerate = video.maxFramerate;
+  }
+
+  if (video.resolution === 'auto') {
+    log('Profile defers resolution to this client; bitrate and framerate ceilings still apply');
+  } else {
+    const preset = VideoPresets[video.resolution];
+    if (preset) options.videoCaptureDefaults = { resolution: preset.resolution };
+    else if (video.resolution !== undefined) {
+      log(`Profile names resolution ${video.resolution}, which this client SDK has no preset for`, 'warn');
+    }
+  }
+
+  const capture = {};
+  if (audio.echoCancellation !== undefined) capture.echoCancellation = audio.echoCancellation;
+  const filter = noiseFilterFor(audio.noiseCancellation);
+  if (filter) capture.noiseSuppression = filter.nativeSuppression;
+  if (Object.keys(capture).length) options.audioCaptureDefaults = capture;
+
+  if (Object.keys(publish).length) options.publishDefaults = publish;
+  return options;
+}
+
+function videoEnabled(config) {
+  const video = (config && config.media && config.media.video) || {};
+  return video.enabled !== false;
+}
+
+function myResolution() {
+  return document.getElementById('my-resolution').value;
+}
+
+function applyLocalPreference(options) {
+  const pref = myResolution();
+  if (!pref) return options;
+  if (pref === 'auto') {
+    delete options.videoCaptureDefaults;
+    log('Your capture size: browser default, overriding the session profile', 'warn');
+  } else if (VideoPresets[pref]) {
+    options.videoCaptureDefaults = { resolution: VideoPresets[pref].resolution };
+    log(`Your capture size: ${pref}, overriding the session profile`, 'warn');
+  }
+  return options;
+}
+
+async function applyMyResolution() {
+  if (statsContext) statsContext.clientResolution = myResolution() || null;
+  if (!room) return;
+
+  const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+  if (!pub || !pub.track) {
+    log('No camera track to change', 'warn');
+    return;
+  }
+  if (syntheticVideo) {
+    log('The synthetic test pattern is drawn at a fixed size; this applies to a real camera', 'warn');
+    return;
+  }
+
+  const pref = myResolution();
+  try {
+    if (!pref) {
+      const fromProfile = (lastConfig && lastConfig.media && lastConfig.media.video) || {};
+      const preset = VideoPresets[fromProfile.resolution];
+      await pub.track.restartTrack(preset ? { resolution: preset.resolution } : {});
+      log('Capture size back to the session profile', 'success');
+    } else if (pref === 'auto') {
+      await pub.track.restartTrack({});
+      log('Capture size now the browser default', 'success');
+    } else {
+      await pub.track.restartTrack({ resolution: VideoPresets[pref].resolution });
+      log(`Capture size now ${pref}`, 'success');
+    }
+  } catch (err) {
+    log(`Could not change capture size: ${err.message}`, 'error');
+  }
+}
+
+const STATS_INTERVAL_MS = 1000;
+const STATS_MAX_SAMPLES = 3600;
+
+let statsTimer = null;
+let statsSamples = [];
+let statsPrev = new Map();
+let statsContext = null;
+
+function startStats(data) {
+  stopStats();
+  const video = (data.config && data.config.media && data.config.media.video) || {};
+  const audio = (data.config && data.config.media && data.config.media.audio) || {};
+  statsContext = {
+    sessionId: data.sessionId,
+    room: data.room,
+    participantId: data.participantId,
+    configHash: data.configHash,
+    profile: { video, audio, encryption: encryptionOf(data.config), noiseFilter: activeNoiseFilter },
+    clientResolution: myResolution() || null,
+  };
+  statsSamples = [];
+  statsPrev = new Map();
+
+  const ceiling = [
+    video.codec,
+    video.resolution,
+    video.maxBitrate ? `<=${Math.round(video.maxBitrate / 1000)} kbps` : null,
+    video.maxFramerate ? `<=${video.maxFramerate} fps` : null,
+    encryptionOf(data.config).mode || null,
+    activeNoiseFilter ? `noise ${activeNoiseFilter}` : null,
+  ].filter(Boolean).join(' · ');
+  const override = statsContext.clientResolution;
+  document.getElementById('stats-profile').textContent =
+    (ceiling ? `profile: ${ceiling}` : 'profile: none') +
+    (override ? `  ·  you chose ${override}` : '');
+  document.getElementById('stats-panel').style.display = 'flex';
+
+  statsTimer = setInterval(collectStats, STATS_INTERVAL_MS);
+  collectStats();
+}
+
+function stopStats() {
+  if (statsTimer) clearInterval(statsTimer);
+  statsTimer = null;
+}
+
+function tracksToSample() {
+  const out = [];
+  if (!room) return out;
+  room.localParticipant.trackPublications.forEach((pub) => {
+    if (pub.track) out.push({ dir: 'up', who: 'you', track: pub.track });
+  });
+  room.remoteParticipants.forEach((p) => {
+    p.trackPublications.forEach((pub) => {
+      if (pub.track) out.push({ dir: 'down', who: p.identity, track: pub.track });
+    });
+  });
+  return out;
+}
+
+async function collectStats() {
+  const at = Date.now();
+  const rows = [];
+
+  for (const { dir, who, track } of tracksToSample()) {
+    let report;
+    try {
+      report = await track.getRTCStatsReport();
+    } catch (err) {
+      continue;
+    }
+    if (!report) continue;
+
+    const byId = new Map();
+    report.forEach((s) => byId.set(s.id, s));
+
+    report.forEach((s) => {
+      const outbound = s.type === 'outbound-rtp';
+      const inbound = s.type === 'inbound-rtp';
+      if (!outbound && !inbound) return;
+
+      const key = `${dir}:${who}:${s.id}`;
+      const bytes = outbound ? s.bytesSent : s.bytesReceived;
+      const prev = statsPrev.get(key);
+      let kbps = null;
+      if (prev && bytes >= prev.bytes && at > prev.at) {
+        kbps = Math.round(((bytes - prev.bytes) * 8) / (at - prev.at));
+      }
+      statsPrev.set(key, { bytes, at });
+
+      let lost = null;
+      if (outbound) {
+        report.forEach((r) => {
+          if (r.type === 'remote-inbound-rtp' && r.localId === s.id) lost = r.packetsLost;
+        });
+      } else {
+        lost = s.packetsLost;
+      }
+
+      const codec = byId.get(s.codecId);
+      const source = s.mediaSourceId ? byId.get(s.mediaSourceId) : null;
+      const pick = (own, fromSource) => (own != null ? own : (source ? fromSource(source) : null));
+      const fps = pick(s.framesPerSecond, (m) => m.framesPerSecond);
+
+      rows.push({
+        dir,
+        who,
+        kind: s.kind || track.kind,
+        layer: s.rid || s.scalabilityMode || '',
+        codec: codec && codec.mimeType ? codec.mimeType.replace(/^(video|audio)\//, '') : '',
+        width: pick(s.frameWidth, (m) => m.width),
+        height: pick(s.frameHeight, (m) => m.height),
+        fps: fps != null ? Math.round(fps) : null,
+        kbps,
+        targetKbps: s.targetBitrate ? Math.round(s.targetBitrate / 1000) : null,
+        lost,
+        active: outbound ? s.active !== false : null,
+        limitedBy: s.qualityLimitationReason && s.qualityLimitationReason !== 'none' ? s.qualityLimitationReason : '',
+        bytes,
+      });
+    });
+  }
+
+  const sample = { at, iso: new Date(at).toISOString(), rows };
+  statsSamples.push(sample);
+  if (statsSamples.length > STATS_MAX_SAMPLES) statsSamples.shift();
+  renderStats(sample);
+}
+
+function renderStats(sample) {
+  const tbody = document.getElementById('stats-rows');
+  const ceiling = statsContext ? statsContext.profile.video : {};
+  const maxKbps = ceiling.maxBitrate ? ceiling.maxBitrate / 1000 : null;
+  const maxFps = ceiling.maxFramerate || null;
+
+  if (!sample.rows.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="11">no streams yet</td></tr>';
+  } else {
+    tbody.innerHTML = sample.rows.map((r) => {
+      const overRate = r.kind === 'video' && maxKbps && r.kbps != null && r.kbps > maxKbps;
+      const overFps = r.kind === 'video' && maxFps && r.fps != null && r.fps > maxFps + 1;
+      const cell = (v, cls) => `<td class="num ${cls || ''}">${v == null ? '-' : v}</td>`;
+      return `<tr class="${r.dir}">
+        <td>${r.dir === 'up' ? '&uarr;' : '&darr;'}</td>
+        <td>${escapeHtml(r.who)}</td>
+        <td>${r.kind}</td>
+        <td>${escapeHtml(r.layer)}</td>
+        <td>${escapeHtml(r.codec)}</td>
+        <td>${r.width ? `${r.width}x${r.height}` : '-'}</td>
+        ${cell(r.fps, overFps ? 'over' : '')}
+        ${cell(r.kbps, overRate ? 'over' : '')}
+        ${cell(r.targetKbps)}
+        ${cell(r.lost)}
+        <td>${r.active === false ? '<span class="paused">paused (dynacast)</span>' : escapeHtml(r.limitedBy)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const sum = (dir) => sample.rows
+    .filter((r) => r.dir === dir && r.kbps != null)
+    .reduce((t, r) => t + r.kbps, 0);
+  const up = sum('up');
+  const down = sum('down');
+
+  const upSeries = statsSamples
+    .map((s) => s.rows.filter((r) => r.dir === 'up' && r.kbps != null).reduce((t, r) => t + r.kbps, 0))
+    .filter((v, i) => i > 0);
+  const peak = upSeries.length ? Math.max(...upSeries) : 0;
+  const mean = upSeries.length ? Math.round(upSeries.reduce((a, b) => a + b, 0) / upSeries.length) : 0;
+
+  if (statsContext) {
+    const ceilingText = document.getElementById('stats-profile').textContent.split('  ·  you chose ')[0];
+    document.getElementById('stats-profile').textContent =
+      ceilingText + (statsContext.clientResolution ? `  ·  you chose ${statsContext.clientResolution}` : '');
+  }
+  document.getElementById('stats-totals').textContent =
+    `up ${up} kbps (peak ${peak}, mean ${mean}) · down ${down} kbps`;
+  document.getElementById('stats-count').textContent = `${statsSamples.length} samples`;
+}
+
+function downloadStats(format) {
+  if (!statsSamples.length) {
+    log('No stats captured yet', 'warn');
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const base = `dafter-stats-${(statsContext && statsContext.sessionId) || 'session'}-${stamp}`;
+
+  let body, type, name;
+  if (format === 'csv') {
+    const cols = ['iso', 'dir', 'who', 'kind', 'layer', 'codec', 'width', 'height', 'fps', 'kbps', 'targetKbps', 'lost', 'active', 'limitedBy', 'bytes'];
+    const lines = [cols.join(',')];
+    for (const s of statsSamples) {
+      for (const r of s.rows) {
+        lines.push(cols.map((c) => {
+          const v = c === 'iso' ? s.iso : r[c];
+          if (v == null) return '';
+          return /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v;
+        }).join(','));
+      }
+    }
+    body = lines.join('\n');
+    type = 'text/csv';
+    name = `${base}.csv`;
+  } else {
+    body = JSON.stringify({
+      capturedAt: new Date().toISOString(),
+      client: 'livekit-client@2.13.5',
+      session: statsContext,
+      sampleIntervalMs: STATS_INTERVAL_MS,
+      samples: statsSamples,
+    }, null, 2);
+    type = 'application/json';
+    name = `${base}.json`;
+  }
+
+  const url = URL.createObjectURL(new Blob([body], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+  log(`Downloaded ${name} (${statsSamples.length} samples)`, 'success');
+}
+
 async function createSession() {
   const btn = document.getElementById('btn-create');
   btn.disabled = true;
@@ -190,6 +794,27 @@ async function createSession() {
     };
     const profile = document.getElementById('profile').value.trim();
     if (profile) body.profile = profile;
+
+    const overrides = {};
+    const resolution = document.getElementById('resolution').value;
+    if (resolution) overrides.media = { video: { resolution } };
+    const noise = document.getElementById('noise-cancellation').value;
+    if (noise) overrides.media = Object.assign(overrides.media || {}, { audio: { noiseCancellation: noise } });
+    const privacyMode = document.getElementById('privacy-mode').value;
+    if (privacyMode) {
+      overrides.privacyMode = privacyMode;
+      if (privacyMode === 'sealed') {
+        overrides.agent = { enabled: false };
+        log('sealed refuses an agent at the API, so the override disables it');
+      }
+    }
+    if (Object.keys(overrides).length) body.overrides = overrides;
+
+    const layout = document.getElementById('recording-layout').value;
+    if (layout) {
+      body.overrides = body.overrides || {};
+      body.overrides.recording = { enabled: true, layout, consentArtifactId: 'consent_testclient' };
+    }
 
     const resp = await fetch('/sessions', {
       method: 'POST',
@@ -260,11 +885,36 @@ async function joinRoom() {
 
     setBadge('connecting');
 
-    room = new Room({
-      adaptiveStream: true,
-      dynacast: true,
-      videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    lastConfig = data.config;
+    const publishesVideo = videoEnabled(data.config);
+    const roomOptions = applyLocalPreference(roomOptionsFrom(data.config));
+    if (data.config && data.config.media) {
+      const v = data.config.media.video || {};
+      const encryption = encryptionOf(data.config).mode || 'unstated';
+      log(`Media profile: ${publishesVideo ? `${v.codec || 'sdk default'} ${v.resolution || ''} ${v.maxBitrate ? `${Math.round(v.maxBitrate / 1000)} kbps` : ''}`.trim() : 'audio only'} · encryption ${encryption} (config ${data.configHash.slice(0, 12)})`, 'success');
+    } else {
+      log('No media profile in the session document; publishing at the SDK defaults', 'warn');
+    }
+
+    const e2ee = await e2eeOptionsFor(data);
+    if (e2ee) roomOptions.e2ee = e2ee;
+
+    room = new Room(roomOptions);
+
+    room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
+      const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
+      log(`Encryption status: ${who} ${enabled ? 'ENCRYPTED' : 'NOT ENCRYPTED'}`, enabled ? 'success' : 'warn');
+      refreshE2EEBadge();
     });
+
+    room.on(RoomEvent.EncryptionError, (err) => {
+      log(`Encryption error: ${err && err.message ? err.message : err}`, 'error');
+    });
+
+    if (e2ee) {
+      await e2ee.keyProvider.setKey(base64urlToBytes(data.encryptionKey));
+      log('Session key loaded into the key provider');
+    }
 
     room.on(RoomEvent.ConnectionStateChanged, (state) => {
       log(`Connection state: ${state}`);
@@ -315,32 +965,51 @@ async function joinRoom() {
 
     await room.connect(connectUrl, data.token, { rtcConfig });
 
+    if (e2ee) {
+      await room.setE2EEEnabled(true);
+      log(`End-to-end encryption enabled before publishing (Room.isE2EEEnabled=${room.isE2EEEnabled})`, 'success');
+      refreshE2EEBadge();
+    }
+
     log('Connected! Publishing tracks...', 'success');
 
+    let micPublished = false;
     try {
-      await room.localParticipant.enableCameraAndMicrophone();
-      log('Camera and microphone published', 'success');
-    } catch (mediaErr) {
-      log(`No camera (${mediaErr.message}), trying microphone only...`, 'warn');
+      await publishMicrophone(room);
+      micPublished = true;
+    } catch (micErr) {
+      log(`No microphone (${micErr.message})`, publishesVideo ? 'warn' : 'error');
+      activeNoiseFilter = null;
+    }
+
+    if (publishesVideo) {
       try {
-        await room.localParticipant.setMicrophoneEnabled(true);
-        log('Microphone published (no camera)', 'success');
-      } catch (micErr) {
-        log(`No microphone either (${micErr.message}), publishing synthetic test pattern...`, 'warn');
-        await publishTestPattern(room);
+        await room.localParticipant.setCameraEnabled(true);
+        log('Camera published', 'success');
+      } catch (camErr) {
+        log(`No camera (${camErr.message})`, 'warn');
+        if (!micPublished) {
+          log('No microphone either, publishing synthetic test pattern...', 'warn');
+          await publishTestPattern(room);
+          activeNoiseFilter = 'none (synthetic audio)';
+        }
       }
+    } else if (micPublished) {
+      log('This channel carries no video', 'success');
     }
 
     const localVideoTrack = room.localParticipant.getTrackPublication(Track.Source.Camera);
     if (localVideoTrack && localVideoTrack.track) {
-      attachTrack(localVideoTrack.track, room.localParticipant, true);
+      attachTrack(localVideoTrack.track, room.localParticipant, true, !syntheticVideo);
     }
 
     document.getElementById('panel-create').style.display = 'none';
     document.getElementById('panel-join').style.display = 'none';
     document.getElementById('session-created-info').style.display = 'none';
     document.getElementById('btn-leave').style.display = 'block';
+    showRecordingPanel(data);
 
+    startStats(data);
     monitorICE();
 
   } catch (err) {
@@ -358,6 +1027,8 @@ async function leaveSession() {
 }
 
 function cleanup() {
+  stopStats();
+  syntheticVideo = false;
   if (syntheticIntervalId != null) {
     clearInterval(syntheticIntervalId);
     syntheticIntervalId = null;
@@ -366,7 +1037,17 @@ function cleanup() {
     syntheticAudioCtx.close();
     syntheticAudioCtx = null;
   }
+  if (noiseAudioCtx) {
+    noiseAudioCtx.close();
+    noiseAudioCtx = null;
+  }
+  activeNoiseFilter = null;
   room = null;
+  if (e2eeWorker) {
+    e2eeWorker.terminate();
+    e2eeWorker = null;
+  }
+  setE2EEBadge(null);
   document.getElementById('video-grid').innerHTML = '';
   document.getElementById('panel-create').style.display = 'block';
   document.getElementById('panel-join').style.display = 'block';
@@ -374,9 +1055,85 @@ function cleanup() {
   document.getElementById('btn-join').disabled = false;
   document.getElementById('btn-leave').style.display = 'none';
   document.getElementById('ice-info').style.display = 'none';
+  document.getElementById('panel-recording').style.display = 'none';
 }
 
-function attachTrack(track, participant, isLocal = false) {
+let recordingSessionId = null;
+
+function showRecordingPanel(data) {
+  const rec = (data.config && data.config.recording) || {};
+  recordingSessionId = rec.enabled ? data.sessionId : null;
+  document.getElementById('panel-recording').style.display = rec.enabled ? 'block' : 'none';
+  if (rec.enabled) {
+    document.getElementById('recording-status').textContent = `layout ${rec.layout || 'track'} - not started`;
+  }
+}
+
+function setRecordingStatus(text) {
+  document.getElementById('recording-status').textContent = text;
+}
+
+function localTrackIds() {
+  const ids = {};
+  if (!room) return ids;
+  const mic = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+  const cam = room.localParticipant.getTrackPublication(Track.Source.Camera);
+  if (mic) ids.audioTrackId = mic.trackSid;
+  if (cam) ids.videoTrackId = cam.trackSid;
+  return ids;
+}
+
+async function recordingCall(action, body) {
+  const resp = await fetch(`/sessions/${recordingSessionId}/recording/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    const detail = (data.details || []).join('; ');
+    log(`Recording ${action} failed: ${data.code} - ${data.message}${detail ? ` (${detail})` : ''}`, 'error');
+    setRecordingStatus(`${action} refused: ${data.code}`);
+    return null;
+  }
+  return data;
+}
+
+async function startRecording() {
+  if (!recordingSessionId) return;
+  const layout = ((lastConfig && lastConfig.recording) || {}).layout || 'track';
+  const ids = localTrackIds();
+  let body = {};
+  if (layout === 'track_composite') body = ids;
+  if (layout === 'track') body = { trackId: ids.audioTrackId || ids.videoTrackId };
+
+  document.getElementById('btn-record-start').disabled = true;
+  try {
+    const data = await recordingCall('start', body);
+    if (!data) return;
+    const rec = data.recordings[0];
+    log(`Recording started: ${rec.egressId} (${rec.status})`, 'success');
+    setRecordingStatus(`${rec.egressId} ${rec.status}`);
+  } finally {
+    document.getElementById('btn-record-start').disabled = false;
+  }
+}
+
+async function stopRecording() {
+  if (!recordingSessionId) return;
+  document.getElementById('btn-record-stop').disabled = true;
+  try {
+    const data = await recordingCall('stop', {});
+    if (!data) return;
+    const lines = data.recordings.map((rec) => `${rec.egressId} ${rec.status}`);
+    log(`Recording stopped: ${lines.join(', ')}`, 'success');
+    setRecordingStatus(lines.join('\n'));
+  } finally {
+    document.getElementById('btn-record-stop').disabled = false;
+  }
+}
+
+function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
   const tileId = `tile-${participant.identity}-${track.kind}`;
   let tile = document.getElementById(tileId);
 
@@ -391,8 +1148,7 @@ function attachTrack(track, participant, isLocal = false) {
     const el = track.attach();
     el.style.width = '100%';
     el.style.height = '100%';
-    el.style.objectFit = 'cover';
-    if (isLocal) el.style.transform = 'scaleX(-1)';
+    if (mirror) el.style.transform = 'scaleX(-1)';
     tile.insertBefore(el, tile.firstChild);
   }
 
@@ -448,6 +1204,7 @@ async function publishTestPattern(room) {
   drawFrame();
 
   const videoStream = canvas.captureStream(30);
+  syntheticVideo = true;
   const videoTrack = new LocalVideoTrack(videoStream.getVideoTracks()[0]);
   await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
   log('Synthetic video track published (color bars + timestamp)', 'success');
@@ -474,7 +1231,7 @@ async function publishTestPattern(room) {
   vid.srcObject = videoStream;
   vid.autoplay = true;
   vid.muted = true;
-  vid.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  vid.style.cssText = 'width:100%;height:100%';
   tile.appendChild(vid);
   const label = document.createElement('span');
   label.className = 'label';
@@ -489,6 +1246,11 @@ async function monitorICE() {
 
   const poll = async () => {
     if (!room || room.state !== ConnectionState.Connected) return;
+
+    document.getElementById('e2ee-state').textContent = room.options.e2ee
+      ? `isE2EEEnabled=${room.isE2EEEnabled}`
+      : (encryptionOf(lastConfig).mode === 'e2ee' ? 'no key: joined without a cryptor' : 'transport only');
+    refreshE2EEBadge();
 
     try {
       const sender = room.engine?.pcManager?.publisher?.pc;
@@ -514,7 +1276,6 @@ async function monitorICE() {
         });
       }
     } catch (e) {
-      // Stats not available yet
     }
     setTimeout(poll, 2000);
   };
@@ -531,15 +1292,14 @@ function copyJoinLink() {
   });
 }
 
+fillNoiseFilterChoices();
+
 (function seedFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  const roomParam = params.get('room');
-  if (roomParam) {
-    document.getElementById('room-id').value = roomParam;
-    if (confirm(`Join room ${roomParam}?`)) {
-      joinRoom();
-    }
-  }
+  const roomParam = new URLSearchParams(window.location.search).get('room');
+  if (!roomParam) return;
+  document.getElementById('room-id').value = roomParam;
+  log(`Join link for ${roomParam}`);
+  joinRoom();
 })();
 </script>
 </body>

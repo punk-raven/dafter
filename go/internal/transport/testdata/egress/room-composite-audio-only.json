@@ -1,0 +1,20 @@
+{
+  "roomName": "s_7f3a9c21",
+  "audioOnly": true,
+  "advanced": {
+    "audioBitrate": 64
+  },
+  "fileOutputs": [
+    {
+      "filepath": "s_7f3a9c21/room_composite-{utc}",
+      "s3": {
+        "accessKey": "minioadmin",
+        "secret": "minioadmin",
+        "region": "us-east-1",
+        "endpoint": "http://127.0.0.1:9000",
+        "bucket": "dafter-recordings",
+        "forcePathStyle": true
+      }
+    }
+  ]
+}

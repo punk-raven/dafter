@@ -19,6 +19,29 @@
         "resumeFalseInterruption": true
       }
     },
+    "media": {
+      "video": {
+        "enabled": true,
+        "codec": "vp9",
+        "backupCodec": "h264",
+        "scalabilityMode": "L3T3_KEY",
+        "resolution": "h720",
+        "maxBitrate": 1700000,
+        "maxFramerate": 30,
+        "simulcast": true,
+        "dynacast": true,
+        "adaptiveStream": true
+      },
+      "audio": {
+        "red": true,
+        "dtx": true,
+        "echoCancellation": true,
+        "noiseCancellation": "native"
+      },
+      "egress": {
+        "audioBitrate": 128
+      }
+    },
     "recording": { "enabled": false },
     "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500 }
   },
@@ -102,7 +125,16 @@
 
   "channels": {
     "webrtc": {
-      "turn": { "endpointingDelayMs": 0 }
+      "turn": { "endpointingDelayMs": 0 },
+      "media": {
+        "egress": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "videoBitrate": 3000,
+          "videoCodec": "h264_main"
+        }
+      }
     },
 
     "telephony": {
@@ -110,6 +142,27 @@
         "silenceMs": 900,
         "endpointingDelayMs": 200,
         "interruption": { "minWords": 3 }
+      },
+      "media": {
+        "video": { "enabled": false },
+        "egress": { "audioBitrate": 64 }
+      }
+    },
+
+    "long_form": {
+      "media": {
+        "video": {
+          "resolution": "h540",
+          "maxBitrate": 800000,
+          "maxFramerate": 25
+        },
+        "egress": {
+          "width": 1280,
+          "height": 720,
+          "framerate": 30,
+          "videoBitrate": 3000,
+          "videoCodec": "h264_main"
+        }
       }
     }
   }

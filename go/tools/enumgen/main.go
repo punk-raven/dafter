@@ -11,13 +11,13 @@ import (
 )
 
 type target struct {
-	Schema  string   // path under schemas/
-	Pointer []string // where the enum lives in that schema
-	Package string   // Go package name
-	Type    string   // Go type name
-	Prefix  string   // constant name prefix
-	Out     string   // file to write, relative to the go module root
-	AllName string   // name of the generated slice of every member
+	Schema  string
+	Pointer []string
+	Package string
+	Type    string
+	Prefix  string
+	Out     string
+	AllName string
 	TypeDoc string
 }
 
@@ -68,6 +68,41 @@ var targets = []target{
 		Out: "internal/config/turn_gen.go", AllName: "AllTurnStrategies",
 	},
 	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "VideoProfile", "properties", "codec", "enum"},
+		Package: "config", Type: "VideoCodec", Prefix: "Codec",
+		Out: "internal/config/codecs_gen.go", AllName: "AllVideoCodecs",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "VideoProfile", "properties", "resolution", "enum"},
+		Package: "config", Type: "VideoResolution", Prefix: "Resolution",
+		Out: "internal/config/resolutions_gen.go", AllName: "AllVideoResolutions",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "AudioProfile", "properties", "noiseCancellation", "enum"},
+		Package: "config", Type: "NoiseCancellation", Prefix: "Noise",
+		Out: "internal/config/noise_gen.go", AllName: "AllNoiseCancellations",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EgressProfile", "properties", "preset", "enum"},
+		Package: "config", Type: "EgressPreset", Prefix: "Preset",
+		Out: "internal/config/presets_gen.go", AllName: "AllEgressPresets",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EgressProfile", "properties", "videoCodec", "enum"},
+		Package: "config", Type: "EgressVideoCodec", Prefix: "EgressCodec",
+		Out: "internal/config/egress_codecs_gen.go", AllName: "AllEgressVideoCodecs",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EncryptionProfile", "properties", "mode", "enum"},
+		Package: "config", Type: "EncryptionMode", Prefix: "Encryption",
+		Out: "internal/config/encryption_gen.go", AllName: "AllEncryptionModes",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "EncryptionProfile", "properties", "keyModel", "enum"},
+		Package: "config", Type: "KeyModel", Prefix: "KeyModel",
+		Out: "internal/config/keymodels_gen.go", AllName: "AllKeyModels",
+	},
+	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Recording", "properties", "layout", "enum"},
 		Package: "config", Type: "EgressLayout", Prefix: "Layout",
 		Out: "internal/config/layouts_gen.go", AllName: "AllEgressLayouts",
@@ -82,6 +117,7 @@ var targets = []target{
 var initialisms = map[string]string{
 	"vad": "VAD", "stt": "STT", "tts": "TTS", "llm": "LLM", "mt": "MT",
 	"webrtc": "WebRTC", "api": "API", "id": "ID", "url": "URL", "json": "JSON",
+	"e2ee": "E2EE",
 }
 
 func goName(prefix, value string) string {
@@ -192,7 +228,6 @@ func renderPython(all map[string][]string, order []target) []byte {
 	return b.Bytes()
 }
 
-// run writes every target and reports one line per file written.
 func run(schemaRoot, goRoot, pyOut string) ([]string, error) {
 	collected := map[string][]string{}
 	var report []string

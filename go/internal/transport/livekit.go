@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"net/http"
 	"net/url"
 	"time"
 
@@ -33,13 +34,41 @@ type claims struct {
 }
 
 type LiveKit struct {
-	url    string
-	key    string
-	secret string
-	now    func() time.Time
+	url     string
+	httpURL string
+	key     string
+	secret  string
+	now     func() time.Time
+
+	storage *EgressStorage
+	client  *http.Client
 }
 
-func NewLiveKit(serverURL, apiKey, apiSecret string) (*LiveKit, error) {
+type Option func(*LiveKit) error
+
+func WithEgressStorage(s EgressStorage) Option {
+	return func(l *LiveKit) error {
+		if s.Bucket == "" || s.AccessKey == "" || s.Secret == "" {
+			return errs.Errorf(errs.CodeInvalidConfig, "egress storage needs a bucket, an access key and a secret")
+		}
+		if s.Endpoint != "" {
+			if u, err := url.Parse(s.Endpoint); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+				return errs.Errorf(errs.CodeInvalidConfig, "egress storage endpoint must be http:// or https://")
+			}
+		}
+		l.storage = &s
+		return nil
+	}
+}
+
+func WithHTTPClient(c *http.Client) Option {
+	return func(l *LiveKit) error {
+		l.client = c
+		return nil
+	}
+}
+
+func NewLiveKit(serverURL, apiKey, apiSecret string, opts ...Option) (*LiveKit, error) {
 	u, err := url.Parse(serverURL)
 	if err != nil || u.Host == "" || (u.Scheme != "ws" && u.Scheme != "wss") {
 		return nil, errs.Errorf(errs.CodeInvalidConfig, "media server url must be ws:// or wss://")
@@ -47,7 +76,19 @@ func NewLiveKit(serverURL, apiKey, apiSecret string) (*LiveKit, error) {
 	if apiKey == "" || apiSecret == "" {
 		return nil, errs.Errorf(errs.CodeAuthenticationFailed, "media server api key and secret are required")
 	}
-	return &LiveKit{url: serverURL, key: apiKey, secret: apiSecret, now: time.Now}, nil
+	httpURL := *u
+	httpURL.Scheme = map[string]string{"ws": "http", "wss": "https"}[u.Scheme]
+	l := &LiveKit{
+		url: serverURL, httpURL: httpURL.String(), key: apiKey, secret: apiSecret,
+		now:    time.Now,
+		client: &http.Client{Timeout: 30 * time.Second},
+	}
+	for _, opt := range opts {
+		if err := opt(l); err != nil {
+			return nil, err
+		}
+	}
+	return l, nil
 }
 
 func (l *LiveKit) MintToken(g Grant) (Token, error) {

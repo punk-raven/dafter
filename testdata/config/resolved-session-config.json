@@ -9,7 +9,7 @@
   "apiVersion": "dafter.dev/v1",
   "sessionId": "s_7f3a9c21",
   "tenantId": "t_9c21a4be",
-  "configHash": "83e6309ac80b7060f9cffb62db49e7f18a810a36418ce7ebf311d5f5aeb5829e",
+  "configHash": "afbac94fda3552ab176ee1fa701f7d9f30023591d92ef2f2aceeea5a32a9d156",
   "privacyMode": "open",
   "language": "hi",
   "channel": "telephony",
@@ -29,6 +29,12 @@
       "llm": { "provider": "sarvam", "model": "sarvam-105b", "options": { "temperature": 0.40 } },
       "tts": { "provider": "sarvam", "model": "bulbul", "options": { "prewarm": true } }
     }
+  },
+  "media": {
+    "audio": { "red": false, "dtx": true, "echoCancellation": true, "noiseCancellation": "native" },
+    "encryption": { "mode": "transport" },
+    "video": { "enabled": false },
+    "egress": { "audioBitrate": 64 }
   },
   "recording": { "enabled": false },
   "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1200, "maxSessionCostUsd": 2.5 }
