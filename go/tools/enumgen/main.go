@@ -11,13 +11,13 @@ import (
 )
 
 type target struct {
-	Schema  string   // path under schemas/
-	Pointer []string // where the enum lives in that schema
-	Package string   // Go package name
-	Type    string   // Go type name
-	Prefix  string   // constant name prefix
-	Out     string   // file to write, relative to the go module root
-	AllName string   // name of the generated slice of every member
+	Schema  string
+	Pointer []string
+	Package string
+	Type    string
+	Prefix  string
+	Out     string
+	AllName string
 	TypeDoc string
 }
 
@@ -207,7 +207,6 @@ func renderPython(all map[string][]string, order []target) []byte {
 	return b.Bytes()
 }
 
-// run writes every target and reports one line per file written.
 func run(schemaRoot, goRoot, pyOut string) ([]string, error) {
 	collected := map[string][]string{}
 	var report []string

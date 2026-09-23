@@ -223,8 +223,8 @@ const { Room, RoomEvent, Track, ConnectionState, VideoPresets } = LivekitClient;
 let room = null;
 let localParticipantId = null;
 let syntheticIntervalId = null;
-let syntheticVideo = false;   // the test pattern is not a selfie view, so it is never mirrored
-let lastConfig = null;        // the joined session's resolved document, for returning to its profile
+let syntheticVideo = false;
+let lastConfig = null;
 let syntheticAudioCtx = null;
 let lastRoomId = null;
 
@@ -351,12 +351,12 @@ async function applyMyResolution() {
 }
 
 const STATS_INTERVAL_MS = 1000;
-const STATS_MAX_SAMPLES = 3600;   // one hour at one per second
+const STATS_MAX_SAMPLES = 3600;
 
 let statsTimer = null;
 let statsSamples = [];
-let statsPrev = new Map();        // stream key -> { bytes, at } from the previous tick
-let statsContext = null;          // session id, config hash, and the profile ceilings
+let statsPrev = new Map();
+let statsContext = null;
 
 function startStats(data) {
   stopStats();
@@ -417,7 +417,7 @@ async function collectStats() {
     try {
       report = await track.getRTCStatsReport();
     } catch (err) {
-      continue;   // a track can go away mid-sample; that is not an error worth logging
+      continue;
     }
     if (!report) continue;
 
@@ -514,7 +514,7 @@ function renderStats(sample) {
 
   const upSeries = statsSamples
     .map((s) => s.rows.filter((r) => r.dir === 'up' && r.kbps != null).reduce((t, r) => t + r.kbps, 0))
-    .filter((v, i) => i > 0);   // the first tick has no delta to measure
+    .filter((v, i) => i > 0);
   const peak = upSeries.length ? Math.max(...upSeries) : 0;
   const mean = upSeries.length ? Math.round(upSeries.reduce((a, b) => a + b, 0) / upSeries.length) : 0;
 
@@ -932,7 +932,6 @@ async function monitorICE() {
         });
       }
     } catch (e) {
-      // Stats not available yet
     }
     setTimeout(poll, 2000);
   };

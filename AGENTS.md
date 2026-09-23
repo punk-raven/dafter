@@ -64,6 +64,8 @@ These override default behavior. Project config wins on conflict with global rul
 3. **Project files stay in this folder and are gitignored.** All project-related memory, temp files, and scratchpad are maintained inside this folder only, gitignored.
 4. **Tooling routing.** Plans through `lavish-axi`. Tasks through `tasks-axi`. GitHub through `gh-axi`. All tasks are subagent-driven on a new terminal, never on the main thread.
 5. **Explicit bypass is single-message only.** A rule bypass applies only to the current message. On the next message, all rules apply again. A bypass never carries over.
+6. **No comments in code.** Names and structure carry the context. Tool directives (`//go:`, `//nolint`, `# noqa`, `# type:`, shebangs, generated-code headers) are the only exception.
+7. **500 lines per file, hard cap.** A file that would pass 500 lines is split before it does.
 
 ## Maintaining this file
 

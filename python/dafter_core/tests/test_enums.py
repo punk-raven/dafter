@@ -1,10 +1,3 @@
-"""The generated enums must match the schemas they came from.
-
-The Go half runs the same checks against the same files. A generator bug passes
-generate-check, because the committed output matches what the generator
-produces, and fails here, because that output no longer matches the schema.
-"""
-
 from __future__ import annotations
 
 from enum import StrEnum

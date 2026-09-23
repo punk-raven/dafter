@@ -13,8 +13,6 @@ type ResolvedSessionConfig struct {
 	SessionID  string `json:"sessionId"`
 	TenantID   string `json:"tenantId"`
 
-	// SHA-256 over the RFC 8785 canonicalization, ConfigHash omitted. Swapping the
-	// scheme stops every issued hash reproducing.
 	ConfigHash string `json:"configHash,omitempty"`
 
 	PrivacyMode PrivacyMode `json:"privacyMode"`
