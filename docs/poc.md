@@ -36,6 +36,18 @@ Python worker running the cascaded pipeline. Hindi: Sarvam (saaras STT, bulbul T
 
 **Pass:** p50 < 800ms, p95 < 1.5s. Barge-in stops speech within 300ms. Backchannels and fillers do not interrupt. If p95 > 2.5s on any language, pipeline design changes before Phase 1.
 
+**Recorded, Hindi only (2026-09-24, one session each, `dafter-evals` against a local SFU, worker in Hyderabad, ~40ms RTT to Sarvam).** Gap is end of the user's synthesized speech leaving the client to the first agent audio arriving back, so it includes WebRTC both ways but no device output.
+
+| Measure | Catalog (silence 500ms, min words 2) | Pass |
+|---|---|---|
+| Turn gap, 20 turns | p50 2002ms, p95 2187ms, stdev 154ms | Fail (p95 under the 2.5s redesign line) |
+| of which end of speech to `thinking` | p50 932ms | |
+| of which `thinking` to first audio | p50 1052ms (trace: LLM TTFT p50 367ms, TTS TTFB p50 287ms) | |
+| Barge-in, 5 trials | 4 stopped, p50 1208ms, max 1448ms | Fail |
+| Backchannel / filler, 5 each | 0 interrupted; 1 of each answered as a new turn | Pass on interruption |
+
+A silence window of 300ms moved the gap p50 to 1728ms (one Sarvam final arrived 8s late). `minWords: 0` brought barge-in p50 to 507ms but let 3 of 5 backchannels interrupt. With provider endpointing and no local VAD, interruption waits for transcribed words, so the 300ms barge-in bar needs a local VAD or a faster onset signal: that is the design question this stage leaves open. English (Deepgram, Silero, semantic turn detection) is not built; the worker refuses those jobs.
+
 ## Infrastructure (parallel track)
 
 | Piece | What | How |
