@@ -26,6 +26,8 @@ type Service struct {
 	TURN      *turn.Fetcher
 	TokenTTL  time.Duration
 	Log       *slog.Logger
+
+	WorkerSecret string
 }
 
 func (s *Service) Handler() http.Handler {
@@ -37,6 +39,8 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/start", s.inviteAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
 	return mux
 }
 

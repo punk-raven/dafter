@@ -71,6 +71,7 @@ services:
       DAFTER_EGRESS_S3_FORCE_PATH_STYLE: "true"
       DAFTER_TURN_TOKEN_ID: ${DAFTER_TURN_TOKEN_ID:-}
       DAFTER_TURN_API_TOKEN: ${DAFTER_TURN_API_TOKEN:-}
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
     depends_on:
       livekit:
         condition: service_started
@@ -100,6 +101,8 @@ services:
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: secret
       LIVEKIT_AGENT_NAME: dafter-py
+      DAFTER_CONTROL_URL: http://127.0.0.1:8080
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
     depends_on:

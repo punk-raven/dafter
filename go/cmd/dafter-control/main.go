@@ -92,7 +92,13 @@ func run() error {
 		slog.Info("cloudflare TURN credentials enabled")
 	}
 
-	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl}
+	svc := &control.Service{
+		Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl,
+		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"),
+	}
+	if svc.WorkerSecret == "" {
+		slog.Info("worker calls disabled: DAFTER_WORKER_SECRET is not set, so no agent can join an end-to-end session")
+	}
 	handler := svc.MetricsHandler()
 	metricsHandler := promhttp.Handler()
 	server := &http.Server{

@@ -28,6 +28,10 @@ func (s *Service) inviteAgent(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if err := s.Store.SetAgentRefusal(r.Context(), sess.SessionID, nil); err != nil {
+		s.fail(w, err)
+		return
+	}
 	dispatchID, err := s.dispatchAgent(r.Context(), sess, cfg)
 	if err != nil {
 		s.fail(w, err)
