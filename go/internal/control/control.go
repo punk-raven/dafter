@@ -35,6 +35,8 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/join", s.joinSession)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/start", s.startRecording)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/start", s.inviteAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	return mux
 }
 

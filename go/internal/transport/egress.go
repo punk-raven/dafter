@@ -34,6 +34,7 @@ type serviceGrant struct {
 	RoomRecord bool   `json:"roomRecord,omitempty"`
 	RoomCreate bool   `json:"roomCreate,omitempty"`
 	RoomAdmin  bool   `json:"roomAdmin,omitempty"`
+	RoomList   bool   `json:"roomList,omitempty"`
 	Room       string `json:"room,omitempty"`
 }
 

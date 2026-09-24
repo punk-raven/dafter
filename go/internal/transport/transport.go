@@ -71,4 +71,5 @@ type Transport interface {
 	StartEgress(context.Context, EgressRequest) (EgressInfo, error)
 	StopEgress(ctx context.Context, egressID string) (EgressInfo, error)
 	DispatchAgent(context.Context, AgentDispatch) (DispatchInfo, error)
+	RecallAgents(ctx context.Context, room, pool string) ([]DispatchInfo, error)
 }

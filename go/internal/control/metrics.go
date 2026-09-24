@@ -65,6 +65,10 @@ func incDispatch(ok bool) {
 	agentDispatchesTotal.WithLabelValues(outcome).Inc()
 }
 
+func incRecall(n int) {
+	agentDispatchesTotal.WithLabelValues("recalled").Add(float64(n))
+}
+
 func incError(code errs.ErrorCode) {
 	errorsTotal.WithLabelValues(string(code)).Inc()
 }
@@ -86,6 +90,8 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/join", s.metricsJoinSession)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/start", s.startRecording)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/start", s.inviteAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()
@@ -104,7 +110,7 @@ func normalizePath(p string) string {
 	if !strings.HasPrefix(p, "/sessions/") {
 		return p
 	}
-	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop"} {
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
 		}

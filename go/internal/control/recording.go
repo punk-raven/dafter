@@ -258,7 +258,7 @@ func trackIDsFor(layout config.EgressLayout, req startRecordingRequest) error {
 }
 
 func located(code errs.ErrorCode, pointer, because string) *errs.Error {
-	e := errs.Errorf(code, "1 problem with the recording request")
+	e := errs.Errorf(code, "1 problem with the request")
 	e.Details = []string{fmt.Sprintf("at '%s': %s", pointer, because)}
 	return e
 }
