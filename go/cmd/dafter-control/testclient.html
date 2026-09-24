@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dafter POC - Test Client</title>
-<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
 <link rel="stylesheet" href="/agent.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
@@ -263,7 +263,7 @@
 <script>
 const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
-const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.e2ee.worker.mjs';
+const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.e2ee.worker.mjs';
 
 let room = null;
 let e2eeWorker = null;
@@ -317,7 +317,7 @@ function setE2EEBadge(state, text) {
 }
 
 function refreshE2EEBadge() {
-  if (!room || !room.options.e2ee) return;
+  if (!room || !room.options.encryption) return;
   if (room.isE2EEEnabled) setE2EEBadge('on', 'E2EE on');
   else setE2EEBadge('pending', 'E2EE pending');
 }
@@ -771,7 +771,7 @@ function downloadStats(format) {
   } else {
     body = JSON.stringify({
       capturedAt: new Date().toISOString(),
-      client: 'livekit-client@2.13.5',
+      client: 'livekit-client@2.22.3',
       session: statsContext,
       sampleIntervalMs: STATS_INTERVAL_MS,
       samples: statsSamples,
@@ -908,7 +908,7 @@ async function joinRoom() {
     }
 
     const e2ee = await e2eeOptionsFor(data);
-    if (e2ee) roomOptions.e2ee = e2ee;
+    if (e2ee) roomOptions.encryption = e2ee;
 
     room = new Room(roomOptions);
     watchAgent(room, data);
@@ -1260,7 +1260,7 @@ async function monitorICE() {
   const poll = async () => {
     if (!room || room.state !== ConnectionState.Connected) return;
 
-    document.getElementById('e2ee-state').textContent = room.options.e2ee
+    document.getElementById('e2ee-state').textContent = room.options.encryption
       ? `isE2EEEnabled=${room.isE2EEEnabled}`
       : (encryptionOf(lastConfig).mode === 'e2ee' ? 'no key: joined without a cryptor' : 'transport only');
     refreshE2EEBadge();
