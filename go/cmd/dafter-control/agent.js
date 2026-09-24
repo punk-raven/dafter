@@ -83,7 +83,7 @@ function renderAgentControls() {
   const pending = agentView.pending === (present ? 'leaving' : 'joining') ? agentView.pending : null;
   presence.textContent = pending || (present ? (agentView.state || 'joining') : 'not in call');
   presence.className = `agent-pill agent-pill-${present ? (agentView.state || 'initializing') : (pending ? 'initializing' : 'off')}`;
-  document.getElementById('agent-reason').textContent = reason;
+  document.getElementById('agent-reason').textContent = reason || agentRefusalText();
   button.textContent = present ? 'Remove agent' : 'Invite agent';
   button.className = `agent-btn ${present ? 'agent-btn-remove' : ''}`;
   button.disabled = agentView.busy || pending !== null || (!present && reason !== '');
@@ -106,6 +106,7 @@ async function toggleAgent() {
     if (action === 'start') log(`Agent invited (${data.agentDispatchId}); ${recalled}`, 'success');
     else log(`Agent removed; ${recalled}`, 'success');
     setAgentPending(action === 'start' ? 'joining' : (data.recalled.length ? 'leaving' : null));
+    if (action === 'start') expectAgent(agentView.sessionId);
   } catch (err) {
     log(`Agent ${action} failed: ${err.message}`, 'error');
   } finally {
@@ -159,6 +160,7 @@ function watchAgent(room, data) {
   room.on(RoomEvent.ParticipantConnected, (participant) => {
     if (!participant.isAgent) return;
     agentView.state = null;
+    clearAgentRefusal();
     showAgentTile(participant);
     setAgentPending(null);
   });
@@ -182,10 +184,12 @@ function watchAgent(room, data) {
     renderAgentControls();
   });
   renderAgentControls();
+  if (agentBlockedReason(data.config) === '') expectAgent(data.sessionId);
 }
 
 function stopAgent() {
   stopAgentMeters();
+  clearAgentRefusal();
   clearTimeout(agentView.pendingTimer);
   agentView.pending = null;
   agentView.room = null;
