@@ -3,12 +3,11 @@ from __future__ import annotations
 import json
 
 import pytest
+from dafter_core import schemas
 from dafter_core.config import parse
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError, ProviderContext
 from dafter_core.validation import validate_document
-
-from dafter_core import schemas
 
 
 def test_error_serializes_within_its_own_schema() -> None:

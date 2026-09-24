@@ -91,6 +91,24 @@ services:
     cap_add:
       - SYS_ADMIN
 
+  agent:
+    build:
+      context: ./python
+    network_mode: host
+    environment:
+      LIVEKIT_URL: ws://127.0.0.1:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+      LIVEKIT_AGENT_NAME: dafter-py
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
+    depends_on:
+      livekit:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:

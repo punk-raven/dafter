@@ -1,0 +1,22 @@
+[project]
+name = "dafter-evals"
+version = "0.0.0"
+description = "Scripted conversations against a live agent: turn latency, barge-in, backchannels, fillers"
+requires-python = ">=3.11"
+dependencies = [
+    "dafter-core",
+    "dafter-providers",
+    "livekit-agents==1.8.3",
+    "aiohttp>=3.10",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+dafter-evals = "dafter_evals.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dafter_evals"]

@@ -3,7 +3,6 @@ from __future__ import annotations
 from enum import StrEnum
 
 import pytest
-
 from dafter_core import (
     AgentMode,
     AgentState,
