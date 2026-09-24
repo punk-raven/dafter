@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -58,6 +59,8 @@ type createSessionResponse struct {
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
 	EncryptionKey string `json:"encryptionKey,omitempty"`
+
+	AgentDispatchID string `json:"agentDispatchId,omitempty"`
 }
 
 func mintEncryptionKey() (string, error) {
@@ -139,6 +142,12 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	dispatchID, err := s.dispatchAgent(r.Context(), sess, resolved.Config)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sessionID,
 		Identity: participantID,
@@ -171,7 +180,27 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:     token.ExpiresAt,
 		ICEServers:    iceServers,
 		EncryptionKey: keyFor(resolved.Config, sess, req.Role),
+
+		AgentDispatchID: dispatchID,
 	})
+}
+
+func (s *Service) dispatchAgent(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig) (string, error) {
+	if !cfg.Agent.Enabled {
+		return "", nil
+	}
+	info, err := s.Transport.DispatchAgent(ctx, transport.AgentDispatch{
+		Room:     sess.Room,
+		Pool:     cfg.Agent.Pool,
+		Metadata: sess.Config,
+	})
+	if err != nil {
+		incDispatch(false)
+		return "", err
+	}
+	incDispatch(true)
+	s.log().Info("agent dispatched", "session", sess.SessionID, "pool", cfg.Agent.Pool, "dispatch", info.DispatchID)
+	return info.DispatchID, nil
 }
 
 type joinSessionRequest struct {

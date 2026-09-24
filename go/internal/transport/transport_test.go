@@ -556,3 +556,52 @@ func TestWithoutStorageNoRecordingStarts(t *testing.T) {
 		})
 	}
 }
+
+func TestADispatchSendsThePinnedRequestUnderARoomScopedAdminToken(t *testing.T) {
+	t.Parallel()
+	const reply = `{"id":"AD_abc123","agent_name":"dafter-py","room":"s_7f3a9c21","metadata":"{}"}`
+	srv, calls := egressServer(t, reply, http.StatusOK)
+	doc := []byte(`{"apiVersion":"dafter.dev/v1","sessionId":"s_7f3a9c21"}`)
+	info, err := recorder(t, srv).DispatchAgent(t.Context(), transport.AgentDispatch{Room: room, Pool: "dafter-py", Metadata: doc})
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	if info.DispatchID != "AD_abc123" || info.Pool != "dafter-py" || info.Room != room {
+		t.Errorf("info = %+v", info)
+	}
+	if len(*calls) != 1 || (*calls)[0].method != "AgentDispatchService/CreateDispatch" {
+		t.Fatalf("calls were %+v", *calls)
+	}
+	raw, err := os.ReadFile(filepath.Join("testdata", "dispatch", "create-dispatch.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := compact(t, (*calls)[0].body), compact(t, raw); got != want {
+		t.Errorf("request differs from the pinned fixture\n got: %s\nwant: %s", got, want)
+	}
+	_, payload := verified(t, (*calls)[0].token)
+	grant, _ := payload["video"].(map[string]any)
+	if grant["roomAdmin"] != true || grant["room"] != room || len(grant) != 2 {
+		t.Errorf("grant = %v, want roomAdmin on %s and nothing else", grant, room)
+	}
+}
+
+func TestADispatchWithoutADocumentNeverReachesTheServer(t *testing.T) {
+	t.Parallel()
+	srv, calls := egressServer(t, "{}", http.StatusOK)
+	lk := recorder(t, srv)
+	for _, d := range []transport.AgentDispatch{
+		{Room: room, Pool: "dafter-py"},
+		{Room: room, Pool: "dafter-py", Metadata: []byte("not json")},
+		{Pool: "dafter-py", Metadata: []byte("{}")},
+		{Room: room, Metadata: []byte("{}")},
+	} {
+		var de *errs.Error
+		if _, err := lk.DispatchAgent(t.Context(), d); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+			t.Errorf("%+v was not refused: %v", d, err)
+		}
+	}
+	if len(*calls) != 0 {
+		t.Errorf("%d refused dispatches reached the server", len(*calls))
+	}
+}

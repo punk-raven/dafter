@@ -37,6 +37,19 @@ type stubTransport struct {
 	stopped   []string
 	egressErr error
 	nextID    int
+
+	dispatched  []transport.AgentDispatch
+	dispatchErr error
+}
+
+func (s *stubTransport) DispatchAgent(_ context.Context, d transport.AgentDispatch) (transport.DispatchInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dispatchErr != nil {
+		return transport.DispatchInfo{}, s.dispatchErr
+	}
+	s.dispatched = append(s.dispatched, d)
+	return transport.DispatchInfo{DispatchID: fmt.Sprintf("AD_stub%d", len(s.dispatched)), Room: d.Room, Pool: d.Pool}, nil
 }
 
 func (s *stubTransport) MintToken(g transport.Grant) (transport.Token, error) {
@@ -128,6 +141,8 @@ type sessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 	EncryptionKey string           `json:"encryptionKey,omitempty"`
+
+	AgentDispatchID string `json:"agentDispatchId,omitempty"`
 }
 
 func (h *harness) post(t *testing.T, body string) (int, []byte) {
@@ -967,5 +982,77 @@ func TestReadingAnUnknownSessionFails(t *testing.T) {
 		if status, _ := h.call(t, http.MethodGet, "/sessions/"+id, ""); status != http.StatusBadRequest {
 			t.Errorf("GET /sessions/%s returned %d", id, status)
 		}
+	}
+}
+
+func TestAnAgentSessionHandsTheStoredDocumentToItsPool(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("hi", "webrtc"))
+
+	if len(h.transport.dispatched) != 1 || got.AgentDispatchID != "AD_stub1" {
+		t.Fatalf("dispatches %+v, response id %q; one agent session is one dispatch", h.transport.dispatched, got.AgentDispatchID)
+	}
+	d := h.transport.dispatched[0]
+	stored, err := h.store.Session(t.Context(), got.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Room != got.Room || d.Pool != "dafter-py" || !bytes.Equal(d.Metadata, stored.Config) {
+		t.Errorf("dispatched room %q pool %q; the worker must receive exactly the stored, hashed document", d.Room, d.Pool)
+	}
+}
+
+const agentJobFixture = "../../../testdata/agent/hindi-webrtc-job.json"
+
+func TestTheHindiAgentJobIsPinnedForTheWorker(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := config.LoadCatalog(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := catalog.Resolve(config.Request{
+		SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelWebRTC,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.Getenv("DAFTER_UPDATE_FIXTURES") == "1" {
+		if err := os.WriteFile(agentJobFixture, append(resolved.Document, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(agentJobFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bytes.TrimSpace(want), resolved.Document) {
+		t.Errorf("the Hindi agent job changed; the worker's tests read %s, so rerun with DAFTER_UPDATE_FIXTURES=1 and check both halves\n got: %s", agentJobFixture, resolved.Document)
+	}
+}
+
+func TestNoAgentMeansNoDispatch(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, `{"tenantId":"`+tenantID+`","language":"hi","channel":"webrtc","overrides":{"agent":{"enabled":false}}}`)
+	if len(h.transport.dispatched) != 0 || got.AgentDispatchID != "" {
+		t.Errorf("a session without an agent dispatched one: %+v", h.transport.dispatched)
+	}
+}
+
+func TestAFailedDispatchMintsNoToken(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	h.transport.dispatchErr = errs.Errorf(errs.CodeProviderUnavailable, "media server unreachable")
+	status, raw := h.post(t, request("hi", "webrtc"))
+	if status != http.StatusServiceUnavailable {
+		t.Errorf("status %d: %s", status, raw)
+	}
+	if h.transport.grant.Identity != "" {
+		t.Error("a token was minted for a session whose agent never got the job")
 	}
 }

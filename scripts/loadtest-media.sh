@@ -163,7 +163,7 @@ duration_s=$(duration_seconds "$DURATION")
 per_room=$((PUBLISHERS + SUBSCRIBERS))
 
 if ! curl -fsS --max-time 3 -o /dev/null -X POST -H 'Content-Type: application/json' \
-    -d "{\"tenantId\":\"$TENANT\",\"language\":\"$LANGUAGE\",\"channel\":\"$CHANNEL\"}" \
+    -d "{\"tenantId\":\"$TENANT\",\"language\":\"$LANGUAGE\",\"channel\":\"$CHANNEL\",\"overrides\":{\"agent\":{\"enabled\":false}}}" \
     "$DAFTER_URL/sessions"; then
   die "control plane at $DAFTER_URL does not accept POST /sessions; is the dev stack up (make dev)?"
 fi
@@ -224,7 +224,7 @@ run_size() {
 
   # Phase 1: sessions and tokens through the control plane.
   local create_body create_failures=0 join_failures=0 tokens=0 bad_tokens=0 t0 t1
-  create_body=$(printf '{"tenantId":"%s","language":"%s","channel":"%s"}' "$TENANT" "$LANGUAGE" "$CHANNEL")
+  create_body=$(printf '{"tenantId":"%s","language":"%s","channel":"%s","overrides":{"agent":{"enabled":false}}}' "$TENANT" "$LANGUAGE" "$CHANNEL")
   t0=$(date +%s.%N)
   local i j resp session participant token
   for ((i = 1; i <= rooms; i++)); do

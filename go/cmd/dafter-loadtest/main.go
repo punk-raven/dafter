@@ -167,10 +167,11 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 		rampInterval = time.Millisecond
 	}
 
-	createBody, _ := json.Marshal(map[string]string{
-		"tenantId": cfg.tenant,
-		"language": cfg.language,
-		"channel":  cfg.channel,
+	createBody, _ := json.Marshal(map[string]any{
+		"tenantId":  cfg.tenant,
+		"language":  cfg.language,
+		"channel":   cfg.channel,
+		"overrides": map[string]any{"agent": map[string]bool{"enabled": false}},
 	})
 	joinBody := []byte(`{"role":"participant"}`)
 

@@ -46,11 +46,24 @@ var (
 		Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 	})
 
+	agentDispatchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dafter_agent_dispatches_total",
+		Help: "Agent dispatches by outcome.",
+	}, []string{"outcome"})
+
 	errorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_errors_total",
 		Help: "Total errors by code.",
 	}, []string{"code"})
 )
+
+func incDispatch(ok bool) {
+	outcome := "failed"
+	if ok {
+		outcome = "dispatched"
+	}
+	agentDispatchesTotal.WithLabelValues(outcome).Inc()
+}
 
 func incError(code errs.ErrorCode) {
 	errorsTotal.WithLabelValues(string(code)).Inc()

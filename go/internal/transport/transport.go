@@ -54,8 +54,21 @@ type EgressStorage struct {
 	ForcePathStyle bool
 }
 
+type AgentDispatch struct {
+	Room     string
+	Pool     string
+	Metadata []byte
+}
+
+type DispatchInfo struct {
+	DispatchID string
+	Room       string
+	Pool       string
+}
+
 type Transport interface {
 	MintToken(Grant) (Token, error)
 	StartEgress(context.Context, EgressRequest) (EgressInfo, error)
 	StopEgress(ctx context.Context, egressID string) (EgressInfo, error)
+	DispatchAgent(context.Context, AgentDispatch) (DispatchInfo, error)
 }
