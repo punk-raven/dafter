@@ -4,8 +4,9 @@ import logging
 import os
 from typing import Any
 
-from dafter_core.enums import Stage
+from dafter_core.enums import EncryptionMode, Stage
 from dafter_core.errors import DafterError
+from livekit import rtc
 from livekit.agents import (
     Agent,
     AgentServer,
@@ -25,6 +26,7 @@ from livekit.agents.voice.room_io import AudioInputOptions, AudioOutputOptions, 
 from opentelemetry import trace
 
 from . import telemetry
+from .control import ControlPlane, encryption
 from .events import TOPIC, StateEvents
 from .plan import Plan, load, plan
 from .stages import Stages, build
@@ -66,14 +68,32 @@ def refusal(exc: DafterError) -> dict[str, Any]:
     return {"code": str(exc.code), "reason": exc.message, "details": list(exc.details)}
 
 
+async def refuse(control: ControlPlane | None, session_id: str, exc: DafterError) -> None:
+    log.warning("job refused", extra=refusal(exc))
+    if control is not None:
+        await control.report_refusal(session_id, exc)
+
+
 async def on_request(req: JobRequest) -> None:
+    control = ControlPlane.from_env()
     try:
-        plan(load(req.job.metadata), pool())
+        plan(load(req.job.metadata), pool(), fetches_keys=control is not None)
     except DafterError as exc:
-        log.warning("job refused", extra=refusal(exc))
+        await refuse(control, req.room.name, exc)
         await req.reject()
         return
     await req.accept(name="Dafter agent", attributes={"dafter.role": "agent"})
+
+
+async def room_encryption(p: Plan, control: ControlPlane) -> rtc.E2EEOptions | None:
+    if p.config.media.encryption.stated_mode is not EncryptionMode.E2EE:
+        return None
+    try:
+        key = await control.session_key(p.config)
+    except DafterError as exc:
+        await refuse(control, p.config.session_id, exc)
+        raise
+    return encryption(key)
 
 
 def room_options(p: Plan, tts_sample_rate: int) -> RoomOptions:
@@ -138,11 +158,13 @@ def watch(session: AgentSession[Any], p: Plan, events: StateEvents) -> None:
 
 async def entrypoint(ctx: JobContext) -> None:
     redact_framework_logs()
-    p = plan(load(ctx.job.metadata), pool())
+    control = ControlPlane.from_env()
+    p = plan(load(ctx.job.metadata), pool(), fetches_keys=control is not None)
     provider = telemetry.install(p.config)
     stages: Stages = build(p)
+    room_key = await room_encryption(p, control) if control is not None else None
 
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY, encryption=room_key)
 
     async def publish(body: bytes) -> None:
         await ctx.room.local_participant.publish_data(body, reliable=True, topic=TOPIC)

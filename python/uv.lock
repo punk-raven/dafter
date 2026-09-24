@@ -630,6 +630,7 @@ name = "dafter-runtime"
 version = "0.0.0"
 source = { editable = "dafter_runtime" }
 dependencies = [
+    { name = "aiohttp" },
     { name = "dafter-core" },
     { name = "dafter-providers" },
     { name = "livekit-agents" },
@@ -639,6 +640,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
     { name = "dafter-core", editable = "dafter_core" },
     { name = "dafter-providers", editable = "dafter_providers" },
     { name = "livekit-agents", specifier = "==1.8.3" },

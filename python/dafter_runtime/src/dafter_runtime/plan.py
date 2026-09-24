@@ -41,7 +41,26 @@ def _refuse(code: ErrorCode, message: str, pointer: str, because: str) -> Dafter
     return DafterError(code, message, details=(f"at '{pointer}': {because}",))
 
 
-def _check_session(cfg: ResolvedSessionConfig, pool: str) -> Pipeline:
+def _check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
+    if cfg.media.encryption.stated_mode is not EncryptionMode.E2EE:
+        return
+    if not cfg.media.encryption.mints_shared_key:
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "this worker decrypts only under the control plane's shared session key",
+            "/media/encryption/keyModel",
+            "must be server_shared",
+        )
+    if not fetches_keys:
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "this worker has no control plane credential, so it cannot fetch the session key",
+            "/media/encryption/mode",
+            "e2ee needs DAFTER_CONTROL_URL and DAFTER_WORKER_SECRET on the worker",
+        )
+
+
+def _check_session(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool) -> Pipeline:
     if not cfg.agent.enabled:
         raise _refuse(
             ErrorCode.INVALID_CONFIG,
@@ -63,13 +82,7 @@ def _check_session(cfg: ResolvedSessionConfig, pool: str) -> Pipeline:
             "/agent/mode",
             "half_cascade and speech_to_speech need a realtime provider",
         )
-    if cfg.media.encryption.stated_mode is EncryptionMode.E2EE:
-        raise _refuse(
-            ErrorCode.UNSUPPORTED_CAPABILITY,
-            "this worker holds no end-to-end key, so it cannot hear an encrypted room",
-            "/media/encryption/mode",
-            "e2ee",
-        )
+    _check_encryption(cfg, fetches_keys)
     if cfg.agent.pipeline is None:
         raise _refuse(
             ErrorCode.INVALID_CONFIG,
@@ -132,8 +145,8 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     }
 
 
-def plan(cfg: ResolvedSessionConfig, pool: str) -> Plan:
-    pipeline = _check_session(cfg, pool)
+def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> Plan:
+    pipeline = _check_session(cfg, pool, fetches_keys)
     stt = _vendor(pipeline.stt, Stage.STT, cfg.language)
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)

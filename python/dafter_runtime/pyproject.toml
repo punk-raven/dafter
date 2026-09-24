@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "dafter-core",
     "dafter-providers",
+    "aiohttp>=3.9",
     "livekit-agents==1.8.3",
     "opentelemetry-sdk>=1.30",
     "opentelemetry-exporter-otlp-proto-http>=1.30",

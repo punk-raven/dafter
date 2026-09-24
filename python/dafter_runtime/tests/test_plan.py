@@ -111,14 +111,32 @@ def test_a_job_the_worker_cannot_run_is_refused_before_it_joins(
     assert any(pointer in d for d in err.details), err.details
 
 
-def test_an_encrypted_room_is_refused_because_the_worker_holds_no_key() -> None:
-    def trusted(d: dict[str, Any]) -> None:
-        d["privacyMode"] = "trusted_agent"
-        d["media"]["encryption"] = {"mode": "e2ee", "keyModel": "server_shared"}
+def trusted(d: dict[str, Any]) -> None:
+    d["privacyMode"] = "trusted_agent"
+    d["media"]["encryption"] = {"mode": "e2ee", "keyModel": "server_shared"}
 
+
+def test_an_encrypted_room_is_refused_by_a_worker_that_cannot_fetch_its_key() -> None:
     err = refused(variant(trusted))
     assert err.code is ErrorCode.UNSUPPORTED_CAPABILITY
     assert "/media/encryption/mode" in err.details[0]
+    assert "DAFTER_WORKER_SECRET" in err.details[0]
+
+
+def test_a_worker_that_fetches_keys_plans_a_trusted_agent_room() -> None:
+    p = plan(load(variant(trusted)), POOL, fetches_keys=True)
+    assert p.config.media.encryption.mints_shared_key
+
+
+def test_an_encrypted_room_without_the_shared_key_model_is_refused() -> None:
+    def unkeyed(d: dict[str, Any]) -> None:
+        trusted(d)
+        del d["media"]["encryption"]["keyModel"]
+
+    with pytest.raises(DafterError) as caught:
+        plan(load(variant(unkeyed)), POOL, fetches_keys=True)
+    assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
+    assert "/media/encryption/keyModel" in caught.value.details[0]
 
 
 def test_auto_resolves_to_provider_endpointing_for_a_recognizer_that_endpoints() -> None:
