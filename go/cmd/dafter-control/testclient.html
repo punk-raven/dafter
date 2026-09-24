@@ -94,6 +94,7 @@
   <h1>Dafter POC</h1>
   <span id="status-badge" class="badge badge-disconnected">disconnected</span>
   <span id="e2ee-badge" class="badge" style="display:none" title="Room.isE2EEEnabled"></span>
+  <span id="agent-badge" class="badge" style="display:none" title="agent.state_changed"></span>
 </div>
 
 <div class="layout">
@@ -134,6 +135,12 @@
         <label>Noise filter</label>
         <select id="noise-cancellation">
           <option value="" selected>follow the catalog</option>
+        </select>
+        <label>Agent</label>
+        <select id="agent-mode">
+          <option value="" selected>follow the catalog</option>
+          <option value="on">on - dispatch the worker pool</option>
+          <option value="off">off - no agent</option>
         </select>
         <label>Recording</label>
         <select id="recording-layout">
@@ -252,6 +259,7 @@
   </div>
 </div>
 
+<script src="/agent.js"></script>
 <script>
 const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
@@ -808,6 +816,8 @@ async function createSession() {
         log('sealed refuses an agent at the API, so the override disables it');
       }
     }
+    const agent = agentOverride();
+    if (agent && !overrides.agent) overrides.agent = agent;
     if (Object.keys(overrides).length) body.overrides = overrides;
 
     const layout = document.getElementById('recording-layout').value;
@@ -833,6 +843,7 @@ async function createSession() {
     lastRoomId = data.room;
     log(`Session created: ${data.sessionId}`, 'success');
     log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
+    if (data.agentDispatchId) log(`Agent dispatched to ${data.config.agent.pool} (${data.agentDispatchId}); join to talk to it`, 'success');
 
     const joinUrl = `${window.location.origin}?room=${data.room}`;
     document.getElementById('created-room-id').textContent = data.room;
@@ -900,6 +911,7 @@ async function joinRoom() {
     if (e2ee) roomOptions.e2ee = e2ee;
 
     room = new Room(roomOptions);
+    watchAgentState(room);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
@@ -1027,6 +1039,7 @@ async function leaveSession() {
 }
 
 function cleanup() {
+  setAgentBadge(null);
   stopStats();
   syntheticVideo = false;
   if (syntheticIntervalId != null) {

@@ -28,6 +28,9 @@ var embeddedCatalog []byte
 //go:embed testclient.html
 var testClientHTML []byte
 
+//go:embed agent.js
+var agentJS []byte
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("dafter-control stopped", "error", err)
@@ -92,6 +95,13 @@ func run() error {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				if _, err := w.Write(testClientHTML); err != nil {
 					slog.Error("write test client", "error", err)
+				}
+				return
+			}
+			if r.Method == http.MethodGet && r.URL.Path == "/agent.js" {
+				w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+				if _, err := w.Write(agentJS); err != nil {
+					slog.Error("write agent script", "error", err)
 				}
 				return
 			}
