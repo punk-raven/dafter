@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dafter POC - Test Client</title>
 <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.13.5/dist/livekit-client.umd.min.js"></script>
+<link rel="stylesheet" href="/agent.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
@@ -79,7 +80,7 @@
 
   .ice-info { margin-top: 12px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; line-height: 1.6; }
   .ice-info dt { color: #888; float: left; width: 100px; clear: left; }
-  .ice-info dd { margin-left: 104px; color: #e0e0e0; }
+  .ice-info dd { margin-left: 104px; color: #e0e0e0; overflow-wrap: anywhere; }
 
   .response-box { margin-top: 8px; padding: 8px; background: #1a1a1a; border-radius: 6px; font-size: 11px; font-family: monospace; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #888; }
 
@@ -94,7 +95,6 @@
   <h1>Dafter POC</h1>
   <span id="status-badge" class="badge badge-disconnected">disconnected</span>
   <span id="e2ee-badge" class="badge" style="display:none" title="Room.isE2EEEnabled"></span>
-  <span id="agent-badge" class="badge" style="display:none" title="agent.state_changed"></span>
 </div>
 
 <div class="layout">
@@ -259,7 +259,7 @@
   </div>
 </div>
 
-<script src="/agent.js"></script>
+<script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent.js"></script>
 <script>
 const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
@@ -911,7 +911,7 @@ async function joinRoom() {
     if (e2ee) roomOptions.e2ee = e2ee;
 
     room = new Room(roomOptions);
-    watchAgentState(room);
+    watchAgent(room, data);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
@@ -1039,7 +1039,7 @@ async function leaveSession() {
 }
 
 function cleanup() {
-  setAgentBadge(null);
+  stopAgent();
   stopStats();
   syntheticVideo = false;
   if (syntheticIntervalId != null) {

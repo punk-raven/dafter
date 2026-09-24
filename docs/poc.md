@@ -48,6 +48,8 @@ Python worker running the cascaded pipeline. Hindi: Sarvam (saaras STT, bulbul T
 
 A silence window of 300ms moved the gap p50 to 1728ms (one Sarvam final arrived 8s late). `minWords: 0` brought barge-in p50 to 507ms but let 3 of 5 backchannels interrupt. With provider endpointing and no local VAD, interruption waits for transcribed words, so the 300ms barge-in bar needs a local VAD or a faster onset signal: that is the design question this stage leaves open. English (Deepgram, Silero, semantic turn detection) is not built; the worker refuses those jobs.
 
+For a real-time check, the test client shows the agent as a call participant: invite or remove it mid-call, a live transcript, and per turn the end of speech to `thinking` (endpoint), `thinking` to first agent audio heard in the page (respond), their sum, and a running p50, measured in the browser from the microphone and agent audio levels. One headless session with a synthesized Hindi question and a spoken interruption (2026-09-24) read totals of 2620ms and 1880ms, endpoints of 893ms and 883ms, and a barge-in stop of 1326ms, in line with the table above.
+
 ## Infrastructure (parallel track)
 
 | Piece | What | How |

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,8 +28,15 @@ var embeddedCatalog []byte
 //go:embed testclient.html
 var testClientHTML []byte
 
-//go:embed agent.js
-var agentJS []byte
+//go:embed agent.js agent-call.js agent-turns.js agent.css
+var clientAssets embed.FS
+
+var clientAssetPaths = map[string]string{
+	"/agent.js":       "agent.js",
+	"/agent-call.js":  "agent-call.js",
+	"/agent-turns.js": "agent-turns.js",
+	"/agent.css":      "agent.css",
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -98,11 +105,8 @@ func run() error {
 				}
 				return
 			}
-			if r.Method == http.MethodGet && r.URL.Path == "/agent.js" {
-				w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-				if _, err := w.Write(agentJS); err != nil {
-					slog.Error("write agent script", "error", err)
-				}
+			if name, ok := clientAssetPaths[r.URL.Path]; ok && r.Method == http.MethodGet {
+				http.ServeFileFS(w, r, clientAssets, name)
 				return
 			}
 			if r.Method == http.MethodGet && r.URL.Path == "/metrics" {
