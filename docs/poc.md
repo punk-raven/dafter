@@ -4,7 +4,7 @@ Prove the hard parts work before committing to Phase 1. Throwaway code: one regi
 
 ## How the pieces connect
 
-Control plane (Go, SQLite) resolves config, mints a LiveKit token, dispatches the agent worker, returns a join URL. The browser and agent worker both join LiveKit with their tokens. The worker runs VAD -> STT -> LLM -> TTS on the user's audio and publishes speech back. Egress writes recordings to MinIO. The resolved config document is the contract between Go and Python - resolved once, hashed (RFC 8785), handed to the worker. The worker never calls back mid-turn.
+Control plane (Go, SQLite) resolves config, mints a LiveKit token, dispatches the agent worker, returns a join URL. The browser and agent worker both join LiveKit with their tokens. The worker runs VAD -> STT -> LLM -> TTS on the user's audio and publishes speech back. Egress writes recordings to MinIO. The resolved config document is the contract between Go and Python - resolved once, hashed (RFC 8785), handed to the worker. The worker calls back only at job start: for the session key when the room is end-to-end encrypted, and to report a job it refuses. It never calls back mid-turn.
 
 ## 1. Control plane configuration
 
@@ -49,6 +49,17 @@ Python worker running the cascaded pipeline. Hindi: Sarvam (saaras STT, bulbul T
 A silence window of 300ms moved the gap p50 to 1728ms (one Sarvam final arrived 8s late). `minWords: 0` brought barge-in p50 to 507ms but let 3 of 5 backchannels interrupt. With provider endpointing and no local VAD, interruption waits for transcribed words, so the 300ms barge-in bar needs a local VAD or a faster onset signal: that is the design question this stage leaves open. English (Deepgram, Silero, semantic turn detection) is not built; the worker refuses those jobs.
 
 For a real-time check, the test client shows the agent as a call participant: invite or remove it mid-call, a live transcript, and per turn the end of speech to `thinking` (endpoint), `thinking` to first agent audio heard in the page (respond), their sum, and a running p50, measured in the browser from the microphone and agent audio levels. One headless session with a synthesized Hindi question and a spoken interruption (2026-09-24) read totals of 2620ms and 1880ms, endpoints of 893ms and 883ms, and a barge-in stop of 1326ms, in line with the table above.
+
+**The agent in an end-to-end session (`trusted_agent`, 2026-09-24).** The worker fetches the session's shared key from the control plane at job start, over its own credential and never through the media server, and joins with the same key provider settings as the browser. One headless session with a synthesized Hindi question: the agent joined as an encrypted participant, its greeting and reply decoded in the browser with no concealed samples, and it transcribed the question, so both directions decrypt. `open` still dispatches and greets unencrypted; `sealed` still refuses an agent at the API.
+
+What frame encryption in that session covers and what it does not:
+
+| Covered (the media server relays ciphertext) | Not covered (the media server or Dafter still sees it) |
+|---|---|
+| Audio and video frames both ways, except the first byte of each audio frame (Opus TOC) and a few header bytes of each video frame, left clear by the frame cryptor | The session key itself: minted, stored and disclosed by the control plane, so this protects against the media server and the network, not against Dafter |
+| The agent's data packets, including `agent.state_changed` on `dafter.events` and its transcripts on `lk.transcription`: its SDK encrypts them in an e2ee room, which is why the test client needs `livekit-client` 2.16 or newer | Participant identities, names, attributes (`dafter.role`), join and leave times, track and room names, the room's job metadata (the resolved document) |
+| The browser's own data packets, since it passes the key provider as `RoomOptions.encryption` | Packet sizes and timing, and the per-packet audio level header the media server uses for active speaker detection, so who speaks when is visible |
+| | The key on the worker-to-control call travels over plain HTTP in the dev stack; outside it that call needs TLS. The worker credential is one static secret for the whole pool, and the `configHash` it sends is in the job metadata the media server sees, so the credential is the only gate |
 
 ## Infrastructure (parallel track)
 
