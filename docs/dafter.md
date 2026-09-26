@@ -361,6 +361,21 @@ recording is refused outright under both end-to-end modes rather than falling
 back to a client-side or consumer-keyed path, because every egress layout the
 platform has is server-side and sees ciphertext.
 
+**Who the agent hears is a privacy decision too, and `agent.addressing.mode`
+states it.** In `always` the agent is linked to one participant, and only that
+person's speech goes to the STT provider. In `transcript` the agent waits to be
+called by name, so it must hear everyone: **every human's speech in the call is
+sent to the session's STT provider** (one stream per participant), including
+everything never meant for the agent, and the last few lines anyone said are
+handed to the LLM as context when it is called. A session that picks
+`transcript` is a session whose consent covers every participant being
+transcribed by that provider, not only the one who talks to the agent; the
+provider, region and residency rules are the same ones the pipeline already
+names. `on_device` is the mode that keeps speech local until the name is
+spotted; it is declared in the schema and refused by the worker until a local
+spotter exists. Events about the agent's addressing carry who woke it as an
+opaque participant id and never what anyone said.
+
 **Envelope encryption.** Each recording gets a unique data key (fast, local); the data key is wrapped by the tenant master key and stored beside the object. This buys per-object isolation, cheap bulk crypto, revocation by disabling the master key, and rotation without re-encrypting media.
 
 **The seal stage.** Egress writes to object storage directly and cannot apply the envelope itself, so sealing is an explicit stage in the processing plane:
