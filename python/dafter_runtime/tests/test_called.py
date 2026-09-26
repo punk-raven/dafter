@@ -11,8 +11,9 @@ from dafter_runtime.addressing import Gate
 from dafter_runtime.answering import Roster, Voice
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
+from dafter_runtime.toolbox import Answering, registry_for
 from dafter_runtime.worker import room_options
-from livekit.agents import Agent, AgentSession
+from livekit.agents import AgentSession
 from stub_llm import REPLY, StubLLM, said
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
@@ -80,6 +81,11 @@ class Call:
             schedule=self.scheduler,
         )
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
+        self.registry = registry_for(
+            p, session, self.roster, lambda: self.gate.addressee, self.gate.sleep
+        )
+        self.voice.before_answer = self.registry.heard
+        self.agent = Answering(p.persona.instructions, self.registry, lambda: self.gate.addressee)
 
     async def answered(self) -> None:
         assert self.voice.reply is not None
@@ -87,14 +93,15 @@ class Call:
         await asyncio.sleep(0)
 
 
-def run_call(script: Callable[[Call, StubLLM], Any]) -> StubLLM:
+def run_call(script: Callable[[Call, StubLLM], Any], calls: list[str] | None = None) -> StubLLM:
     p = called_plan()
-    stub = StubLLM()
+    stub = StubLLM(calls=calls)
 
     async def run() -> None:
         async with AgentSession[None](llm=stub) as session:
-            await session.start(Agent(instructions=p.persona.instructions))
-            await script(Call(p, session), stub)
+            call = Call(p, session)
+            await session.start(call.agent)
+            await script(call, stub)
 
     asyncio.run(run())
     return stub
@@ -250,3 +257,15 @@ def test_roster_labels_by_name_or_by_order_of_joining() -> None:
         "Ravi",
         ["Ravi"],
     )
+
+
+def test_the_agent_can_send_itself_to_sleep_with_go_quiet() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "Nivya, that will be all for today, thanks")
+        await call.answered()
+        assert call.gate.dormant
+        call.gate.heard(ASHA, "and tomorrow?")
+
+    stub = run_call(script, calls=["go_quiet"])
+    assert len(stub.requests) == 2
+    assert stub.offered[0] == ["current_time", "go_quiet", "who_is_here"]

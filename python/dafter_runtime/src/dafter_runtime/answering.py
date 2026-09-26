@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from livekit.agents import AgentSession
@@ -47,8 +48,11 @@ class Voice:
         self._roster = roster
         self._interruptible = interruptible
         self.reply: SpeechHandle | None = None
+        self.before_answer: Callable[[str, str], None] | None = None
 
     def answer(self, speaker: str, text: str, overheard: list[Said]) -> None:
+        if self.before_answer is not None:
+            self.before_answer(speaker, text)
         if self._interruptible:
             self._session.interrupt()
         self.reply = self._session.generate_reply(

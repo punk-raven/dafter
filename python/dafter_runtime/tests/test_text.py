@@ -9,9 +9,11 @@ from typing import Any
 import pytest
 from dafter_core.enums import EventType
 from dafter_core.events import EventEnvelope, parse_event
+from dafter_runtime.answering import Roster
 from dafter_runtime.events import SessionEvents
 from dafter_runtime.metrics import WorkerMetrics
 from dafter_runtime.plan import Plan, load, plan
+from dafter_runtime.toolbox import Answering, registry_for
 from dafter_runtime.worker import watch
 from livekit.agents import Agent, AgentSession, RunResult
 from opentelemetry import trace
@@ -117,3 +119,17 @@ def test_a_text_session_reports_its_turns_and_what_they_cost() -> None:
 
 def of(events: list[EventEnvelope], event_type: EventType) -> list[dict[str, Any]]:
     return [e.payload for e in events if e.type is event_type]
+
+
+def test_an_agent_that_always_answers_offers_the_everyday_tools_but_not_go_quiet() -> None:
+    p = hindi_plan()
+    stub = StubLLM()
+
+    async def run() -> None:
+        async with AgentSession[None](llm=stub) as session:
+            registry = registry_for(p, session, Roster(), lambda: None, None)
+            await session.start(Answering(p.persona.instructions, registry, lambda: None))
+            await session.run(user_input="नमस्ते")
+
+    asyncio.run(run())
+    assert stub.offered == [["current_time", "who_is_here"]]

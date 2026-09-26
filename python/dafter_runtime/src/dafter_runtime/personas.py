@@ -45,7 +45,8 @@ def called_by_name(persona: Persona, name: str) -> Persona:
             "people and you speak only when one of them calls you. Each message starts with "
             "who spoke in square brackets: lines marked 'to you' are the person talking to "
             "you, who is the one you answer; lines marked 'not to you' are what others said "
-            "in the call just before, which you may use as context but never answer or quote."
+            "in the call just before, which you may use as context but never answer or quote. "
+            "Call go_quiet when the person talking to you is done or asks you to be quiet."
         ),
         greeting=persona.greeting,
     )

@@ -49,6 +49,9 @@ class Called:
         )
         self._tasks: set[asyncio.Task[None]] = set()
 
+    def addressee(self) -> str | None:
+        return self.gate.addressee
+
     def usage(self) -> AgentSessionUsage:
         return AgentSessionUsage(
             model_usage=[*self._session.usage.model_usage, *self.listeners.usage()]

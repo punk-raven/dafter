@@ -21,9 +21,13 @@ class StubStream(llm.LLMStream):
     ) -> None:
         super().__init__(owner, chat_ctx=chat_ctx, tools=tools, conn_options=conn_options)
         self._reply = owner.reply
+        self._call = owner.calls.pop(0) if owner.calls else None
 
     async def _run(self) -> None:
         delta = llm.ChoiceDelta(role="assistant", content=self._reply)
+        if self._call is not None:
+            call = llm.FunctionToolCall(name=self._call, arguments="{}", call_id=f"c_{self._call}")
+            delta = llm.ChoiceDelta(role="assistant", tool_calls=[call])
         usage = llm.CompletionUsage(
             completion_tokens=COMPLETION_TOKENS,
             prompt_tokens=PROMPT_TOKENS,
@@ -34,10 +38,12 @@ class StubStream(llm.LLMStream):
 
 
 class StubLLM(llm.LLM[Any]):
-    def __init__(self, reply: str = REPLY) -> None:
+    def __init__(self, reply: str = REPLY, calls: list[str] | None = None) -> None:
         super().__init__()
         self.reply = reply
+        self.calls = list(calls or [])
         self.requests: list[llm.ChatContext] = []
+        self.offered: list[list[str]] = []
 
     @property
     def model(self) -> str:
@@ -58,6 +64,7 @@ class StubLLM(llm.LLM[Any]):
         extra_kwargs: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
     ) -> llm.LLMStream:
         self.requests.append(chat_ctx.copy())
+        self.offered.append(sorted(t.id for t in tools or []))
         return StubStream(self, chat_ctx=chat_ctx, tools=tools or [], conn_options=conn_options)
 
 

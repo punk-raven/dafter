@@ -9,7 +9,6 @@ from dafter_core.enums import EncryptionMode, EventType, Stage
 from dafter_core.errors import DafterError
 from livekit import local_inference, rtc
 from livekit.agents import (
-    Agent,
     AgentServer,
     AgentSession,
     AutoSubscribe,
@@ -30,6 +29,7 @@ from livekit.agents.voice.room_io import AudioInputOptions, AudioOutputOptions, 
 from opentelemetry import trace
 
 from . import telemetry
+from .answering import Roster
 from .called import Called
 from .control import ControlPlane, encryption
 from .cost import load_prices, priced, usage_payload
@@ -38,6 +38,7 @@ from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
 from .stages import Stages, build
 from .timing import Turns
+from .toolbox import Answering, follow, linked, registry_for
 
 POOL_ENV = "LIVEKIT_AGENT_NAME"
 DEFAULT_POOL = "dafter-py"
@@ -250,10 +251,25 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(flush)
     called = Called(ctx, p, stages, session, stt_sample_rate(p)) if p.called_by_name else None
-    usage = called.usage if called is not None else None
-    watch(session, p, events, telemetry.tracer(provider), usage=usage)
+    caller: Callable[[], str | None]
+    if called is not None:
+        caller = called.addressee
+        registry = registry_for(p, session, called.roster, caller, called.gate.sleep)
+        called.voice.before_answer = registry.heard
+    else:
+        roster = Roster()
+        follow(ctx.room, roster)
+        caller = linked(session)
+        registry = registry_for(p, session, roster, caller, None)
+    watch(
+        session,
+        p,
+        events,
+        telemetry.tracer(provider),
+        usage=called.usage if called is not None else None,
+    )
     await session.start(
-        agent=Agent(instructions=p.persona.instructions),
+        agent=Answering(p.persona.instructions, registry, caller),
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate),
         record=False,
