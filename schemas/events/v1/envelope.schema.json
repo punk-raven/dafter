@@ -265,8 +265,13 @@
         "e2eLatencyMs": {
           "$ref": "#/$defs/LayerMs",
           "description": "From the end of the user's speech to the agent starting to speak."
+        },
+        "serial": {
+          "type": "boolean",
+          "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs), so the reply waited on more than its first sentence and its latency tracked the length of the reply. Present only when both LLM layers were measured."
         }
-      }
+      },
+      "dependentRequired": { "serial": ["llmNodeTtftMs", "llmNodeTtfsMs"] }
     },
 
     "UsageItem": {

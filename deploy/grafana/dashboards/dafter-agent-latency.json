@@ -30,7 +30,7 @@
       "title": "Reply time p50",
       "description": "Worker-measured end of the user's speech to the agent starting to speak, median over 15 min. Target under 800 ms (docs/dafter.md, Latency).",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
@@ -65,7 +65,7 @@
       "title": "Reply time p95",
       "description": "The same, 1 turn in 20 slower than this. Target under 1.5 s; over 2.5 s users talk over the agent.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
@@ -104,7 +104,7 @@
       "title": "Agent turns (15 min)",
       "description": "Agent replies measured end to end in the last 15 min. A greeting has no end to end time and is not counted.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -250,7 +250,7 @@
       "title": "Where the reply time goes, p95 by layer",
       "description": "The same at p95. The dashed line is the 1.5 s p95 target for e2e_latency.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 13},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
@@ -287,6 +287,99 @@
           "expr": "histogram_quantile(0.95, sum by (le, layer) (rate(dafter_agent_turn_layer_seconds_bucket[5m]))) * 1000",
           "legendFormat": "{{layer}}",
           "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Serial share (1 h)",
+      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs): its reply time tracked the whole reply rather than the first sentence. Share of the turns the rule could judge, both LLM layers measured.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "noValue": "-",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#73BF69", "value": null},
+              {"color": "#FF9830", "value": 5},
+              {"color": "#F2495C", "value": 20}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "(100 * sum(increase(dafter_agent_serial_turns_total[1h])) or vector(0)) / (sum(increase(dafter_agent_serial_checked_turns_total[1h])) > 0)",
+          "legendFormat": "Serial share (1 h)",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Serial turns per minute",
+      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs): its reply time tracked the whole reply rather than the first sentence.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "judged"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#5794F2"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (llm, tts) (rate(dafter_agent_serial_turns_total[5m])) * 60",
+          "legendFormat": "serial {{llm}} to {{tts}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(dafter_agent_serial_checked_turns_total[5m])) * 60",
+          "legendFormat": "judged",
+          "refId": "B",
           "range": true
         }
       ]

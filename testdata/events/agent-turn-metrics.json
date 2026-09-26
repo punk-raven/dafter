@@ -16,6 +16,7 @@
     "llmNodeTtfsMs": 1021,
     "ttsNodeTtfbMs": 296,
     "playbackLatencyMs": 3,
-    "e2eLatencyMs": 1968
+    "e2eLatencyMs": 1968,
+    "serial": false
   }
 }

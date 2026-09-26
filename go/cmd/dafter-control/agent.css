@@ -59,5 +59,7 @@ table.agent-turns td { padding: 3px 5px; border-bottom: 1px solid #151515; white
 table.agent-turns .num { text-align: right; }
 table.agent-turns tr.agent-barge td { color: #f87171; }
 table.agent-turns tr.agent-turn-cut td:first-child { color: #f87171; }
+table.agent-turns tr.agent-turn-serial td:not(:first-child):not(:last-child) { color: #fb923c; }
+table.agent-turns tr.agent-turn-serial td:first-child { box-shadow: inset 2px 0 0 #fb923c; }
 table.agent-turns tr:not(.agent-barge) td:last-child, table.agent-turns th:last-child { border-left: 1px solid #1c1c1c; }
 table.agent-turns .agent-empty-row td { color: #555; text-align: center; padding: 12px; }

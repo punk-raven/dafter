@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from dafter_runtime.timing import SPAN_NAME, Turns
+import pytest
+from dafter_runtime.timing import SERIAL_WAIT_MS, SPAN_NAME, Turns, TurnTiming
 from livekit.agents.llm import ChatMessage
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -48,6 +49,7 @@ def test_a_reply_joins_the_user_layers_of_the_message_it_answers() -> None:
         "ttsNodeTtfbMs": 296,
         "playbackLatencyMs": 3,
         "e2eLatencyMs": 1968,
+        "serial": False,
     }
 
 
@@ -120,4 +122,55 @@ def test_log_fields_keep_seconds_and_the_span_carries_milliseconds() -> None:
         "dafter.turn.tts_node_ttfb_ms": 296,
         "dafter.turn.playback_latency_ms": 3,
         "dafter.turn.e2e_latency_ms": 1968,
+        "dafter.turn.serial": False,
     }
+
+
+def llm_layers(ttft: float, ttfs: float) -> TurnTiming:
+    return TurnTiming(
+        turn=0, interrupted=False, seconds={"llm_node_ttft": ttft, "llm_node_ttfs": ttfs}
+    )
+
+
+@pytest.mark.parametrize(
+    ("ttft", "ttfs", "serial"),
+    [
+        (0.367, 0.52, False),
+        (0.4, 0.9, False),
+        (0.4, 0.901, True),
+        (0.3, 2.4, True),
+        (1.8, 1.9, False),
+    ],
+)
+def test_a_turn_is_serial_when_its_first_sentence_waits_past_the_first_token(
+    ttft: float, ttfs: float, serial: bool
+) -> None:
+    timing = llm_layers(ttft, ttfs)
+    assert timing.serial() is serial
+    assert timing.payload()["serial"] is serial
+    assert timing.span_attributes()["dafter.turn.serial"] is serial
+    assert timing.log_fields()["serial"] is serial
+
+
+def test_the_rule_reads_the_milliseconds_the_row_carries() -> None:
+    timing = llm_layers(0.4006, 0.9014)
+    row = timing.payload()
+    assert row["llmNodeTtfsMs"] - row["llmNodeTtftMs"] == SERIAL_WAIT_MS
+    assert row["serial"] is False
+
+
+@pytest.mark.parametrize(
+    "seconds",
+    [
+        {"llm_node_ttft": 0.3, "tts_node_ttfb": 0.2},
+        {"llm_node_ttfs": 2.0},
+        {},
+    ],
+    ids=["interrupted before the first sentence", "no first token", "nothing measured"],
+)
+def test_a_turn_without_both_llm_layers_is_not_judged(seconds: dict[str, float]) -> None:
+    timing = TurnTiming(turn=0, interrupted=True, seconds=seconds)
+    assert timing.serial() is None
+    assert "serial" not in timing.payload()
+    assert "dafter.turn.serial" not in timing.span_attributes()
+    assert "serial" not in timing.log_fields()

@@ -62,6 +62,16 @@ def test_every_measured_layer_is_observed_under_the_pipeline_that_ran() -> None:
     assert registry.get_sample_value("dafter_agent_turn_layer_seconds_count", ttft) == 1
 
 
+def test_serial_turns_are_counted_beside_the_turns_the_rule_could_judge() -> None:
+    registry, session = fresh()
+    judged = {"llm_node_ttft": 0.3}
+    session.turn(TurnTiming(0, False, {**judged, "llm_node_ttfs": 0.5}))
+    session.turn(TurnTiming(1, False, {**judged, "llm_node_ttfs": 2.3}))
+    session.turn(TurnTiming(2, True, judged))
+    assert registry.get_sample_value("dafter_agent_serial_checked_turns_total", PIPELINE) == 2
+    assert registry.get_sample_value("dafter_agent_serial_turns_total", PIPELINE) == 1
+
+
 def test_no_label_names_a_session() -> None:
     registry, session = fresh()
     session.turn(TurnTiming(turn=0, interrupted=False, seconds={"e2e_latency": 0.9}))

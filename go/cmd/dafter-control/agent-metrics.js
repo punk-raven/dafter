@@ -8,6 +8,7 @@ const AGENT_LAYER_LABELS = {
   playbackLatencyMs: 'playback',
   e2eLatencyMs: 'end to end',
 };
+const SERIAL_WAIT_MS = 500;
 const TURN_COLUMNS = AGENT_LAYER_COLUMNS.length + 2;
 const HEARD_COLUMN = TURN_COLUMNS - 1;
 
@@ -45,10 +46,14 @@ function onTurnMetrics(payload) {
   row.children[0].textContent = String(payload.turn);
   AGENT_LAYER_COLUMNS.forEach((key, i) => { row.children[i + 1].textContent = turnCell(payload[key]); });
   row.classList.toggle('agent-turn-cut', payload.interrupted === true);
+  row.classList.toggle('agent-turn-serial', payload.serial === true);
   const layers = Object.entries(AGENT_LAYER_LABELS)
     .filter(([key]) => payload[key] != null)
     .map(([key, label]) => `${label} ${payload[key]} ms`);
-  row.dataset.agentDetail = `agent turn ${payload.turn}${payload.interrupted ? ' (interrupted)' : ''}: ${layers.join(', ') || 'no layer measured'}`;
+  const serial = payload.serial === true
+    ? `; went serial, the first sentence reached TTS ${payload.llmNodeTtfsMs - payload.llmNodeTtftMs} ms after the LLM's first token (over ${SERIAL_WAIT_MS} ms)`
+    : '';
+  row.dataset.agentDetail = `agent turn ${payload.turn}${payload.interrupted ? ' (interrupted)' : ''}: ${layers.join(', ') || 'no layer measured'}${serial}`;
   row.title = turnTitle(row);
   log(row.dataset.agentDetail);
 }

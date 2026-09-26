@@ -11,7 +11,7 @@ from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram
 
 from .cost import Item, model_name, provider_name
 from .plan import Plan
-from .timing import TurnTiming
+from .timing import SERIAL_WAIT_MS, TurnTiming
 
 PORT_ENV = "DAFTER_METRICS_PORT"
 MULTIPROC_ENV = "PROMETHEUS_MULTIPROC_DIR"
@@ -52,6 +52,19 @@ class WorkerMetrics:
             "Where an agent turn's latency went, one series per layer, measured in the worker.",
             ["layer", *PIPELINE],
             buckets=LAYER_BUCKETS,
+            registry=registry,
+        )
+        self.serial_checked = Counter(
+            "dafter_agent_serial_checked_turns",
+            "Agent turns the serial rule could judge: both LLM layers were measured.",
+            PIPELINE,
+            registry=registry,
+        )
+        self.serial = Counter(
+            "dafter_agent_serial_turns",
+            "Agent turns that went serial: the first sentence reached TTS more than "
+            f"{SERIAL_WAIT_MS} ms after the LLM's first token.",
+            PIPELINE,
             registry=registry,
         )
         self.cost = Counter(
@@ -116,6 +129,11 @@ class SessionMetrics:
     def turn(self, timing: TurnTiming) -> None:
         for layer, seconds in timing.seconds.items():
             self._metrics.layers.labels(layer, *self._pipeline).observe(seconds)
+        serial = timing.serial()
+        if serial is not None:
+            self._metrics.serial_checked.labels(*self._pipeline).inc()
+        if serial:
+            self._metrics.serial.labels(*self._pipeline).inc()
 
     def usage(self, items: Iterable[Item]) -> None:
         for item in items:

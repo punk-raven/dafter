@@ -25,6 +25,7 @@ PAYLOAD_FIELDS = {
     "e2e_latency": "e2eLatencyMs",
 }
 SPAN_NAME = "dafter.agent_turn"
+SERIAL_WAIT_MS = 500
 
 
 def _layers(metrics: Mapping[str, Any], keys: tuple[str, ...]) -> dict[str, float]:
@@ -45,9 +46,17 @@ class TurnTiming:
     def milliseconds(self) -> dict[str, int]:
         return {key: round(value * 1000) for key, value in self.seconds.items()}
 
+    def serial(self) -> bool | None:
+        ms = self.milliseconds()
+        if "llm_node_ttft" not in ms or "llm_node_ttfs" not in ms:
+            return None
+        return ms["llm_node_ttfs"] - ms["llm_node_ttft"] > SERIAL_WAIT_MS
+
     def payload(self) -> dict[str, Any]:
         body: dict[str, Any] = {"turn": self.turn, "interrupted": self.interrupted}
         body.update({PAYLOAD_FIELDS[k]: ms for k, ms in self.milliseconds().items()})
+        if (serial := self.serial()) is not None:
+            body["serial"] = serial
         return body
 
     def span_attributes(self) -> dict[str, int | bool]:
@@ -56,11 +65,15 @@ class TurnTiming:
             "dafter.turn.interrupted": self.interrupted,
         }
         attrs.update({f"dafter.turn.{k}_ms": ms for k, ms in self.milliseconds().items()})
+        if (serial := self.serial()) is not None:
+            attrs["dafter.turn.serial"] = serial
         return attrs
 
     def log_fields(self) -> dict[str, Any]:
         fields: dict[str, Any] = {"turn": self.turn, "interrupted": self.interrupted}
         fields.update({k: round(v, 4) for k, v in self.seconds.items()})
+        if (serial := self.serial()) is not None:
+            fields["serial"] = serial
         return fields
 
     def record(self, tracer: trace.Tracer) -> None:

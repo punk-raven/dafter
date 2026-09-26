@@ -8,7 +8,9 @@ and must accept them, then refuse the same mutations of them:
 - `python/dafter_core/tests/test_events.py`
 
 `agent-turn-metrics.json` is one agent turn's latency split into its layers, in
-milliseconds.
+milliseconds. Its first sentence reached TTS 287 ms after the LLM's first
+token, inside the 500 ms the serial rule allows, so `serial` is false; a
+`serial` without both LLM layers is refused.
 
 `session-usage.json` is a session's consumption with one priced item and one
 unpriced one. An unpriced item carries no `costInr` at all, and `costInr` on
