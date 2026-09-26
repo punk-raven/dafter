@@ -39,6 +39,7 @@ STT_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
 STT_SAMPLE_RATES = {8000: 8000, 16000: 16000}
 TTS_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
 TTS_SAMPLE_RATES = {r: r for r in (8000, 16000, 22050, 24000, 48000)}
+MAX_FINAL_GRACE_MS = 10000
 
 T = TypeVar("T")
 
@@ -89,11 +90,19 @@ def _construct(stage: Stage, build: Callable[[], T]) -> T:
 
 def build_stt(ref: ProviderRef, language: str, turn: Turn) -> stt.STT[Any]:
     _checked(ref, Stage.STT, STT_MODELS)
-    opts = Options(Stage.STT, NAME, ref.options, ("chunkMs", "encoding", "sampleRate"))
+    opts = Options(
+        Stage.STT, NAME, ref.options, ("chunkMs", "encoding", "sampleRate", "finalGraceMs")
+    )
     code = language_code(language, Stage.STT)
     stream_type = opts.choice("chunkMs", CHUNK_PROFILES, 500)
     encoding = opts.choice("encoding", STT_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", STT_SAMPLE_RATES, 16000)
+    final_grace_ms = opts.get("finalGraceMs", int, 1500)
+    if not 0 <= final_grace_ms <= MAX_FINAL_GRACE_MS:
+        raise opts.error(
+            "an option is out of range",
+            f"at '{opts.pointer('finalGraceMs')}': between 0 and {MAX_FINAL_GRACE_MS}",
+        )
     key = credentials.resolve(ref.credential_ref)
     return _construct(
         Stage.STT,
@@ -106,6 +115,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn) -> stt.STT[Any]:
             api_key=key,
             vad_min_speech_ms=turn.min_speech_ms or None,
             vad_min_silence_ms=turn.silence_ms or None,
+            final_grace=final_grace_ms / 1000,
         ),
     )
 

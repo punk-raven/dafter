@@ -478,6 +478,7 @@ A language specialist, and the reason the config model has a per-language axis a
 | STT class | Streaming class, not the legacy one | Legacy has no real partials and no live reconfiguration |
 | Local VAD | **Interruptions only** | Sarvam's server VAD decides the end of the turn; a second detector deciding it would fight it. A local Silero VAD only detects the caller talking over the agent, which Sarvam reports no sooner than its first transcript |
 | Turn strategy | `provider_endpointing` | The framework's semantic turn detector is English-trained; trust Sarvam's own end-of-speech events for Indic |
+| End-of-turn silence | 350ms (`turn.silenceMs`, Sarvam's `silence_duration_ms`) | The only wait before the turn ends: the framework's endpointing delay is 0 because the recognizer has already waited, and the adapter releases end of speech with the final transcript |
 | Chunk profile | `fast` (500ms) | The 1000ms default adds up to a full second before VAD even begins. **Single biggest latency knob** |
 | TTS codec | Raw PCM | Skips a decode pass per chunk. Use mulaw at 8kHz for telephony |
 | TTS connection | Prewarmed at worker start | Time-to-first-byte is dominated by TLS handshake, not the model |

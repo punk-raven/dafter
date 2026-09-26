@@ -16,8 +16,9 @@
     },
     "turn": {
       "strategy": "auto",
-      "silenceMs": 500,
+      "silenceMs": 350,
       "minSpeechMs": 120,
+      "endpointingDelayMs": 0,
       "interruption": {
         "enabled": true,
         "localVadEnabled": true,
@@ -80,7 +81,7 @@
             "model": "saaras:v3-realtime",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000 }
+            "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
           },
           "llm": {
             "provider": "sarvam",

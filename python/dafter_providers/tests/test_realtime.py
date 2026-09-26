@@ -6,8 +6,6 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import aiohttp
-import pytest
-from dafter_providers.sarvam import realtime
 from dafter_providers.sarvam.realtime import FinalFirstStream, FinalFirstSTT
 from livekit.agents import stt
 
@@ -26,9 +24,10 @@ class Recorder:
 
 
 @contextlib.asynccontextmanager
-async def stream() -> AsyncIterator[tuple[FinalFirstStream, Recorder]]:
+async def stream(grace: float = 1.5) -> AsyncIterator[tuple[FinalFirstStream, Recorder]]:
     async with aiohttp.ClientSession() as http:
         model = FinalFirstSTT(
+            final_grace=grace,
             language="hi-IN",
             stream_type="fast",
             api_key="test-only-not-a-key",
@@ -72,11 +71,9 @@ def test_a_final_that_beat_the_speech_end_is_released_by_it() -> None:
     assert asyncio.run(run()) == [Kind.START_OF_SPEECH, Kind.FINAL_TRANSCRIPT, Kind.END_OF_SPEECH]
 
 
-def test_a_final_that_never_comes_still_ends_the_turn(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(realtime, "FINAL_GRACE_S", 0.05)
-
+def test_a_final_that_never_comes_still_ends_the_turn_after_the_grace() -> None:
     async def run() -> list[Kind]:
-        async with stream() as (s, recorder):
+        async with stream(grace=0.05) as (s, recorder):
             await s._handle_message({"event": "vad.speech_start", "utterance_idx": 0})
             await s._handle_message({"event": "vad.speech_end", "utterance_idx": 0})
             await asyncio.sleep(0.2)

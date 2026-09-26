@@ -44,6 +44,12 @@ def test_stt_is_the_realtime_class_on_the_fast_profile() -> None:
     assert (opts.language, opts.stream_type, opts.endpointing) == ("hi-IN", "fast", "vad")
     assert (opts.encoding, opts.sample_rate) == ("linear16", 16000)
     assert (opts.vad_min_silence_ms, opts.vad_min_speech_ms) == (500, 120)
+    assert stt._final_grace == 1.5
+
+
+def test_the_wait_for_a_late_final_is_a_stt_option() -> None:
+    stt = sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=400), "hi", TURN)
+    assert stt._final_grace == 0.4  # type: ignore[attr-defined]
 
 
 def test_llm_turns_thinking_off_on_the_generally_available_endpoint() -> None:
@@ -71,6 +77,11 @@ def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
             lambda: sarvam.build_stt(ref("saaras:v3-realtime", chunkMs=250), "hi", TURN),
             ErrorCode.INVALID_CONFIG,
             "/agent/pipeline/stt/options/chunkMs",
+        ),
+        (
+            lambda: sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=-1), "hi", TURN),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/stt/options/finalGraceMs",
         ),
         (
             lambda: sarvam.build_tts(ref("bulbul:v3", codec="opus"), "hi"),
