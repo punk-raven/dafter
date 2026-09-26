@@ -1,5 +1,6 @@
 from . import enums, schemas
 from .enums import (
+    AddressingMode,
     AgentMode,
     AgentState,
     Channel,
@@ -22,6 +23,7 @@ from .enums import (
 )
 
 __all__ = [
+    "AddressingMode",
     "AgentMode",
     "AgentState",
     "Channel",

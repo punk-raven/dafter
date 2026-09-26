@@ -4,7 +4,14 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from dafter_core.config import Pipeline, ProviderRef, ResolvedSessionConfig, Turn, parse
-from dafter_core.enums import AgentMode, EncryptionMode, ErrorCode, Stage, TurnStrategy
+from dafter_core.enums import (
+    AddressingMode,
+    AgentMode,
+    EncryptionMode,
+    ErrorCode,
+    Stage,
+    TurnStrategy,
+)
 from dafter_core.errors import DafterError
 from dafter_core.hashing import hash_document
 from dafter_providers import Vendor, vendor_for
@@ -63,6 +70,20 @@ def _check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
         )
 
 
+RUNS_ADDRESSING = frozenset({AddressingMode.ALWAYS})
+
+
+def _check_addressing(cfg: ResolvedSessionConfig) -> None:
+    mode = cfg.agent.addressing.mode
+    if mode not in RUNS_ADDRESSING:
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "this worker cannot wait to be called by name in this addressing mode",
+            "/agent/addressing/mode",
+            f"{mode} is not built in this worker; always is",
+        )
+
+
 def _check_session(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool) -> Pipeline:
     if not cfg.agent.enabled:
         raise _refuse(
@@ -86,6 +107,7 @@ def _check_session(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool) ->
             "half_cascade and speech_to_speech need a realtime provider",
         )
     _check_encryption(cfg, fetches_keys)
+    _check_addressing(cfg)
     if cfg.agent.pipeline is None:
         raise _refuse(
             ErrorCode.INVALID_CONFIG,

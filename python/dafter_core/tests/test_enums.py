@@ -4,6 +4,7 @@ from enum import StrEnum
 
 import pytest
 from dafter_core import (
+    AddressingMode,
     AgentMode,
     AgentState,
     Channel,
@@ -39,6 +40,7 @@ CASES = [
     (Channel, schemas.IDS, ("$defs", "Channel", "enum")),
     (PrivacyMode, CFG, ("properties", "privacyMode", "enum")),
     (AgentMode, CFG, ("properties", "agent", "properties", "mode", "enum")),
+    (AddressingMode, CFG, ("$defs", "Addressing", "properties", "mode", "enum")),
     (TurnStrategy, CFG, ("$defs", "Turn", "properties", "strategy", "enum")),
     (VideoCodec, CFG, ("$defs", "VideoProfile", "properties", "codec", "enum")),
     (VideoResolution, CFG, ("$defs", "VideoProfile", "properties", "resolution", "enum")),

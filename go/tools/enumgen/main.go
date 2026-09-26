@@ -68,6 +68,11 @@ var targets = []target{
 		Out: "internal/config/modes_gen.go", AllName: "AllAgentModes",
 	},
 	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Addressing", "properties", "mode", "enum"},
+		Package: "config", Type: "AddressingMode", Prefix: "Addressing",
+		Out: "internal/config/addressing_gen.go", AllName: "AllAddressingModes",
+	},
+	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Turn", "properties", "strategy", "enum"},
 		Package: "config", Type: "TurnStrategy", Prefix: "Turn",
 		Out: "internal/config/turn_gen.go", AllName: "AllTurnStrategies",

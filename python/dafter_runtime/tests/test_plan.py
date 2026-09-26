@@ -110,6 +110,11 @@ def test_a_job_for_another_pool_is_refused() -> None:
             "/agent/pipeline/vad",
         ),
         (
+            lambda d: d["agent"]["addressing"].update(mode="on_device"),
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "/agent/addressing/mode",
+        ),
+        (
             lambda d: d["agent"].update(personaRef="persona://unknown/v1"),
             ErrorCode.UNSUPPORTED_CAPABILITY,
             "/agent/personaRef",

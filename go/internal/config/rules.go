@@ -19,6 +19,20 @@ var crossFieldRules = []crossFieldRule{
 		because: "a sealed session cannot have an agent dispatched into it, because an agent that transcribes or responds must decrypt the audio",
 	},
 	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Agent.Addressing.WaitsToBeCalled() && c.Agent.Addressing.Name == ""
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/addressing/name",
+		because: "an agent that stays quiet until it is called by name needs a name to be called by",
+	},
+	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.Agent.Addressing.NearMissIsTheName() },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/addressing/nearMisses",
+		because: "a near miss is a word that must never wake the agent, so one that is also its name or an alias contradicts itself",
+	},
+	{
 		broken:  func(c *ResolvedSessionConfig) bool { return c.Recording.Enabled && c.Recording.ConsentArtifactID == "" },
 		code:    errs.CodeConsentRequired,
 		pointer: "/recording/consentArtifactId",
