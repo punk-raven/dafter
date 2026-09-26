@@ -40,6 +40,13 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 known-third-party = ["dafter_core", "dafter_providers", "dafter_runtime", "dafter_evals"]
 
 [tool.pytest.ini_options]
+addopts = "-m 'not llm_judge'"
+markers = [
+    "llm_judge: calls a real LLM and judges the reply with it; deselected by default, run with `pytest -m llm_judge` and SARVAM_API_KEY set, which spends provider credits",
+]
+filterwarnings = [
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:livekit.rtc.event_emitter",
+]
 testpaths = [
     "dafter_core/tests",
     "dafter_providers/tests",
