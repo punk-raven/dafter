@@ -109,6 +109,12 @@
         "silenceMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
         "minSpeechMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
         "endpointingDelayMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+        "endpointingMaxDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "The longest the agent waits once speech has stopped: under the semantic strategy, the wait when the turn detector judges the caller unlikely to be done, and the ceiling its learned delay never passes."
+        },
         "localVadEnabled": {
           "type": "boolean",
           "description": "Whether a local VAD takes part in deciding the user's turn, as it does under the vad and semantic strategies. False under provider_endpointing, where the recognizer's own VAD decides the turn and a second detector deciding it would fight the first. A local VAD that only catches the caller talking over the agent is interruption.localVadEnabled.",

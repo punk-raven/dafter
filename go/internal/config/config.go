@@ -57,10 +57,11 @@ type Pipeline struct {
 }
 
 type Turn struct {
-	Strategy           TurnStrategy `json:"strategy"`
-	SilenceMs          int          `json:"silenceMs,omitempty"`
-	MinSpeechMs        int          `json:"minSpeechMs,omitempty"`
-	EndpointingDelayMs int          `json:"endpointingDelayMs,omitempty"`
+	Strategy              TurnStrategy `json:"strategy"`
+	SilenceMs             int          `json:"silenceMs,omitempty"`
+	MinSpeechMs           int          `json:"minSpeechMs,omitempty"`
+	EndpointingDelayMs    int          `json:"endpointingDelayMs,omitempty"`
+	EndpointingMaxDelayMs int          `json:"endpointingMaxDelayMs,omitempty"`
 
 	LocalVADEnabled *bool `json:"localVadEnabled,omitempty"`
 

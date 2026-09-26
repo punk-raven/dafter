@@ -189,12 +189,15 @@ def watch(
 
 
 def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
+    handling = dict(p.turn_handling)
+    if stages.turn_detector is not None:
+        handling["turn_detection"] = stages.turn_detector
     return AgentSession(
         stt=stages.stt,
         llm=stages.llm,
         tts=stages.tts,
         vad=stages.vad,
-        turn_handling=p.turn_handling,  # type: ignore[arg-type]
+        turn_handling=handling,  # type: ignore[arg-type]
         user_away_timeout=None,
     )
 
@@ -233,6 +236,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
 def prewarm(proc: JobProcess) -> None:
     local_inference.init_vad()
+    local_inference.init_eot()
 
 
 def server() -> AgentServer:

@@ -19,6 +19,7 @@
       "silenceMs": 350,
       "minSpeechMs": 120,
       "endpointingDelayMs": 0,
+      "endpointingMaxDelayMs": 2500,
       "interruption": {
         "enabled": true,
         "localVadEnabled": true,

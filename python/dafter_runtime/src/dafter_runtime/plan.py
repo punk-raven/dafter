@@ -8,10 +8,12 @@ from dafter_core.enums import AgentMode, EncryptionMode, ErrorCode, Stage, TurnS
 from dafter_core.errors import DafterError
 from dafter_core.hashing import hash_document
 from dafter_providers import Vendor, vendor_for
+from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
 
-from .personas import Persona, persona_for
+from .personas import Persona, base_language, persona_for
 
-TurnDetection = Literal["stt", "manual"]
+TurnDetection = Literal["stt", "semantic", "manual"]
+TURN_DETECTOR_LANGUAGES = frozenset(LOCAL_LANGUAGES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,25 +108,44 @@ def _vendor(ref: ProviderRef | None, stage: Stage, language: str) -> Vendor:
     return vendor
 
 
-def local_vad(pipeline: Pipeline, turn: Turn) -> Vendor | None:
-    if not turn.interruption.local_vad_enabled:
+def local_vad(pipeline: Pipeline, turn: Turn, detection: TurnDetection) -> Vendor | None:
+    if detection == "semantic":
+        why = "the turn detector reads the local VAD's speech boundaries"
+    elif turn.interruption.local_vad_enabled:
+        why = "turn.interruption.localVadEnabled needs one"
+    else:
         return None
     if pipeline.vad is None:
         raise _refuse(
             ErrorCode.INVALID_CONFIG,
-            "the session asks for a local VAD and the pipeline names none",
+            "the session needs a local VAD and the pipeline names none",
             "/agent/pipeline/vad",
-            "turn.interruption.localVadEnabled needs one",
+            why,
         )
     return vendor_for(pipeline.vad, Stage.VAD)
 
 
-def turn_detection(turn: Turn, stt: Vendor) -> TurnDetection:
+def _semantic(turn: Turn, stt: Vendor, language: str) -> TurnDetection | None:
+    if base_language(language) not in TURN_DETECTOR_LANGUAGES:
+        return "stt" if stt.native_endpointing else None
+    if not turn.local_vad_enabled:
+        raise _refuse(
+            ErrorCode.INVALID_CONFIG,
+            "the turn detector decides the turn with a local VAD, and the session turns it off",
+            "/turn/localVadEnabled",
+            "must be true under the semantic strategy",
+        )
+    return "semantic"
+
+
+def turn_detection(turn: Turn, stt: Vendor, language: str) -> TurnDetection:
     strategy = turn.strategy
     if strategy is TurnStrategy.AUTO:
         strategy = TurnStrategy.PROVIDER_ENDPOINTING if stt.native_endpointing else TurnStrategy.VAD
     if strategy is TurnStrategy.MANUAL:
         return "manual"
+    if strategy is TurnStrategy.SEMANTIC and (detection := _semantic(turn, stt, language)):
+        return detection
     if strategy is TurnStrategy.PROVIDER_ENDPOINTING and stt.native_endpointing:
         if turn.local_vad_enabled:
             raise _refuse(
@@ -142,11 +163,21 @@ def turn_detection(turn: Turn, stt: Vendor) -> TurnDetection:
     )
 
 
+def endpointing(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "mode": "dynamic" if detection == "semantic" else "fixed",
+        "min_delay": turn.endpointing_delay_ms / 1000,
+    }
+    if turn.endpointing_max_delay_ms is not None:
+        options["max_delay"] = turn.endpointing_max_delay_ms / 1000
+    return options
+
+
 def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     i = turn.interruption
-    return {
-        "turn_detection": detection,
-        "endpointing": {"min_delay": turn.endpointing_delay_ms / 1000},
+    handling: dict[str, Any] = {} if detection == "semantic" else {"turn_detection": detection}
+    return handling | {
+        "endpointing": endpointing(turn, detection),
         "interruption": {
             "enabled": i.enabled,
             "mode": "vad",
@@ -165,14 +196,14 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     stt = _vendor(pipeline.stt, Stage.STT, cfg.language)
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
-    detection = turn_detection(cfg.turn, stt)
+    detection = turn_detection(cfg.turn, stt, cfg.language)
     return Plan(
         config=cfg,
         pipeline=pipeline,
         stt=stt,
         llm=llm,
         tts=tts,
-        vad=local_vad(pipeline, cfg.turn),
+        vad=local_vad(pipeline, cfg.turn, detection),
         turn_detection=detection,
         turn_handling=turn_handling(cfg.turn, detection),
         persona=persona_for(cfg.agent.persona_ref, cfg.language),

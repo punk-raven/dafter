@@ -97,6 +97,7 @@ class Turn:
     silence_ms: int = 0
     min_speech_ms: int = 0
     endpointing_delay_ms: int = 0
+    endpointing_max_delay_ms: int | None = None
     local_vad_enabled: bool = True
     interruption: Interruption = field(default_factory=Interruption)
 
@@ -107,6 +108,7 @@ class Turn:
             silence_ms=d.get("silenceMs", 0),
             min_speech_ms=d.get("minSpeechMs", 0),
             endpointing_delay_ms=d.get("endpointingDelayMs", 0),
+            endpointing_max_delay_ms=d.get("endpointingMaxDelayMs"),
             local_vad_enabled=d.get("localVadEnabled", True),
             interruption=Interruption.from_dict(d.get("interruption") or {}),
         )

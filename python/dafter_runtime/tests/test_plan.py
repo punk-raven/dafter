@@ -39,7 +39,7 @@ def test_the_pinned_hindi_job_plans_the_sarvam_cascade() -> None:
     assert p.turn_detection == "stt"
     assert p.turn_handling == {
         "turn_detection": "stt",
-        "endpointing": {"min_delay": 0.0},
+        "endpointing": {"mode": "fixed", "min_delay": 0.0, "max_delay": 2.5},
         "interruption": {
             "enabled": True,
             "mode": "vad",
@@ -89,9 +89,14 @@ def test_a_job_for_another_pool_is_refused() -> None:
             "/language",
         ),
         (
-            lambda d: d["turn"].update(strategy="semantic"),
+            lambda d: d["turn"].update(strategy="server_vad"),
             ErrorCode.UNSUPPORTED_CAPABILITY,
             "/turn/strategy",
+        ),
+        (
+            lambda d: d["turn"].update(strategy="semantic"),
+            ErrorCode.INVALID_CONFIG,
+            "/turn/localVadEnabled",
         ),
         (
             lambda d: d["turn"].update(localVadEnabled=True),
