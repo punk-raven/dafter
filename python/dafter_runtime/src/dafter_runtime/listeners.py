@@ -16,7 +16,7 @@ from livekit.agents.voice.room_io import AudioInputOptions, RoomOptions
 
 log = logging.getLogger("dafter.runtime.listeners")
 
-Heard = Callable[[str, str], None]
+Heard = Callable[[str, str, lk_llm.MetricsReport], None]
 Joined = Callable[[str, AgentSession[Any]], None]
 
 
@@ -31,7 +31,7 @@ class Listener(Agent):
     ) -> None:
         text = (new_message.text_content or "").strip()
         if text:
-            self._heard(self._speaker, text)
+            self._heard(self._speaker, text, new_message.metrics)
         raise StopResponse()
 
 

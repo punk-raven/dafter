@@ -9,6 +9,7 @@ from typing import Any
 
 from livekit import rtc
 from livekit.agents import AgentSession, JobContext
+from livekit.agents.llm import MetricsReport
 from livekit.agents.metrics import AgentSessionUsage
 from livekit.agents.voice.events import AgentStateChangedEvent
 
@@ -98,9 +99,9 @@ class Called:
             model_usage=[*self._session.usage.model_usage, *self.listeners.usage()]
         )
 
-    def _heard(self, speaker: str, text: str) -> None:
+    def _heard(self, speaker: str, text: str, timing: MetricsReport) -> None:
         self.barge_in.committed(speaker)
-        self.gate.heard(speaker, text)
+        self.gate.heard(speaker, text, timing)
 
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)

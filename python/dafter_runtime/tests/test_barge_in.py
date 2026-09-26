@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from dafter_core.enums import WakeSource
 from dafter_core.hashing import seal
-from dafter_runtime.addressing import Gate, Said
+from dafter_runtime.addressing import Gate, Said, Timing
 from dafter_runtime.answering import Roster, Voice
 from dafter_runtime.barge_in import BargeIn, follow
 from dafter_runtime.called import barge_in_for
@@ -166,7 +166,7 @@ class Responder:
     def __init__(self) -> None:
         self.stops = 0
 
-    def answer(self, speaker: str, text: str, overheard: list[Said]) -> None:
+    def answer(self, speaker: str, text: str, overheard: list[Said], timing: Timing | None) -> None:
         return None
 
     def hush(self) -> None:

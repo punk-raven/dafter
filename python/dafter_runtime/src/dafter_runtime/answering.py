@@ -6,9 +6,11 @@ from typing import Any
 
 from dafter_core.enums import WakeSource
 from livekit.agents import AgentSession
+from livekit.agents.llm import ChatMessage
 from livekit.agents.voice.speech_handle import SpeechHandle
 
-from .addressing import Said
+from .addressing import Said, Timing
+from .timing import heard
 
 log = logging.getLogger("dafter.runtime.answering")
 
@@ -52,14 +54,19 @@ class Voice:
         self.before_answer: Callable[[str, str], None] | None = None
         self.announce: Callable[[str | None, WakeSource | None], None] | None = None
 
-    def answer(self, speaker: str, text: str, overheard: list[Said]) -> None:
+    def answer(
+        self, speaker: str, text: str, overheard: list[Said], timing: Timing | None = None
+    ) -> None:
         if self.before_answer is not None:
             self.before_answer(speaker, text)
         if self._interruptible:
             self._session.interrupt()
-        self.reply = self._session.generate_reply(
-            user_input=turn_text(self._roster, speaker, text, overheard)
+        said = ChatMessage(
+            role="user",
+            content=[turn_text(self._roster, speaker, text, overheard)],
+            metrics=heard(timing),
         )
+        self.reply = self._session.generate_reply(user_input=said)
 
     def hush(self) -> None:
         self._session.interrupt()

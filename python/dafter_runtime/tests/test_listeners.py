@@ -54,15 +54,16 @@ def test_a_listener_hears_one_participant_and_never_speaks() -> None:
     assert options.close_on_disconnect is False
 
 
-def test_a_listener_passes_each_finished_turn_on_and_stops_the_reply() -> None:
-    heard: list[tuple[str, str]] = []
-    listener = Listener("p_4b81e0d7", lambda who, text: heard.append((who, text)))
+def test_a_listener_passes_each_finished_turn_and_its_timing_on_and_stops_the_reply() -> None:
+    heard: list[tuple[str, str, llm.MetricsReport]] = []
+    listener = Listener("p_4b81e0d7", lambda who, text, timing: heard.append((who, text, timing)))
+    timing: llm.MetricsReport = {"end_of_turn_delay": 0.35, "transcription_delay": 0.12}
 
     async def turn(text: str) -> None:
-        message = llm.ChatMessage(role="user", content=[text])
+        message = llm.ChatMessage(role="user", content=[text], metrics=timing)
         with pytest.raises(StopResponse):
             await listener.on_user_turn_completed(llm.ChatContext(), message)
 
     asyncio.run(turn(" निव्या, समय क्या है? "))
     asyncio.run(turn("  "))
-    assert heard == [("p_4b81e0d7", "निव्या, समय क्या है?")]
+    assert heard == [("p_4b81e0d7", "निव्या, समय क्या है?", timing)]

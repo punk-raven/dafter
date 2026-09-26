@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from dafter_core.enums import WakeSource
 
@@ -12,6 +12,8 @@ from .naming import Heard, Matcher
 CONTEXT_SECONDS = 90.0
 CONTEXT_LINES = 12
 BUSY_STATES = frozenset({"thinking", "speaking"})
+
+Timing = Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +24,9 @@ class Said:
 
 
 class Responder(Protocol):
-    def answer(self, speaker: str, text: str, overheard: list[Said]) -> None: ...
+    def answer(
+        self, speaker: str, text: str, overheard: list[Said], timing: Timing | None
+    ) -> None: ...
 
     def hush(self) -> None: ...
 
@@ -66,7 +70,7 @@ class Gate:
     def addressee(self) -> str | None:
         return self._addressee
 
-    def heard(self, speaker: str, text: str) -> None:
+    def heard(self, speaker: str, text: str, timing: Timing | None = None) -> None:
         heard = self._matcher.hear(text)
         if heard is Heard.STOPPED or (heard is Heard.STOP and not self.dormant):
             self._responder.hush()
@@ -74,16 +78,16 @@ class Gate:
             return
         if heard is Heard.CALLED:
             self._wake(speaker, WakeSource.NAME)
-            self._answer(speaker, text)
+            self._answer(speaker, text, timing)
             return
         if speaker == self._addressee:
-            self._answer(speaker, text)
+            self._answer(speaker, text, timing)
             return
         self._said.append(Said(speaker, text, self._clock()))
 
     def wake(self, speaker: str) -> None:
         self._wake(speaker, WakeSource.MANUAL)
-        self._answer(speaker, self._name)
+        self._answer(speaker, self._name, None)
 
     def sleep(self) -> None:
         self._stop_timer()
@@ -109,12 +113,12 @@ class Gate:
         self._addressee = speaker
         self._responder.addressed(speaker, via)
 
-    def _answer(self, speaker: str, text: str) -> None:
+    def _answer(self, speaker: str, text: str, timing: Timing | None) -> None:
         since = self._clock() - CONTEXT_SECONDS
         overheard = [s for s in self._said if s.at >= since]
         self._said.clear()
         self._start_timer()
-        self._responder.answer(speaker, text, overheard)
+        self._responder.answer(speaker, text, overheard, timing)
 
     def _start_timer(self) -> None:
         self._stop_timer()
@@ -131,4 +135,4 @@ class Gate:
             self.sleep()
 
 
-__all__ = ["Gate", "Responder", "Said", "Timer"]
+__all__ = ["Gate", "Responder", "Said", "Timer", "Timing"]

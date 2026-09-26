@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
-from livekit.agents.llm import ChatMessage
+from livekit.agents.llm import ChatMessage, MetricsReport
 from opentelemetry import trace
 
 USER_LAYERS = ("end_of_turn_delay", "transcription_delay")
+HEARD_AT = ("started_speaking_at", "stopped_speaking_at")
 AGENT_LAYERS = (
     "llm_node_ttft",
     "llm_node_ttfs",
@@ -35,6 +36,10 @@ def _layers(metrics: Mapping[str, Any], keys: tuple[str, ...]) -> dict[str, floa
         if isinstance(value, int | float) and not isinstance(value, bool) and value >= 0:
             found[key] = float(value)
     return found
+
+
+def heard(metrics: Mapping[str, Any] | None) -> MetricsReport:
+    return cast(MetricsReport, _layers(metrics or {}, (*HEARD_AT, *USER_LAYERS)))
 
 
 @dataclass(frozen=True, slots=True)
