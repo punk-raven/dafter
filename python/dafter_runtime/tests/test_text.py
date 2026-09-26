@@ -13,81 +13,16 @@ from dafter_runtime.events import SessionEvents
 from dafter_runtime.metrics import WorkerMetrics
 from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.worker import watch
-from livekit.agents import (
-    DEFAULT_API_CONNECT_OPTIONS,
-    Agent,
-    AgentSession,
-    APIConnectOptions,
-    RunResult,
-    llm,
-)
-from livekit.agents.types import NOT_GIVEN, NotGivenOr
+from livekit.agents import Agent, AgentSession, RunResult
 from opentelemetry import trace
 from prometheus_client import CollectorRegistry
+from stub_llm import COMPLETION_TOKENS, PROMPT_TOKENS, REPLY, StubLLM, said
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
-REPLY = "नमस्ते! बताइए, मैं क्या मदद करूँ?"
-PROMPT_TOKENS = 50
-COMPLETION_TOKENS = 7
-
-
-class StubStream(llm.LLMStream):
-    def __init__(
-        self,
-        owner: StubLLM,
-        *,
-        chat_ctx: llm.ChatContext,
-        tools: list[llm.Tool],
-        conn_options: APIConnectOptions,
-    ) -> None:
-        super().__init__(owner, chat_ctx=chat_ctx, tools=tools, conn_options=conn_options)
-        self._reply = owner.reply
-
-    async def _run(self) -> None:
-        delta = llm.ChoiceDelta(role="assistant", content=self._reply)
-        usage = llm.CompletionUsage(
-            completion_tokens=COMPLETION_TOKENS,
-            prompt_tokens=PROMPT_TOKENS,
-            total_tokens=PROMPT_TOKENS + COMPLETION_TOKENS,
-        )
-        self._event_ch.send_nowait(llm.ChatChunk(id="stub", delta=delta))
-        self._event_ch.send_nowait(llm.ChatChunk(id="stub", usage=usage))
-
-
-class StubLLM(llm.LLM[Any]):
-    def __init__(self, reply: str = REPLY) -> None:
-        super().__init__()
-        self.reply = reply
-        self.requests: list[llm.ChatContext] = []
-
-    @property
-    def model(self) -> str:
-        return "sarvam-105b"
-
-    @property
-    def provider(self) -> str:
-        return "Sarvam"
-
-    def chat(
-        self,
-        *,
-        chat_ctx: llm.ChatContext,
-        tools: list[llm.Tool] | None = None,
-        conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
-        parallel_tool_calls: NotGivenOr[bool] = NOT_GIVEN,
-        tool_choice: NotGivenOr[llm.ToolChoice] = NOT_GIVEN,
-        extra_kwargs: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
-    ) -> llm.LLMStream:
-        self.requests.append(chat_ctx.copy())
-        return StubStream(self, chat_ctx=chat_ctx, tools=tools or [], conn_options=conn_options)
 
 
 def hindi_plan() -> Plan:
     return plan(load(JOB.read_bytes().strip()), "dafter-py")
-
-
-def said(ctx: llm.ChatContext) -> list[tuple[str, str | None]]:
-    return [(m.role, m.text_content) for m in ctx.items if isinstance(m, llm.ChatMessage)]
 
 
 def test_the_persona_answers_a_text_turn() -> None:

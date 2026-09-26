@@ -116,8 +116,12 @@ def quantities(usage: AgentSessionUsage) -> list[tuple[Stage, str, str, UsageUni
 
 
 def priced(usage: AgentSessionUsage, table: dict[Key, Price]) -> list[Item]:
-    items: list[Item] = []
+    summed: dict[tuple[Stage, str, str, UsageUnit], float] = {}
     for stage, provider, model, unit, quantity in quantities(usage):
+        key = (stage, provider, model, unit)
+        summed[key] = summed.get(key, 0.0) + quantity
+    items: list[Item] = []
+    for (stage, provider, model, unit), quantity in summed.items():
         price = table.get((provider, model, unit))
         cost = price.cost(quantity) if price is not None else None
         items.append(Item(stage, provider, model, unit, round(quantity, 3), cost))

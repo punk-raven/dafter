@@ -38,6 +38,19 @@ PERSONAS: dict[tuple[str, str], Persona] = {
 }
 
 
+def called_by_name(persona: Persona, name: str) -> Persona:
+    return Persona(
+        instructions=(
+            f"{persona.instructions}\n\nYour name is {name}. You are in a call with several "
+            "people and you speak only when one of them calls you. Each message starts with "
+            "who spoke in square brackets: lines marked 'to you' are the person talking to "
+            "you, who is the one you answer; lines marked 'not to you' are what others said "
+            "in the call just before, which you may use as context but never answer or quote."
+        ),
+        greeting=persona.greeting,
+    )
+
+
 def base_language(tag: str) -> str:
     return tag.split("-", 1)[0].lower()
 

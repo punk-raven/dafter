@@ -51,6 +51,9 @@ def test_the_pinned_hindi_job_plans_the_sarvam_cascade() -> None:
         },
     }
     assert p.persona.greeting
+    assert not p.called_by_name
+    assert p.stt_prompt is None
+    assert p.voice_turn_handling is p.turn_handling
 
 
 def test_a_document_that_does_not_match_its_hash_is_refused() -> None:

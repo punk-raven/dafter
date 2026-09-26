@@ -90,7 +90,7 @@ def _construct(stage: Stage, build: Callable[[], T]) -> T:
         ) from exc
 
 
-def build_stt(ref: ProviderRef, language: str, turn: Turn) -> stt.STT[Any]:
+def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -> stt.STT[Any]:
     _checked(ref, Stage.STT, STT_MODELS)
     opts = Options(
         Stage.STT, NAME, ref.options, ("chunkMs", "encoding", "sampleRate", "finalGraceMs")
@@ -118,6 +118,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn) -> stt.STT[Any]:
             vad_min_speech_ms=turn.min_speech_ms or None,
             vad_min_silence_ms=turn.silence_ms or None,
             final_grace=final_grace_ms / 1000,
+            prompt=prompt,
         ),
     )
 

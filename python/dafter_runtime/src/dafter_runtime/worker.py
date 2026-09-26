@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
 
 from dafter_core.enums import EncryptionMode, EventType, Stage
@@ -17,6 +18,8 @@ from livekit.agents import (
     JobRequest,
 )
 from livekit.agents.llm import ChatMessage
+from livekit.agents.metrics import AgentSessionUsage
+from livekit.agents.types import NOT_GIVEN
 from livekit.agents.voice.events import (
     AgentStateChangedEvent,
     CloseEvent,
@@ -27,6 +30,7 @@ from livekit.agents.voice.room_io import AudioInputOptions, AudioOutputOptions, 
 from opentelemetry import trace
 
 from . import telemetry
+from .called import Called
 from .control import ControlPlane, encryption
 from .cost import load_prices, priced, usage_payload
 from .events import TOPIC, SessionEvents
@@ -93,10 +97,20 @@ async def room_encryption(p: Plan, control: ControlPlane) -> rtc.E2EEOptions | N
     return encryption(key)
 
 
+def stt_sample_rate(p: Plan) -> int:
+    return int(p.pipeline.stt.options.get("sampleRate", 16000)) if p.pipeline.stt else 16000
+
+
 def room_options(p: Plan, tts_sample_rate: int) -> RoomOptions:
-    stt_rate = int(p.pipeline.stt.options.get("sampleRate", 16000)) if p.pipeline.stt else 16000
+    if p.called_by_name:
+        return RoomOptions(
+            audio_input=False,
+            text_input=False,
+            audio_output=AudioOutputOptions(sample_rate=tts_sample_rate),
+            close_on_disconnect=False,
+        )
     return RoomOptions(
-        audio_input=AudioInputOptions(sample_rate=stt_rate),
+        audio_input=AudioInputOptions(sample_rate=stt_sample_rate(p)),
         audio_output=AudioOutputOptions(sample_rate=tts_sample_rate),
         close_on_disconnect=True,
     )
@@ -113,13 +127,15 @@ def watch(
     events: SessionEvents,
     tracer: trace.Tracer,
     metrics: WorkerMetrics = WORKER,
+    usage: Callable[[], AgentSessionUsage] | None = None,
 ) -> None:
     turns = Turns()
     prices = load_prices()
     recorder = SessionMetrics(metrics, p)
+    spent = usage or (lambda: session.usage)
 
     def report_usage(final: bool) -> dict[str, Any]:
-        items = priced(session.usage, prices)
+        items = priced(spent(), prices)
         payload = usage_payload(items, final)
         events.emit(EventType.SESSION_USAGE, payload, current_trace_id())
         if final:
@@ -189,6 +205,15 @@ def watch(
 
 
 def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
+    if p.called_by_name:
+        return AgentSession(
+            stt=NOT_GIVEN,
+            llm=stages.llm,
+            tts=stages.tts,
+            vad=None,
+            turn_handling=p.voice_turn_handling,  # type: ignore[arg-type]
+            user_away_timeout=None,
+        )
     handling = dict(p.turn_handling)
     if stages.turn_detector is not None:
         handling["turn_detection"] = stages.turn_detector
@@ -217,7 +242,6 @@ async def entrypoint(ctx: JobContext) -> None:
 
     events = SessionEvents(p.config, publish)
     session = new_session(p, stages)
-    watch(session, p, events, telemetry.tracer(provider))
 
     async def flush() -> None:
         await events.drain()
@@ -225,12 +249,18 @@ async def entrypoint(ctx: JobContext) -> None:
             provider.force_flush()
 
     ctx.add_shutdown_callback(flush)
+    called = Called(ctx, p, stages, session, stt_sample_rate(p)) if p.called_by_name else None
+    usage = called.usage if called is not None else None
+    watch(session, p, events, telemetry.tracer(provider), usage=usage)
     await session.start(
         agent=Agent(instructions=p.persona.instructions),
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate),
         record=False,
     )
+    if called is not None:
+        called.listen()
+        return
     session.say(p.persona.greeting, allow_interruptions=True)
 
 

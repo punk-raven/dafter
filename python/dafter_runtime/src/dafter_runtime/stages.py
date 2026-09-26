@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,6 +25,7 @@ class Stages:
     tts: lk_tts.TTS[Any]
     vad: lk_vad.VAD | None
     turn_detector: inference.TurnDetector | None
+    listener_stt: Callable[[], lk_stt.STT[Any]]
 
 
 def _ref(ref: ProviderRef | None, stage: Stage) -> ProviderRef:
@@ -45,10 +47,15 @@ def build(plan: Plan) -> Stages:
     stt_ref = _ref(plan.pipeline.stt, Stage.STT)
     llm_ref = _ref(plan.pipeline.llm, Stage.LLM)
     tts_ref = _ref(plan.pipeline.tts, Stage.TTS)
-    if plan.stt.stt is None or plan.llm.llm is None or plan.tts.tts is None:
+    new_stt = plan.stt.stt
+    if new_stt is None or plan.llm.llm is None or plan.tts.tts is None:
         raise DafterError(ErrorCode.INTERNAL, "a planned vendor lost a stage factory")
+
+    def listener_stt() -> lk_stt.STT[Any]:
+        return new_stt(stt_ref, cfg.language, cfg.turn, plan.stt_prompt)
+
     stages = Stages(
-        stt=plan.stt.stt(stt_ref, cfg.language, cfg.turn),
+        stt=listener_stt(),
         llm=plan.llm.llm(llm_ref),
         tts=plan.tts.tts(tts_ref, cfg.language),
         vad=_vad(plan),
@@ -57,6 +64,7 @@ def build(plan: Plan) -> Stages:
             if plan.turn_detection == "semantic"
             else None
         ),
+        listener_stt=listener_stt,
     )
     if plan.llm.wants_prewarm(llm_ref):
         stages.llm.prewarm()

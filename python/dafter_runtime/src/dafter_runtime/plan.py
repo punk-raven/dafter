@@ -17,7 +17,7 @@ from dafter_core.hashing import hash_document
 from dafter_providers import Vendor, vendor_for
 from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
 
-from .personas import Persona, base_language, persona_for
+from .personas import Persona, base_language, called_by_name, persona_for
 
 TurnDetection = Literal["stt", "semantic", "manual"]
 TURN_DETECTOR_LANGUAGES = frozenset(LOCAL_LANGUAGES)
@@ -34,6 +34,17 @@ class Plan:
     turn_detection: TurnDetection
     turn_handling: dict[str, Any]
     persona: Persona
+    stt_prompt: str | None = None
+
+    @property
+    def called_by_name(self) -> bool:
+        return self.config.agent.addressing.waits_to_be_called
+
+    @property
+    def voice_turn_handling(self) -> dict[str, Any]:
+        if self.called_by_name:
+            return {**self.turn_handling, "turn_detection": "manual"}
+        return self.turn_handling
 
 
 def load(metadata: str | bytes) -> ResolvedSessionConfig:
@@ -70,7 +81,7 @@ def _check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
         )
 
 
-RUNS_ADDRESSING = frozenset({AddressingMode.ALWAYS})
+RUNS_ADDRESSING = frozenset({AddressingMode.ALWAYS, AddressingMode.TRANSCRIPT})
 
 
 def _check_addressing(cfg: ResolvedSessionConfig) -> None:
@@ -80,7 +91,7 @@ def _check_addressing(cfg: ResolvedSessionConfig) -> None:
             ErrorCode.UNSUPPORTED_CAPABILITY,
             "this worker cannot wait to be called by name in this addressing mode",
             "/agent/addressing/mode",
-            f"{mode} is not built in this worker; always is",
+            f"{mode} is not built in this worker; always and transcript are",
         )
 
 
@@ -221,6 +232,12 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
     detection = turn_detection(cfg.turn, stt, cfg.language)
+    persona = persona_for(cfg.agent.persona_ref, cfg.language)
+    addressing = cfg.agent.addressing
+    prompt = None
+    if addressing.waits_to_be_called:
+        persona = called_by_name(persona, addressing.name)
+        prompt = ", ".join(dict.fromkeys((addressing.name, *addressing.aliases)))
     return Plan(
         config=cfg,
         pipeline=pipeline,
@@ -230,5 +247,6 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         vad=local_vad(pipeline, cfg.turn, detection),
         turn_detection=detection,
         turn_handling=turn_handling(cfg.turn, detection),
-        persona=persona_for(cfg.agent.persona_ref, cfg.language),
+        persona=persona,
+        stt_prompt=prompt,
     )
