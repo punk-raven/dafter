@@ -41,6 +41,7 @@ STT_SAMPLE_RATES = {8000: 8000, 16000: 16000}
 TTS_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
 TTS_SAMPLE_RATES = {r: r for r in (8000, 16000, 22050, 24000, 48000)}
 MAX_FINAL_GRACE_MS = 10000
+MIN_BUFFER_CHARS = (30, 200)
 
 T = TypeVar("T")
 
@@ -123,7 +124,10 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn) -> stt.STT[Any]:
 
 def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     _checked(ref, Stage.LLM, LLM_MODELS)
-    opts = Options(Stage.LLM, NAME, ref.options, ("thinking", "temperature", "maxTokens"))
+    opts = Options(
+        Stage.LLM, NAME, ref.options, ("prewarm", "thinking", "temperature", "maxTokens")
+    )
+    opts.get("prewarm", bool, True)
     thinking = opts.get("thinking", bool, False)
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
@@ -156,9 +160,19 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
 def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     _checked(ref, Stage.TTS, TTS_MODELS)
     opts = Options(
-        Stage.TTS, NAME, ref.options, ("prewarm", "encoding", "sampleRate", "voice", "pace")
+        Stage.TTS,
+        NAME,
+        ref.options,
+        ("prewarm", "encoding", "sampleRate", "voice", "pace", "minBufferSize"),
     )
     code = language_code(language, Stage.TTS)
+    min_buffer = opts.get("minBufferSize", int, 50)
+    if not MIN_BUFFER_CHARS[0] <= min_buffer <= MIN_BUFFER_CHARS[1]:
+        raise opts.error(
+            "an option is out of range",
+            f"at '{opts.pointer('minBufferSize')}': between {MIN_BUFFER_CHARS[0]} and "
+            f"{MIN_BUFFER_CHARS[1]} characters",
+        )
     encoding = opts.choice("encoding", TTS_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", TTS_SAMPLE_RATES, 24000)
     voice = opts.get("voice", str, "shubh")
@@ -174,6 +188,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
             speaker=voice,
             speech_sample_rate=sample_rate,
             pace=pace,
+            min_buffer_size=min_buffer,
             api_key=key,
             output_audio_codec=encoding,
         ),

@@ -16,8 +16,10 @@ class Persona:
 
 _HINDI_VOICE_RULES = (
     "You are speaking on a live voice call. Reply only in Hindi, written in Devanagari script. "
-    "Keep every reply to one or two short spoken sentences. Never use markdown, lists, "
-    "headings, emojis or symbols that cannot be spoken aloud. Write numbers as words. "
+    "Open every reply with one short sentence of five to eight words, so it can be spoken "
+    "at once, and keep the whole reply to one or two short spoken sentences. Never use "
+    "markdown, lists, headings, emojis or symbols that cannot be spoken aloud. Write numbers as "
+    "words. "
     "If the caller only says something like hmm or okay, reply with a very short acknowledgement."
 )
 

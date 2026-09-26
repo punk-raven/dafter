@@ -40,6 +40,7 @@ def test_the_pinned_hindi_job_plans_the_sarvam_cascade() -> None:
     assert p.turn_handling == {
         "turn_detection": "stt",
         "endpointing": {"mode": "fixed", "min_delay": 0.0, "max_delay": 2.5},
+        "preemptive_generation": {"enabled": True, "preemptive_tts": True},
         "interruption": {
             "enabled": True,
             "mode": "vad",

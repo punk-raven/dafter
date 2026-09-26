@@ -46,6 +46,7 @@ def sarvam_key(monkeypatch: pytest.MonkeyPatch) -> None:
 def offline_plan(**turn: Any) -> Plan:
     doc = json.loads(JOB.read_bytes())
     doc["agent"]["pipeline"]["tts"]["options"]["prewarm"] = False
+    doc["agent"]["pipeline"]["llm"]["options"]["prewarm"] = False
     doc["turn"].update(turn)
     sealed, _ = seal(json.dumps(doc))
     return plan(load(sealed), "dafter-py")
@@ -75,6 +76,8 @@ def test_the_session_catches_barge_in_on_the_local_vad_and_ends_turns_on_the_rec
         assert session.options.interruption["min_duration"] == 0.25
         assert session.options.interruption["min_words"] == 0
         assert session.options.endpointing["mode"] == "fixed"
+        assert session.options.preemptive_generation["enabled"] is True
+        assert session.options.preemptive_generation["preemptive_tts"] is True
 
     check_session(offline_plan(), check)
 

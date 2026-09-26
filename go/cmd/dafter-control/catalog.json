@@ -20,6 +20,7 @@
       "minSpeechMs": 120,
       "endpointingDelayMs": 0,
       "endpointingMaxDelayMs": 2500,
+      "preemptiveGeneration": { "enabled": true, "tts": true },
       "interruption": {
         "enabled": true,
         "localVadEnabled": true,
@@ -89,14 +90,14 @@
             "model": "sarvam-105b",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+            "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
           },
           "tts": {
             "provider": "sarvam",
             "model": "bulbul:v3",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh" }
+            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh", "minBufferSize": 30 }
           }
         }
       }
@@ -121,14 +122,14 @@
             "model": "sarvam-105b",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+            "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
           },
           "tts": {
             "provider": "sarvam",
             "model": "bulbul:v3",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh" }
+            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh", "minBufferSize": 30 }
           }
         }
       }

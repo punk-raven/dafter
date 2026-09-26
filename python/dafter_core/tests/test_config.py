@@ -357,3 +357,13 @@ def test_provider_endpointing_takes_a_local_vad_that_only_catches_barge_in() -> 
     )
     assert (c.turn.local_vad_enabled, c.turn.interruption.local_vad_enabled) == (False, True)
     assert parse(doc()).turn.interruption.local_vad_enabled is False
+
+
+def test_preemptive_generation_defaults_to_the_reply_without_its_speech() -> None:
+    pg = parse(doc()).turn.preemptive_generation
+    assert (pg.enabled, pg.tts) == (True, False)
+    stated = parse(doc(turn={"strategy": "auto", "preemptiveGeneration": {"tts": True}}))
+    assert stated.turn.preemptive_generation.tts is True
+    assert refuse(doc(turn={"strategy": "auto", "preemptiveGeneration": {"llm": True}})).code is (
+        ErrorCode.INVALID_CONFIG
+    )

@@ -58,6 +58,15 @@ def test_llm_turns_thinking_off_on_the_generally_available_endpoint() -> None:
     assert str(llm._client.base_url).rstrip("/") == sarvam.LLM_BASE_URL  # type: ignore[attr-defined]
 
 
+def test_the_first_tts_chunk_size_and_the_llm_prewarm_are_options() -> None:
+    tts = sarvam.build_tts(ref("bulbul:v3", minBufferSize=30), "hi")
+    assert tts._opts.min_buffer_size == 30  # type: ignore[attr-defined]
+    llm = ref("sarvam-105b", prewarm=False)
+    sarvam.build_llm(llm)
+    assert sarvam.wants_prewarm(llm) is False
+    assert sarvam.wants_prewarm(ref("sarvam-105b")) is True
+
+
 def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
     tts = sarvam.build_tts(ref("bulbul:v3", sampleRate=24000, voice="shubh"), "hi")
     assert tts.sample_rate == 24000
@@ -82,6 +91,11 @@ def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
             lambda: sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=-1), "hi", TURN),
             ErrorCode.INVALID_CONFIG,
             "/agent/pipeline/stt/options/finalGraceMs",
+        ),
+        (
+            lambda: sarvam.build_tts(ref("bulbul:v3", minBufferSize=20), "hi"),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/tts/options/minBufferSize",
         ),
         (
             lambda: sarvam.build_tts(ref("bulbul:v3", codec="opus"), "hi"),

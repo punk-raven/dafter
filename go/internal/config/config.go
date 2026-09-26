@@ -65,7 +65,13 @@ type Turn struct {
 
 	LocalVADEnabled *bool `json:"localVadEnabled,omitempty"`
 
-	Interruption *Interruption `json:"interruption,omitempty"`
+	PreemptiveGeneration *PreemptiveGeneration `json:"preemptiveGeneration,omitempty"`
+	Interruption         *Interruption         `json:"interruption,omitempty"`
+}
+
+type PreemptiveGeneration struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	TTS     *bool `json:"tts,omitempty"`
 }
 
 type Interruption struct {

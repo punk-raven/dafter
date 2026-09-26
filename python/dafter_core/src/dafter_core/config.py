@@ -92,6 +92,16 @@ class Interruption:
 
 
 @dataclass(frozen=True, slots=True)
+class PreemptiveGeneration:
+    enabled: bool = True
+    tts: bool = False
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> PreemptiveGeneration:
+        return cls(enabled=d.get("enabled", True), tts=d.get("tts", False))
+
+
+@dataclass(frozen=True, slots=True)
 class Turn:
     strategy: TurnStrategy
     silence_ms: int = 0
@@ -99,6 +109,7 @@ class Turn:
     endpointing_delay_ms: int = 0
     endpointing_max_delay_ms: int | None = None
     local_vad_enabled: bool = True
+    preemptive_generation: PreemptiveGeneration = field(default_factory=PreemptiveGeneration)
     interruption: Interruption = field(default_factory=Interruption)
 
     @classmethod
@@ -110,6 +121,9 @@ class Turn:
             endpointing_delay_ms=d.get("endpointingDelayMs", 0),
             endpointing_max_delay_ms=d.get("endpointingMaxDelayMs"),
             local_vad_enabled=d.get("localVadEnabled", True),
+            preemptive_generation=PreemptiveGeneration.from_dict(
+                d.get("preemptiveGeneration") or {}
+            ),
             interruption=Interruption.from_dict(d.get("interruption") or {}),
         )
 

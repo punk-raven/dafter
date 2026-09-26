@@ -482,6 +482,8 @@ A language specialist, and the reason the config model has a per-language axis a
 | Chunk profile | `fast` (500ms) | The 1000ms default adds up to a full second before VAD even begins. **Single biggest latency knob** |
 | TTS codec | Raw PCM | Skips a decode pass per chunk. Use mulaw at 8kHz for telephony |
 | TTS connection | Prewarmed at worker start | Time-to-first-byte is dominated by TLS handshake, not the model |
+| TTS text | Sentence by sentence, the danda (।) ending a sentence; first chunk 30 characters (`minBufferSize`, the smallest Sarvam takes) | The framework's sentence splitter does not know the danda, so a Hindi reply would reach TTS only once fully written |
+| LLM connection | Prewarmed before the room is joined (`prewarm`) | Same handshake cost, paid before the first turn instead of in it |
 
 **Operational notes worth encoding once in the adapter:** construct providers in worker setup rather than per session, so bad config kills the worker at boot instead of mid-call; websocket close code `1003` (auth/quota) is **not** retryable and should page someone, while `1013` is transient; and the true TTS request ID appears only in the tracing span, not in client metrics, so tracing is mandatory for vendor support to debug a latency complaint.
 

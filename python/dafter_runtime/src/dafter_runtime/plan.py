@@ -176,8 +176,10 @@ def endpointing(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
 def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     i = turn.interruption
     handling: dict[str, Any] = {} if detection == "semantic" else {"turn_detection": detection}
+    pg = turn.preemptive_generation
     return handling | {
         "endpointing": endpointing(turn, detection),
+        "preemptive_generation": {"enabled": pg.enabled, "preemptive_tts": pg.tts},
         "interruption": {
             "enabled": i.enabled,
             "mode": "vad",

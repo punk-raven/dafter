@@ -58,6 +58,8 @@ def build(plan: Plan) -> Stages:
             else None
         ),
     )
+    if plan.llm.wants_prewarm(llm_ref):
+        stages.llm.prewarm()
     if plan.tts.wants_prewarm(tts_ref):
         stages.tts.prewarm()
     return stages
