@@ -28,7 +28,7 @@ var embeddedCatalog []byte
 //go:embed testclient.html
 var testClientHTML []byte
 
-//go:embed agent.js agent-call.js agent-turns.js agent-refusal.js agent.css
+//go:embed agent.js agent-call.js agent-turns.js agent-metrics.js agent-refusal.js agent.css
 //go:embed client.js client-stats.js client-session.js client-media.js
 var clientAssets embed.FS
 
@@ -36,6 +36,7 @@ var clientAssetPaths = map[string]string{
 	"/agent.js":          "agent.js",
 	"/agent-call.js":     "agent-call.js",
 	"/agent-turns.js":    "agent-turns.js",
+	"/agent-metrics.js":  "agent-metrics.js",
 	"/agent-refusal.js":  "agent-refusal.js",
 	"/agent.css":         "agent.css",
 	"/client.js":         "client.js",

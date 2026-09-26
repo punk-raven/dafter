@@ -44,16 +44,19 @@ function agentPanel() {
         <div id="agent-lines" class="agent-lines"><div class="agent-empty">speech shows here as it is recognised</div></div>
       </div>
       <div class="agent-col agent-latency">
-        <div class="agent-col-head"><span>Turn latency</span><span id="agent-p50" class="agent-p50">p50 -</span></div>
+        <div class="agent-col-head"><span>Turn latency <span class="agent-hint">ms</span></span><span id="agent-cost" class="agent-cost">cost -</span><span id="agent-p50" class="agent-p50" title="median of the heard column">p50 -</span></div>
         <div class="agent-turns-body">
           <table class="agent-turns">
             <thead><tr>
-              <th>#</th>
-              <th class="num" title="end of your speech to the agent starting to think">endpoint</th>
-              <th class="num" title="agent thinking to its first audio heard here">respond</th>
-              <th class="num" title="end of your speech to the agent's first audio heard here">total</th>
+              <th title="the agent's turn, the greeting is 0; (n) until the worker reports it">#</th>
+              <th class="num" title="worker: end of your speech to deciding your turn ended">eot</th>
+              <th class="num" title="worker: end of your speech to the final transcript">stt</th>
+              <th class="num" title="worker: LLM time to first token">llm</th>
+              <th class="num" title="worker: TTS time to first audio">tts</th>
+              <th class="num" title="worker: end of your speech to the agent starting to speak">e2e</th>
+              <th class="num" title="this browser: end of your speech to the agent's first audio heard here">heard</th>
             </tr></thead>
-            <tbody id="agent-turn-rows"><tr class="agent-empty-row"><td colspan="4">no turn yet</td></tr></tbody>
+            <tbody id="agent-turn-rows"><tr class="agent-empty-row"><td colspan="${TURN_COLUMNS}">no turn yet</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -135,7 +138,16 @@ function onAgentEvent(payload) {
     log(`agent event is not JSON: ${err.message}`, 'warn');
     return;
   }
-  if (event.type !== 'agent.state_changed' || !event.payload) return;
+  if (!event.payload) return;
+  if (event.type === 'agent.turn_metrics') {
+    onTurnMetrics(event.payload);
+    return;
+  }
+  if (event.type === 'session.usage') {
+    onSessionUsage(event.payload);
+    return;
+  }
+  if (event.type !== 'agent.state_changed') return;
   const previous = agentView.state;
   agentView.state = event.payload.state;
   agentTurnState(previous, agentView.state, performance.now());

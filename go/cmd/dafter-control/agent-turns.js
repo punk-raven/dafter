@@ -21,8 +21,9 @@ function resetAgentTurns() {
     userOnsetAt: 0, userVoiceAt: 0, speakingSince: 0, lines: new Map(), agentLine: null,
   });
   document.getElementById('agent-lines').innerHTML = '<div class="agent-empty">speech shows here as it is recognised</div>';
-  document.getElementById('agent-turn-rows').innerHTML = '<tr class="agent-empty-row"><td colspan="4">no turn yet</td></tr>';
+  document.getElementById('agent-turn-rows').innerHTML = `<tr class="agent-empty-row"><td colspan="${TURN_COLUMNS}">no turn yet</td></tr>`;
   document.getElementById('agent-p50').textContent = 'p50 -';
+  resetAgentCost();
 }
 
 function ms(v) {
@@ -35,23 +36,13 @@ function median(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function addTurnRow(cells) {
-  const body = document.getElementById('agent-turn-rows');
-  const empty = body.querySelector('.agent-empty-row');
-  if (empty) empty.remove();
-  const row = document.createElement('tr');
-  row.innerHTML = cells.map((c, i) => `<td class="${i ? 'num' : ''}"></td>`).join('');
-  cells.forEach((c, i) => { row.children[i].textContent = c; });
-  body.prepend(row);
-}
-
 function addBargeRow(stopMs) {
   const body = document.getElementById('agent-turn-rows');
   const empty = body.querySelector('.agent-empty-row');
   if (empty) empty.remove();
   const row = document.createElement('tr');
   row.className = 'agent-barge';
-  row.innerHTML = '<td>cut</td><td colspan="3"></td>';
+  row.innerHTML = `<td>cut</td><td colspan="${TURN_COLUMNS - 1}"></td>`;
   row.children[1].textContent = `barge-in: agent stopped ${ms(stopMs)} after you started`;
   body.prepend(row);
 }
@@ -70,7 +61,7 @@ function finishTurn(turn) {
   const respond = turn.firstAudioAt - turn.thinkingAt;
   const total = turn.userEndAt ? turn.firstAudioAt - turn.userEndAt : null;
   if (total != null) agentTurns.totals.push(total);
-  addTurnRow([String(turn.n), ms(endpoint), ms(respond), ms(total)]);
+  addHeardTurn(turn.n, endpoint, respond, total);
   renderP50();
   log(`Turn ${turn.n}: endpoint ${ms(endpoint)}, respond ${ms(respond)}, total ${ms(total)}`, 'success');
 }
