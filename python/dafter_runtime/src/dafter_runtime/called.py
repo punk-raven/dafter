@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -11,8 +12,9 @@ from livekit.agents import AgentSession, JobContext
 from livekit.agents.metrics import AgentSessionUsage
 from livekit.agents.voice.events import AgentStateChangedEvent
 
-from .addressing import Gate, Timer
+from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
+from .barge_in import BargeIn, follow
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
@@ -37,6 +39,18 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         clock=loop.time,
         schedule=schedule,
         name=addressing.name,
+    )
+
+
+def barge_in_for(p: Plan, gate: Gate, voice: Voice, loop: asyncio.AbstractEventLoop) -> BargeIn:
+    interruption = p.config.turn.interruption
+    return BargeIn(
+        interruption.min_duration_ms / 1000,
+        interruption.min_words,
+        caller=lambda: gate.addressee,
+        stop=voice.barge_in,
+        clock=time.time,
+        schedule=loop.call_later,
     )
 
 
@@ -68,8 +82,12 @@ class Called:
         self._session = session
         self.roster = Roster()
         self.voice = Voice(session, self.roster, interruptible=p.config.turn.interruption.enabled)
-        self.gate = gate_for(p, self.voice, asyncio.get_running_loop())
-        self.listeners = Listeners(ctx.room, listening(p, stages), sample_rate, self.gate.heard)
+        loop = asyncio.get_running_loop()
+        self.gate = gate_for(p, self.voice, loop)
+        self.barge_in = barge_in_for(p, self.gate, self.voice, loop)
+        self.listeners = Listeners(
+            ctx.room, listening(p, stages), sample_rate, self._heard, self._listening
+        )
         self._tasks: set[asyncio.Task[None]] = set()
 
     def addressee(self) -> str | None:
@@ -79,6 +97,13 @@ class Called:
         return AgentSessionUsage(
             model_usage=[*self._session.usage.model_usage, *self.listeners.usage()]
         )
+
+    def _heard(self, speaker: str, text: str) -> None:
+        self.barge_in.committed(speaker)
+        self.gate.heard(speaker, text)
+
+    def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
+        follow(self.barge_in, speaker, session)
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.ensure_future(work)
@@ -96,6 +121,7 @@ class Called:
             return
         self.roster.leave(participant.identity)
         self.gate.left(participant.identity)
+        self.barge_in.left(participant.identity)
         self._spawn(self.listeners.leave(participant.identity))
         if not self.roster.present():
             log.info("everyone left, closing the agent session")
@@ -103,6 +129,8 @@ class Called:
 
     def _state_changed(self, ev: AgentStateChangedEvent) -> None:
         self.gate.agent_state(ev.new_state)
+        if ev.new_state in BUSY_STATES:
+            self.barge_in.replying()
 
     def _data(self, packet: rtc.DataPacket) -> None:
         if packet.topic != CONTROL_TOPIC:
@@ -124,4 +152,4 @@ class Called:
         self._ctx.add_shutdown_callback(self.listeners.aclose)
 
 
-__all__ = ["CONTROL_TOPIC", "Called", "command", "gate_for", "listening"]
+__all__ = ["CONTROL_TOPIC", "Called", "barge_in_for", "command", "gate_for", "listening"]

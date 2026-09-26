@@ -64,6 +64,15 @@ class Voice:
     def hush(self) -> None:
         self._session.interrupt()
 
+    def barge_in(self) -> None:
+        speech = self._session.current_speech
+        if not self._interruptible or speech is None:
+            return
+        if speech.interrupted or not speech.allow_interruptions:
+            return
+        log.info("the caller talked over the reply")
+        speech.interrupt(source="audio_activity")
+
     def addressed(self, woken_by: str | None, via: WakeSource | None) -> None:
         log.info(
             "agent addressed",

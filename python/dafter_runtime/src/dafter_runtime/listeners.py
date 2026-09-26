@@ -17,6 +17,7 @@ from livekit.agents.voice.room_io import AudioInputOptions, RoomOptions
 log = logging.getLogger("dafter.runtime.listeners")
 
 Heard = Callable[[str, str], None]
+Joined = Callable[[str, AgentSession[Any]], None]
 
 
 class Listener(Agent):
@@ -72,11 +73,13 @@ class Listeners:
         new_session: Callable[[], AgentSession[Any]],
         sample_rate: int,
         heard: Heard,
+        joined: Joined,
     ) -> None:
         self._room = room
         self._new_session = new_session
         self._sample_rate = sample_rate
         self._heard = heard
+        self._joined = joined
         self._sessions: dict[str, AgentSession[Any]] = {}
         self._spent: list[ModelUsage] = []
 
@@ -88,6 +91,7 @@ class Listeners:
             return
         session = self._new_session()
         self._sessions[identity] = session
+        self._joined(identity, session)
         await session.start(
             agent=Listener(identity, self._heard),
             room=self._room,
