@@ -27,6 +27,7 @@ from opentelemetry import trace
 
 from . import telemetry
 from .control import ControlPlane, encryption
+from .cost import load_prices, priced, usage_payload
 from .events import TOPIC, SessionEvents
 from .plan import Plan, load, plan
 from .stages import Stages, build
@@ -106,6 +107,12 @@ def current_trace_id() -> str | None:
 
 def watch(session: AgentSession[Any], p: Plan, events: SessionEvents, tracer: trace.Tracer) -> None:
     turns = Turns()
+    prices = load_prices()
+
+    def report_usage(final: bool) -> dict[str, Any]:
+        payload = usage_payload(priced(session.usage, prices), final)
+        events.emit(EventType.SESSION_USAGE, payload, current_trace_id())
+        return payload
 
     def state_changed(ev: AgentStateChangedEvent) -> None:
         events.changed(ev.new_state, current_trace_id())
@@ -119,6 +126,7 @@ def watch(session: AgentSession[Any], p: Plan, events: SessionEvents, tracer: tr
         log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
         timing.record(tracer)
         events.emit(EventType.AGENT_TURN_METRICS, timing.payload(), current_trace_id())
+        report_usage(final=False)
 
     def failed(ev: ErrorEvent) -> None:
         stage, vendor = Stage.CONTROL, p.stt
@@ -144,6 +152,20 @@ def watch(session: AgentSession[Any], p: Plan, events: SessionEvents, tracer: tr
 
     def closed(ev: CloseEvent) -> None:
         log.info("agent session closed", extra={"session": p.config.session_id, "why": ev.reason})
+        usage = report_usage(final=True)
+        unpriced = [
+            f"{i['stage']}:{i['provider']}/{i['model']}/{i['unit']}"
+            for i in usage["items"]
+            if not i["priced"]
+        ]
+        log.info(
+            "session cost",
+            extra={
+                "session": p.config.session_id,
+                "cost_inr": usage["costInr"],
+                "unpriced": ",".join(unpriced),
+            },
+        )
 
     session.on("agent_state_changed", state_changed)
     session.on("conversation_item_added", item_added)
