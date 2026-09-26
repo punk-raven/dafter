@@ -8,6 +8,7 @@ from livekit import rtc
 from livekit.agents import Agent, AgentSession, StopResponse
 from livekit.agents import llm as lk_llm
 from livekit.agents import stt as lk_stt
+from livekit.agents import vad as lk_vad
 from livekit.agents.job import DEFAULT_PARTICIPANT_KINDS
 from livekit.agents.metrics.usage import ModelUsage
 from livekit.agents.types import ATTRIBUTE_PUBLISH_ON_BEHALF
@@ -40,6 +41,20 @@ def is_human(participant: rtc.RemoteParticipant, room: rtc.Room) -> bool:
     return behalf != room.local_participant.identity
 
 
+def listener_session(
+    stt: lk_stt.STT[Any], vad: lk_vad.VAD | None, turn_handling: dict[str, Any]
+) -> AgentSession[Any]:
+    return AgentSession(
+        stt=stt,
+        vad=vad,
+        turn_handling={  # type: ignore[arg-type]
+            **turn_handling,
+            "preemptive_generation": {"enabled": False},
+        },
+        user_away_timeout=None,
+    )
+
+
 def listener_options(identity: str, sample_rate: int) -> RoomOptions:
     return RoomOptions(
         participant_identity=identity,
@@ -54,14 +69,12 @@ class Listeners:
     def __init__(
         self,
         room: rtc.Room,
-        new_stt: Callable[[], lk_stt.STT[Any]],
-        turn_handling: dict[str, Any],
+        new_session: Callable[[], AgentSession[Any]],
         sample_rate: int,
         heard: Heard,
     ) -> None:
         self._room = room
-        self._new_stt = new_stt
-        self._turn_handling = turn_handling
+        self._new_session = new_session
         self._sample_rate = sample_rate
         self._heard = heard
         self._sessions: dict[str, AgentSession[Any]] = {}
@@ -73,12 +86,7 @@ class Listeners:
     async def join(self, identity: str) -> None:
         if identity in self._sessions:
             return
-        session: AgentSession[Any] = AgentSession(
-            stt=self._new_stt(),
-            vad=None,
-            turn_handling=self._turn_handling,  # type: ignore[arg-type]
-            user_away_timeout=None,
-        )
+        session = self._new_session()
         self._sessions[identity] = session
         await session.start(
             agent=Listener(identity, self._heard),
@@ -105,4 +113,4 @@ class Listeners:
         return [*self._spent, *live]
 
 
-__all__ = ["Listener", "Listeners", "is_human", "listener_options"]
+__all__ = ["Listener", "Listeners", "is_human", "listener_options", "listener_session"]

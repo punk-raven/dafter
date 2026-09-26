@@ -36,7 +36,7 @@ from .cost import load_prices, priced, usage_payload
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
-from .stages import Stages, build
+from .stages import Stages, build, hearing
 from .timing import Turns
 from .toolbox import Answering, follow, linked, registry_for
 
@@ -215,15 +215,12 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
             turn_handling=p.voice_turn_handling,  # type: ignore[arg-type]
             user_away_timeout=None,
         )
-    handling = dict(p.turn_handling)
-    if stages.turn_detector is not None:
-        handling["turn_detection"] = stages.turn_detector
     return AgentSession(
         stt=stages.stt,
         llm=stages.llm,
         tts=stages.tts,
         vad=stages.vad,
-        turn_handling=handling,  # type: ignore[arg-type]
+        turn_handling=hearing(p, stages),  # type: ignore[arg-type]
         user_away_timeout=None,
     )
 

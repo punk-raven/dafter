@@ -71,3 +71,10 @@ def build(plan: Plan) -> Stages:
     if plan.tts.wants_prewarm(tts_ref):
         stages.tts.prewarm()
     return stages
+
+
+def hearing(plan: Plan, stages: Stages) -> dict[str, Any]:
+    handling = dict(plan.turn_handling)
+    if stages.turn_detector is not None:
+        handling["turn_detection"] = stages.turn_detector
+    return handling

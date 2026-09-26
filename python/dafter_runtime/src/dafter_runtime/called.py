@@ -13,10 +13,10 @@ from livekit.agents.voice.events import AgentStateChangedEvent
 
 from .addressing import Gate, Timer
 from .answering import Roster, Voice
-from .listeners import Listeners, is_human
+from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
-from .stages import Stages
+from .stages import Stages, hearing
 
 log = logging.getLogger("dafter.runtime.called")
 
@@ -40,6 +40,15 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
     )
 
 
+def listening(p: Plan, stages: Stages) -> Callable[[], AgentSession[Any]]:
+    handling = hearing(p, stages)
+
+    def new_session() -> AgentSession[Any]:
+        return listener_session(stages.listener_stt(), stages.vad, handling)
+
+    return new_session
+
+
 def command(data: bytes) -> str | None:
     try:
         message = json.loads(data)
@@ -60,9 +69,7 @@ class Called:
         self.roster = Roster()
         self.voice = Voice(session, self.roster, interruptible=p.config.turn.interruption.enabled)
         self.gate = gate_for(p, self.voice, asyncio.get_running_loop())
-        self.listeners = Listeners(
-            ctx.room, stages.listener_stt, p.turn_handling, sample_rate, self.gate.heard
-        )
+        self.listeners = Listeners(ctx.room, listening(p, stages), sample_rate, self.gate.heard)
         self._tasks: set[asyncio.Task[None]] = set()
 
     def addressee(self) -> str | None:
@@ -117,4 +124,4 @@ class Called:
         self._ctx.add_shutdown_callback(self.listeners.aclose)
 
 
-__all__ = ["CONTROL_TOPIC", "Called", "command", "gate_for"]
+__all__ = ["CONTROL_TOPIC", "Called", "command", "gate_for", "listening"]
