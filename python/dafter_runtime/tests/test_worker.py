@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
+from typing import cast
 
 import pytest
-from dafter_runtime.worker import FRAMEWORK_LOGGER, redact_framework_logs
+from dafter_runtime.worker import FRAMEWORK_LOGGER, prewarm, redact_framework_logs, server
+from livekit.agents import JobProcess
 
 
 class Capture(logging.Handler):
@@ -39,3 +41,8 @@ def test_framework_log_records_lose_their_transcript_fields(framework: logging.L
     assert "lk.pii.user_input" not in record.__dict__
     assert record.__dict__["room"] == "s_7f3a9c21"
     assert sum(type(f).__name__ == "RedactTranscripts" for f in framework.filters) == 1
+
+
+def test_every_worker_process_loads_the_local_models_before_its_first_job() -> None:
+    assert server().setup_fnc is prewarm
+    prewarm(cast(JobProcess, None))

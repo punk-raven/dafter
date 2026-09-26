@@ -10,7 +10,8 @@ resolved session config for session `s_7f3a9c21`, sealed with its own
   on purpose, then run the Python tests too.
 - `python/dafter_runtime/tests/test_plan.py` loads it the way the worker loads
   a job: validate, re-hash, then plan the pipeline, and expects the Sarvam
-  cascade with provider endpointing and no local VAD.
+  cascade with provider endpointing and a local VAD that only catches
+  barge-in.
 
 A catalog change that the worker cannot run fails on the Python side instead
 of at the first real call.

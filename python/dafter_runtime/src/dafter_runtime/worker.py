@@ -6,13 +6,14 @@ from typing import Any
 
 from dafter_core.enums import EncryptionMode, EventType, Stage
 from dafter_core.errors import DafterError
-from livekit import rtc
+from livekit import local_inference, rtc
 from livekit.agents import (
     Agent,
     AgentServer,
     AgentSession,
     AutoSubscribe,
     JobContext,
+    JobProcess,
     JobRequest,
 )
 from livekit.agents.llm import ChatMessage
@@ -187,6 +188,17 @@ def watch(
     session.on("close", closed)
 
 
+def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
+    return AgentSession(
+        stt=stages.stt,
+        llm=stages.llm,
+        tts=stages.tts,
+        vad=stages.vad,
+        turn_handling=p.turn_handling,  # type: ignore[arg-type]
+        user_away_timeout=None,
+    )
+
+
 async def entrypoint(ctx: JobContext) -> None:
     redact_framework_logs()
     control = ControlPlane.from_env()
@@ -201,14 +213,7 @@ async def entrypoint(ctx: JobContext) -> None:
         await ctx.room.local_participant.publish_data(body, reliable=True, topic=TOPIC)
 
     events = SessionEvents(p.config, publish)
-    session: AgentSession[Any] = AgentSession(
-        stt=stages.stt,
-        llm=stages.llm,
-        tts=stages.tts,
-        vad=None,
-        turn_handling=p.turn_handling,  # type: ignore[arg-type]
-        user_away_timeout=None,
-    )
+    session = new_session(p, stages)
     watch(session, p, events, telemetry.tracer(provider))
 
     async def flush() -> None:
@@ -226,11 +231,16 @@ async def entrypoint(ctx: JobContext) -> None:
     session.say(p.persona.greeting, allow_interruptions=True)
 
 
+def prewarm(proc: JobProcess) -> None:
+    local_inference.init_vad()
+
+
 def server() -> AgentServer:
     redact_framework_logs()
     os.environ.setdefault(POOL_ENV, DEFAULT_POOL)
     exposed = exposition()
     agent_server = AgentServer(
+        setup_fnc=prewarm,
         prometheus_port=exposed.port if exposed else None,
         prometheus_multiproc_dir=exposed.multiproc_dir if exposed else None,
     )
@@ -238,4 +248,12 @@ def server() -> AgentServer:
     return agent_server
 
 
-__all__ = ["entrypoint", "on_request", "pool", "redact_framework_logs", "server"]
+__all__ = [
+    "entrypoint",
+    "new_session",
+    "on_request",
+    "pool",
+    "prewarm",
+    "redact_framework_logs",
+    "server",
+]

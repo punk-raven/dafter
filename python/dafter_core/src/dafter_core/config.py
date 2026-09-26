@@ -73,6 +73,7 @@ class Pipeline:
 @dataclass(frozen=True, slots=True)
 class Interruption:
     enabled: bool = True
+    local_vad_enabled: bool = False
     min_duration_ms: int = 0
     min_words: int = 0
     false_interruption_timeout_ms: int = 0
@@ -82,6 +83,7 @@ class Interruption:
     def from_dict(cls, d: dict[str, Any]) -> Interruption:
         return cls(
             enabled=d.get("enabled", True),
+            local_vad_enabled=d.get("localVadEnabled", False),
             min_duration_ms=d.get("minDurationMs", 0),
             min_words=d.get("minWords", 0),
             false_interruption_timeout_ms=d.get("falseInterruptionTimeoutMs", 0),

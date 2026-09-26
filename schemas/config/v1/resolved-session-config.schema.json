@@ -111,7 +111,7 @@
         "endpointingDelayMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
         "localVadEnabled": {
           "type": "boolean",
-          "description": "Turn off where a provider's server VAD is authoritative: a second local VAD sees the same audio as the recognizer and fights it.",
+          "description": "Whether a local VAD takes part in deciding the user's turn, as it does under the vad and semantic strategies. False under provider_endpointing, where the recognizer's own VAD decides the turn and a second detector deciding it would fight the first. A local VAD that only catches the caller talking over the agent is interruption.localVadEnabled.",
           "default": true
         },
         "interruption": {
@@ -119,6 +119,11 @@
           "unevaluatedProperties": false,
           "properties": {
             "enabled": { "type": "boolean", "default": true },
+            "localVadEnabled": {
+              "type": "boolean",
+              "description": "Run the local VAD in agent.pipeline.vad to detect the caller starting to talk over the agent, without it deciding the end of the turn, so barge-in does not wait for the recognizer's first transcript. One VAD serves both jobs, so it is implied wherever turn.localVadEnabled is true.",
+              "default": false
+            },
             "minDurationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
             "minWords": { "type": "integer", "minimum": 0, "maximum": 20 },
             "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },

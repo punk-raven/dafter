@@ -463,7 +463,7 @@ Self-hosted OSS is the reference, keeping decryption out of a third party's hand
 
 VAD is a **first-class, provider-agnostic pipeline stage** (see the architecture document). Any VAD LiveKit supports is usable and configurable, independent of the STT/LLM/TTS providers. A provider's own server-side VAD is one option, not a requirement.
 
-The only provider-specific VAD tuning worth encoding once: **when a provider's server VAD is authoritative, turn the local VAD off.** A second local VAD sees the same audio as the provider's recognizer and fights it. This is a per-provider config detail, not a property of the pipeline.
+The only provider-specific VAD tuning worth encoding once: **when a provider's server VAD is authoritative, the local VAD does not decide the turn; it runs for interruptions only.** Two detectors deciding one turn fight each other, so the recognizer ends the turn (`turn.localVadEnabled` false, refused under `provider_endpointing` on both halves). The local VAD still hears the caller start to talk over the agent (`turn.interruption.localVadEnabled`), so barge-in does not wait for the recognizer's first transcript. This is a per-provider config detail, not a property of the pipeline.
 
 #### Sarvam
 
@@ -476,7 +476,7 @@ A language specialist, and the reason the config model has a per-language axis a
 | Setting | Value | Why |
 |---|---|---|
 | STT class | Streaming class, not the legacy one | Legacy has no real partials and no live reconfiguration |
-| Local VAD | **Off** | Sarvam's server VAD sees the same audio as the recognizer. A second local VAD fights it |
+| Local VAD | **Interruptions only** | Sarvam's server VAD decides the end of the turn; a second detector deciding it would fight it. A local Silero VAD only detects the caller talking over the agent, which Sarvam reports no sooner than its first transcript |
 | Turn strategy | `provider_endpointing` | The framework's semantic turn detector is English-trained; trust Sarvam's own end-of-speech events for Indic |
 | Chunk profile | `fast` (500ms) | The 1000ms default adds up to a full second before VAD even begins. **Single biggest latency knob** |
 | TTS codec | Raw PCM | Skips a decode pass per chunk. Use mulaw at 8kHz for telephony |

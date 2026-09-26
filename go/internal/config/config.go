@@ -69,6 +69,7 @@ type Turn struct {
 
 type Interruption struct {
 	Enabled                    *bool `json:"enabled,omitempty"`
+	LocalVADEnabled            *bool `json:"localVadEnabled,omitempty"`
 	MinDurationMs              int   `json:"minDurationMs,omitempty"`
 	MinWords                   int   `json:"minWords,omitempty"`
 	FalseInterruptionTimeoutMs int   `json:"falseInterruptionTimeoutMs,omitempty"`
@@ -100,6 +101,10 @@ type AudioProfile struct {
 	DTX               *bool             `json:"dtx,omitempty"`
 	EchoCancellation  *bool             `json:"echoCancellation,omitempty"`
 	NoiseCancellation NoiseCancellation `json:"noiseCancellation,omitempty"`
+}
+
+func (t Turn) LocalVADDecidesTurn() bool {
+	return t.LocalVADEnabled == nil || *t.LocalVADEnabled
 }
 
 func (c *ResolvedSessionConfig) VideoEnabled() bool {

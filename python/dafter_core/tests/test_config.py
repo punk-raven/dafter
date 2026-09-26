@@ -334,3 +334,26 @@ def test_pipeline_fields_are_assigned_by_name() -> None:
         c.agent.pipeline.realtime is not None
         and c.agent.pipeline.realtime.provider == "realtime_vendor"
     )
+
+
+@pytest.mark.parametrize("stated", [{"localVadEnabled": True}, {}])
+def test_provider_endpointing_refuses_a_local_vad_deciding_the_turn(
+    stated: dict[str, Any],
+) -> None:
+    err = refuse(doc(turn={"strategy": "provider_endpointing", **stated}))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/turn/localVadEnabled" in err.details[0]
+
+
+def test_provider_endpointing_takes_a_local_vad_that_only_catches_barge_in() -> None:
+    c = parse(
+        doc(
+            turn={
+                "strategy": "provider_endpointing",
+                "localVadEnabled": False,
+                "interruption": {"localVadEnabled": True},
+            }
+        )
+    )
+    assert (c.turn.local_vad_enabled, c.turn.interruption.local_vad_enabled) == (False, True)
+    assert parse(doc()).turn.interruption.local_vad_enabled is False

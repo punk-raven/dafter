@@ -5,7 +5,14 @@
     "agent": {
       "enabled": true,
       "pool": "dafter-py",
-      "mode": "cascaded"
+      "mode": "cascaded",
+      "pipeline": {
+        "vad": {
+          "provider": "silero",
+          "model": "silero",
+          "options": { "minSpeechMs": 50, "minSilenceMs": 250, "prefixPaddingMs": 500, "activationThreshold": 0.5 }
+        }
+      }
     },
     "turn": {
       "strategy": "auto",
@@ -13,8 +20,9 @@
       "minSpeechMs": 120,
       "interruption": {
         "enabled": true,
-        "minWords": 2,
-        "minDurationMs": 300,
+        "localVadEnabled": true,
+        "minWords": 0,
+        "minDurationMs": 250,
         "falseInterruptionTimeoutMs": 2000,
         "resumeFalseInterruption": true
       }

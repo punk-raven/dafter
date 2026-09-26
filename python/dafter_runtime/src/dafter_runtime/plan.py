@@ -21,6 +21,7 @@ class Plan:
     stt: Vendor
     llm: Vendor
     tts: Vendor
+    vad: Vendor | None
     turn_detection: TurnDetection
     turn_handling: dict[str, Any]
     persona: Persona
@@ -105,6 +106,19 @@ def _vendor(ref: ProviderRef | None, stage: Stage, language: str) -> Vendor:
     return vendor
 
 
+def local_vad(pipeline: Pipeline, turn: Turn) -> Vendor | None:
+    if not turn.interruption.local_vad_enabled:
+        return None
+    if pipeline.vad is None:
+        raise _refuse(
+            ErrorCode.INVALID_CONFIG,
+            "the session asks for a local VAD and the pipeline names none",
+            "/agent/pipeline/vad",
+            "turn.interruption.localVadEnabled needs one",
+        )
+    return vendor_for(pipeline.vad, Stage.VAD)
+
+
 def turn_detection(turn: Turn, stt: Vendor) -> TurnDetection:
     strategy = turn.strategy
     if strategy is TurnStrategy.AUTO:
@@ -135,6 +149,7 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
         "endpointing": {"min_delay": turn.endpointing_delay_ms / 1000},
         "interruption": {
             "enabled": i.enabled,
+            "mode": "vad",
             "min_duration": i.min_duration_ms / 1000,
             "min_words": i.min_words,
             "false_interruption_timeout": (
@@ -157,6 +172,7 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         stt=stt,
         llm=llm,
         tts=tts,
+        vad=local_vad(pipeline, cfg.turn),
         turn_detection=detection,
         turn_handling=turn_handling(cfg.turn, detection),
         persona=persona_for(cfg.agent.persona_ref, cfg.language),
