@@ -1,7 +1,9 @@
 package events_test
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -95,6 +97,80 @@ func TestEventRejectsANonOpaqueSessionID(t *testing.T) {
 	}
 }
 
+const vectors = "../../../testdata/events/"
+
+func vector(t *testing.T, name string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(vectors + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	return doc
+}
+
+func TestMeasurementVectorsParse(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]events.EventType{
+		"agent-turn-metrics.json": events.EventAgentTurnMetrics,
+		"session-usage.json":      events.EventSessionUsage,
+	} {
+		raw, err := os.ReadFile(vectors + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e, err := events.Parse(raw)
+		if err != nil {
+			t.Fatalf("%s was rejected: %v", name, err)
+		}
+		if e.Type != want {
+			t.Errorf("%s parsed as %s", name, e.Type)
+		}
+	}
+}
+
+func TestMeasurementPayloadsAreEnforced(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		file   string
+		mutate func(payload map[string]any)
+	}{
+		{"negative layer", "agent-turn-metrics.json", func(p map[string]any) { p["e2eLatencyMs"] = -1 }},
+		{"fractional layer", "agent-turn-metrics.json", func(p map[string]any) { p["llmNodeTtftMs"] = 1.5 }},
+		{"unknown layer", "agent-turn-metrics.json", func(p map[string]any) { p["vadDelayMs"] = 10 }},
+		{"missing turn", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "turn") }},
+		{"unpriced item with a cost", "session-usage.json", func(p map[string]any) { item(p, 1)["costInr"] = 0 }},
+		{"priced item without a cost", "session-usage.json", func(p map[string]any) { delete(item(p, 0), "costInr") }},
+		{"unknown unit", "session-usage.json", func(p map[string]any) { item(p, 0)["unit"] = "minute" }},
+		{"vendor spelling of a provider", "session-usage.json", func(p map[string]any) { item(p, 0)["provider"] = "Sarvam" }},
+		{"missing final", "session-usage.json", func(p map[string]any) { delete(p, "final") }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			doc := vector(t, tc.file)
+			tc.mutate(doc["payload"].(map[string]any))
+			raw, err := json.Marshal(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = events.Parse(raw)
+			var de *errs.Error
+			if !errors.As(err, &de) || de.Code != errs.CodeInternal || len(de.Details) == 0 {
+				t.Fatalf("want a located %s, got %v", errs.CodeInternal, err)
+			}
+		})
+	}
+}
+
+func item(payload map[string]any, i int) map[string]any {
+	return payload["items"].([]any)[i].(map[string]any)
+}
+
 func TestGeneratedEnumsMatchSchema(t *testing.T) {
 	t.Parallel()
 	const file = "events/v1/envelope.schema.json"
@@ -105,6 +181,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 	}{
 		{"EventType", []string{"$defs", "EventType", "enum"}, schema.Names(events.AllEventTypes)},
 		{"AgentState", []string{"$defs", "AgentState", "enum"}, schema.Names(events.AllAgentStates)},
+		{"UsageUnit", []string{"$defs", "UsageUnit", "enum"}, schema.Names(events.AllUsageUnits)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

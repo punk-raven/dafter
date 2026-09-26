@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -10,6 +12,7 @@ from dafter_core.errors import DafterError
 from dafter_core.events import EventEnvelope, parse_event
 
 AT = datetime(2026, 9, 11, 10, 0, 0, tzinfo=UTC)
+VECTORS = Path(__file__).resolve().parents[3] / "testdata" / "events"
 
 
 def event(typ: EventType, payload: dict[str, Any] | None = None, **kw: Any) -> EventEnvelope:
@@ -111,3 +114,53 @@ def test_parse_event_refuses_malformed_json_as_internal() -> None:
     with pytest.raises(DafterError) as exc:
         parse_event('{"eventId":')
     assert exc.value.code is ErrorCode.INTERNAL
+
+
+def vector(name: str) -> dict[str, Any]:
+    doc: dict[str, Any] = json.loads((VECTORS / name).read_text())
+    return doc
+
+
+@pytest.mark.parametrize(
+    ("name", "typ"),
+    [
+        ("agent-turn-metrics.json", EventType.AGENT_TURN_METRICS),
+        ("session-usage.json", EventType.SESSION_USAGE),
+    ],
+)
+def test_measurement_vectors_parse(name: str, typ: EventType) -> None:
+    assert parse_event((VECTORS / name).read_bytes()).type is typ
+
+
+def _item(payload: dict[str, Any], i: int) -> dict[str, Any]:
+    item: dict[str, Any] = payload["items"][i]
+    return item
+
+
+MUTATIONS: list[tuple[str, str, Callable[[dict[str, Any]], object]]] = [
+    ("negative layer", "agent-turn-metrics.json", lambda p: p.update(e2eLatencyMs=-1)),
+    ("fractional layer", "agent-turn-metrics.json", lambda p: p.update(llmNodeTtftMs=1.5)),
+    ("unknown layer", "agent-turn-metrics.json", lambda p: p.update(vadDelayMs=10)),
+    ("missing turn", "agent-turn-metrics.json", lambda p: p.pop("turn")),
+    ("unpriced item with a cost", "session-usage.json", lambda p: _item(p, 1).update(costInr=0)),
+    ("priced item without a cost", "session-usage.json", lambda p: _item(p, 0).pop("costInr")),
+    ("unknown unit", "session-usage.json", lambda p: _item(p, 0).update(unit="minute")),
+    (
+        "vendor spelling of a provider",
+        "session-usage.json",
+        lambda p: _item(p, 0).update(provider="Sarvam"),
+    ),
+    ("missing final", "session-usage.json", lambda p: p.pop("final")),
+]
+
+
+@pytest.mark.parametrize(("name", "file", "mutate"), MUTATIONS, ids=[m[0] for m in MUTATIONS])
+def test_measurement_payloads_are_enforced(
+    name: str, file: str, mutate: Callable[[dict[str, Any]], object]
+) -> None:
+    doc = vector(file)
+    mutate(doc["payload"])
+    with pytest.raises(DafterError) as exc:
+        parse_event(json.dumps(doc))
+    assert exc.value.code is ErrorCode.INTERNAL, name
+    assert exc.value.details, name

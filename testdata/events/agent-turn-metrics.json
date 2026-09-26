@@ -1,0 +1,21 @@
+{
+  "eventId": "e_3f0c9a7d2b1e4c6f8a9d0e1f2a3b4c5d",
+  "type": "agent.turn_metrics",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 4,
+  "occurredAt": "2026-09-24T10:00:03.412Z",
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "payload": {
+    "turn": 1,
+    "interrupted": false,
+    "endOfTurnDelayMs": 612,
+    "transcriptionDelayMs": 488,
+    "llmNodeTtftMs": 734,
+    "llmNodeTtfsMs": 1021,
+    "ttsNodeTtfbMs": 296,
+    "playbackLatencyMs": 3,
+    "e2eLatencyMs": 1968
+  }
+}
