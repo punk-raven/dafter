@@ -105,6 +105,7 @@ services:
       DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
+      DAFTER_METRICS_PORT: "9464"
     depends_on:
       livekit:
         condition: service_started
@@ -126,6 +127,8 @@ services:
       - "9090:9090"
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       control:
         condition: service_started

@@ -29,6 +29,7 @@ from . import telemetry
 from .control import ControlPlane, encryption
 from .cost import load_prices, priced, usage_payload
 from .events import TOPIC, SessionEvents
+from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
 from .stages import Stages, build
 from .timing import Turns
@@ -105,13 +106,25 @@ def current_trace_id() -> str | None:
     return format(ctx.trace_id, "032x") if ctx.is_valid else None
 
 
-def watch(session: AgentSession[Any], p: Plan, events: SessionEvents, tracer: trace.Tracer) -> None:
+def watch(
+    session: AgentSession[Any],
+    p: Plan,
+    events: SessionEvents,
+    tracer: trace.Tracer,
+    metrics: WorkerMetrics = WORKER,
+) -> None:
     turns = Turns()
     prices = load_prices()
+    recorder = SessionMetrics(metrics, p)
 
     def report_usage(final: bool) -> dict[str, Any]:
-        payload = usage_payload(priced(session.usage, prices), final)
+        items = priced(session.usage, prices)
+        payload = usage_payload(items, final)
         events.emit(EventType.SESSION_USAGE, payload, current_trace_id())
+        if final:
+            recorder.closed(items)
+        else:
+            recorder.usage(items)
         return payload
 
     def state_changed(ev: AgentStateChangedEvent) -> None:
@@ -125,6 +138,7 @@ def watch(session: AgentSession[Any], p: Plan, events: SessionEvents, tracer: tr
             return
         log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
         timing.record(tracer)
+        recorder.turn(timing)
         events.emit(EventType.AGENT_TURN_METRICS, timing.payload(), current_trace_id())
         report_usage(final=False)
 
@@ -215,7 +229,11 @@ async def entrypoint(ctx: JobContext) -> None:
 def server() -> AgentServer:
     redact_framework_logs()
     os.environ.setdefault(POOL_ENV, DEFAULT_POOL)
-    agent_server = AgentServer()
+    exposed = exposition()
+    agent_server = AgentServer(
+        prometheus_port=exposed.port if exposed else None,
+        prometheus_multiproc_dir=exposed.multiproc_dir if exposed else None,
+    )
     agent_server.rtc_session(entrypoint, on_request=on_request)
     return agent_server
 

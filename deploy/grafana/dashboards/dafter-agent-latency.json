@@ -1,0 +1,295 @@
+{
+  "uid": "dafter-agent-latency",
+  "title": "Dafter agent latency",
+  "description": "The agent worker's reply time by layer against the latency targets. Scraped from the worker (DAFTER_METRICS_PORT, job dafter-agent).",
+  "tags": ["dafter"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]},
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "links": [
+    {
+      "title": "Dafter",
+      "type": "dashboards",
+      "tags": ["dafter"],
+      "asDropdown": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Reply time p50",
+      "description": "Worker-measured end of the user's speech to the agent starting to speak, median over 15 min. Target under 800 ms (docs/dafter.md, Latency).",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "noValue": "-",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "#73BF69", "value": null}, {"color": "#F2495C", "value": 800}]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[15m]))) * 1000",
+          "legendFormat": "Reply time p50",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Reply time p95",
+      "description": "The same, 1 turn in 20 slower than this. Target under 1.5 s; over 2.5 s users talk over the agent.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "noValue": "-",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#73BF69", "value": null},
+              {"color": "#FF9830", "value": 1500},
+              {"color": "#F2495C", "value": 2500}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[15m]))) * 1000",
+          "legendFormat": "Reply time p95",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Agent turns (15 min)",
+      "description": "Agent replies measured end to end in the last 15 min. A greeting has no end to end time and is not counted.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "-",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#5794F2", "value": null}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(dafter_agent_turn_layer_seconds_count{layer=\"e2e_latency\"}[15m])) or vector(0)",
+          "legendFormat": "Agent turns (15 min)",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Reply time vs targets (p50 / p95)",
+      "description": "Worker-measured end to end reply time. Dashed lines are the targets: p50 under 800 ms, p95 under 1.5 s. The 300 ms barge-in target has no line: the worker does not measure how fast speech stops on barge-in; the test client and dafter-evals do.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {"mode": "dashed"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#73BF69", "value": null},
+              {"color": "#FF9830", "value": 800},
+              {"color": "#F2495C", "value": 1500}
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "p50"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "p95"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#FF9830"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[5m]))) * 1000",
+          "legendFormat": "p50",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[5m]))) * 1000",
+          "legendFormat": "p95",
+          "refId": "B",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Where the reply time goes, p50 by layer",
+      "description": "Median of each layer the worker measures. end_of_turn_delay and transcription_delay run in parallel from the end of speech; llm_node_ttft, llm_node_ttfs and tts_node_ttfb follow; e2e_latency is the whole. The dashed line is the 800 ms p50 target for e2e_latency.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {"mode": "dashed"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "#73BF69", "value": null}, {"color": "#F2495C", "value": 800}]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.5, sum by (le, layer) (rate(dafter_agent_turn_layer_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{layer}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Where the reply time goes, p95 by layer",
+      "description": "The same at p95. The dashed line is the 1.5 s p95 target for e2e_latency.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 13},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {"mode": "dashed"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "#73BF69", "value": null}, {"color": "#F2495C", "value": 1500}]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le, layer) (rate(dafter_agent_turn_layer_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{layer}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    }
+  ]
+}

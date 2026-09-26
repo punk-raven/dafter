@@ -6,9 +6,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import pytest
 from dafter_core.enums import EventType
 from dafter_core.events import EventEnvelope, parse_event
 from dafter_runtime.events import SessionEvents
+from dafter_runtime.metrics import WorkerMetrics
 from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.worker import watch
 from livekit.agents import (
@@ -21,6 +23,7 @@ from livekit.agents import (
 )
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 from opentelemetry import trace
+from prometheus_client import CollectorRegistry
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
 REPLY = "नमस्ते! बताइए, मैं क्या मदद करूँ?"
@@ -125,6 +128,7 @@ def test_a_second_turn_carries_the_conversation() -> None:
 def test_a_text_session_reports_its_turns_and_what_they_cost() -> None:
     p = hindi_plan()
     sent: list[bytes] = []
+    registry = CollectorRegistry()
 
     async def publish(body: bytes) -> None:
         sent.append(body)
@@ -134,7 +138,7 @@ def test_a_text_session_reports_its_turns_and_what_they_cost() -> None:
             p.config, publish, clock=lambda: datetime(2026, 9, 24, 10, 0, tzinfo=UTC)
         )
         session = AgentSession[None](llm=StubLLM())
-        watch(session, p, events, trace.NoOpTracer())
+        watch(session, p, events, trace.NoOpTracer(), WorkerMetrics(registry))
         await session.start(Agent(instructions=p.persona.instructions))
         await session.run(user_input="नमस्ते")
         await session.run(user_input="धन्यवाद")
@@ -160,6 +164,20 @@ def test_a_text_session_reports_its_turns_and_what_they_cost() -> None:
         2 * PROMPT_TOKENS * 29.28 / 1e6 + 2 * COMPLETION_TOKENS * 73.20 / 1e6, 6
     )
     assert json.loads(sent[-1])["type"] == "session.usage"
+
+    place = {"language": "hi", "channel": "webrtc"}
+    ttft = {
+        "layer": "llm_node_ttft",
+        **place,
+        "stt": "sarvam/saaras:v3-realtime",
+        "llm": "sarvam/sarvam-105b",
+        "tts": "sarvam/bulbul:v3",
+    }
+    assert registry.get_sample_value("dafter_agent_turn_layer_seconds_count", ttft) == 2
+    assert registry.get_sample_value("dafter_agent_session_cost_inr_count", place) == 1
+    llm_spend = {**place, "stage": "llm", "provider": "sarvam", "model": "sarvam-105b"}
+    spent = registry.get_sample_value("dafter_agent_cost_inr_total", llm_spend)
+    assert spent == pytest.approx(final["costInr"])
 
 
 def of(events: list[EventEnvelope], event_type: EventType) -> list[dict[str, Any]]:
