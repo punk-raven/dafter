@@ -12,6 +12,7 @@ from livekit.plugins import sarvam as plugin
 from .. import credentials
 from ..options import Options
 from .realtime import FinalFirstSTT
+from .sentences import SentenceTTS
 
 NAME = "sarvam"
 STT_MODELS = frozenset({"saaras:v3-realtime"})
@@ -167,7 +168,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     model = ref.model or ""
     return _construct(
         Stage.TTS,
-        lambda: plugin.TTS(
+        lambda: SentenceTTS(
             target_language_code=code,
             model=model,
             speaker=voice,
