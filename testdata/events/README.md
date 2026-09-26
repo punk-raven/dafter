@@ -1,11 +1,16 @@
 # Event vectors
 
-One envelope per event type the agent worker added for measuring a call, each
-a document the worker could publish on `dafter.events`. Both halves parse them
+One envelope per typed payload the agent worker publishes, each a document the
+worker could publish on `dafter.events`. Both halves parse them
 and must accept them, then refuse the same mutations of them:
 
 - `go/internal/events/events_test.go`
 - `python/dafter_core/tests/test_events.py`
+
+`agent-state-changed.json` is the state change of an agent that waits to be
+called by name, woken by participant `p_4b81e0d7` saying its name and now
+thinking. Awake, it must say who woke it and how; dormant, it must not name
+anyone; and who woke it is an opaque participant id, never a name.
 
 `agent-turn-metrics.json` is one agent turn's latency split into its layers, in
 milliseconds. Its first sentence reached TTS 287 ms after the LLM's first

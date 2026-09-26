@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from dafter_core.enums import WakeSource
 from livekit.agents import AgentSession
 from livekit.agents.voice.speech_handle import SpeechHandle
 
@@ -49,6 +50,7 @@ class Voice:
         self._interruptible = interruptible
         self.reply: SpeechHandle | None = None
         self.before_answer: Callable[[str, str], None] | None = None
+        self.announce: Callable[[str | None, WakeSource | None], None] | None = None
 
     def answer(self, speaker: str, text: str, overheard: list[Said]) -> None:
         if self.before_answer is not None:
@@ -62,8 +64,13 @@ class Voice:
     def hush(self) -> None:
         self._session.interrupt()
 
-    def addressed(self, woken_by: str | None) -> None:
-        log.info("agent addressed", extra={"awake": woken_by is not None, "by": woken_by})
+    def addressed(self, woken_by: str | None, via: WakeSource | None) -> None:
+        log.info(
+            "agent addressed",
+            extra={"awake": woken_by is not None, "by": woken_by, "via": via and str(via)},
+        )
+        if self.announce is not None:
+            self.announce(woken_by, via)
 
 
 __all__ = ["Roster", "Voice", "turn_text"]

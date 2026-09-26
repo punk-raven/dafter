@@ -5,6 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from dafter_core.enums import WakeSource
+
 from .naming import Heard, Matcher
 
 CONTEXT_SECONDS = 90.0
@@ -24,7 +26,7 @@ class Responder(Protocol):
 
     def hush(self) -> None: ...
 
-    def addressed(self, woken_by: str | None) -> None: ...
+    def addressed(self, woken_by: str | None, via: WakeSource | None) -> None: ...
 
 
 class Timer(Protocol):
@@ -43,8 +45,10 @@ class Gate:
         responder: Responder,
         clock: Clock,
         schedule: Schedule,
+        name: str = "",
     ) -> None:
         self._matcher = matcher
+        self._name = name
         self._follow_up_s = follow_up_s
         self._responder = responder
         self._clock = clock
@@ -69,7 +73,7 @@ class Gate:
             self.sleep()
             return
         if heard is Heard.CALLED:
-            self._wake(speaker)
+            self._wake(speaker, WakeSource.NAME)
             self._answer(speaker, text)
             return
         if speaker == self._addressee:
@@ -77,12 +81,16 @@ class Gate:
             return
         self._said.append(Said(speaker, text, self._clock()))
 
+    def wake(self, speaker: str) -> None:
+        self._wake(speaker, WakeSource.MANUAL)
+        self._answer(speaker, self._name)
+
     def sleep(self) -> None:
         self._stop_timer()
         if self._addressee is None:
             return
         self._addressee = None
-        self._responder.addressed(None)
+        self._responder.addressed(None, None)
 
     def left(self, speaker: str) -> None:
         if speaker == self._addressee:
@@ -95,11 +103,11 @@ class Gate:
         elif not self.dormant:
             self._start_timer()
 
-    def _wake(self, speaker: str) -> None:
+    def _wake(self, speaker: str, via: WakeSource) -> None:
         if speaker == self._addressee:
             return
         self._addressee = speaker
-        self._responder.addressed(speaker)
+        self._responder.addressed(speaker, via)
 
     def _answer(self, speaker: str, text: str) -> None:
         since = self._clock() - CONTEXT_SECONDS

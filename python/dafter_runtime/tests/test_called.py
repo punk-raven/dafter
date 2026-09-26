@@ -6,9 +6,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from dafter_core.events import parse_event
 from dafter_core.hashing import seal
 from dafter_runtime.addressing import Gate
 from dafter_runtime.answering import Roster, Voice
+from dafter_runtime.called import command
+from dafter_runtime.events import SessionEvents
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.toolbox import Answering, registry_for
@@ -67,6 +70,9 @@ class Scheduler:
 
 class Call:
     def __init__(self, p: Plan, session: AgentSession[None]) -> None:
+        self.sent: list[bytes] = []
+        self.events = SessionEvents(p.config, self._publish)
+        session.on("agent_state_changed", lambda ev: self.events.changed(ev.new_state))
         self.roster = Roster()
         self.roster.join(ASHA)
         self.roster.join(RAVI)
@@ -79,13 +85,22 @@ class Call:
             self.voice,
             clock=self.clock,
             schedule=self.scheduler,
+            name=p.config.agent.addressing.name,
         )
+        self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
         self.registry = registry_for(
             p, session, self.roster, lambda: self.gate.addressee, self.gate.sleep
         )
         self.voice.before_answer = self.registry.heard
         self.agent = Answering(p.persona.instructions, self.registry, lambda: self.gate.addressee)
+
+    async def _publish(self, body: bytes) -> None:
+        self.sent.append(body)
+
+    async def states(self) -> list[dict[str, Any]]:
+        await self.events.drain()
+        return [parse_event(body).payload for body in self.sent]
 
     async def answered(self) -> None:
         assert self.voice.reply is not None
@@ -269,3 +284,43 @@ def test_the_agent_can_send_itself_to_sleep_with_go_quiet() -> None:
     stub = run_call(script, calls=["go_quiet"])
     assert len(stub.requests) == 2
     assert stub.offered[0] == ["current_time", "go_quiet", "who_is_here"]
+
+
+def test_state_events_say_whether_it_is_dormant_and_who_woke_it() -> None:
+    states: list[dict[str, Any]] = []
+
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "Nivya, what time is it?")
+        await call.answered()
+        call.scheduler.fire()
+        states.extend(await call.states())
+
+    run_call(script)
+    awake = {"dormant": False, "wokenBy": ASHA, "wokenVia": "name"}
+    assert states == [
+        {"state": "listening", "dormant": True},
+        {"state": "listening", **awake},
+        {"state": "thinking", "previousState": "listening", **awake},
+        {"state": "speaking", "previousState": "thinking", **awake},
+        {"state": "listening", "previousState": "speaking", **awake},
+        {"state": "listening", "dormant": True},
+    ]
+
+
+def test_the_wake_control_counts_as_being_called_by_that_person() -> None:
+    states: list[dict[str, Any]] = []
+
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.wake(RAVI)
+        await call.answered()
+        states.extend(await call.states())
+
+    stub = run_call(script)
+    assert said(stub.requests[0])[-1] == ("user", "[Speaker 2, to you] Nivya")
+    assert {"state": "listening", "dormant": False, "wokenBy": RAVI, "wokenVia": "manual"} in states
+
+
+def test_only_a_well_formed_wake_command_is_read() -> None:
+    assert command(b'{"action": "wake"}') == "wake"
+    for data in (b"wake", b'{"action": "sleep"}', b'{"action": "wake", "as": "p_1"}', b"[]"):
+        assert command(data) is None

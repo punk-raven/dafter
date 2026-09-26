@@ -20,6 +20,7 @@ from .enums import (
     UsageUnit,
     VideoCodec,
     VideoResolution,
+    WakeSource,
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "UsageUnit",
     "VideoCodec",
     "VideoResolution",
+    "WakeSource",
     "enums",
     "schemas",
 ]

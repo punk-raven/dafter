@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -19,6 +20,9 @@ from .stages import Stages
 
 log = logging.getLogger("dafter.runtime.called")
 
+CONTROL_TOPIC = "dafter.agent"
+COMMANDS = frozenset({"wake"})
+
 
 def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
     addressing = p.config.agent.addressing
@@ -32,7 +36,19 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         voice,
         clock=loop.time,
         schedule=schedule,
+        name=addressing.name,
     )
+
+
+def command(data: bytes) -> str | None:
+    try:
+        message = json.loads(data)
+    except ValueError:
+        return None
+    if not isinstance(message, dict) or set(message) != {"action"}:
+        return None
+    action = message["action"]
+    return action if action in COMMANDS else None
 
 
 class Called:
@@ -81,13 +97,24 @@ class Called:
     def _state_changed(self, ev: AgentStateChangedEvent) -> None:
         self.gate.agent_state(ev.new_state)
 
+    def _data(self, packet: rtc.DataPacket) -> None:
+        if packet.topic != CONTROL_TOPIC:
+            return
+        sender = packet.participant
+        if sender is None or not is_human(sender, self._ctx.room):
+            return
+        if command(packet.data) == "wake":
+            log.info("woken from the wake control", extra={"by": sender.identity})
+            self.gate.wake(sender.identity)
+
     def listen(self) -> None:
         self._session.on("agent_state_changed", self._state_changed)
         self._ctx.room.on("participant_connected", self._joined)
         self._ctx.room.on("participant_disconnected", self._left)
+        self._ctx.room.on("data_received", self._data)
         for participant in self._ctx.room.remote_participants.values():
             self._joined(participant)
         self._ctx.add_shutdown_callback(self.listeners.aclose)
 
 
-__all__ = ["Called", "gate_for"]
+__all__ = ["CONTROL_TOPIC", "Called", "command", "gate_for"]

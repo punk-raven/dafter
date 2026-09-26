@@ -36,6 +36,18 @@ func TestValidEventPasses(t *testing.T) {
 	}
 }
 
+func TestADormantAgentNamesNobody(t *testing.T) {
+	t.Parallel()
+	for _, payload := range []map[string]any{
+		{"state": string(events.AgentListening), "dormant": true},
+		{"state": string(events.AgentListening), "dormant": false, "wokenBy": "p_4b81e0d7", "wokenVia": string(events.WakeManual)},
+	} {
+		if err := event(t, events.EventAgentStateChanged, payload).Validate(); err != nil {
+			t.Errorf("%v was rejected: %v", payload, err)
+		}
+	}
+}
+
 func TestTypedPayloadIsEnforced(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -115,8 +127,9 @@ func vector(t *testing.T, name string) map[string]any {
 func TestMeasurementVectorsParse(t *testing.T) {
 	t.Parallel()
 	for name, want := range map[string]events.EventType{
-		"agent-turn-metrics.json": events.EventAgentTurnMetrics,
-		"session-usage.json":      events.EventSessionUsage,
+		"agent-state-changed.json": events.EventAgentStateChanged,
+		"agent-turn-metrics.json":  events.EventAgentTurnMetrics,
+		"session-usage.json":       events.EventSessionUsage,
 	} {
 		raw, err := os.ReadFile(vectors + name)
 		if err != nil {
@@ -150,6 +163,12 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 		{"unknown unit", "session-usage.json", func(p map[string]any) { item(p, 0)["unit"] = "minute" }},
 		{"vendor spelling of a provider", "session-usage.json", func(p map[string]any) { item(p, 0)["provider"] = "Sarvam" }},
 		{"missing final", "session-usage.json", func(p map[string]any) { delete(p, "final") }},
+		{"awake without who woke it", "agent-state-changed.json", func(p map[string]any) { delete(p, "wokenBy"); delete(p, "wokenVia") }},
+		{"dormant yet woken", "agent-state-changed.json", func(p map[string]any) { p["dormant"] = true }},
+		{"woken without dormant", "agent-state-changed.json", func(p map[string]any) { delete(p, "dormant") }},
+		{"woken by a name", "agent-state-changed.json", func(p map[string]any) { p["wokenBy"] = "Asha" }},
+		{"woken without how", "agent-state-changed.json", func(p map[string]any) { delete(p, "wokenVia") }},
+		{"unknown wake source", "agent-state-changed.json", func(p map[string]any) { p["wokenVia"] = "wake_word" }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -184,6 +203,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"EventType", []string{"$defs", "EventType", "enum"}, schema.Names(events.AllEventTypes)},
 		{"AgentState", []string{"$defs", "AgentState", "enum"}, schema.Names(events.AllAgentStates)},
 		{"UsageUnit", []string{"$defs", "UsageUnit", "enum"}, schema.Names(events.AllUsageUnits)},
+		{"WakeSource", []string{"$defs", "WakeSource", "enum"}, schema.Names(events.AllWakeSources)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

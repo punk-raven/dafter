@@ -256,6 +256,7 @@ async def entrypoint(ctx: JobContext) -> None:
         caller = called.addressee
         registry = registry_for(p, session, called.roster, caller, called.gate.sleep)
         called.voice.before_answer = registry.heard
+        called.voice.announce = events.addressed
     else:
         roster = Roster()
         follow(ctx.room, roster)

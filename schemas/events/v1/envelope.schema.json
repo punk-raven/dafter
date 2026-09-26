@@ -221,15 +221,38 @@
       }
     },
 
+    "WakeSource": {
+      "type": "string",
+      "description": "How a dormant agent was woken: name, somebody said its name; manual, somebody pressed a wake control, which the agent treats as that person calling it.",
+      "enum": ["name", "manual"]
+    },
+
     "AgentStateChangedPayload": {
       "type": "object",
       "unevaluatedProperties": false,
       "required": ["state"],
-      "description": "The single most important event for user experience. A consumer renders this directly, so it is typed rather than left for them to discover at runtime.",
+      "description": "The single most important event for user experience. A consumer renders this directly, so it is typed rather than left for them to discover at runtime. An agent that waits to be called by name also says whether it is dormant, and when awake who woke it, as an opaque participant id and never a name or what they said, so the event stays safe to log. Sent again, with the same state and no previousState, when only that changes.",
       "properties": {
         "state": { "$ref": "#/$defs/AgentState" },
-        "previousState": { "$ref": "#/$defs/AgentState" }
-      }
+        "previousState": { "$ref": "#/$defs/AgentState" },
+        "dormant": {
+          "type": "boolean",
+          "description": "Present only when the session's addressing mode waits to be called. True: the agent hears the call but answers nobody until its name is said."
+        },
+        "wokenBy": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId" },
+        "wokenVia": { "$ref": "#/$defs/WakeSource" }
+      },
+      "dependentRequired": { "wokenBy": ["dormant", "wokenVia"], "wokenVia": ["wokenBy"] },
+      "allOf": [
+        {
+          "if": { "properties": { "dormant": { "const": true } }, "required": ["dormant"] },
+          "then": { "not": { "required": ["wokenBy"] } }
+        },
+        {
+          "if": { "properties": { "dormant": { "const": false } }, "required": ["dormant"] },
+          "then": { "required": ["wokenBy"] }
+        }
+      ]
     },
 
     "AgentTurnMetricsPayload": {

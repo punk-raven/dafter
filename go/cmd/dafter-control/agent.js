@@ -36,6 +36,7 @@ function agentPanel() {
       <strong>Agent</strong>
       <span id="agent-presence" class="agent-pill agent-pill-off">not in call</span>
       <button id="agent-toggle" class="agent-btn" type="button">Invite agent</button>
+      <button id="agent-wake" class="agent-btn agent-btn-wake" type="button" style="display:none">Wake</button>
     </div>
     <div id="agent-reason" class="agent-reason"></div>
     <div class="agent-body">
@@ -67,6 +68,7 @@ function agentPanel() {
   grid.parentNode.insertBefore(stage, grid);
   stage.append(grid, panel);
   document.getElementById('agent-toggle').addEventListener('click', toggleAgent);
+  document.getElementById('agent-wake').addEventListener('click', wakeAgent);
   return panel;
 }
 
@@ -84,8 +86,11 @@ function renderAgentControls() {
   const present = agentParticipant(agentView.room) !== null;
   const presence = document.getElementById('agent-presence');
   const pending = agentView.pending === (present ? 'leaving' : 'joining') ? agentView.pending : null;
-  presence.textContent = pending || (present ? (agentView.state || 'joining') : 'not in call');
-  presence.className = `agent-pill agent-pill-${present ? (agentView.state || 'initializing') : (pending ? 'initializing' : 'off')}`;
+  const dormant = present && agentAddressing.dormant === true;
+  presence.textContent = pending || (present ? (dormant ? 'dormant' : (agentView.state || 'joining')) : 'not in call');
+  presence.className = `agent-pill agent-pill-${present ? (dormant ? 'dormant' : (agentView.state || 'initializing')) : (pending ? 'initializing' : 'off')}`;
+  presence.title = present ? addressingText(agentView.state) || '' : '';
+  renderWakeButton(present);
   document.getElementById('agent-reason').textContent = reason || agentRefusalText();
   button.textContent = present ? 'Remove agent' : 'Invite agent';
   button.className = `agent-btn ${present ? 'agent-btn-remove' : ''}`;
@@ -150,10 +155,12 @@ function onAgentEvent(payload) {
   if (event.type !== 'agent.state_changed') return;
   const previous = agentView.state;
   agentView.state = event.payload.state;
+  const addressed = onAgentAddressing(event.payload);
   agentTurnState(previous, agentView.state, performance.now());
   setAgentTileState(agentView.state);
   renderAgentControls();
-  log(`agent ${event.payload.previousState || 'joined'} -> ${event.payload.state} (event ${event.sequence})`);
+  if (previous !== agentView.state || !addressed) log(`agent ${event.payload.previousState || 'joined'} -> ${event.payload.state} (event ${event.sequence})`);
+  if (addressed) log(...addressed);
 }
 
 function watchAgent(room, data) {
@@ -162,6 +169,7 @@ function watchAgent(room, data) {
   agentView.sessionId = data.sessionId;
   agentView.config = data.config;
   agentView.state = null;
+  resetAgentAddressing();
   agentPanel().style.display = '';
   resetAgentTurns();
   watchTranscripts(room);
@@ -172,6 +180,7 @@ function watchAgent(room, data) {
   room.on(RoomEvent.ParticipantConnected, (participant) => {
     if (!participant.isAgent) return;
     agentView.state = null;
+    resetAgentAddressing();
     clearAgentRefusal();
     showAgentTile(participant);
     setAgentPending(null);
@@ -179,6 +188,7 @@ function watchAgent(room, data) {
   room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     if (!participant.isAgent) return;
     agentView.state = null;
+    resetAgentAddressing();
     hideAgentTile(participant);
     agentTurns.current = null;
     setAgentPending(null);
@@ -208,6 +218,7 @@ function stopAgent() {
   agentView.sessionId = null;
   agentView.config = null;
   agentView.state = null;
+  resetAgentAddressing();
   const panel = document.getElementById('agent-panel');
   if (panel) panel.style.display = 'none';
 }
