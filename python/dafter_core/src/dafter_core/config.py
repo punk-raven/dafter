@@ -321,6 +321,7 @@ class Recording:
 class Budgets:
     turn_gap_p50_ms: int
     turn_gap_p95_ms: int
+    barge_in_stop_p50_ms: int = 300
     max_session_cost_usd: float | None = None
 
     @classmethod
@@ -328,6 +329,7 @@ class Budgets:
         return cls(
             turn_gap_p50_ms=d["turnGapP50Ms"],
             turn_gap_p95_ms=d["turnGapP95Ms"],
+            barge_in_stop_p50_ms=d.get("bargeInStopP50Ms", 300),
             max_session_cost_usd=d.get("maxSessionCostUsd"),
         )
 

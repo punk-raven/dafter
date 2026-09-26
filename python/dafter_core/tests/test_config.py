@@ -367,3 +367,10 @@ def test_preemptive_generation_defaults_to_the_reply_without_its_speech() -> Non
     assert refuse(doc(turn={"strategy": "auto", "preemptiveGeneration": {"llm": True}})).code is (
         ErrorCode.INVALID_CONFIG
     )
+
+
+def test_the_barge_in_stop_budget_defaults_to_the_schema_value() -> None:
+    assert parse(doc()).budgets.barge_in_stop_p50_ms == 300
+    stated = doc(budgets={"turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 250})
+    assert parse(stated).budgets.barge_in_stop_p50_ms == 250
+    assert refuse(doc(budgets={"turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 0}))

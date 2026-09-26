@@ -316,6 +316,12 @@
       "properties": {
         "turnGapP50Ms": { "type": "integer", "minimum": 1, "default": 800 },
         "turnGapP95Ms": { "type": "integer", "minimum": 1, "default": 1500 },
+        "bargeInStopP50Ms": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 300,
+          "description": "Median time from the caller starting to talk over the agent to the agent leaving the speaking state."
+        },
         "maxSessionCostUsd": { "type": "number", "minimum": 0 }
       }
     }

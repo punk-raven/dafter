@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import numpy as np
-from dafter_evals.probe import SAMPLES_PER_FRAME, Meter, trim
-from dafter_evals.turns import OverlapResult, TurnResult, percentile, summarize
+from dafter_core.config import Budgets
+from dafter_evals.probe import SAMPLES_PER_FRAME, Events, Meter, trim
+from dafter_evals.turns import OverlapResult, TurnResult, summarize
 
-
-def test_percentiles_interpolate_between_ranks() -> None:
-    assert percentile([], 0.5) is None
-    assert percentile([100], 0.95) == 100
-    assert percentile([100, 200, 300, 400], 0.5) == 250
-    assert percentile(list(range(1, 21)), 0.95) == 19
+BUDGETS = Budgets(turn_gap_p50_ms=800, turn_gap_p95_ms=1500, barge_in_stop_p50_ms=300)
 
 
 def test_trim_cuts_the_silence_the_voice_leaves_around_speech() -> None:
@@ -36,8 +32,10 @@ def test_the_summary_counts_only_answered_turns() -> None:
         TurnResult(1, 900, None, None, None),
         TurnResult(2, 900, 900, 350, 550),
     ]
-    overlaps = [OverlapResult("barge_in", "रुकिए", 1000, True, 250, ["listening"], False, False)]
-    s = summarize(turns, overlaps, 0)["summary"]
+    overlaps = [
+        OverlapResult("barge_in", "रुकिए", 1000, True, 250, ["listening"], False, False, 180)
+    ]
+    s = summarize(turns, overlaps, Events(), BUDGETS)["summary"]
     assert (s["turns"], s["answered"], s["gap_p50_ms"]) == (3, 2, 800)
     assert s["barge_in"] == {
         "trials": 1,
@@ -46,4 +44,7 @@ def test_the_summary_counts_only_answered_turns() -> None:
         "replied_to": 0,
         "stop_p50_ms": 250,
         "stop_max_ms": 250,
+        "state_stopped": 1,
+        "state_stop_p50_ms": 180,
+        "state_stop_p95_ms": 180,
     }

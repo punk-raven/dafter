@@ -206,6 +206,7 @@ type Recording struct {
 type Budgets struct {
 	TurnGapP50Ms      int     `json:"turnGapP50Ms"`
 	TurnGapP95Ms      int     `json:"turnGapP95Ms"`
+	BargeInStopP50Ms  int     `json:"bargeInStopP50Ms,omitempty"`
 	MaxSessionCostUSD float64 `json:"maxSessionCostUsd,omitempty"`
 }
 

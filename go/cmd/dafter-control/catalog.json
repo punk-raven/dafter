@@ -54,7 +54,7 @@
       }
     },
     "recording": { "enabled": false },
-    "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500 }
+    "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 300 }
   },
 
   "tenants": {

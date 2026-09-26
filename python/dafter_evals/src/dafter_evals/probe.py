@@ -4,8 +4,10 @@ import asyncio
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
+from dafter_core.enums import EventType
 from dafter_core.errors import DafterError
 from dafter_core.events import parse_event
 from livekit import rtc
@@ -68,6 +70,27 @@ class Meter:
 
 
 @dataclass
+class Events:
+    states: list[tuple[float, str]] = field(default_factory=list)
+    turn_metrics: list[dict[str, Any]] = field(default_factory=list)
+    errors: int = 0
+
+    def receive(self, body: bytes, at: float) -> None:
+        try:
+            event = parse_event(body)
+        except DafterError:
+            self.errors += 1
+            return
+        if event.type is EventType.AGENT_STATE_CHANGED:
+            self.states.append((at, str(event.payload["state"])))
+        elif event.type is EventType.AGENT_TURN_METRICS:
+            self.turn_metrics.append(dict(event.payload))
+
+    def state_after(self, t: float) -> tuple[float, str] | None:
+        return next(((st, s) for st, s in self.states if st > t), None)
+
+
+@dataclass
 class Utterance:
     started: float
     ended: float
@@ -78,11 +101,14 @@ class Probe:
         self.room = rtc.Room()
         self.source = rtc.AudioSource(SAMPLE_RATE, 1, queue_size_ms=40)
         self.meter = Meter()
-        self.states: list[tuple[float, str]] = []
-        self.event_errors = 0
+        self.events = Events()
         self._queue: deque[tuple[np.ndarray, asyncio.Future[Utterance]]] = deque()
         self._agent_audio = asyncio.Event()
         self._tasks: list[asyncio.Task[None]] = []
+
+    @property
+    def states(self) -> list[tuple[float, str]]:
+        return self.events.states
 
     @property
     def state(self) -> str | None:
@@ -170,11 +196,5 @@ class Probe:
                 self._agent_audio.set()
 
     def _data(self, packet: rtc.DataPacket) -> None:
-        if packet.topic != EVENTS_TOPIC:
-            return
-        try:
-            event = parse_event(bytes(packet.data))
-        except DafterError:
-            self.event_errors += 1
-            return
-        self.states.append((now(), str(event.payload.get("state"))))
+        if packet.topic == EVENTS_TOPIC:
+            self.events.receive(bytes(packet.data), now())

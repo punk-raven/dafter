@@ -6,7 +6,7 @@ Realtime AI media toolkit (agents, translation, transcription, sealed recording)
 
 - `schemas/`: the only source of truth. All language types are generated from it.
 - `go/` (control plane, state, egress, seal) and `python/` (agent runtime, providers, batch, evals). They touch only at the resolved config document and the event envelope.
-- `python/` workspace members: `dafter_core` (generated contract), `dafter_providers` (one subpackage per vendor, `registry.py` maps `agent.pipeline.<stage>.provider` to a factory; nothing else imports a vendor plugin), `dafter_runtime` (the agent worker, pool `dafter-py`), `dafter_evals` (scripted live-agent harness, `uv run dafter-evals`; it spends provider credits, run it deliberately).
+- `python/` workspace members: `dafter_core` (generated contract), `dafter_providers` (one subpackage per vendor, `registry.py` maps `agent.pipeline.<stage>.provider` to a factory; nothing else imports a vendor plugin), `dafter_runtime` (the agent worker, pool `dafter-py`), `dafter_evals` (scripted live-agent harness, `uv run dafter-evals`; it spends provider credits, run it deliberately). One run per config change: `--overrides` for the session, `--out` for the report (p50/p95 of every `agent.turn_metrics` layer, barge-in stop from agent state events, go/no-go against the session's `budgets`), `--baseline` an earlier report to diff against.
 - `go/tools/enumgen`: emits enum constants for both halves. `Makefile` is the entry point; `.github/workflows/ci.yml` runs it.
 - `testdata/`: fixtures both halves read, so a cross-language claim is checked on both sides rather than asserted on one. Each directory has a README saying what it pins; `testdata/rfc8785/` is vendored verbatim and must never be edited or reformatted.
 
