@@ -6,6 +6,7 @@ import logging
 import secrets
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from dafter_core.config import ResolvedSessionConfig
 from dafter_core.enums import AgentState, EventType
@@ -13,7 +14,7 @@ from dafter_core.errors import DafterError
 from dafter_core.events import EventEnvelope
 
 TOPIC = "dafter.events"
-STATE_EVENT_VERSION = 1
+EVENT_VERSION = 1
 
 log = logging.getLogger("dafter.runtime.events")
 
@@ -32,7 +33,7 @@ def new_event_id() -> str:
     return "e_" + secrets.token_hex(16)
 
 
-class StateEvents:
+class SessionEvents:
     def __init__(
         self,
         cfg: ResolvedSessionConfig,
@@ -46,16 +47,13 @@ class StateEvents:
         self._current: AgentState | None = None
         self._last: asyncio.Future[None] | None = None
 
-    def envelope(self, state: AgentState, trace_id: str | None = None) -> EventEnvelope | None:
-        if state is self._current:
-            return None
-        payload: dict[str, str] = {"state": str(state)}
-        if self._current is not None:
-            payload["previousState"] = str(self._current)
+    def envelope(
+        self, event_type: EventType, payload: dict[str, Any], trace_id: str | None = None
+    ) -> EventEnvelope:
         event = EventEnvelope(
             event_id=new_event_id(),
-            type=EventType.AGENT_STATE_CHANGED,
-            version=STATE_EVENT_VERSION,
+            type=event_type,
+            version=EVENT_VERSION,
             session_id=self._cfg.session_id,
             tenant_id=self._cfg.tenant_id,
             sequence=self._sequence,
@@ -65,21 +63,31 @@ class StateEvents:
         )
         event.validate()
         self._sequence += 1
-        self._current = state
         return event
+
+    def emit(
+        self, event_type: EventType, payload: dict[str, Any], trace_id: str | None = None
+    ) -> bool:
+        try:
+            event = self.envelope(event_type, payload, trace_id)
+        except DafterError as exc:
+            log.error(
+                "event failed validation",
+                extra={"type": str(event_type), "code": str(exc.code)},
+            )
+            return False
+        self._last = asyncio.ensure_future(self._send(event, self._last))
+        return True
 
     def changed(self, framework_state: str, trace_id: str | None = None) -> None:
         state = agent_state(framework_state)
-        if state is None:
+        if state is None or state is self._current:
             return
-        try:
-            event = self.envelope(state, trace_id)
-        except DafterError as exc:
-            log.error("agent state event failed validation", extra={"code": str(exc.code)})
-            return
-        if event is None:
-            return
-        self._last = asyncio.ensure_future(self._send(event, self._last))
+        payload = {"state": str(state)}
+        if self._current is not None:
+            payload["previousState"] = str(self._current)
+        if self.emit(EventType.AGENT_STATE_CHANGED, payload, trace_id):
+            self._current = state
 
     async def drain(self) -> None:
         if self._last is not None:
@@ -93,6 +101,10 @@ class StateEvents:
             await self._publish(body)
         except Exception as exc:
             log.warning(
-                "agent state event not delivered",
-                extra={"sequence": event.sequence, "error": type(exc).__name__},
+                "event not delivered",
+                extra={
+                    "type": str(event.type),
+                    "sequence": event.sequence,
+                    "error": type(exc).__name__,
+                },
             )

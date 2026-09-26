@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any
 
-from dafter_core.enums import EncryptionMode, Stage
+from dafter_core.enums import EncryptionMode, EventType, Stage
 from dafter_core.errors import DafterError
 from livekit import rtc
 from livekit.agents import (
@@ -27,19 +27,13 @@ from opentelemetry import trace
 
 from . import telemetry
 from .control import ControlPlane, encryption
-from .events import TOPIC, StateEvents
+from .events import TOPIC, SessionEvents
 from .plan import Plan, load, plan
 from .stages import Stages, build
+from .timing import Turns
 
 POOL_ENV = "LIVEKIT_AGENT_NAME"
 DEFAULT_POOL = "dafter-py"
-LATENCY_KEYS = (
-    "e2e_latency",
-    "end_of_turn_delay",
-    "transcription_delay",
-    "llm_node_ttft",
-    "tts_node_ttfb",
-)
 
 PII_PREFIX = "lk.pii."
 FRAMEWORK_LOGGER = "livekit.agents"
@@ -110,20 +104,21 @@ def current_trace_id() -> str | None:
     return format(ctx.trace_id, "032x") if ctx.is_valid else None
 
 
-def watch(session: AgentSession[Any], p: Plan, events: StateEvents) -> None:
+def watch(session: AgentSession[Any], p: Plan, events: SessionEvents, tracer: trace.Tracer) -> None:
+    turns = Turns()
+
     def state_changed(ev: AgentStateChangedEvent) -> None:
         events.changed(ev.new_state, current_trace_id())
 
     def item_added(ev: ConversationItemAddedEvent) -> None:
-        item = ev.item
-        if not isinstance(item, ChatMessage) or item.role != "assistant":
+        if not isinstance(ev.item, ChatMessage):
             return
-        metrics: dict[str, Any] = dict(item.metrics)
-        stages = {k: round(float(metrics[k]), 4) for k in LATENCY_KEYS if k in metrics}
-        log.info(
-            "agent turn",
-            extra={"session": p.config.session_id, "interrupted": item.interrupted, **stages},
-        )
+        timing = turns.add(ev.item)
+        if timing is None:
+            return
+        log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
+        timing.record(tracer)
+        events.emit(EventType.AGENT_TURN_METRICS, timing.payload(), current_trace_id())
 
     def failed(ev: ErrorEvent) -> None:
         stage, vendor = Stage.CONTROL, p.stt
@@ -169,7 +164,7 @@ async def entrypoint(ctx: JobContext) -> None:
     async def publish(body: bytes) -> None:
         await ctx.room.local_participant.publish_data(body, reliable=True, topic=TOPIC)
 
-    events = StateEvents(p.config, publish)
+    events = SessionEvents(p.config, publish)
     session: AgentSession[Any] = AgentSession(
         stt=stages.stt,
         llm=stages.llm,
@@ -178,7 +173,7 @@ async def entrypoint(ctx: JobContext) -> None:
         turn_handling=p.turn_handling,  # type: ignore[arg-type]
         user_away_timeout=None,
     )
-    watch(session, p, events)
+    watch(session, p, events, telemetry.tracer(provider))
 
     async def flush() -> None:
         await events.drain()
