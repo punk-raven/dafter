@@ -30,6 +30,7 @@ from opentelemetry import trace
 
 from . import telemetry
 from .answering import Roster
+from .backchannel import Acknowledgements
 from .called import Called
 from .control import ControlPlane, encryption
 from .cost import load_prices, priced, usage_payload
@@ -267,7 +268,12 @@ async def entrypoint(ctx: JobContext) -> None:
         usage=called.usage if called is not None else None,
     )
     await session.start(
-        agent=Answering(p.persona.instructions, registry, caller),
+        agent=Answering(
+            p.persona.instructions,
+            registry,
+            caller,
+            Acknowledgements.of(p.config.turn.interruption.backchannel),
+        ),
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate),
         record=False,

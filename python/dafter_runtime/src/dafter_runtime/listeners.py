@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import AsyncIterable, Callable
 from typing import Any
 
 from livekit import rtc
-from livekit.agents import Agent, AgentSession, StopResponse
+from livekit.agents import Agent, AgentSession, ModelSettings, StopResponse
 from livekit.agents import llm as lk_llm
 from livekit.agents import stt as lk_stt
 from livekit.agents import vad as lk_vad
@@ -14,17 +14,27 @@ from livekit.agents.metrics.usage import ModelUsage
 from livekit.agents.types import ATTRIBUTE_PUBLISH_ON_BEHALF
 from livekit.agents.voice.room_io import AudioInputOptions, RoomOptions
 
+from .backchannel import Events, Filter
+
 log = logging.getLogger("dafter.runtime.listeners")
 
 Heard = Callable[[str, str, lk_llm.MetricsReport], None]
 Joined = Callable[[str, AgentSession[Any]], None]
+Hearing = Callable[[str], Filter]
 
 
 class Listener(Agent):
-    def __init__(self, speaker: str, heard: Heard) -> None:
+    def __init__(self, speaker: str, heard: Heard, hearing: Filter | None = None) -> None:
         super().__init__(instructions="")
         self._speaker = speaker
         self._heard = heard
+        self._hearing = hearing
+
+    def stt_node(
+        self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
+    ) -> Events:
+        events = Agent.default.stt_node(self, audio, model_settings)
+        return self._hearing(events) if self._hearing is not None else events
 
     async def on_user_turn_completed(
         self, turn_ctx: lk_llm.ChatContext, new_message: lk_llm.ChatMessage
@@ -74,12 +84,14 @@ class Listeners:
         sample_rate: int,
         heard: Heard,
         joined: Joined,
+        hearing: Hearing | None = None,
     ) -> None:
         self._room = room
         self._new_session = new_session
         self._sample_rate = sample_rate
         self._heard = heard
         self._joined = joined
+        self._hearing = hearing
         self._sessions: dict[str, AgentSession[Any]] = {}
         self._spent: list[ModelUsage] = []
 
@@ -93,7 +105,9 @@ class Listeners:
         self._sessions[identity] = session
         self._joined(identity, session)
         await session.start(
-            agent=Listener(identity, self._heard),
+            agent=Listener(
+                identity, self._heard, self._hearing(identity) if self._hearing else None
+            ),
             room=self._room,
             room_options=listener_options(identity, self._sample_rate),
             record=False,

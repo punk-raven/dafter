@@ -15,7 +15,8 @@ from livekit.agents.voice.events import AgentStateChangedEvent
 
 from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
-from .barge_in import BargeIn, follow
+from .backchannel import Acknowledgements, Filter, acknowledged, holds_floor
+from .barge_in import BargeIn, Resume, follow
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
@@ -43,6 +44,13 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
     )
 
 
+def resume_for(p: Plan, voice: Voice) -> Resume | None:
+    interruption = p.config.turn.interruption
+    if not interruption.resume_false_interruption or not interruption.false_interruption_timeout_ms:
+        return None
+    return Resume(voice.pause, voice.resume, interruption.false_interruption_timeout_ms / 1000)
+
+
 def barge_in_for(p: Plan, gate: Gate, voice: Voice, loop: asyncio.AbstractEventLoop) -> BargeIn:
     interruption = p.config.turn.interruption
     return BargeIn(
@@ -52,6 +60,8 @@ def barge_in_for(p: Plan, gate: Gate, voice: Voice, loop: asyncio.AbstractEventL
         stop=voice.barge_in,
         clock=time.time,
         schedule=loop.call_later,
+        resume=resume_for(p, voice),
+        waits_for_words=Acknowledgements.of(interruption.backchannel) is not None,
     )
 
 
@@ -86,8 +96,14 @@ class Called:
         loop = asyncio.get_running_loop()
         self.gate = gate_for(p, self.voice, loop)
         self.barge_in = barge_in_for(p, self.gate, self.voice, loop)
+        self._acknowledgements = Acknowledgements.of(p.config.turn.interruption.backchannel)
         self.listeners = Listeners(
-            ctx.room, listening(p, stages), sample_rate, self._heard, self._listening
+            ctx.room,
+            listening(p, stages),
+            sample_rate,
+            self._heard,
+            self._listening,
+            self._hearing,
         )
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -105,6 +121,13 @@ class Called:
 
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)
+
+    def _hearing(self, speaker: str) -> Filter:
+        return acknowledged(
+            self._acknowledgements,
+            lambda: holds_floor(self._session),
+            lambda: self.barge_in.acknowledged(speaker),
+        )
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.ensure_future(work)
@@ -153,4 +176,12 @@ class Called:
         self._ctx.add_shutdown_callback(self.listeners.aclose)
 
 
-__all__ = ["CONTROL_TOPIC", "Called", "barge_in_for", "command", "gate_for", "listening"]
+__all__ = [
+    "CONTROL_TOPIC",
+    "Called",
+    "barge_in_for",
+    "command",
+    "gate_for",
+    "listening",
+    "resume_for",
+]
