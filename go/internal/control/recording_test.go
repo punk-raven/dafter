@@ -20,6 +20,11 @@ type recordingView struct {
 	Status    string     `json:"status,omitempty"`
 	StartedAt time.Time  `json:"startedAt"`
 	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
+	TrackID   string     `json:"trackId,omitempty"`
+	Speaker   *struct {
+		Kind          string `json:"kind"`
+		ParticipantID string `json:"participantId,omitempty"`
+	} `json:"speaker,omitempty"`
 }
 
 type recordingResponse struct {
@@ -156,6 +161,7 @@ func TestStartTakesTrackIDsForTheTrackLayouts(t *testing.T) {
 	h.recording(t, "start", composite.SessionID, `{"audioTrackId":"TR_a1","videoTrackId":"TR_v1"}`, http.StatusCreated)
 
 	track := h.create(t, recordingRequest("track", ""))
+	h.transport.publish("TR_a2", transport.TrackPublisher{Identity: "p_4b81e0d7", Audio: true})
 	h.recording(t, "start", track.SessionID, `{"trackId":"TR_a2"}`, http.StatusCreated)
 
 	started, _ := h.transport.egresses()
@@ -220,6 +226,8 @@ func TestStopEndsTheRunningRecordingsAndTheSessionReadShowsIt(t *testing.T) {
 	t.Parallel()
 	h := serve(t)
 	created := h.create(t, recordingRequest("track", ""))
+	h.transport.publish("TR_a1", transport.TrackPublisher{Identity: "p_4b81e0d7", Audio: true})
+	h.transport.publish("TR_v1", transport.TrackPublisher{Identity: "p_4b81e0d7"})
 	h.recording(t, "start", created.SessionID, `{"trackId":"TR_a1"}`, http.StatusCreated)
 	h.recording(t, "start", created.SessionID, `{"trackId":"TR_v1"}`, http.StatusCreated)
 

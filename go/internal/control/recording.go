@@ -12,6 +12,7 @@ import (
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/errs"
+	"github.com/punk-raven/dafter/go/internal/events"
 	"github.com/punk-raven/dafter/go/internal/ids"
 	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
@@ -33,11 +34,41 @@ type stopRecordingRequest struct {
 }
 
 type recordingView struct {
-	EgressID  string     `json:"egressId"`
-	Layout    string     `json:"layout"`
-	Status    string     `json:"status,omitempty"`
-	StartedAt time.Time  `json:"startedAt"`
-	StoppedAt *time.Time `json:"stoppedAt,omitempty"`
+	EgressID  string       `json:"egressId"`
+	Layout    string       `json:"layout"`
+	Status    string       `json:"status,omitempty"`
+	StartedAt time.Time    `json:"startedAt"`
+	StoppedAt *time.Time   `json:"stoppedAt,omitempty"`
+	TrackID   string       `json:"trackId,omitempty"`
+	Speaker   *speakerView `json:"speaker,omitempty"`
+}
+
+type speakerView struct {
+	Kind          string `json:"kind"`
+	ParticipantID string `json:"participantId,omitempty"`
+}
+
+func viewOf(e state.Egress, status string) recordingView {
+	v := recordingView{EgressID: e.EgressID, Layout: e.Layout, Status: status, StartedAt: e.StartedAt, TrackID: e.TrackID}
+	if !e.Active() {
+		stopped := e.StoppedAt
+		v.StoppedAt = &stopped
+	}
+	if e.SpeakerKind != "" {
+		v.Speaker = &speakerView{Kind: e.SpeakerKind, ParticipantID: e.ParticipantID}
+	}
+	return v
+}
+
+func attributed(trackID string, p transport.TrackPublisher) state.Egress {
+	e := state.Egress{TrackID: trackID, Audio: p.Audio}
+	switch {
+	case p.Agent:
+		e.SpeakerKind = string(events.SpeakerAgent)
+	case ids.ValidateID(ids.PrefixParticipant, p.Identity) == nil:
+		e.SpeakerKind, e.ParticipantID = string(events.SpeakerHuman), p.Identity
+	}
+	return e
 }
 
 type recordingResponse struct {
@@ -65,23 +96,32 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 	if !s.decodeOptional(w, r, &req, "decode recording start request") {
 		return
 	}
-	if err := trackIDsFor(cfg.Recording.Layout, req); err != nil {
+	if err := trackIDsFor(cfg.Recording.EffectiveLayout(), req); err != nil {
 		s.fail(w, err)
 		return
 	}
+	var track state.Egress
+	if cfg.Recording.EffectiveLayout() == config.LayoutTrack {
+		owner, err := s.Transport.TrackOwner(r.Context(), sess.Room, req.TrackID)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		track = attributed(req.TrackID, owner)
+	}
 
-	info, err := s.startEgress(r.Context(), sess, cfg, req, false)
+	stored, info, err := s.startEgress(r.Context(), sess, cfg, req, false, track)
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
 	s.write(w, http.StatusCreated, recordingResponse{
 		SessionID:  sess.SessionID,
-		Recordings: []recordingView{{EgressID: info.EgressID, Layout: string(cfg.Recording.Layout), Status: info.Status, StartedAt: info.StartedAt}},
+		Recordings: []recordingView{viewOf(stored, info.Status)},
 	})
 }
 
-func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, req startRecordingRequest, beforeFirstJoin bool) (transport.EgressInfo, error) {
+func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, req startRecordingRequest, beforeFirstJoin bool, track state.Egress) (state.Egress, transport.EgressInfo, error) {
 	layout := cfg.Recording.EffectiveLayout()
 	info, err := s.Transport.StartEgress(ctx, transport.EgressRequest{
 		Room:         sess.Room,
@@ -95,22 +135,22 @@ func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *conf
 		TrackID:      req.TrackID,
 	})
 	if err != nil {
-		return transport.EgressInfo{}, err
+		return state.Egress{}, transport.EgressInfo{}, err
 	}
 	startedAt := info.StartedAt
 	if startedAt.IsZero() {
 		startedAt = time.Now().UTC()
 	}
-	if err := s.Store.AddEgress(ctx, state.Egress{
-		EgressID: info.EgressID, SessionID: sess.SessionID, Layout: string(layout), StartedAt: startedAt,
-	}); err != nil {
+	stored := track
+	stored.EgressID, stored.SessionID, stored.Layout, stored.StartedAt = info.EgressID, sess.SessionID, string(layout), startedAt
+	if err := s.Store.AddEgress(ctx, stored); err != nil {
 		if _, stopErr := s.Transport.StopEgress(ctx, info.EgressID); stopErr != nil {
 			s.log().Error("egress running but not recorded; stop failed", "egress", info.EgressID, "error", stopErr)
 		}
-		return transport.EgressInfo{}, err
+		return state.Egress{}, transport.EgressInfo{}, err
 	}
 	info.StartedAt = startedAt
-	return info, nil
+	return stored, info, nil
 }
 
 func (s *Service) stopRecording(w http.ResponseWriter, r *http.Request) {
@@ -158,9 +198,8 @@ func (s *Service) stopRecording(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, err)
 			return
 		}
-		out.Recordings = append(out.Recordings, recordingView{
-			EgressID: e.EgressID, Layout: e.Layout, Status: info.Status, StartedAt: e.StartedAt, StoppedAt: &stoppedAt,
-		})
+		e.StoppedAt = stoppedAt
+		out.Recordings = append(out.Recordings, viewOf(e, info.Status))
 	}
 	s.write(w, http.StatusOK, out)
 }
@@ -177,12 +216,7 @@ func (s *Service) readSession(w http.ResponseWriter, r *http.Request) {
 	}
 	views := make([]recordingView, 0, len(egresses))
 	for _, e := range egresses {
-		v := recordingView{EgressID: e.EgressID, Layout: e.Layout, StartedAt: e.StartedAt}
-		if !e.Active() {
-			stopped := e.StoppedAt
-			v.StoppedAt = &stopped
-		}
-		views = append(views, v)
+		views = append(views, viewOf(e, ""))
 	}
 	s.write(w, http.StatusOK, sessionView{
 		SessionID: sess.SessionID, Room: sess.Room, ConfigHash: sess.ConfigHash,

@@ -30,6 +30,11 @@ type Egress struct {
 	Layout    string
 	StartedAt time.Time
 	StoppedAt time.Time
+
+	TrackID       string
+	SpeakerKind   string
+	ParticipantID string
+	Audio         bool
 }
 
 func (e Egress) Active() bool { return e.StoppedAt.IsZero() }
@@ -66,14 +71,28 @@ CREATE TABLE IF NOT EXISTS egresses (
 	session_id  TEXT NOT NULL REFERENCES sessions(session_id),
 	layout      TEXT NOT NULL,
 	started_at  INTEGER NOT NULL,
-	stopped_at  INTEGER
+	stopped_at  INTEGER,
+	track_id       TEXT NOT NULL DEFAULT '',
+	speaker_kind   TEXT NOT NULL DEFAULT '',
+	participant_id TEXT NOT NULL DEFAULT '',
+	audio          INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 CREATE INDEX IF NOT EXISTS egresses_by_session ON egresses(session_id, started_at);
 `
 
-var addedColumns = []struct{ name, definition string }{
-	{"encryption_key", "TEXT NOT NULL DEFAULT ''"},
-	{"agent_refusal", "TEXT NOT NULL DEFAULT ''"},
+type column struct{ name, definition string }
+
+var addedColumns = map[string][]column{
+	"sessions": {
+		{"encryption_key", "TEXT NOT NULL DEFAULT ''"},
+		{"agent_refusal", "TEXT NOT NULL DEFAULT ''"},
+	},
+	"egresses": {
+		{"track_id", "TEXT NOT NULL DEFAULT ''"},
+		{"speaker_kind", "TEXT NOT NULL DEFAULT ''"},
+		{"participant_id", "TEXT NOT NULL DEFAULT ''"},
+		{"audio", "INTEGER NOT NULL DEFAULT 0"},
+	},
 }
 
 func Open(ctx context.Context, path string) (*Store, error) {
@@ -88,14 +107,16 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if _, err := db.ExecContext(ctx, migration); err != nil {
 		return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
 	}
-	if err := addMissingColumns(ctx, db); err != nil {
-		return nil, closing(db, err)
+	for _, table := range []string{"sessions", "egresses"} {
+		if err := addMissingColumns(ctx, db, table); err != nil {
+			return nil, closing(db, err)
+		}
 	}
 	return &Store{db: db}, nil
 }
 
-func addMissingColumns(ctx context.Context, db *sql.DB) error {
-	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info('sessions')`)
+func addMissingColumns(ctx context.Context, db *sql.DB, table string) error {
+	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_table_info(?)`, table)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "inspect session store")
 	}
@@ -110,11 +131,11 @@ func addMissingColumns(ctx context.Context, db *sql.DB) error {
 	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "inspect session store")
 	}
-	for _, c := range addedColumns {
+	for _, c := range addedColumns[table] {
 		if present[c.name] {
 			continue
 		}
-		if _, err := db.ExecContext(ctx, `ALTER TABLE sessions ADD COLUMN `+c.name+` `+c.definition); err != nil {
+		if _, err := db.ExecContext(ctx, `ALTER TABLE `+table+` ADD COLUMN `+c.name+` `+c.definition); err != nil {
 			return errs.Wrap(errs.CodeInternal, err, "migrate session store")
 		}
 	}
@@ -177,9 +198,11 @@ func (s *Store) SetAgentRefusal(ctx context.Context, sessionID string, refusal j
 
 func (s *Store) AddEgress(ctx context.Context, e Egress) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO egresses (egress_id, session_id, layout, started_at, stopped_at)
-		 VALUES (?, ?, ?, ?, NULL)`,
-		e.EgressID, e.SessionID, e.Layout, e.StartedAt.UnixMicro())
+		`INSERT INTO egresses (egress_id, session_id, layout, started_at, stopped_at,
+		                       track_id, speaker_kind, participant_id, audio)
+		 VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+		e.EgressID, e.SessionID, e.Layout, e.StartedAt.UnixMicro(),
+		e.TrackID, e.SpeakerKind, e.ParticipantID, e.Audio)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "store egress")
 	}
@@ -201,7 +224,8 @@ func (s *Store) StopEgress(ctx context.Context, egressID string, at time.Time) e
 
 func (s *Store) Egresses(ctx context.Context, sessionID string) ([]Egress, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT egress_id, session_id, layout, started_at, stopped_at
+		`SELECT egress_id, session_id, layout, started_at, stopped_at,
+		        track_id, speaker_kind, participant_id, audio
 		 FROM egresses WHERE session_id = ? ORDER BY started_at, egress_id`, sessionID)
 	if err != nil {
 		return nil, errs.Wrap(errs.CodeInternal, err, "list egresses")
@@ -213,7 +237,8 @@ func (s *Store) Egresses(ctx context.Context, sessionID string) ([]Egress, error
 		var e Egress
 		var startedAt int64
 		var stoppedAt sql.NullInt64
-		if err := rows.Scan(&e.EgressID, &e.SessionID, &e.Layout, &startedAt, &stoppedAt); err != nil {
+		if err := rows.Scan(&e.EgressID, &e.SessionID, &e.Layout, &startedAt, &stoppedAt,
+			&e.TrackID, &e.SpeakerKind, &e.ParticipantID, &e.Audio); err != nil {
 			return nil, errs.Wrap(errs.CodeInternal, err, "read egress")
 		}
 		e.StartedAt = time.UnixMicro(startedAt).UTC()

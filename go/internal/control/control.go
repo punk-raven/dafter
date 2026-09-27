@@ -142,7 +142,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
-		if _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true); err != nil {
+		if _, _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true, state.Egress{}); err != nil {
 			s.fail(w, err)
 			return
 		}

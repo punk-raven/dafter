@@ -66,10 +66,27 @@ type DispatchInfo struct {
 	Pool       string
 }
 
+type TrackPublisher struct {
+	Identity string
+	Agent    bool
+	Audio    bool
+}
+
+type RecordingFile struct {
+	EgressID  string
+	Status    string
+	Complete  bool
+	Key       string
+	URL       string
+	ExpiresAt time.Time
+}
+
 type Transport interface {
 	MintToken(Grant) (Token, error)
 	StartEgress(context.Context, EgressRequest) (EgressInfo, error)
 	StopEgress(ctx context.Context, egressID string) (EgressInfo, error)
 	DispatchAgent(context.Context, AgentDispatch) (DispatchInfo, error)
 	RecallAgents(ctx context.Context, room, pool string) ([]DispatchInfo, error)
+	TrackOwner(ctx context.Context, room, trackID string) (TrackPublisher, error)
+	RecordingFile(ctx context.Context, egressID string, ttl time.Duration) (RecordingFile, error)
 }

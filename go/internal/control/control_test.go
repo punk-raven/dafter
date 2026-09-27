@@ -42,6 +42,9 @@ type stubTransport struct {
 	recalled    []string
 	live        []string
 	recallErr   error
+
+	owners map[string]transport.TrackPublisher
+	files  map[string]transport.RecordingFile
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {
