@@ -1,0 +1,23 @@
+[project]
+name = "dafter-batch"
+version = "0.0.0"
+description = "The transcript after the call: each recorded track through the batch provider, back to the control plane as a version"
+requires-python = ">=3.11"
+dependencies = [
+    "dafter-core",
+    "dafter-providers",
+    "aiohttp>=3.9",
+]
+
+[project.scripts]
+dafter-batch = "dafter_batch.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dafter_batch"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/dafter_batch/py.typed" = "dafter_batch/py.typed"
