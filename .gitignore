@@ -61,3 +61,6 @@ build/
 
 # Media plan, kept as a local document outside the repo
 /docs/media-plan.md
+
+# Word error rate clips: real voices, consent-bound, never committed
+/testdata/wer/audio/
