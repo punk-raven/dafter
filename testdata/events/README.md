@@ -22,3 +22,23 @@ unpriced one. An unpriced item carries no `costInr` at all, and `costInr` on
 the payload sums only the priced items, so a consumer can tell "free" from
 "no price known". The numbers are illustrative, not a statement of any
 provider's price.
+
+`transcript-partial.json` and `transcript-final.json` are live captions: a
+human's segment still being recognised, labelled by participant id and the
+recognizer that heard it, and the agent's own line once spoken, which names no
+participant and no recognizer. A human line must name the participant, an
+agent line must not, and a segment id is opaque. They carry what was said,
+which is why they are never logged; the schema says why the text is allowed
+there at all.
+
+`transcript-version-created.json` is one version of a transcript of record,
+made after the call from two participants' own recorded tracks, in its
+verbatim and clean renderings, with how it was made (provider, model, the
+session's `configHash`, the recordings and whose they are, when). Its
+`transcriptHash` is SHA-256 over RFC 8785 of the payload with that field
+omitted, and both halves pin it:
+`4010587f3b7e5c5efc778288684a658a53c3266c6a572909d1b157b1d44efe9a`, in
+`go/internal/config/hash_test.go` and
+`python/dafter_core/tests/test_transcript_events.py`. The config hash in it is
+illustrative. `go/internal/events/transcript_test.go` and the same Python file
+refuse the same mutations of all three.

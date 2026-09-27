@@ -204,6 +204,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"AgentState", []string{"$defs", "AgentState", "enum"}, schema.Names(events.AllAgentStates)},
 		{"UsageUnit", []string{"$defs", "UsageUnit", "enum"}, schema.Names(events.AllUsageUnits)},
 		{"WakeSource", []string{"$defs", "WakeSource", "enum"}, schema.Names(events.AllWakeSources)},
+		{"SpeakerKind", []string{"$defs", "SpeakerKind", "enum"}, schema.Names(events.AllSpeakerKinds)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

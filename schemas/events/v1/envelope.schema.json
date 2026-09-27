@@ -79,6 +79,18 @@
     {
       "if": { "properties": { "type": { "const": "session.usage" } }, "required": ["type"] },
       "then": { "properties": { "payload": { "$ref": "#/$defs/SessionUsagePayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "transcript.partial" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/CaptionSegmentPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "transcript.final" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/CaptionSegmentPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "transcript.version_created" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/TranscriptVersionPayload" } }, "required": ["payload"] }
     }
   ],
 
@@ -253,6 +265,144 @@
           "then": { "required": ["wokenBy"] }
         }
       ]
+    },
+
+    "SpeakerKind": {
+      "type": "string",
+      "description": "Who spoke a line: human, a participant who joined with a token the control plane minted; agent, the session's AI agent, whose identity the media server assigns and which is therefore never a participant id.",
+      "enum": ["human", "agent"]
+    },
+
+    "Speaker": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["kind"],
+      "description": "Who said it, as an opaque participant id and never a name. A human line always names the participant; an agent line never does.",
+      "properties": {
+        "kind": { "$ref": "#/$defs/SpeakerKind" },
+        "participantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId" }
+      },
+      "if": { "properties": { "kind": { "const": "human" } }, "required": ["kind"] },
+      "then": { "required": ["participantId"] },
+      "else": { "not": { "required": ["participantId"] } }
+    },
+
+    "TranscriptSource": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["provider", "model"],
+      "description": "The recognizer that produced the text. A session that fell back mid-call has lines from two providers, so this is per line rather than per transcript.",
+      "properties": {
+        "provider": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+
+    "CaptionSegmentPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["segmentId", "speaker", "text"],
+      "description": "One caption while it is being spoken: transcript.partial while the recognizer (or, for the agent, its speech) is still going, the whole segment so far each time; transcript.final once, when it settles. This is the realtime pass and never the record: it is not stored, and a consumer must not present it as the transcript of the call. It carries what somebody said, which error messages and logs never may. It is allowed here because captions are the point of the event and the session's transcription consent covers them: it is published only while transcription is live, to the call's own participants over its data channel (encrypted with the media under end-to-end encryption), and never logged, because the worker logs an event's type and sequence and never its payload.",
+      "properties": {
+        "segmentId": {
+          "type": "string",
+          "pattern": "^sg_[0-9a-f]{16}$",
+          "description": "Opaque and minted by the worker. Every partial of a segment and the final that settles it share it, so a consumer replaces rather than appends."
+        },
+        "speaker": { "$ref": "#/$defs/Speaker" },
+        "text": { "type": "string", "maxLength": 4000 },
+        "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
+        "source": {
+          "$ref": "#/$defs/TranscriptSource",
+          "description": "The recognizer. Absent on the agent's own lines, whose text is the reply it spoke rather than anything recognised."
+        }
+      }
+    },
+
+    "TranscriptLine": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["speaker", "recordingId", "startMs", "endMs", "text"],
+      "description": "One line of a transcript, from one speaker's own recorded track, so the attribution is the recording's rather than a guess. startMs and endMs count from the start of that recording, whose start time the provenance states.",
+      "properties": {
+        "speaker": { "$ref": "#/$defs/Speaker" },
+        "recordingId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/EgressId" },
+        "startMs": { "type": "integer", "minimum": 0 },
+        "endMs": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" },
+        "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" }
+      }
+    },
+
+    "TranscriptRecording": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["recordingId", "speaker", "startedAt"],
+      "properties": {
+        "recordingId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/EgressId" },
+        "speaker": { "$ref": "#/$defs/Speaker" },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})$"
+        }
+      }
+    },
+
+    "TranscriptVersionPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["transcriptHash", "pass", "language", "provenance", "verbatim", "clean"],
+      "description": "One version of a session's transcript of record, and the whole of it: the batch pass hands it to the control plane as this event, and the control plane checks its hash, numbers it and stores it. A re-run is a new version and never overwrites one, because the recorded audio is the source of truth and a transcript is derived from it. It carries what people said, like the caption payload, and is never logged.",
+      "properties": {
+        "transcriptHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hex SHA-256 over the RFC 8785 serialization of this payload with transcriptHash itself omitted: the scheme configHash uses, so an exported transcript can be re-hashed by whoever receives it."
+        },
+        "pass": {
+          "type": "string",
+          "const": "batch",
+          "description": "Which pass made it. Only the batch pass after the call makes a transcript of record; captions are never stored as one."
+        },
+        "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
+        "provenance": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "required": ["provider", "model", "configHash", "createdAt", "recordings"],
+          "description": "How it was made, enough to explain it or make it again.",
+          "properties": {
+            "provider": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+            "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "configHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "The session's resolved config, which pins the provider and model and states the consent the transcription ran under."
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "recordings": {
+              "type": "array",
+              "minItems": 1,
+              "description": "Every recorded track the transcript was made from, and whose it is.",
+              "items": { "$ref": "#/$defs/TranscriptRecording" }
+            }
+          }
+        },
+        "verbatim": {
+          "type": "array",
+          "description": "Word for word, fillers, repetitions and spoken numbers as said.",
+          "items": { "$ref": "#/$defs/TranscriptLine" }
+        },
+        "clean": {
+          "type": "array",
+          "description": "The same audio transcribed for reading: punctuated, numbers written as numbers, fillers dropped. Made by a separate pass over the audio, so its lines need not align one to one with the verbatim lines.",
+          "items": { "$ref": "#/$defs/TranscriptLine" }
+        }
+      }
     },
 
     "AgentTurnMetricsPayload": {

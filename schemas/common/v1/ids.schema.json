@@ -24,6 +24,12 @@
       "pattern": "^r_[0-9a-f]{8}$",
       "examples": ["r_1d05fa73"]
     },
+    "EgressId": {
+      "type": "string",
+      "description": "A recording's id as the media server minted it. Not a Dafter identifier and not opaque by our construction, but it names no person, and it is the id a consumer finds in the media server's own logs and storage.",
+      "pattern": "^EG_[A-Za-z0-9]{1,64}$",
+      "examples": ["EG_Kx9r2QmT4bZa"]
+    },
     "SecretRef": {
       "type": "string",
       "description": "A reference into the secrets store, never a value. Config documents are safe to store, diff, log and hand to a consumer.",
