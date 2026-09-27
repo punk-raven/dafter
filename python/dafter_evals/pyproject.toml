@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 dafter-evals = "dafter_evals.__main__:main"
+dafter-wer = "dafter_evals.score:main"
 
 [build-system]
 requires = ["hatchling"]
