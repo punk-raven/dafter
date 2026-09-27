@@ -29,6 +29,15 @@ func (s *stubTransport) TrackOwner(_ context.Context, _, trackID string) (transp
 	return p, nil
 }
 
+func (s *stubTransport) finish(f transport.RecordingFile) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.files == nil {
+		s.files = map[string]transport.RecordingFile{}
+	}
+	s.files[f.EgressID] = f
+}
+
 func (s *stubTransport) RecordingFile(_ context.Context, egressID string, ttl time.Duration) (transport.RecordingFile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

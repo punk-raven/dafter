@@ -48,6 +48,9 @@ type SessionStore interface {
 	AddEgress(ctx context.Context, e Egress) error
 	StopEgress(ctx context.Context, egressID string, at time.Time) error
 	Egresses(ctx context.Context, sessionID string) ([]Egress, error)
+	AddTranscript(ctx context.Context, t Transcript) (Transcript, bool, error)
+	Transcripts(ctx context.Context, sessionID string) ([]Transcript, error)
+	Transcript(ctx context.Context, sessionID string, version int) (Transcript, error)
 	Close() error
 }
 
@@ -111,6 +114,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		if err := addMissingColumns(ctx, db, table); err != nil {
 			return nil, closing(db, err)
 		}
+	}
+	if _, err := db.ExecContext(ctx, transcriptsMigration); err != nil {
+		return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
 	}
 	return &Store{db: db}, nil
 }
