@@ -65,8 +65,7 @@ function captionPanel() {
   panel.innerHTML = `
     <div class="caption-head"><strong>Captions</strong><span class="caption-hint">live, not the record · interim in italics</span></div>
     <div id="caption-lines" class="caption-lines"><div class="caption-empty">what anyone says shows here, labelled by who said it</div></div>`;
-  const stats = document.getElementById('stats-panel');
-  stats.parentNode.insertBefore(panel, stats);
+  document.getElementById('transcripts').prepend(panel);
   return panel;
 }
 
