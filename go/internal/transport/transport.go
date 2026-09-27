@@ -75,6 +75,8 @@ type TrackPublisher struct {
 type RecordingFile struct {
 	EgressID  string
 	Status    string
+	Ended     bool
+	EndedAt   time.Time
 	Complete  bool
 	Key       string
 	URL       string

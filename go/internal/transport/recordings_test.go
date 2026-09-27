@@ -2,6 +2,7 @@ package transport_test
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -118,16 +119,58 @@ func TestACompleteRecordingIsHandedOutAsAPresignedURL(t *testing.T) {
 
 func TestARecordingStillWritingHasNoURL(t *testing.T) {
 	t.Parallel()
-	for _, status := range []string{"EGRESS_ACTIVE", "EGRESS_ENDING", "EGRESS_FAILED"} {
-		reply := `{"items":[{"egress_id":"EG_abc123","status":"` + status + `","file_results":[]}]}`
+	replies := map[string]string{
+		"EGRESS_ACTIVE":   `{"items":[{"egress_id":"EG_abc123","status":"EGRESS_ACTIVE","file_results":[]}]}`,
+		"EGRESS_ENDING":   `{"items":[{"egress_id":"EG_abc123","status":"EGRESS_ENDING","ended_at":"0","file_results":[]}]}`,
+		"EGRESS_STARTING": `{"items":[{"egress_id":"EG_abc123"}]}`,
+		"a status number": `{"items":[{"egress_id":"EG_abc123","status":1}]}`,
+	}
+	for name, reply := range replies {
 		srv, _ := dispatchServer(t, map[string]string{"Egress/ListEgress": reply})
 		got, err := recorder(t, srv).RecordingFile(t.Context(), egressID, time.Minute)
 		if err != nil {
-			t.Fatalf("%s: %v", status, err)
+			t.Fatalf("%s: %v", name, err)
 		}
-		if got.Complete || got.URL != "" || got.Status != status {
-			t.Errorf("%s: %+v", status, got)
+		if got.Ended || got.Complete || got.URL != "" || !got.EndedAt.IsZero() || got.Status == "" {
+			t.Errorf("%s: %+v", name, got)
 		}
+	}
+}
+
+func TestAnEndedRecordingSaysHowItEndedAndWhetherItLeftAFile(t *testing.T) {
+	t.Parallel()
+	ended := time.Unix(0, 1758535650000000000).UTC()
+	cases := []struct {
+		name, reply, status string
+		file                bool
+	}{
+		{"cut at its limit", string(fixture(t, "list-egress-limit-reached.json")), "EGRESS_LIMIT_REACHED", true},
+		{"failed", string(fixture(t, "list-egress-failed.json")), "EGRESS_FAILED", false},
+		{"aborted", `{"items":[{"egress_id":"EG_abc123","status":5,"ended_at":"1758535650000000000"}]}`, "EGRESS_ABORTED", false},
+		{"cut with nothing written", `{"items":[{"egress_id":"EG_abc123","status":"EGRESS_LIMIT_REACHED","ended_at":"1758535650000000000","file_results":[]}]}`, "EGRESS_LIMIT_REACHED", false},
+	}
+	for _, tc := range cases {
+		srv, _ := dispatchServer(t, map[string]string{"Egress/ListEgress": tc.reply})
+		got, err := recorder(t, srv).RecordingFile(t.Context(), egressID, time.Minute)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if !got.Ended || got.Status != tc.status || !got.EndedAt.Equal(ended) || got.Complete != tc.file || (got.URL != "") != tc.file {
+			t.Errorf("%s: %+v", tc.name, got)
+		}
+	}
+}
+
+func TestAnEgressThatEndedRefusesAStop(t *testing.T) {
+	t.Parallel()
+	srv, calls := egressServer(t, string(fixture(t, "stop-ended.json")), http.StatusPreconditionFailed)
+	_, err := recorder(t, srv).StopEgress(t.Context(), egressID)
+	var de *errs.Error
+	if !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig || !strings.Contains(err.Error(), "failed_precondition") {
+		t.Fatalf("want %s from failed_precondition, got %v", errs.CodeInvalidConfig, err)
+	}
+	if len(*calls) != 1 || compact(t, (*calls)[0].body) != compact(t, fixture(t, "stop.json")) {
+		t.Errorf("calls %+v", *calls)
 	}
 }
 
@@ -136,8 +179,8 @@ func TestARecordingIsLocatedOnlyWhenTheServerKnowsIt(t *testing.T) {
 	srv, _ := dispatchServer(t, map[string]string{"Egress/ListEgress": `{"items":[]}`})
 	_, err := recorder(t, srv).RecordingFile(t.Context(), egressID, time.Minute)
 	var de *errs.Error
-	if !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
-		t.Fatalf("want %s, got %v", errs.CodeInvalidConfig, err)
+	if !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig || !errors.Is(err, transport.ErrUnknownRecording) {
+		t.Fatalf("want %s naming an unknown recording, got %v", errs.CodeInvalidConfig, err)
 	}
 
 	bare, calls := dispatchServer(t, map[string]string{})

@@ -38,9 +38,21 @@ func (s *stubTransport) finish(f transport.RecordingFile) {
 	s.files[f.EgressID] = f
 }
 
+func (s *stubTransport) forget(egressID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.forgotten == nil {
+		s.forgotten = map[string]bool{}
+	}
+	s.forgotten[egressID] = true
+}
+
 func (s *stubTransport) RecordingFile(_ context.Context, egressID string, ttl time.Duration) (transport.RecordingFile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.forgotten[egressID] {
+		return transport.RecordingFile{}, errs.Wrap(errs.CodeInvalidConfig, transport.ErrUnknownRecording, "the media server knows no recording under that id")
+	}
 	f, ok := s.files[egressID]
 	if !ok {
 		return transport.RecordingFile{EgressID: egressID, Status: "EGRESS_ACTIVE"}, nil

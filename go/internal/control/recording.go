@@ -172,36 +172,58 @@ func (s *Service) stopRecording(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	out := recordingResponse{SessionID: sess.SessionID, Recordings: []recordingView{}}
 	var targets []state.Egress
 	for _, e := range running {
-		if e.Active() && (req.EgressID == "" || e.EgressID == req.EgressID) {
+		switch {
+		case req.EgressID != "" && e.EgressID == req.EgressID && !e.Active():
+			out.Recordings = append(out.Recordings, viewOf(e, ""))
+		case e.Active() && (req.EgressID == "" || e.EgressID == req.EgressID):
 			targets = append(targets, e)
 		}
 	}
-	if len(targets) == 0 {
+	if len(targets) == 0 && len(out.Recordings) == 0 {
 		s.fail(w, located(errs.CodeInvalidConfig, "/egressId", "no recording of this session is running under that id"))
 		return
 	}
 
-	out := recordingResponse{SessionID: sess.SessionID, Recordings: []recordingView{}}
 	for _, e := range targets {
-		info, err := s.Transport.StopEgress(r.Context(), e.EgressID)
+		stopped, status, err := s.stopEgress(r.Context(), e)
 		if err != nil {
 			s.fail(w, err)
 			return
 		}
-		stoppedAt := info.EndedAt
-		if stoppedAt.IsZero() {
-			stoppedAt = time.Now().UTC()
-		}
-		if err := s.Store.StopEgress(r.Context(), e.EgressID, stoppedAt); err != nil {
-			s.fail(w, err)
-			return
-		}
-		e.StoppedAt = stoppedAt
-		out.Recordings = append(out.Recordings, viewOf(e, info.Status))
+		out.Recordings = append(out.Recordings, viewOf(stopped, status))
 	}
 	s.write(w, http.StatusOK, out)
+}
+
+func (s *Service) stopEgress(ctx context.Context, e state.Egress) (state.Egress, string, error) {
+	info, err := s.Transport.StopEgress(ctx, e.EgressID)
+	if err == nil {
+		stopped, err := s.settle(ctx, e, info.EndedAt)
+		return stopped, info.Status, err
+	}
+	file, lookupErr := s.Transport.RecordingFile(ctx, e.EgressID, sourceURLTTL)
+	if lookupErr != nil || !file.Ended {
+		return state.Egress{}, "", err
+	}
+	stopped, err := s.settle(ctx, e, file.EndedAt)
+	return stopped, file.Status, err
+}
+
+func (s *Service) settle(ctx context.Context, e state.Egress, endedAt time.Time) (state.Egress, error) {
+	if !e.Active() {
+		return e, nil
+	}
+	if endedAt.IsZero() {
+		endedAt = time.Now().UTC()
+	}
+	if err := s.Store.StopEgress(ctx, e.EgressID, endedAt); err != nil && !errors.Is(err, state.ErrNotFound) {
+		return state.Egress{}, err
+	}
+	e.StoppedAt = endedAt
+	return e, nil
 }
 
 func (s *Service) readSession(w http.ResponseWriter, r *http.Request) {

@@ -13,6 +13,7 @@ import (
 	"github.com/punk-raven/dafter/go/internal/errs"
 	"github.com/punk-raven/dafter/go/internal/events"
 	"github.com/punk-raven/dafter/go/internal/state"
+	"github.com/punk-raven/dafter/go/internal/transport"
 )
 
 const (
@@ -137,16 +138,30 @@ func (s *Service) transcriptionSources(w http.ResponseWriter, r *http.Request) {
 		case e.SpeakerKind == "":
 			out.Skipped = append(out.Skipped, heldBack{e.EgressID, "its publisher is not a participant the control plane minted"})
 			continue
-		case e.Active():
-			out.Pending = append(out.Pending, heldBack{e.EgressID, "still recording"})
-			continue
 		}
 		file, err := s.Transport.RecordingFile(r.Context(), e.EgressID, sourceURLTTL)
+		if errors.Is(err, transport.ErrUnknownRecording) {
+			out.Skipped = append(out.Skipped, heldBack{e.EgressID, "the media server no longer knows this recording"})
+			continue
+		}
 		if err != nil {
 			s.fail(w, err)
 			return
 		}
-		if !file.Complete {
+		if file.Ended {
+			if e, err = s.settle(r.Context(), e, file.EndedAt); err != nil {
+				s.fail(w, err)
+				return
+			}
+		}
+		switch {
+		case file.Ended && !file.Complete:
+			out.Skipped = append(out.Skipped, heldBack{e.EgressID, "the media server ended it as " + file.Status + " with no file to read"})
+			continue
+		case !file.Complete && e.Active():
+			out.Pending = append(out.Pending, heldBack{e.EgressID, "still recording"})
+			continue
+		case !file.Complete:
 			out.Pending = append(out.Pending, heldBack{e.EgressID, "the media server reports " + file.Status})
 			continue
 		}

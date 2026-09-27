@@ -3,16 +3,20 @@ package transport
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
 
+var ErrUnknownRecording = errors.New("transport: the media server knows no recording under that id")
+
 const (
 	methodListParticipants = "ListParticipants"
 	methodListEgress       = "ListEgress"
 	egressComplete         = "EGRESS_COMPLETE"
+	egressLimitReached     = "EGRESS_LIMIT_REACHED"
 	participantKindAgent   = "AGENT"
 	trackTypeAudio         = "AUDIO"
 )
@@ -30,6 +34,8 @@ type protoEnum string
 var (
 	participantKinds = map[int]string{0: "STANDARD", 1: "INGRESS", 2: "EGRESS", 3: "SIP", 4: participantKindAgent, 7: "CONNECTOR", 8: "BRIDGE"}
 	trackTypes       = map[int]string{0: trackTypeAudio, 1: "VIDEO", 2: "DATA"}
+	egressStatuses   = map[int]string{0: "EGRESS_STARTING", 1: "EGRESS_ACTIVE", 2: "EGRESS_ENDING", 3: egressComplete, 4: "EGRESS_FAILED", 5: "EGRESS_ABORTED", 6: egressLimitReached}
+	egressEnded      = map[protoEnum]bool{egressComplete: true, "EGRESS_FAILED": true, "EGRESS_ABORTED": true, egressLimitReached: true}
 )
 
 func (e *protoEnum) decode(raw json.RawMessage, numbers map[int]string) error {
@@ -71,12 +77,14 @@ type fileInfoJSON struct {
 }
 
 type listedEgressJSON struct {
-	EgressID      string         `json:"egress_id"`
-	EgressIDCamel string         `json:"egressId"`
-	Status        string         `json:"status"`
-	FileResults   []fileInfoJSON `json:"file_results"`
-	FileResultsC  []fileInfoJSON `json:"fileResults"`
-	File          *fileInfoJSON  `json:"file"`
+	EgressID      string          `json:"egress_id"`
+	EgressIDCamel string          `json:"egressId"`
+	Status        json.RawMessage `json:"status"`
+	EndedAt       int64JSON       `json:"ended_at"`
+	EndedAtCamel  int64JSON       `json:"endedAt"`
+	FileResults   []fileInfoJSON  `json:"file_results"`
+	FileResultsC  []fileInfoJSON  `json:"fileResults"`
+	File          *fileInfoJSON   `json:"file"`
 }
 
 type listEgressJSON struct {
@@ -144,13 +152,21 @@ func (l *LiveKit) RecordingFile(ctx context.Context, egressID string, ttl time.D
 		if first(item.EgressID, item.EgressIDCamel) != egressID {
 			continue
 		}
-		out := RecordingFile{EgressID: egressID, Status: item.Status}
-		if item.Status != egressComplete {
+		var status protoEnum
+		if err := status.decode(item.Status, egressStatuses); err != nil {
+			return RecordingFile{}, errs.Wrap(errs.CodeInternal, err, "decode an egress status")
+		}
+		out := RecordingFile{EgressID: egressID, Status: string(status), Ended: egressEnded[status]}
+		if !out.Ended {
 			return out, nil
 		}
+		out.EndedAt = nanos(int64(max(item.EndedAt, item.EndedAtCamel)))
 		key := objectKey(item)
-		if key == "" {
+		switch {
+		case key == "" && status == egressComplete:
 			return RecordingFile{}, errs.Errorf(errs.CodeInternal, "the media server reports a complete recording with no file")
+		case key == "" || (status != egressComplete && status != egressLimitReached):
+			return out, nil
 		}
 		now := l.now().UTC().Truncate(time.Second)
 		signed, err := PresignGet(*l.storage, key, now, ttl)
@@ -160,7 +176,7 @@ func (l *LiveKit) RecordingFile(ctx context.Context, egressID string, ttl time.D
 		out.Complete, out.Key, out.URL, out.ExpiresAt = true, key, signed, now.Add(ttl).UTC()
 		return out, nil
 	}
-	return RecordingFile{}, errs.Errorf(errs.CodeInvalidConfig, "the media server knows no recording under that id")
+	return RecordingFile{}, errs.Wrap(errs.CodeInvalidConfig, ErrUnknownRecording, "the media server knows no recording under that id")
 }
 
 func objectKey(item listedEgressJSON) string {

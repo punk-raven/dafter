@@ -36,3 +36,21 @@ Attributing a track recording and reading one back:
   `pkg/config/output_file.go`). The control plane hands that object out as an
   S3 SigV4 presigned GET (`presign.go`), checked against the AWS example
   signature and a botocore-signed MinIO URL.
+
+Answers the adapter reads, from the same protos (proto field names, int64
+as a decimal string, enums as names or numbers):
+
+- `list-egress-limit-reached.json`: a `ListEgress` item that ended at its
+  time limit. It still carries `file_results`, so it is read like
+  `EGRESS_COMPLETE`. `ended_at` is when the egress ended; the control plane
+  stores it as the recording's stop, because a track egress ends by itself
+  when its track is unpublished and nothing else tells the control plane.
+- `list-egress-failed.json`: a `ListEgress` item that ended as
+  `EGRESS_FAILED` with no file. `EGRESS_FAILED`, `EGRESS_ABORTED` and
+  `EGRESS_LIMIT_REACHED` are terminal (`EgressStatus` in
+  `livekit_egress.proto`); a terminal egress without a file is skipped,
+  never pending.
+- `stop-ended.json`: the Twirp error (HTTP 412) `StopEgress` answers for an
+  egress that is no longer starting or active (`EgressService.StopEgress` in
+  `livekit/livekit` `pkg/service/egress.go`). The control plane then reads
+  the egress with `ListEgress` and records the stop it already had.
