@@ -96,3 +96,9 @@ def test_the_catalog_voice_is_calmer_for_a_concern_and_warmer_for_a_greeting() -
     assert settings(built) == (0.9, 0.4)
     built.style("greeting")
     assert settings(built) == (1.0, 0.8)
+
+
+def test_sarvam_declares_no_markup_so_the_frameworks_expressive_mode_stays_off() -> None:
+    built = tts()
+    assert built.capabilities.streaming
+    assert built.markup.llm_instructions() is None

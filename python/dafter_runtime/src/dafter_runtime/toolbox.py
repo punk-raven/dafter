@@ -5,13 +5,15 @@ from collections.abc import AsyncIterable, Callable
 from typing import Any
 
 from dafter_core.enums import Role
+from dafter_providers import Styled
 from livekit import rtc
-from livekit.agents import Agent, AgentSession, ModelSettings
+from livekit.agents import Agent, AgentSession, FlushSentinel, ModelSettings
 from livekit.agents import llm as lk_llm
 
 from .answering import Roster
 from .backchannel import Acknowledgements, Events, acknowledged, holds_floor
 from .consent import Confirmations
+from .delivery import Delivery
 from .everyday import current_time, go_quiet, who_is_here
 from .listeners import is_human
 from .naming import words
@@ -28,17 +30,33 @@ class Answering(Agent):
         registry: Registry,
         caller: Callable[[], str | None],
         acknowledgements: Acknowledgements | None = None,
+        delivery: Delivery | None = None,
     ):
         super().__init__(instructions=instructions, tools=registry.function_tools())
         self._registry = registry
         self._caller = caller
         self._acknowledgements = acknowledgements
+        self._delivery = delivery
 
     def stt_node(
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
     ) -> Events:
         events = Agent.default.stt_node(self, audio, model_settings)
         return acknowledged(self._acknowledgements, lambda: holds_floor(self.session))(events)
+
+    def llm_node(
+        self, chat_ctx: lk_llm.ChatContext, tools: list[lk_llm.Tool], model_settings: ModelSettings
+    ) -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
+        if self._delivery is not None:
+            self._delivery.heard(chat_ctx)
+        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+
+    def tts_node(
+        self, text: AsyncIterable[str], model_settings: ModelSettings
+    ) -> AsyncIterable[rtc.AudioFrame]:
+        if self._delivery is not None and isinstance(voice := self.session.tts, Styled):
+            voice.style(str(self._delivery.situation))
+        return Agent.default.tts_node(self, text, model_settings)
 
     async def on_user_turn_completed(
         self, turn_ctx: lk_llm.ChatContext, new_message: lk_llm.ChatMessage

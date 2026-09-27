@@ -34,6 +34,7 @@ from .backchannel import Acknowledgements
 from .called import Called
 from .control import ControlPlane, encryption
 from .cost import load_prices, priced, usage_payload
+from .delivery import Delivery
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
@@ -218,6 +219,7 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
             turn_handling=p.voice_turn_handling,  # type: ignore[arg-type]
             user_away_timeout=None,
             tts_text_transforms=spoken,
+            expressive=p.config.agent.speech.expressive,
         )
     return AgentSession(
         stt=stages.stt,
@@ -227,6 +229,7 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
         turn_handling=hearing(p, stages),  # type: ignore[arg-type]
         user_away_timeout=None,
         tts_text_transforms=spoken,
+        expressive=p.config.agent.speech.expressive,
     )
 
 
@@ -253,6 +256,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(flush)
     called = Called(ctx, p, stages, session, stt_sample_rate(p)) if p.called_by_name else None
+    delivery = Delivery(p.config.agent.speech)
     caller: Callable[[], str | None]
     if called is not None:
         caller = called.addressee
@@ -277,6 +281,7 @@ async def entrypoint(ctx: JobContext) -> None:
             registry,
             caller,
             Acknowledgements.of(p.config.turn.interruption.backchannel),
+            delivery,
         ),
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate),
