@@ -615,6 +615,7 @@ source = { editable = "dafter_providers" }
 dependencies = [
     { name = "dafter-core" },
     { name = "livekit-agents" },
+    { name = "livekit-plugins-openai" },
     { name = "livekit-plugins-sarvam" },
 ]
 
@@ -622,6 +623,7 @@ dependencies = [
 requires-dist = [
     { name = "dafter-core", editable = "dafter_core" },
     { name = "livekit-agents", specifier = "==1.8.3" },
+    { name = "livekit-plugins-openai", specifier = "==1.8.3" },
     { name = "livekit-plugins-sarvam", specifier = "==1.8.3" },
 ]
 

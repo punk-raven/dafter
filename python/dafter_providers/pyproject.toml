@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "dafter-core",
     "livekit-agents==1.8.3",
+    "livekit-plugins-openai==1.8.3",
     "livekit-plugins-sarvam==1.8.3",
 ]
 
