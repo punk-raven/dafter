@@ -144,6 +144,10 @@ function onAgentEvent(payload) {
     return;
   }
   if (!event.payload) return;
+  if (event.type === 'transcript.partial' || event.type === 'transcript.final') {
+    onCaption(event);
+    return;
+  }
   if (event.type === 'agent.turn_metrics') {
     onTurnMetrics(event.payload);
     return;
