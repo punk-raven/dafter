@@ -11,6 +11,9 @@ from livekit.plugins import sarvam as plugin
 
 from .. import credentials
 from ..options import Options
+from .batch import build_batch as build_batch
+from .languages import LANGUAGES as LANGUAGES
+from .languages import language_code
 from .realtime import FinalFirstSTT
 from .sentences import SentenceTTS
 
@@ -21,20 +24,6 @@ TTS_MODELS = frozenset({"bulbul:v3"})
 REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
 
-LANGUAGES = {
-    "hi": "hi-IN",
-    "hi-IN": "hi-IN",
-    "en-IN": "en-IN",
-    "bn-IN": "bn-IN",
-    "kn-IN": "kn-IN",
-    "ml-IN": "ml-IN",
-    "mr-IN": "mr-IN",
-    "ta-IN": "ta-IN",
-    "te-IN": "te-IN",
-    "gu-IN": "gu-IN",
-    "pa-IN": "pa-IN",
-    "or-IN": "or-IN",
-}
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
 STT_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
 STT_SAMPLE_RATES = {8000: 8000, 16000: 16000}
@@ -63,19 +52,6 @@ def _checked(ref: ProviderRef, stage: Stage, models: frozenset[str]) -> None:
             stage=stage,
             provider=context,
         )
-
-
-def language_code(tag: str, stage: Stage) -> str:
-    code = LANGUAGES.get(tag)
-    if code is None:
-        raise DafterError(
-            ErrorCode.UNSUPPORTED_CAPABILITY,
-            f"{NAME} {stage} does not serve this session's language",
-            stage=stage,
-            provider=ProviderContext(NAME),
-            details=("at '/language': not a language this provider declares",),
-        )
-    return code
 
 
 def _construct(stage: Stage, build: Callable[[], T]) -> T:

@@ -11,11 +11,17 @@ T = TypeVar("T")
 
 class Options:
     def __init__(
-        self, stage: Stage, provider: str, raw: Mapping[str, Any], known: Collection[str]
+        self,
+        stage: Stage,
+        provider: str,
+        raw: Mapping[str, Any],
+        known: Collection[str],
+        base: str | None = None,
     ) -> None:
         self._stage = stage
         self._provider = provider
         self._raw = raw
+        self._base = base or f"/agent/pipeline/{stage}"
         unknown = sorted(set(raw) - set(known))
         if unknown:
             raise self.error(
@@ -24,7 +30,7 @@ class Options:
             )
 
     def pointer(self, key: str) -> str:
-        return f"/agent/pipeline/{self._stage}/options/{key}"
+        return f"{self._base}/options/{key}"
 
     def error(self, message: str, *details: str) -> DafterError:
         return DafterError(

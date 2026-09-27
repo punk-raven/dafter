@@ -613,6 +613,7 @@ name = "dafter-providers"
 version = "0.0.0"
 source = { editable = "dafter_providers" }
 dependencies = [
+    { name = "aiohttp" },
     { name = "dafter-core" },
     { name = "livekit-agents" },
     { name = "livekit-plugins-sarvam" },
@@ -620,6 +621,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
     { name = "dafter-core", editable = "dafter_core" },
     { name = "livekit-agents", specifier = "==1.8.3" },
     { name = "livekit-plugins-sarvam", specifier = "==1.8.3" },
