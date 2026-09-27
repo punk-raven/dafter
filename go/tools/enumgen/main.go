@@ -127,6 +127,11 @@ var targets = []target{
 		Package: "config", Type: "RecordingStart", Prefix: "StartAt",
 		Out: "internal/config/start_gen.go", AllName: "AllRecordingStarts",
 	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Transcription", "properties", "mode", "enum"},
+		Package: "config", Type: "TranscriptionMode", Prefix: "Transcription",
+		Out: "internal/config/transcription_gen.go", AllName: "AllTranscriptionModes",
+	},
 }
 
 var initialisms = map[string]string{

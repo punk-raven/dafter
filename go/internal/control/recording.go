@@ -82,10 +82,7 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, req startRecordingRequest, beforeFirstJoin bool) (transport.EgressInfo, error) {
-	layout := cfg.Recording.Layout
-	if layout == "" {
-		layout = config.LayoutTrack
-	}
+	layout := cfg.Recording.EffectiveLayout()
 	info, err := s.Transport.StartEgress(ctx, transport.EgressRequest{
 		Room:         sess.Room,
 		SessionID:    sess.SessionID,

@@ -20,6 +20,7 @@ from dafter_core import (
     RecordingStart,
     Role,
     Stage,
+    TranscriptionMode,
     TurnStrategy,
     UsageUnit,
     VideoCodec,
@@ -57,6 +58,7 @@ CASES = [
     (KeyModel, CFG, ("$defs", "EncryptionProfile", "properties", "keyModel", "enum")),
     (EgressLayout, CFG, ("$defs", "Recording", "properties", "layout", "enum")),
     (RecordingStart, CFG, ("$defs", "Recording", "properties", "startAt", "enum")),
+    (TranscriptionMode, CFG, ("$defs", "Transcription", "properties", "mode", "enum")),
 ]
 
 

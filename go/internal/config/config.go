@@ -25,7 +25,10 @@ type ResolvedSessionConfig struct {
 	Turn      Turn       `json:"turn"`
 	Media     *Media     `json:"media,omitempty"`
 	Recording Recording  `json:"recording"`
-	Budgets   Budgets    `json:"budgets"`
+
+	Transcription *Transcription `json:"transcription,omitempty"`
+
+	Budgets Budgets `json:"budgets"`
 }
 
 type Residency struct {
@@ -227,6 +230,52 @@ type Recording struct {
 	StartAt           RecordingStart `json:"startAt,omitempty"`
 	RetentionClass    string         `json:"retentionClass,omitempty"`
 	ConsentArtifactID string         `json:"consentArtifactId,omitempty"`
+}
+
+func (r Recording) EffectiveLayout() EgressLayout {
+	if r.Layout == "" {
+		return LayoutTrack
+	}
+	return r.Layout
+}
+
+type Transcription struct {
+	Mode              TranscriptionMode `json:"mode"`
+	ConsentArtifactID string            `json:"consentArtifactId,omitempty"`
+	Batch             *ProviderRef      `json:"batch,omitempty"`
+}
+
+func (c *ResolvedSessionConfig) TranscriptionMode() TranscriptionMode {
+	if c.Transcription == nil || c.Transcription.Mode == "" {
+		return TranscriptionOff
+	}
+	return c.Transcription.Mode
+}
+
+func (m TranscriptionMode) Transcribes() bool {
+	return m != TranscriptionOff
+}
+
+func (m TranscriptionMode) Live() bool {
+	return m == TranscriptionLive || m == TranscriptionBoth
+}
+
+func (m TranscriptionMode) AfterCall() bool {
+	return m == TranscriptionAfterCall || m == TranscriptionBoth
+}
+
+func (c *ResolvedSessionConfig) transcriptionConsent() string {
+	if c.Transcription == nil {
+		return ""
+	}
+	return c.Transcription.ConsentArtifactID
+}
+
+func (c *ResolvedSessionConfig) transcriptionBatch() *ProviderRef {
+	if c.Transcription == nil {
+		return nil
+	}
+	return c.Transcription.Batch
 }
 
 type Budgets struct {

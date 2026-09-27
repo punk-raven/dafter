@@ -18,6 +18,7 @@ from .enums import (
     PrivacyMode,
     RecordingStart,
     Role,
+    TranscriptionMode,
     TurnStrategy,
     VideoCodec,
     VideoResolution,
@@ -348,6 +349,34 @@ class Recording:
 
 
 @dataclass(frozen=True, slots=True)
+class Transcription:
+    mode: TranscriptionMode = TranscriptionMode.OFF
+    consent_artifact_id: str | None = None
+    batch: ProviderRef | None = None
+
+    @property
+    def transcribes(self) -> bool:
+        return self.mode is not TranscriptionMode.OFF
+
+    @property
+    def live(self) -> bool:
+        return self.mode in (TranscriptionMode.LIVE, TranscriptionMode.BOTH)
+
+    @property
+    def after_call(self) -> bool:
+        return self.mode in (TranscriptionMode.AFTER_CALL, TranscriptionMode.BOTH)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Transcription:
+        batch = d.get("batch")
+        return cls(
+            mode=TranscriptionMode(d.get("mode", TranscriptionMode.OFF)),
+            consent_artifact_id=d.get("consentArtifactId"),
+            batch=ProviderRef.from_dict(batch) if batch else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Budgets:
     turn_gap_p50_ms: int
     turn_gap_p95_ms: int
@@ -377,6 +406,7 @@ class ResolvedSessionConfig:
     recording: Recording
     budgets: Budgets
     media: Media = field(default_factory=Media)
+    transcription: Transcription = field(default_factory=Transcription)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
 
@@ -408,6 +438,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         recording=Recording.from_dict(doc["recording"]),
         budgets=Budgets.from_dict(doc["budgets"]),
         media=Media.from_dict(doc.get("media") or {}),
+        transcription=Transcription.from_dict(doc.get("transcription") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
     )

@@ -1,0 +1,32 @@
+{
+  "base": {
+    "apiVersion": "dafter.dev/v1",
+    "sessionId": "s_7f3a9c21",
+    "tenantId": "t_9c21a4be",
+    "privacyMode": "open",
+    "language": "hi",
+    "channel": "webrtc",
+    "agent": { "enabled": true, "pool": "dafter-py" },
+    "turn": { "strategy": "auto" },
+    "recording": { "enabled": true, "layout": "track", "consentArtifactId": "consent_rec" },
+    "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500 }
+  },
+  "batch": { "provider": "sarvam", "model": "saaras:v3", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" },
+  "cases": [
+    { "name": "no transcription block", "patch": {}, "mode": "off", "rejected": null },
+    { "name": "off needs no consent", "patch": { "transcription": { "mode": "off" } }, "mode": "off", "rejected": null },
+    { "name": "live with consent", "patch": { "transcription": { "mode": "live", "consentArtifactId": "consent_tr" } }, "mode": "live", "rejected": null },
+    { "name": "both with consent and a batch provider", "patch": { "transcription": { "mode": "both", "consentArtifactId": "consent_tr", "batch": "$batch" } }, "mode": "both", "rejected": null },
+    { "name": "after the call with the layout left to its default", "patch": { "recording": { "enabled": true, "consentArtifactId": "consent_rec" }, "transcription": { "mode": "after_call", "consentArtifactId": "consent_tr", "batch": "$batch" } }, "mode": "after_call", "rejected": null },
+    { "name": "live without consent", "patch": { "transcription": { "mode": "live" } }, "rejected": { "code": "consent_required", "pointers": ["/transcription/consentArtifactId"] } },
+    { "name": "both without consent", "patch": { "transcription": { "mode": "both", "batch": "$batch" } }, "rejected": { "code": "consent_required", "pointers": ["/transcription/consentArtifactId"] } },
+    { "name": "after the call without a batch provider", "patch": { "transcription": { "mode": "after_call", "consentArtifactId": "consent_tr" } }, "rejected": { "code": "invalid_config", "pointers": ["/transcription/batch"] } },
+    { "name": "after the call without recording", "patch": { "recording": { "enabled": false }, "transcription": { "mode": "after_call", "consentArtifactId": "consent_tr", "batch": "$batch" } }, "rejected": { "code": "invalid_config", "pointers": ["/recording/layout"] } },
+    { "name": "after the call from a room composite", "patch": { "recording": { "enabled": true, "layout": "room_composite", "consentArtifactId": "consent_rec" }, "transcription": { "mode": "after_call", "consentArtifactId": "consent_tr", "batch": "$batch" } }, "rejected": { "code": "invalid_config", "pointers": ["/recording/layout"] } },
+    { "name": "live without an agent", "patch": { "agent": { "enabled": false, "pool": "dafter-py" }, "transcription": { "mode": "live", "consentArtifactId": "consent_tr" } }, "rejected": { "code": "invalid_config", "pointers": ["/transcription/mode"] } },
+    { "name": "after the call without an agent", "patch": { "agent": { "enabled": false, "pool": "dafter-py" }, "transcription": { "mode": "after_call", "consentArtifactId": "consent_tr", "batch": "$batch" } }, "mode": "after_call", "rejected": null },
+    { "name": "sealed and live", "patch": { "privacyMode": "sealed", "agent": { "enabled": false, "pool": "dafter-py" }, "recording": { "enabled": false }, "media": { "encryption": { "mode": "e2ee", "keyModel": "server_shared" } }, "transcription": { "mode": "live", "consentArtifactId": "consent_tr" } }, "rejected": { "code": "privacy_mode_forbids", "pointers": ["/transcription/mode", "/transcription/mode"] } },
+    { "name": "sealed and after the call", "patch": { "privacyMode": "sealed", "agent": { "enabled": false, "pool": "dafter-py" }, "recording": { "enabled": false }, "media": { "encryption": { "mode": "e2ee", "keyModel": "server_shared" } }, "transcription": { "mode": "after_call", "consentArtifactId": "consent_tr", "batch": "$batch" } }, "rejected": { "code": "privacy_mode_forbids", "pointers": ["/transcription/mode", "/recording/layout"] } },
+    { "name": "sealed with transcription off", "patch": { "privacyMode": "sealed", "agent": { "enabled": false, "pool": "dafter-py" }, "recording": { "enabled": false }, "media": { "encryption": { "mode": "e2ee", "keyModel": "server_shared" } }, "transcription": { "mode": "off" } }, "mode": "off", "rejected": null }
+  ]
+}

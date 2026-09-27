@@ -136,6 +136,47 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         ),
     ),
     CrossFieldRule(
+        broken=lambda c: c.transcription.transcribes and not c.transcription.consent_artifact_id,
+        code=ErrorCode.CONSENT_REQUIRED,
+        pointer="/transcription/consentArtifactId",
+        because="transcribing the people in the call cannot proceed without a consent artifact",
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.privacy_mode is PrivacyMode.SEALED and c.transcription.transcribes,
+        code=ErrorCode.PRIVACY_MODE_FORBIDS,
+        pointer="/transcription/mode",
+        because="a sealed session never sends its audio to a transcription provider",
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.transcription.live and not c.agent.enabled,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/transcription/mode",
+        because=(
+            "live captions are transcribed by the session's agent worker, so a session "
+            "without an agent has nobody to caption it"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.transcription.after_call
+            and (not c.recording.enabled or c.recording.layout is not EgressLayout.TRACK)
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/recording/layout",
+        because=(
+            "the transcript after the call is made from each participant's own recorded "
+            "track, so it needs recording on with the track layout"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.transcription.after_call and c.transcription.batch is None,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/transcription/batch",
+        because=(
+            "the transcript after the call is made by a batch provider, and the session pins none"
+        ),
+    ),
+    CrossFieldRule(
         broken=lambda c: (
             c.turn.strategy is TurnStrategy.PROVIDER_ENDPOINTING and c.turn.local_vad_enabled
         ),
