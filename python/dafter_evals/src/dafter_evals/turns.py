@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import statistics
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from dafter_core.config import Budgets
 
-from .measure import layers, percentile, state_stop, verdict
+from .measure import CALLER, CLOCKS, caller, percentile, state_stop, verdict, worker
 from .probe import Events, Probe, now
 from .script import Script
 from .voice import Voice
@@ -143,21 +142,15 @@ def summarize(
     results: list[TurnResult], overlaps: list[OverlapResult], events: Events, budgets: Budgets
 ) -> dict[str, Any]:
     gaps = [r.gap_ms for r in results if r.gap_ms is not None]
-    endpoints = [r.endpoint_ms for r in results if r.endpoint_ms is not None]
+    ends = [r.endpoint_ms for r in results if r.endpoint_ms is not None]
     replies = [r.reply_ms for r in results if r.reply_ms is not None]
     summary: dict[str, Any] = {
+        "clocks": CLOCKS,
         "turns": len(results),
         "answered": len(gaps),
-        "gap_p50_ms": percentile(gaps, 0.5),
-        "gap_p95_ms": percentile(gaps, 0.95),
-        "gap_max_ms": max(gaps) if gaps else None,
-        "gap_stdev_ms": round(statistics.pstdev(gaps)) if len(gaps) > 1 else None,
-        "endpoint_p50_ms": percentile(endpoints, 0.5),
-        "endpoint_p95_ms": percentile(endpoints, 0.95),
-        "reply_p50_ms": percentile(replies, 0.5),
-        "reply_p95_ms": percentile(replies, 0.95),
+        "caller": caller(gaps, ends, replies),
+        "worker": worker(events.turn_metrics),
         "event_errors": events.errors,
-        "layers": layers(events.turn_metrics),
     }
     for kind in ("barge_in", "backchannel", "filler"):
         rows = [o for o in overlaps if o.kind == kind]
@@ -165,6 +158,7 @@ def summarize(
         conclusive = [o for o in rows if not o.inconclusive]
         state_stops = [o.state_stop_ms for o in conclusive if o.state_stop_ms is not None]
         summary[kind] = {
+            "clock": CALLER,
             "trials": len(rows),
             "stopped": sum(o.agent_stopped for o in rows),
             "inconclusive": sum(o.inconclusive for o in rows),
@@ -175,7 +169,7 @@ def summarize(
             "state_stop_p50_ms": percentile(state_stops, 0.5),
             "state_stop_p95_ms": percentile(state_stops, 0.95),
         }
-    summary["verdict"] = verdict(summary["layers"], summary["barge_in"], budgets)
+    summary["verdict"] = verdict(summary["caller"], summary["barge_in"], budgets)
     return {
         "summary": summary,
         "turns": [asdict(r) for r in results],

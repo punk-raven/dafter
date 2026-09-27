@@ -36,8 +36,10 @@ def test_the_summary_counts_only_answered_turns() -> None:
         OverlapResult("barge_in", "रुकिए", 1000, True, 250, ["listening"], False, False, 180)
     ]
     s = summarize(turns, overlaps, Events(), BUDGETS)["summary"]
-    assert (s["turns"], s["answered"], s["gap_p50_ms"]) == (3, 2, 800)
+    assert (s["turns"], s["answered"], s["caller"]["gap_ms"]["p50"]) == (3, 2, 800)
+    assert s["caller"]["end_of_turn_ms"] == {"n": 2, "p50": 325, "p95": 348}
     assert s["barge_in"] == {
+        "clock": "caller",
         "trials": 1,
         "stopped": 1,
         "inconclusive": 0,

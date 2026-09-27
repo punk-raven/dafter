@@ -37,6 +37,7 @@ func TestLoadCatalogRejectsWhatCouldNeverResolve(t *testing.T) {
 		"no defaults layer": `{"tenants": {"t_9c21a4be": {}}, "languages": {"hi": {}}}`,
 		"unknown channel":   `{"defaults": {}, "channels": {"carrier_pigeon": {}}}`,
 		"unknown section":   `{"defaults": {}, "roles": {"participant": {}}}`,
+		"an axis unsplit":   `{"defaults": {}, "languages": {"hi": {"turn": {"strategy": "semantic"}}}}`,
 		"not a JSON object": `["defaults"]`,
 	}
 	for name, raw := range cases {
