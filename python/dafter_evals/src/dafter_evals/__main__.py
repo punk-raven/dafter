@@ -35,7 +35,7 @@ def arguments() -> argparse.Namespace:
         "--baseline",
         type=Path,
         default=None,
-        help="an earlier --out report; print each layer's change against it",
+        help="an earlier --out report; print the change on each clock against it",
     )
     return p.parse_args()
 

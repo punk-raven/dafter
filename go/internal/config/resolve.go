@@ -3,16 +3,25 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"reflect"
+	"slices"
+	"strings"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
 
 type Catalog struct {
-	Defaults  json.RawMessage             `json:"defaults"`
-	Tenants   map[string]json.RawMessage  `json:"tenants"`
-	Profiles  map[string]json.RawMessage  `json:"profiles"`
-	Languages map[string]json.RawMessage  `json:"languages"`
-	Channels  map[Channel]json.RawMessage `json:"channels"`
+	Defaults  json.RawMessage            `json:"defaults"`
+	Tenants   map[string]json.RawMessage `json:"tenants"`
+	Profiles  map[string]json.RawMessage `json:"profiles"`
+	Languages map[string]Axis            `json:"languages"`
+	Channels  map[Channel]Axis           `json:"channels"`
+}
+
+type Axis struct {
+	Tuning  json.RawMessage `json:"tuning"`
+	Overlay json.RawMessage `json:"overlay"`
 }
 
 type Request struct {
@@ -81,22 +90,19 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 		}
 	}
 	if len(req.Overrides) > 0 {
-		sources = append(sources, source{"overrides", req.Overrides})
 		problems = append(problems, reservedProblems(req.Overrides)...)
 	}
 	if len(problems) > 0 {
 		return nil, detailed(errs.CodeInvalidConfig, problems, "%d layer(s) could not be resolved")
 	}
 
-	if raw, ok := c.Languages[req.Language]; ok {
-		sources = append(sources, source{"language overlay", raw})
-	} else {
+	language, ok := c.Languages[req.Language]
+	if !ok {
 		problems = append(problems, located("/language",
 			"no language overlay is configured, so a turn strategy cannot be resolved for this language"))
 	}
-	if raw, ok := c.Channels[req.Channel]; ok {
-		sources = append(sources, source{"channel overlay", raw})
-	} else {
+	channel, ok := c.Channels[req.Channel]
+	if !ok {
 		problems = append(problems, located("/channel",
 			"no channel overlay is configured, so turn constants cannot be resolved for this channel"))
 	}
@@ -104,15 +110,88 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 		return nil, detailed(errs.CodeUnsupportedCapability, problems, "%d composition axis/axes could not be resolved")
 	}
 
+	sources = append(sources, source{"language tuning", language.Tuning}, source{"channel tuning", channel.Tuning})
+	overlays := []source{
+		{req.Language + " language overlay", language.Overlay},
+		{string(req.Channel) + " channel overlay", channel.Overlay},
+	}
 	doc := map[string]any{}
 	for _, s := range sources {
-		var m map[string]any
-		if err := json.Unmarshal(s.raw, &m); err != nil {
-			return nil, errs.Wrap(errs.CodeInvalidConfig, err, "the %s layer is not a JSON object", s.name)
+		m, err := decode(s)
+		if err != nil {
+			return nil, err
 		}
 		doc = merge(doc, m)
 	}
+	overrides, err := decode(source{"overrides", req.Overrides})
+	if err != nil {
+		return nil, err
+	}
+	doc = merge(doc, overrides)
+	pins := make([]map[string]any, len(overlays))
+	for i, s := range overlays {
+		if pins[i], err = decode(s); err != nil {
+			return nil, err
+		}
+		doc = merge(doc, pins[i])
+	}
+
+	for _, pointer := range dropped(overrides, doc, "") {
+		problems = append(problems, located(pointer,
+			"the "+pinnedBy(overlays, pins, pointer)+" pins this, so a session override cannot change it"))
+	}
+	if len(problems) > 0 {
+		return nil, detailed(errs.CodeInvalidConfig, problems, "%d session override(s) would be dropped by an overlay")
+	}
 	return doc, nil
+}
+
+func decode(s source) (map[string]any, error) {
+	m := map[string]any{}
+	if len(s.raw) == 0 {
+		return m, nil
+	}
+	if err := json.Unmarshal(s.raw, &m); err != nil {
+		return nil, errs.Wrap(errs.CodeInvalidConfig, err, "the %s layer is not a JSON object", s.name)
+	}
+	return m, nil
+}
+
+func dropped(over, doc map[string]any, pointer string) []string {
+	var pointers []string
+	for _, k := range slices.Sorted(maps.Keys(over)) {
+		at := pointer + "/" + pointerEscaper.Replace(k)
+		om, overIsObject := over[k].(map[string]any)
+		dm, docIsObject := doc[k].(map[string]any)
+		if overIsObject && docIsObject {
+			pointers = append(pointers, dropped(om, dm, at)...)
+			continue
+		}
+		if !reflect.DeepEqual(over[k], doc[k]) {
+			pointers = append(pointers, at)
+		}
+	}
+	return pointers
+}
+
+var (
+	pointerEscaper   = strings.NewReplacer("~", "~0", "/", "~1")
+	pointerUnescaper = strings.NewReplacer("~1", "/", "~0", "~")
+)
+
+func pinnedBy(overlays []source, pins []map[string]any, pointer string) string {
+	tokens := strings.Split(strings.TrimPrefix(pointer, "/"), "/")
+	for i := len(pins) - 1; i > 0; i-- {
+		var node any = pins[i]
+		for _, token := range tokens {
+			m, _ := node.(map[string]any)
+			node = m[pointerUnescaper.Replace(token)]
+		}
+		if node != nil {
+			return overlays[i].name
+		}
+	}
+	return overlays[0].name
 }
 
 func stampEncryption(doc map[string]any) {
