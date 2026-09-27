@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from dafter_core.enums import WakeSource
 from dafter_core.hashing import seal
 from dafter_runtime.addressing import Gate, Said, Timing
@@ -15,7 +16,14 @@ from dafter_runtime.barge_in import BargeIn, follow
 from dafter_runtime.called import barge_in_for
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import load, plan
-from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, Agent, AgentSession, APIConnectOptions, llm
+from livekit.agents import (
+    DEFAULT_API_CONNECT_OPTIONS,
+    Agent,
+    AgentSession,
+    APIConnectOptions,
+    TurnHandlingOptions,
+    llm,
+)
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 from stub_llm import StubLLM, StubStream
@@ -238,10 +246,13 @@ class HeldLLM(StubLLM):
         return HeldStream(self, chat_ctx=chat_ctx, tools=tools or [], conn_options=conn_options)
 
 
-def on_voice(script: Callable[[AgentSession[None], HeldLLM], Awaitable[None]]) -> None:
+def on_voice(
+    script: Callable[[AgentSession[None], HeldLLM], Awaitable[None]], interruptible: bool = True
+) -> None:
     async def run() -> None:
         held = HeldLLM()
-        async with AgentSession[None](llm=held) as session:
+        handling: TurnHandlingOptions = {"interruption": {"enabled": interruptible}}
+        async with AgentSession[None](llm=held, turn_handling=handling) as session:
             await session.start(Agent(instructions=""))
             await script(session, held)
 
@@ -287,3 +298,34 @@ def test_a_reply_that_disallows_interruptions_or_a_session_without_them_keeps_pl
         await voice.reply
 
     on_voice(script)
+
+
+@pytest.mark.parametrize("interruptible", [True, False], ids=["interruptible", "uninterruptible"])
+@pytest.mark.parametrize("stop", ["Nivya, stop", "निव्या, बस"], ids=["english", "hindi"])
+def test_a_stop_command_ends_the_reply_and_sleeps_whatever_the_interruption_setting(
+    interruptible: bool, stop: str
+) -> None:
+    doc = json.loads(JOB.read_bytes())
+    doc["agent"]["addressing"]["mode"] = "transcript"
+    sealed, _ = seal(json.dumps(doc))
+    addressing = plan(load(sealed), "dafter-py").config.agent.addressing
+
+    async def script(session: AgentSession[None], held: HeldLLM) -> None:
+        voice = Voice(session, Roster(), interruptible=interruptible)
+        gate = Gate(
+            Matcher.for_addressing(addressing),
+            20.0,
+            voice,
+            clock=Clock(),
+            schedule=Scheduler(),
+            name=addressing.name,
+        )
+        gate.heard(ASHA, "Nivya, what time is it?")
+        await replying(session)
+        gate.heard(ASHA, stop)
+        assert gate.dormant
+        assert voice.reply is not None and voice.reply.interrupted
+        held.release.set()
+        await voice.reply
+
+    on_voice(script, interruptible)
