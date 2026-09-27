@@ -3,9 +3,10 @@ package config
 type PhrasesByLanguage map[string][]string
 
 type Backchannel struct {
-	Enabled  *bool             `json:"enabled,omitempty"`
-	MaxWords int               `json:"maxWords,omitempty"`
-	Words    PhrasesByLanguage `json:"words,omitempty"`
+	Enabled        *bool             `json:"enabled,omitempty"`
+	MaxWords       int               `json:"maxWords,omitempty"`
+	AnswerWithinMs int               `json:"answerWithinMs,omitempty"`
+	Words          PhrasesByLanguage `json:"words,omitempty"`
 }
 
 type Speech struct {

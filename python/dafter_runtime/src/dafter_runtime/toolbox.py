@@ -11,7 +11,7 @@ from livekit.agents import Agent, AgentSession, FlushSentinel, ModelSettings
 from livekit.agents import llm as lk_llm
 
 from .answering import Roster
-from .backchannel import Acknowledgements, Events, acknowledged, holds_floor
+from .backchannel import Acknowledgements, Events, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, who_is_here
@@ -37,12 +37,15 @@ class Answering(Agent):
         self._caller = caller
         self._acknowledgements = acknowledgements
         self._delivery = delivery
+        self._floor: SessionFloor | None = None
 
     def stt_node(
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
     ) -> Events:
         events = Agent.default.stt_node(self, audio, model_settings)
-        return acknowledged(self._acknowledgements, lambda: holds_floor(self.session))(events)
+        if self._floor is None:
+            self._floor = SessionFloor(self.session)
+        return acknowledged(self._acknowledgements, self._floor)(events)
 
     def llm_node(
         self, chat_ctx: lk_llm.ChatContext, tools: list[lk_llm.Tool], model_settings: ModelSettings

@@ -198,7 +198,7 @@
     "Backchannel": {
       "type": "object",
       "unevaluatedProperties": false,
-      "description": "Short acknowledgements (haan, hmm, achha, ok) said while the agent holds the floor are the caller listening, not taking the turn. A local VAD still stops the agent's audio as soon as anyone talks over it, so real barge-in stays fast; an utterance made only of phrases on this list is then dropped before it becomes a turn or reaches chat history, and the agent's paused reply resumes after interruption.falseInterruptionTimeoutMs. The words of every language are used together, because people in one call mix languages and a recognizer does not always transcribe in the session language's script.",
+      "description": "Short acknowledgements (haan, hmm, achha, ok) said while the agent holds the floor are the caller listening, not taking the turn. A local VAD still stops the agent's audio as soon as anyone talks over it, so real barge-in stays fast; an utterance made only of phrases on this list is then dropped before it becomes a turn or reaches chat history, and the agent's paused reply resumes after interruption.falseInterruptionTimeoutMs. Said over the end of a question it is the caller's answer instead (answerWithinMs). The words of every language are used together, because people in one call mix languages and a recognizer does not always transcribe in the session language's script.",
       "properties": {
         "enabled": { "type": "boolean", "default": true },
         "maxWords": {
@@ -207,6 +207,13 @@
           "minimum": 1,
           "maximum": 6,
           "default": 3
+        },
+        "answerWithinMs": {
+          "type": "integer",
+          "description": "An acknowledgement said over a reply that ends in a question answers it and becomes the caller's turn, when that reply then plays to its end within this long of the caller falling silent and the caller says nothing more. Said earlier, over the rest of the reply, it was the caller listening and is dropped; said over a statement, it is always dropped.",
+          "minimum": 100,
+          "maximum": 5000,
+          "default": 1500
         },
         "words": { "$ref": "#/$defs/PhrasesByLanguage" }
       }

@@ -15,7 +15,7 @@ from livekit.agents.voice.events import AgentStateChangedEvent
 
 from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
-from .backchannel import Acknowledgements, Filter, acknowledged, holds_floor
+from .backchannel import Acknowledgements, Filter, SessionFloor, acknowledged
 from .barge_in import BargeIn, Resume, follow
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
@@ -97,6 +97,7 @@ class Called:
         self.gate = gate_for(p, self.voice, loop)
         self.barge_in = barge_in_for(p, self.gate, self.voice, loop)
         self._acknowledgements = Acknowledgements.of(p.config.turn.interruption.backchannel)
+        self._floor = SessionFloor(session)
         self.listeners = Listeners(
             ctx.room,
             listening(p, stages),
@@ -125,7 +126,7 @@ class Called:
     def _hearing(self, speaker: str) -> Filter:
         return acknowledged(
             self._acknowledgements,
-            lambda: holds_floor(self._session),
+            self._floor,
             lambda: self.barge_in.acknowledged(speaker),
         )
 

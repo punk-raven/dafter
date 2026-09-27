@@ -68,10 +68,17 @@ def test_the_backchannel_length_is_bounded() -> None:
     refused_at(doc(turn=long), "/turn/interruption/backchannel/maxWords")
 
 
+@pytest.mark.parametrize("ms", [99, 5001])
+def test_the_backchannel_answer_window_is_bounded(ms: int) -> None:
+    late = {"interruption": {"backchannel": {"answerWithinMs": ms, "words": {"hi": ["हाँ"]}}}}
+    refused_at(doc(turn=late), "/turn/interruption/backchannel/answerWithinMs")
+
+
 def test_the_catalog_states_every_language_it_hears_acknowledgements_and_fillers_in() -> None:
     c = parse(JOB.read_bytes())
     backchannel = c.turn.interruption.backchannel
     assert set(backchannel.words) == {"hi", "en", "kn", "mr", "te"}
     assert {"हाँ", "ok", "ಹೌದು", "हो", "అవును"} <= set(every_phrase(backchannel.words))
+    assert backchannel.answer_within_ms == 1500
     assert set(c.agent.speech.fillers.phrases) == {"hi", "en", "kn", "mr", "te"}
     assert c.agent.speech.fillers.after_ms == 1000

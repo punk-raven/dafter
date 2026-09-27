@@ -77,6 +77,7 @@
         "backchannel": {
           "enabled": true,
           "maxWords": 3,
+          "answerWithinMs": 1500,
           "words": {
             "hi": ["हाँ", "हां", "हाँजी", "हांजी", "जी", "हम्म", "हम", "हूँ", "हूं", "अच्छा", "ठीक है", "सही", "सही है", "बिल्कुल", "ओके", "haan", "haanji", "ji", "hmm", "achha", "accha", "theek hai", "ok"],
             "en": ["ok", "okay", "hmm", "hm", "mm", "mhm", "uh huh", "yeah", "yes", "yep", "right", "sure", "alright", "got it", "i see"],

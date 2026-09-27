@@ -20,6 +20,7 @@ def every_phrase(by_language: PhrasesByLanguage) -> tuple[str, ...]:
 class Backchannel:
     enabled: bool = True
     max_words: int = 3
+    answer_within_ms: int = 1500
     words: PhrasesByLanguage = field(default_factory=dict)
 
     @classmethod
@@ -27,6 +28,7 @@ class Backchannel:
         return cls(
             enabled=d.get("enabled", True),
             max_words=d.get("maxWords", 3),
+            answer_within_ms=d.get("answerWithinMs", 1500),
             words=phrases_by_language(d.get("words")),
         )
 

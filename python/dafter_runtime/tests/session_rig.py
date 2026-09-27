@@ -41,6 +41,7 @@ class Speaker(io.AudioOutput):
         super().__init__(label="speaker", capabilities=io.AudioOutputCapabilities(pause=True))
         self.paused = False
         self.pauses = 0
+        self.played = 0.0
         self._queued = 0.0
         self._playing: asyncio.Task[None] | None = None
 
@@ -60,6 +61,7 @@ class Speaker(io.AudioOutput):
             await asyncio.sleep(FRAME_S)
             if not self.paused:
                 position += FRAME_S
+                self.played += FRAME_S
         self._queued = 0.0
         self.on_playback_finished(playback_position=duration, interrupted=False)
 

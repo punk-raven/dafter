@@ -56,3 +56,14 @@ func TestValidateBoundsTheBackchannelLength(t *testing.T) {
 	}}
 	refusedAt(t, c, "/turn/interruption/backchannel/maxWords")
 }
+
+func TestValidateBoundsTheBackchannelAnswerWindow(t *testing.T) {
+	t.Parallel()
+	for _, ms := range []int{99, 5001} {
+		c := validConfig(t)
+		c.Turn.Interruption = &config.Interruption{Backchannel: &config.Backchannel{
+			AnswerWithinMs: ms, Words: config.PhrasesByLanguage{"hi": {"हाँ"}},
+		}}
+		refusedAt(t, c, "/turn/interruption/backchannel/answerWithinMs")
+	}
+}
