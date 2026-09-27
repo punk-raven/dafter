@@ -190,10 +190,12 @@ class SlowReader(tts.TTS[Any]):
             capabilities=tts.TTSCapabilities(streaming=False), sample_rate=RATE, num_channels=1
         )
         self.seconds = seconds
+        self.read: list[str] = []
 
     def synthesize(
         self, text: str, *, conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS
     ) -> Reading:
+        self.read.append(text)
         return Reading(self, text, conn_options)
 
 

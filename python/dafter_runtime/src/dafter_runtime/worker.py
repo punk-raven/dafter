@@ -37,6 +37,7 @@ from .cost import load_prices, priced, usage_payload
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
+from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
 from .timing import Turns
 from .toolbox import Answering, follow, linked, registry_for
@@ -207,6 +208,7 @@ def watch(
 
 
 def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
+    spoken = SpeechPlan(p.config.agent.speech, p.config.language).transforms()
     if p.called_by_name:
         return AgentSession(
             stt=NOT_GIVEN,
@@ -215,6 +217,7 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
             vad=None,
             turn_handling=p.voice_turn_handling,  # type: ignore[arg-type]
             user_away_timeout=None,
+            tts_text_transforms=spoken,
         )
     return AgentSession(
         stt=stages.stt,
@@ -223,6 +226,7 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
         vad=stages.vad,
         turn_handling=hearing(p, stages),  # type: ignore[arg-type]
         user_away_timeout=None,
+        tts_text_transforms=spoken,
     )
 
 
