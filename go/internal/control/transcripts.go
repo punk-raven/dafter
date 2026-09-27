@@ -298,6 +298,9 @@ func versionView(t state.Transcript) transcriptVersionView {
 }
 
 func (s *Service) listTranscripts(w http.ResponseWriter, r *http.Request) {
+	if !s.authenticWorker(w, r) {
+		return
+	}
 	sess, ok := s.storedSession(w, r)
 	if !ok {
 		return
@@ -315,6 +318,9 @@ func (s *Service) listTranscripts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) exportTranscript(w http.ResponseWriter, r *http.Request) {
+	if !s.authenticWorker(w, r) {
+		return
+	}
 	sess, ok := s.storedSession(w, r)
 	if !ok {
 		return

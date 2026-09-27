@@ -106,7 +106,7 @@ func TestAReRunIsANewVersionAndEveryVersionExportsWithItsHash(t *testing.T) {
 		t.Fatalf("a re-run: %d %s", status, raw)
 	}
 
-	status, raw = h.call(t, http.MethodGet, path, "")
+	status, raw = h.as(t, workerSecret, http.MethodGet, path, "")
 	var listed struct {
 		SessionID string         `json:"sessionId"`
 		Versions  []versionReply `json:"versions"`
@@ -119,7 +119,7 @@ func TestAReRunIsANewVersionAndEveryVersionExportsWithItsHash(t *testing.T) {
 		t.Errorf("versions %+v", listed.Versions)
 	}
 
-	status, raw = h.call(t, http.MethodGet, path+"/1", "")
+	status, raw = h.as(t, workerSecret, http.MethodGet, path+"/1", "")
 	var export struct {
 		SessionID  string          `json:"sessionId"`
 		Version    int             `json:"version"`
@@ -136,7 +136,7 @@ func TestAReRunIsANewVersionAndEveryVersionExportsWithItsHash(t *testing.T) {
 		t.Errorf("the export re-hashes to %s, stored %s", rehashed, listed.Versions[0].TranscriptHash)
 	}
 	for _, bad := range []string{"/3", "/0", "/one"} {
-		if status, _ := h.call(t, http.MethodGet, path+bad, ""); status != http.StatusBadRequest {
+		if status, _ := h.as(t, workerSecret, http.MethodGet, path+bad, ""); status != http.StatusBadRequest {
 			t.Errorf("GET %s: %d", bad, status)
 		}
 	}
@@ -184,7 +184,32 @@ func TestATranscriptVersionMustProveHowItWasMade(t *testing.T) {
 	if status, _ := h.submit(t, other.SessionID, good); status != http.StatusBadRequest {
 		t.Errorf("one session's transcript was stored under another: %d", status)
 	}
-	if status, raw := h.call(t, http.MethodGet, "/sessions/"+call.session.SessionID+"/transcripts", ""); status != http.StatusOK || !strings.Contains(string(raw), `"versions":[]`) {
+	if status, raw := h.as(t, workerSecret, http.MethodGet, "/sessions/"+call.session.SessionID+"/transcripts", ""); status != http.StatusOK || !strings.Contains(string(raw), `"versions":[]`) {
 		t.Errorf("a refused version was stored: %s", raw)
+	}
+}
+
+func TestATranscriptIsReadOnlyWithTheWorkerCredential(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	call := recordCall(t, h)
+	if status, raw := h.submit(t, call.session.SessionID, versionEvent(t, call, "2026-09-24T10:31:12.004Z", nil)); status != http.StatusCreated {
+		t.Fatalf("store: %d %s", status, raw)
+	}
+	path := "/sessions/" + call.session.SessionID + "/transcripts"
+	for _, read := range []string{path, path + "/1"} {
+		for name, credential := range map[string]string{
+			"no credential": "", "a wrong secret": "not-the-secret", "a participant's token": call.session.Token,
+		} {
+			status, raw := h.as(t, credential, http.MethodGet, read, "")
+			var de errs.Error
+			if err := json.Unmarshal(raw, &de); err != nil || status != http.StatusUnauthorized ||
+				de.Code != errs.CodeAuthenticationFailed || strings.Contains(string(raw), "transcriptHash") {
+				t.Errorf("GET %s with %s: %d %s", read, name, status, raw)
+			}
+		}
+		if status, raw := h.as(t, workerSecret, http.MethodGet, read, ""); status != http.StatusOK {
+			t.Errorf("GET %s with the worker credential: %d %s", read, status, raw)
+		}
 	}
 }

@@ -338,7 +338,9 @@ pass: they go only to the call's own participants and are never stored.
 recorded track, so it needs per-track recording; the batch provider is pinned
 in `transcription.batch`, the pass produces a verbatim and a clean rendering,
 and each run is a new version with its provenance and a hash a consumer can
-recompute. Three things from the list above are not built yet: language at
+recompute. Reading a version back is as guarded as writing one: until tenant
+API keys exist, both take the worker credential, and a participant's media
+token never grants a read of what was said. Three things from the list above are not built yet: language at
 word level (the batch provider returns phrase-level chunks, so language is per
 line), `normalized_text` beside each line's `text` (the clean rendering is a
 second pass over the audio, so its lines do not pair up with the verbatim
