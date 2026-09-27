@@ -82,3 +82,12 @@ def test_the_detector_needs_the_pipeline_vad_even_without_the_interruption_vad()
         plan(load(sealed), "dafter-py")
     assert caught.value.code is ErrorCode.INVALID_CONFIG
     assert "/agent/pipeline/vad" in caught.value.details[0]
+
+
+@pytest.mark.parametrize("fixture", ["hindi-semantic-webrtc-job.json", "english-webrtc-job.json"])
+def test_the_catalog_resolves_jobs_that_run_the_turn_detector(fixture: str) -> None:
+    p = plan(load(JOB.with_name(fixture).read_bytes().strip()), "dafter-py")
+    assert p.turn_detection == "semantic"
+    assert (p.stt.name, p.llm.name, p.tts.name) == ("sarvam", "sarvam", "sarvam")
+    assert p.vad is not None and p.vad.name == "silero"
+    assert p.persona.greeting

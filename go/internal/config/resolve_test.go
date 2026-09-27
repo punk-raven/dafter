@@ -42,34 +42,34 @@ func catalog() *config.Catalog {
 		Profiles: map[string]json.RawMessage{
 			"support": json.RawMessage(`{"agent": {"personaRef": "persona://support/v3"}}`),
 		},
-		Languages: map[string]json.RawMessage{
-			"hi": json.RawMessage(`{
-				"turn": {"strategy": "provider_endpointing", "localVadEnabled": false},
-				"agent": {"pipeline": {"stt": {"provider": "sarvam", "model": "saaras"}}}
-			}`),
-			"en-IN": json.RawMessage(`{
-				"turn": {"strategy": "semantic", "localVadEnabled": true},
-				"agent": {"pipeline": {
+		Languages: map[string]config.Axis{
+			"hi": {
+				Tuning:  json.RawMessage(`{"turn": {"strategy": "provider_endpointing", "localVadEnabled": false}}`),
+				Overlay: json.RawMessage(`{"agent": {"pipeline": {"stt": {"provider": "sarvam", "model": "saaras"}}}}`),
+			},
+			"en-IN": {
+				Tuning: json.RawMessage(`{"turn": {"strategy": "semantic", "localVadEnabled": true}}`),
+				Overlay: json.RawMessage(`{"agent": {"pipeline": {
 					"vad": {"provider": "silero"},
-					"stt": {"provider": "deepgram", "model": "nova"}
-				}}
-			}`),
+					"stt": {"provider": "sarvam", "model": "saaras"}
+				}}}`),
+			},
 		},
-		Channels: map[config.Channel]json.RawMessage{
-			config.ChannelWebRTC: json.RawMessage(`{
-				"turn": {"endpointingDelayMs": 0},
-				"media": {"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}}
-			}`),
-			config.ChannelTelephony: json.RawMessage(`{
-				"turn": {"silenceMs": 900},
-				"media": {"video": {"enabled": false}, "egress": {"audioBitrate": 64}}
-			}`),
-			config.ChannelLongForm: json.RawMessage(`{
-				"media": {
+		Channels: map[config.Channel]config.Axis{
+			config.ChannelWebRTC: {
+				Tuning:  json.RawMessage(`{"turn": {"endpointingDelayMs": 0}}`),
+				Overlay: json.RawMessage(`{"media": {"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}}}`),
+			},
+			config.ChannelTelephony: {
+				Tuning:  json.RawMessage(`{"turn": {"silenceMs": 900}}`),
+				Overlay: json.RawMessage(`{"media": {"video": {"enabled": false}, "egress": {"audioBitrate": 64}}}`),
+			},
+			config.ChannelLongForm: {
+				Overlay: json.RawMessage(`{"media": {
 					"video": {"resolution": "h540", "maxBitrate": 800000, "maxFramerate": 25},
 					"egress": {"width": 1280, "height": 720, "framerate": 30, "videoBitrate": 3000, "videoCodec": "h264_main"}
-				}
-			}`),
+				}}`),
+			},
 		},
 	}
 }
@@ -286,6 +286,49 @@ func TestResolveTakesTurnStrategyFromTheLanguageAxis(t *testing.T) {
 	}
 	if hindi.Turn.SilenceMs != 500 || english.Turn.SilenceMs != 500 {
 		t.Error("the language overlay dropped a base turn constant it does not set")
+	}
+}
+
+func TestResolveLetsASessionOverrideTuneTheTurnAnAxisSuggests(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Language = "hi"
+	req.Overrides = json.RawMessage(`{"turn": {"strategy": "semantic", "localVadEnabled": true, "endpointingDelayMs": 300}}`)
+	c := resolve(t, req).Config
+	if c.Turn.Strategy != config.TurnSemantic || !c.Turn.LocalVADDecidesTurn() {
+		t.Errorf("the language axis beat the session override: %s, local VAD deciding %v", c.Turn.Strategy, c.Turn.LocalVADDecidesTurn())
+	}
+	if c.Turn.EndpointingDelayMs != 300 {
+		t.Errorf("the channel axis beat the session override: endpointingDelayMs = %d, want 300", c.Turn.EndpointingDelayMs)
+	}
+	if c.Agent.Pipeline == nil || c.Agent.Pipeline.STT == nil || c.Agent.Pipeline.STT.Provider != "sarvam" {
+		t.Errorf("the language pipeline was lost: %+v", c.Agent.Pipeline)
+	}
+}
+
+func TestResolveRefusesAnOverrideAnOverlayWouldDrop(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Language, req.Channel = "hi", config.ChannelTelephony
+	req.Overrides = json.RawMessage(`{
+		"agent": {"pipeline": {"stt": {"provider": "deepgram", "model": "saaras"}}},
+		"media": {"video": {"enabled": true}}
+	}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodeInvalidConfig {
+		t.Errorf("want %s, got %s", errs.CodeInvalidConfig, de.Code)
+	}
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{
+		"'/agent/pipeline/stt/provider': the hi language overlay pins this",
+		"'/media/video/enabled': the telephony channel overlay pins this",
+	} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s; an override the overlay replaces must not vanish\n%v", pointer, de)
+		}
+	}
+	if strings.Contains(joined, "/model") {
+		t.Errorf("an override that agrees with the overlay was refused: %v", de)
 	}
 }
 
