@@ -16,6 +16,7 @@ from livekit.agents.voice.events import AgentStateChangedEvent
 from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
 from .barge_in import BargeIn, follow
+from .captions import Captions
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
@@ -77,10 +78,17 @@ def command(data: bytes) -> str | None:
 
 class Called:
     def __init__(
-        self, ctx: JobContext, p: Plan, stages: Stages, session: AgentSession[Any], sample_rate: int
+        self,
+        ctx: JobContext,
+        p: Plan,
+        stages: Stages,
+        session: AgentSession[Any],
+        sample_rate: int,
+        captions: Captions | None = None,
     ) -> None:
         self._ctx = ctx
         self._session = session
+        self._captions = captions
         self.roster = Roster()
         self.voice = Voice(session, self.roster, interruptible=p.config.turn.interruption.enabled)
         loop = asyncio.get_running_loop()
@@ -105,6 +113,8 @@ class Called:
 
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)
+        if self._captions is not None:
+            self._captions.follow(speaker, session)
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.ensure_future(work)
@@ -123,6 +133,8 @@ class Called:
         self.roster.leave(participant.identity)
         self.gate.left(participant.identity)
         self.barge_in.left(participant.identity)
+        if self._captions is not None:
+            self._captions.left(participant.identity)
         self._spawn(self.listeners.leave(participant.identity))
         if not self.roster.present():
             log.info("everyone left, closing the agent session")
