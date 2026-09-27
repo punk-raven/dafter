@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from dafter_core.enums import Stage
 from dafter_evals.screen import catalog
-from dafter_providers import credentials, vendor_for
+from dafter_providers import credentials, openai_compat, vendor_for
 
 SOURCES = Path(__file__).resolve().parents[2]
 CODE = [
@@ -51,6 +51,14 @@ def test_every_endpoint_candidate_names_the_endpoint_it_speaks_to() -> None:
     assert str(listed["opencode_zen"]) == "2026-09-27" and listed["openai"] is None
 
 
+def test_the_catalog_reads_each_endpoint_binding_from_the_provider() -> None:
+    c = catalog.load()
+    for endpoint in c.endpoints.values():
+        assert endpoint.binding is openai_compat.ENDPOINTS[endpoint.name]
+    text = (Path(catalog.__file__).parent / catalog.CATALOG).read_text(encoding="utf-8")
+    assert "baseUrl" not in text and "credentialEnv" not in text
+
+
 def test_every_candidate_builds_through_its_registered_vendor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -85,6 +93,14 @@ def test_price_is_per_token_count_in_the_stated_currency() -> None:
     assert catalog.load().pick(["gemma_4_moe"])[0].price is None
 
 
+OPENAI = "secret://evals/openai/api-key"
+
+
+def options(doc: dict[str, Any]) -> dict[str, Any]:
+    found: dict[str, Any] = doc["candidates"][1]["provider"]["options"]
+    return found
+
+
 def broken(change: Any) -> str:
     doc = copy.deepcopy(raw())
     change(doc)
@@ -102,10 +118,11 @@ def broken(change: Any) -> str:
         (lambda d: d["candidates"][1]["price"].__setitem__("currency", "EUR"), "currency"),
         (lambda d: d["candidates"][1]["provider"].pop("model"), "pinned model"),
         (lambda d: d.pop("judge"), "judge"),
-        (lambda d: d["candidates"][1].__setitem__("endpoint", "nowhere"), "nowhere"),
-        (lambda d: d["candidates"][1].pop("endpoint"), "needs a named endpoint"),
-        (lambda d: d["endpoints"]["google"].__setitem__("baseUrl", "https://x"), "baseUrl"),
-        (lambda d: d["endpoints"]["google"].__setitem__("credentialEnv", "X_KEY"), "X_KEY"),
+        (lambda d: options(d).__setitem__("endpoint", "nowhere"), "nowhere"),
+        (lambda d: options(d).pop("endpoint"), "needs a named endpoint"),
+        (lambda d: d["endpoints"].__setitem__("groq", d["endpoints"]["openai"]), "binds"),
+        (lambda d: d["endpoints"]["google"].__setitem__("baseUrl", "https://x"), "exactly"),
+        (lambda d: d["candidates"][1]["provider"].__setitem__("credentialRef", OPENAI), "GEMINI"),
     ],
 )
 def test_a_malformed_catalog_is_refused(change: Any, message: str) -> None:

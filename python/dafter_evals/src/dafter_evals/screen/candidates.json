@@ -2,29 +2,21 @@
   "asOf": "2026-09-27",
   "endpoints": {
     "google": {
-      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
-      "credentialEnv": "GEMINI_API_KEY",
       "modelList": "https://generativelanguage.googleapis.com/v1beta/models",
       "listedOn": "2026-09-27",
       "docs": "https://ai.google.dev/gemini-api/docs/openai"
     },
     "openrouter": {
-      "baseUrl": "https://openrouter.ai/api/v1",
-      "credentialEnv": "OPENROUTER_API_KEY",
       "modelList": "https://openrouter.ai/api/v1/models",
       "listedOn": "2026-09-27",
       "docs": "https://openrouter.ai/docs/quickstart"
     },
     "opencode_zen": {
-      "baseUrl": "https://opencode.ai/zen/v1",
-      "credentialEnv": "OPENCODE_API_KEY",
       "modelList": "https://opencode.ai/zen/v1/models",
       "listedOn": "2026-09-27",
       "docs": "https://opencode.ai/docs/zen/"
     },
     "openai": {
-      "baseUrl": "https://api.openai.com/v1",
-      "credentialEnv": "OPENAI_API_KEY",
       "modelList": null,
       "listedOn": null,
       "docs": "https://developers.openai.com/api/reference/overview"
@@ -34,13 +26,12 @@
     "id": "judge_gemini_flash",
     "role": "judge",
     "family": "Gemini Flash, newest stable, low thinking",
-    "endpoint": "google",
     "provider": {
       "provider": "openai_compat",
       "model": "gemini-3.8-flash",
       "credentialRef": "secret://evals/gemini/api-key",
       "options": {
-        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "endpoint": "google",
         "temperature": 0.0,
         "maxTokens": 400,
         "reasoningEffort": "low"
@@ -97,13 +88,12 @@
       "id": "gemini_flash_lite",
       "role": "default",
       "family": "Gemini Flash-Lite, minimal thinking",
-      "endpoint": "google",
       "provider": {
         "provider": "openai_compat",
         "model": "gemini-3.5-flash-lite",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200
         }
@@ -131,13 +121,12 @@
       "id": "gemini_flash",
       "role": "ceiling",
       "family": "Gemini Flash, minimal thinking",
-      "endpoint": "google",
       "provider": {
         "provider": "openai_compat",
         "model": "gemini-3.6-flash",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200,
           "reasoningEffort": "minimal"
@@ -168,13 +157,12 @@
       "id": "gemini_flash_latest",
       "role": "latest",
       "family": "Gemini Flash, newest stable, low thinking",
-      "endpoint": "google",
       "provider": {
         "provider": "openai_compat",
         "model": "gemini-3.8-flash",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200,
           "reasoningEffort": "low"
@@ -204,13 +192,12 @@
       "id": "gemma_4_moe",
       "role": "open_weights",
       "family": "Gemma 4 26B mixture of experts, thinking off",
-      "endpoint": "google",
       "provider": {
         "provider": "openai_compat",
         "model": "gemma-4-26b-a4b-it",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200,
           "extraBody": {
@@ -242,13 +229,12 @@
       "id": "gemma_4_dense_openrouter",
       "role": "open_weights",
       "family": "Gemma 4 31B dense on OpenRouter's free variant, reasoning off",
-      "endpoint": "openrouter",
       "provider": {
         "provider": "openai_compat",
         "model": "google/gemma-4-31b-it:free",
         "credentialRef": "secret://evals/openrouter/api-key",
         "options": {
-          "baseUrl": "https://openrouter.ai/api/v1",
+          "endpoint": "openrouter",
           "temperature": 0.4,
           "maxTokens": 200,
           "extraBody": {
@@ -275,13 +261,12 @@
       "id": "openai_mini",
       "role": "runner_up",
       "family": "OpenAI GPT mini, no reasoning",
-      "endpoint": "openai",
       "provider": {
         "provider": "openai_compat",
         "model": "gpt-5.4-mini-2026-03-17",
         "credentialRef": "secret://evals/openai/api-key",
         "options": {
-          "baseUrl": "https://api.openai.com/v1",
+          "endpoint": "openai",
           "maxTokens": 200,
           "reasoningEffort": "none"
         }
@@ -305,13 +290,12 @@
       "id": "nemotron_lightning_zen",
       "role": "free_endpoint",
       "family": "NVIDIA Nemotron Lightning, OpenCode Zen free trial",
-      "endpoint": "opencode_zen",
       "provider": {
         "provider": "openai_compat",
         "model": "nemotron-3.5-lightning-free",
         "credentialRef": "secret://evals/opencode/api-key",
         "options": {
-          "baseUrl": "https://opencode.ai/zen/v1",
+          "endpoint": "opencode_zen",
           "temperature": 0.4,
           "maxTokens": 200
         }

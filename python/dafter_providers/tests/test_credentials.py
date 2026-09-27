@@ -27,12 +27,7 @@ STAGES: dict[str, tuple[Stage, str, dict[str, Any], Build]] = {
     ),
     "sarvam llm": (Stage.LLM, "sarvam-105b", {}, sarvam.build_llm),
     "sarvam tts": (Stage.TTS, "bulbul:v3", {}, lambda r: sarvam.build_tts(r, "hi")),
-    "openai_compat llm": (
-        Stage.LLM,
-        "a-model",
-        {"baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/"},
-        openai_compat.build_llm,
-    ),
+    "openai_compat llm": (Stage.LLM, "a-model", {"endpoint": "google"}, openai_compat.build_llm),
 }
 
 

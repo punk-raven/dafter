@@ -8,7 +8,7 @@ from importlib import resources
 from typing import Any
 
 from dafter_core.config import ProviderRef
-from dafter_providers import VENDORS, credentials
+from dafter_providers import VENDORS, credentials, openai_compat
 
 PACKAGE = "dafter_evals.screen"
 CATALOG = "candidates.json"
@@ -25,6 +25,7 @@ ROLES = frozenset(
     }
 )
 CURRENCIES = frozenset({"INR", "USD"})
+ENDPOINT_FIELDS = frozenset({"modelList", "listedOn", "docs"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,8 +44,7 @@ class Price:
 @dataclass(frozen=True, slots=True)
 class Endpoint:
     name: str
-    base_url: str
-    credential_env: str
+    binding: openai_compat.Endpoint
     model_list: str | None
     listed_on: date | None
     docs: str
@@ -113,32 +113,33 @@ def _price(where: str, raw: object) -> Price | None:
 
 def _endpoint(name: str, raw: dict[str, Any]) -> Endpoint:
     where = f"endpoint {name}"
+    binding = openai_compat.ENDPOINTS.get(name)
+    if binding is None:
+        raise ValueError(f"{where}: not an endpoint the {openai_compat.NAME} provider binds")
+    if set(raw) != ENDPOINT_FIELDS:
+        raise ValueError(f"{where}: exactly {', '.join(sorted(ENDPOINT_FIELDS))}")
     listed = raw["listedOn"]
     model_list = raw["modelList"]
     return Endpoint(
         name=name,
-        base_url=_https(where, raw["baseUrl"]),
-        credential_env=raw["credentialEnv"],
+        binding=binding,
         model_list=None if model_list is None else _https(where, model_list),
         listed_on=None if listed is None else date.fromisoformat(listed),
         docs=_https(where, raw["docs"]),
     )
 
 
-def _served_by(
-    where: str, ref: ProviderRef, name: object, endpoints: dict[str, Endpoint]
-) -> Endpoint | None:
+def _served_by(where: str, ref: ProviderRef, endpoints: dict[str, Endpoint]) -> Endpoint | None:
+    name = ref.options.get("endpoint")
     if name is None:
-        if "baseUrl" in ref.options:
-            raise ValueError(f"{where}: an endpoint URL needs a named endpoint")
+        if ref.provider == openai_compat.NAME:
+            raise ValueError(f"{where}: {openai_compat.NAME} needs a named endpoint")
         return None
     endpoint = endpoints.get(str(name))
     if endpoint is None:
         raise ValueError(f"{where}: names endpoint {name}, which the catalog does not list")
-    if ref.options.get("baseUrl") != endpoint.base_url:
-        raise ValueError(f"{where}: baseUrl is not endpoint {name}'s")
-    if credentials.env_name(ref.credential_ref or "") != endpoint.credential_env:
-        raise ValueError(f"{where}: credential does not read {endpoint.credential_env}")
+    if credentials.env_name(ref.credential_ref or "") != endpoint.binding.credential_env:
+        raise ValueError(f"{where}: credential does not read {endpoint.binding.credential_env}")
     return endpoint
 
 
@@ -162,7 +163,7 @@ def _candidate(raw: dict[str, Any], endpoints: dict[str, Endpoint]) -> Candidate
         id=raw["id"],
         role=raw["role"],
         family=raw["family"],
-        endpoint=_served_by(where, ref, raw.get("endpoint"), endpoints),
+        endpoint=_served_by(where, ref, endpoints),
         ref=ref,
         price=_price(where, raw["price"]),
         free_tier=free_tier,

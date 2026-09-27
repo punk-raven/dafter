@@ -10,7 +10,8 @@ import pytest
 from dafter_core.config import ProviderRef
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError
-from dafter_providers import VENDORS, openai_compat, vendor_for
+from dafter_providers import VENDORS, credentials, openai_compat, vendor_for
+from dafter_providers.openai_compat import endpoints
 from dafter_providers.openai_compat.client import CompatLLM
 from livekit.agents import (
     APIConnectionError,
@@ -23,29 +24,31 @@ from livekit.agents import (
 
 KEY_REF = "secret://tenants/t_9c21a4be/gemini/api-key"
 GOOGLE = "https://generativelanguage.googleapis.com/v1beta/openai/"
-ENDPOINTS = [
-    GOOGLE,
-    "https://integrate.api.nvidia.com/v1",
-    "https://api.groq.com/openai/v1",
-    "https://openrouter.ai/api/v1",
-    "https://api.openai.com/v1",
-    "https://opencode.ai/zen/v1",
-]
 NO_RETRY = APIConnectOptions(max_retry=0)
 
 
 @pytest.fixture(autouse=True)
-def gemini_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GEMINI_API_KEY", "test-only-not-a-key")
+def provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    for endpoint in openai_compat.ENDPOINTS.values():
+        monkeypatch.setenv(endpoint.credential_env, "test-only-not-a-key")
 
 
-def ref(model: str | None = "a-model", region: str | None = None, **options: Any) -> ProviderRef:
+def key_ref(env: str) -> str:
+    return f"secret://tenants/t_9c21a4be/{env.removesuffix('_API_KEY').lower()}/api-key"
+
+
+def ref(
+    model: str | None = "a-model",
+    region: str | None = None,
+    credential_ref: str = KEY_REF,
+    **options: Any,
+) -> ProviderRef:
     return ProviderRef(
         provider="openai_compat",
         model=model,
         region=region,
-        credential_ref=KEY_REF,
-        options={"baseUrl": GOOGLE, **options},
+        credential_ref=credential_ref,
+        options={"endpoint": "google", **options},
     )
 
 
@@ -55,11 +58,43 @@ def built(r: ProviderRef) -> CompatLLM:
     return made
 
 
-@pytest.mark.parametrize("base_url", ENDPOINTS)
-def test_one_vendor_speaks_to_every_endpoint_the_config_names(base_url: str) -> None:
-    made = built(ref(baseUrl=base_url))
-    assert str(made._client.base_url).rstrip("/") == base_url.rstrip("/")
+@pytest.mark.parametrize("name", sorted(openai_compat.ENDPOINTS))
+def test_each_named_endpoint_is_reached_with_the_key_it_is_bound_to(name: str) -> None:
+    endpoint = openai_compat.ENDPOINTS[name]
+    made = built(ref(credential_ref=key_ref(endpoint.credential_env), endpoint=name))
+    assert str(made._client.base_url).rstrip("/") == endpoint.base_url.rstrip("/")
+    assert made._client.api_key == "test-only-not-a-key"
     assert (made.model, made.provider) == ("a-model", "openai_compat")
+
+
+def test_the_endpoint_table_binds_each_https_host_to_its_own_provider_key() -> None:
+    table = openai_compat.ENDPOINTS
+    assert set(table) == {"google", "openrouter", "opencode_zen", "openai"}
+    assert table["google"].base_url == GOOGLE
+    keys = [e.credential_env for e in table.values()]
+    assert len(set(keys)) == len(keys)
+    assert set(keys) <= credentials.PROVIDER_CREDENTIALS
+    assert all(e.base_url.startswith("https://") for e in table.values())
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"credentialEnv": "DAFTER_WORKER_SECRET"}, "DAFTER_WORKER_SECRET"),
+        ({"credentialEnv": "OPENAI_API_KEY"}, "more than one endpoint"),
+        ({"baseUrl": "http://generativelanguage.googleapis.com/"}, "https"),
+        ({"headers": {"x": "y"}}, "exactly"),
+    ],
+)
+def test_an_endpoint_table_that_binds_badly_is_refused(
+    change: dict[str, Any], message: str
+) -> None:
+    table = {
+        "google": {"baseUrl": GOOGLE, "credentialEnv": "GEMINI_API_KEY", **change},
+        "openai": {"baseUrl": "https://api.openai.com/v1", "credentialEnv": "OPENAI_API_KEY"},
+    }
+    with pytest.raises(ValueError, match=message):
+        endpoints.parse(json.dumps(table))
 
 
 def test_options_reach_the_request_settings() -> None:
@@ -88,7 +123,13 @@ def test_the_vendor_serves_llm_only_in_the_languages_it_declares() -> None:
     [
         (ref(model=None), ErrorCode.INVALID_CONFIG, "/agent/pipeline/llm/model"),
         (ref(region="ap-south-1"), ErrorCode.RESIDENCY_VIOLATION, "/agent/pipeline/llm/region"),
-        (ref(baseUrl="http://x"), ErrorCode.INVALID_CONFIG, "/agent/pipeline/llm/options/baseUrl"),
+        (ref(endpoint="nowhere"), ErrorCode.INVALID_CONFIG, "/agent/pipeline/llm/options/endpoint"),
+        (
+            ref(endpoint=["google"]),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/llm/options/endpoint",
+        ),
+        (ref(baseUrl=GOOGLE), ErrorCode.INVALID_CONFIG, "/agent/pipeline/llm/options/baseUrl"),
         (
             ref(reasoningEffort="off"),
             ErrorCode.INVALID_CONFIG,
@@ -108,15 +149,10 @@ def test_bad_settings_fail_at_construction_located_by_pointer(
 
 
 def test_a_missing_credential_names_its_variable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY")
     with pytest.raises(DafterError) as caught:
         openai_compat.build_llm(
-            ProviderRef(
-                provider="openai_compat",
-                model="m",
-                credential_ref="secret://tenants/t_9c21a4be/openrouter/api-key",
-                options={"baseUrl": ENDPOINTS[3]},
-            )
+            ref(credential_ref=key_ref("OPENROUTER_API_KEY"), endpoint="openrouter")
         )
     assert caught.value.code is ErrorCode.AUTHENTICATION_FAILED
     assert "OPENROUTER_API_KEY" in caught.value.message
@@ -235,3 +271,31 @@ def test_transport_failures_map_to_the_taxonomy(
 ) -> None:
     err = openai_compat.classify(exc, Stage.LLM)
     assert (err.code, err.retryable) == (code, retryable)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{"baseUrl": "https://attacker.example/v1"}, {"endpoint": "https://attacker.example/v1"}],
+)
+def test_a_session_cannot_send_a_trusted_key_to_a_host_it_names(options: dict[str, Any]) -> None:
+    with pytest.raises(DafterError) as caught:
+        openai_compat.build_llm(
+            ProviderRef(
+                provider="openai_compat", model="m", credential_ref=KEY_REF, options=options
+            )
+        )
+    assert caught.value.code is ErrorCode.INVALID_CONFIG
+
+
+def test_a_named_endpoint_reads_only_the_key_it_is_bound_to() -> None:
+    with pytest.raises(DafterError) as caught:
+        openai_compat.build_llm(
+            ProviderRef(
+                provider="openai_compat",
+                model="m",
+                credential_ref=KEY_REF,
+                options={"endpoint": "openrouter"},
+            )
+        )
+    assert caught.value.code is ErrorCode.INVALID_CONFIG
+    assert any("/agent/pipeline/llm/credentialRef" in d for d in caught.value.details)

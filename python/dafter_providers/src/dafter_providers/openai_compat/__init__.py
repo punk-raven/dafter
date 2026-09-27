@@ -11,6 +11,7 @@ from livekit.agents.types import NOT_GIVEN, NotGivenOr
 from .. import credentials
 from ..options import Options
 from .client import NAME, CompatLLM, Effort
+from .endpoints import ENDPOINTS, Endpoint
 
 LANGUAGES = frozenset({"hi", "hi-IN"})
 EFFORTS: dict[str, Effort] = {
@@ -31,9 +32,17 @@ QUOTA_CODES = frozenset(
 )
 TIMEOUT_STATUSES = frozenset({408, 504})
 CONFIG_STATUSES = frozenset({400, 404, 422})
-OPTIONS = ("baseUrl", "temperature", "maxTokens", "reasoningEffort", "extraBody")
+OPTIONS = ("endpoint", "temperature", "maxTokens", "reasoningEffort", "extraBody")
 
-__all__ = ["LANGUAGES", "NAME", "build_llm", "classify", "wants_prewarm"]
+__all__ = [
+    "ENDPOINTS",
+    "LANGUAGES",
+    "NAME",
+    "Endpoint",
+    "build_llm",
+    "classify",
+    "wants_prewarm",
+]
 
 
 def _refuse(code: ErrorCode, message: str, pointer: str, because: str) -> DafterError:
@@ -73,22 +82,22 @@ def _effort(opts: Options, raw: dict[str, Any]) -> NotGivenOr[Effort]:
 def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     model = _model(ref)
     opts = Options(Stage.LLM, NAME, ref.options, OPTIONS)
-    base_url = opts.get("baseUrl", str, "")
-    if not base_url.startswith("https://"):
+    endpoint = ENDPOINTS.get(opts.get("endpoint", str, ""))
+    if endpoint is None:
         raise opts.error(
-            "an OpenAI-compatible stage needs the endpoint it speaks to",
-            f"at '{opts.pointer('baseUrl')}': an https URL",
+            "an OpenAI-compatible stage names an endpoint this worker binds",
+            f"at '{opts.pointer('endpoint')}': one of {', '.join(ENDPOINTS)}",
         )
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
     effort = _effort(opts, ref.options)
     extra_body: dict[str, Any] = opts.get("extraBody", dict, {})
-    key = credentials.resolve(ref, Stage.LLM, credentials.PROVIDER_CREDENTIALS)
+    key = credentials.resolve(ref, Stage.LLM, {endpoint.credential_env})
     try:
         return CompatLLM(
             model=model,
             api_key=key,
-            base_url=base_url,
+            base_url=endpoint.base_url,
             temperature=temperature,
             max_completion_tokens=max_tokens,
             reasoning_effort=effort,
