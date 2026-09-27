@@ -1,0 +1,331 @@
+{
+  "asOf": "2026-09-27",
+  "endpoints": {
+    "google": {
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "credentialEnv": "GEMINI_API_KEY",
+      "modelList": "https://generativelanguage.googleapis.com/v1beta/models",
+      "listedOn": "2026-09-27",
+      "docs": "https://ai.google.dev/gemini-api/docs/openai"
+    },
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "credentialEnv": "OPENROUTER_API_KEY",
+      "modelList": "https://openrouter.ai/api/v1/models",
+      "listedOn": "2026-09-27",
+      "docs": "https://openrouter.ai/docs/quickstart"
+    },
+    "opencode_zen": {
+      "baseUrl": "https://opencode.ai/zen/v1",
+      "credentialEnv": "OPENCODE_API_KEY",
+      "modelList": "https://opencode.ai/zen/v1/models",
+      "listedOn": "2026-09-27",
+      "docs": "https://opencode.ai/docs/zen/"
+    },
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1",
+      "credentialEnv": "OPENAI_API_KEY",
+      "modelList": null,
+      "listedOn": null,
+      "docs": "https://developers.openai.com/api/reference/overview"
+    }
+  },
+  "judge": {
+    "id": "judge_gemini_flash",
+    "role": "judge",
+    "family": "Gemini Flash, newest stable, low thinking",
+    "endpoint": "google",
+    "provider": {
+      "provider": "openai_compat",
+      "model": "gemini-3.8-flash",
+      "credentialRef": "secret://evals/gemini/api-key",
+      "options": {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "temperature": 0.0,
+        "maxTokens": 400,
+        "reasoningEffort": "low"
+      }
+    },
+    "price": {
+      "currency": "USD",
+      "input": 0.75,
+      "output": 3.75,
+      "per": 1000000,
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    "freeTier": true,
+    "sources": [
+      "https://generativelanguage.googleapis.com/v1beta/models",
+      "https://ai.google.dev/gemini-api/docs/models",
+      "https://ai.google.dev/gemini-api/docs/openai",
+      "https://ai.google.dev/gemini-api/docs/pricing"
+    ],
+    "unverified": [],
+    "notes": "Scores every reply. The OpenAI compatibility page shows this model with reasoning_effort low; minimal is rejected by this model. It shares a family with two candidates, so self-preference bias is possible: the spot-check sample is the check on it. Paid price rises on 2027-01-01."
+  },
+  "candidates": [
+    {
+      "id": "sarvam_105b",
+      "role": "baseline",
+      "family": "Sarvam 105B, thinking off",
+      "provider": {
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "region": "ap-south-1",
+        "credentialRef": "secret://evals/sarvam/api-key",
+        "options": {
+          "thinking": false,
+          "temperature": 0.4,
+          "maxTokens": 200
+        }
+      },
+      "price": {
+        "currency": "INR",
+        "input": 29.28,
+        "output": 73.2,
+        "per": 1000000,
+        "source": "https://www.sarvam.ai/api-pricing"
+      },
+      "freeTier": null,
+      "sources": [
+        "https://www.sarvam.ai/api-pricing"
+      ],
+      "unverified": [],
+      "notes": "The model the agent runs today, as in testdata/agent/hindi-webrtc-job.json; price as in the runtime price table."
+    },
+    {
+      "id": "gemini_flash_lite",
+      "role": "default",
+      "family": "Gemini Flash-Lite, minimal thinking",
+      "endpoint": "google",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "gemini-3.5-flash-lite",
+        "credentialRef": "secret://evals/gemini/api-key",
+        "options": {
+          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "temperature": 0.4,
+          "maxTokens": 200
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "input": 0.3,
+        "output": 2.5,
+        "per": 1000000,
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      "freeTier": true,
+      "sources": [
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite",
+        "https://ai.google.dev/gemini-api/docs/thinking",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ],
+      "unverified": [
+        "the compatibility page does not say whether max_completion_tokens is honoured"
+      ],
+      "notes": "Stable. The thinking page gives minimal as this model's default level, so no thinking option is sent."
+    },
+    {
+      "id": "gemini_flash",
+      "role": "ceiling",
+      "family": "Gemini Flash, minimal thinking",
+      "endpoint": "google",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "gemini-3.6-flash",
+        "credentialRef": "secret://evals/gemini/api-key",
+        "options": {
+          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "temperature": 0.4,
+          "maxTokens": 200,
+          "reasoningEffort": "minimal"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "input": 0.75,
+        "output": 3.75,
+        "per": 1000000,
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      "freeTier": true,
+      "sources": [
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        "https://ai.google.dev/gemini-api/docs/models",
+        "https://ai.google.dev/gemini-api/docs/thinking",
+        "https://ai.google.dev/gemini-api/docs/openai",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ],
+      "unverified": [
+        "the reasoning_effort to thinking_level table covers the Gemini 3 Flash column (minimal to minimal), not this model by name",
+        "the compatibility page does not say whether max_completion_tokens is honoured"
+      ],
+      "notes": "Stable. The newest Flash that accepts minimal thinking: the thinking page lists low, medium, high only for gemini-3.8-flash and gemini-3.7-flash, and minimal as supported here. Paid price rises on 2027-01-01."
+    },
+    {
+      "id": "gemini_flash_latest",
+      "role": "latest",
+      "family": "Gemini Flash, newest stable, low thinking",
+      "endpoint": "google",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "gemini-3.8-flash",
+        "credentialRef": "secret://evals/gemini/api-key",
+        "options": {
+          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "temperature": 0.4,
+          "maxTokens": 200,
+          "reasoningEffort": "low"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "input": 0.75,
+        "output": 3.75,
+        "per": 1000000,
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      },
+      "freeTier": true,
+      "sources": [
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+        "https://ai.google.dev/gemini-api/docs/thinking",
+        "https://ai.google.dev/gemini-api/docs/openai",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ],
+      "unverified": [
+        "the compatibility page does not say whether max_completion_tokens is honoured"
+      ],
+      "notes": "Stable. Its lowest thinking level is low: the model page says minimal is not supported and returns an error, and the compatibility page shows it with reasoning_effort low. Paid price rises on 2027-01-01. Also the judge's model, so its quality score is the most exposed to self-preference bias."
+    },
+    {
+      "id": "gemma_4_moe",
+      "role": "open_weights",
+      "family": "Gemma 4 26B mixture of experts, thinking off",
+      "endpoint": "google",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "gemma-4-26b-a4b-it",
+        "credentialRef": "secret://evals/gemini/api-key",
+        "options": {
+          "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+          "temperature": 0.4,
+          "maxTokens": 200,
+          "extraBody": {
+            "extra_body": {
+              "google": {
+                "thinking_config": {
+                  "thinking_level": "minimal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "price": null,
+      "freeTier": true,
+      "sources": [
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        "https://ai.google.dev/gemma/docs/core/gemma_on_gemini_api",
+        "https://ai.google.dev/gemini-api/docs/openai",
+        "https://ai.google.dev/gemini-api/docs/pricing"
+      ],
+      "unverified": [
+        "the Gemma page shows only the native generateContent API; serving through the OpenAI-compatible endpoint is not stated",
+        "thinking is switched off by thinking_level minimal on the native API; passing it through extra_body.google is documented for Gemini, not Gemma"
+      ],
+      "notes": "The Gemini API model list names gemma-4-31b-it and gemma-4-26b-a4b-it; the mixture of experts one is chosen for latency. The pricing page lists Gemma 4 as free of charge with no paid tier, so no price."
+    },
+    {
+      "id": "gemma_4_dense_openrouter",
+      "role": "open_weights",
+      "family": "Gemma 4 31B dense on OpenRouter's free variant, reasoning off",
+      "endpoint": "openrouter",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "google/gemma-4-31b-it:free",
+        "credentialRef": "secret://evals/openrouter/api-key",
+        "options": {
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "temperature": 0.4,
+          "maxTokens": 200,
+          "extraBody": {
+            "reasoning": {
+              "effort": "none"
+            }
+          }
+        }
+      },
+      "price": null,
+      "freeTier": true,
+      "sources": [
+        "https://openrouter.ai/api/v1/models",
+        "https://openrouter.ai/docs/quickstart",
+        "https://openrouter.ai/docs/guides/best-practices/reasoning-tokens",
+        "https://openrouter.ai/docs/api/reference/limits"
+      ],
+      "unverified": [
+        "the reasoning guide documents effort none as switching reasoning off, but models marked mandatory reject it, and whether this model is one is not stated"
+      ],
+      "notes": "Listed on OpenRouter's model list with its paid twin google/gemma-4-31b-it. Free variants are limited to 20 requests a minute and 50 a day on an account with under 10 purchased credits (1000 a day above that), so a full five-run Hindi screen of 100 calls hits the daily cap; the screen records those refusals as rate limits."
+    },
+    {
+      "id": "openai_mini",
+      "role": "runner_up",
+      "family": "OpenAI GPT mini, no reasoning",
+      "endpoint": "openai",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "gpt-5.4-mini-2026-03-17",
+        "credentialRef": "secret://evals/openai/api-key",
+        "options": {
+          "baseUrl": "https://api.openai.com/v1",
+          "maxTokens": 200,
+          "reasoningEffort": "none"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "input": 0.75,
+        "output": 4.5,
+        "per": 1000000,
+        "source": "https://developers.openai.com/api/docs/models/gpt-5.4-mini"
+      },
+      "freeTier": null,
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-5.4-mini",
+        "https://developers.openai.com/api/reference/overview"
+      ],
+      "unverified": [],
+      "notes": "Pinned to the default snapshot. The model page gives reasoning effort none as the default. LiveKit drops temperature for this family, so none is sent."
+    },
+    {
+      "id": "nemotron_lightning_zen",
+      "role": "free_endpoint",
+      "family": "NVIDIA Nemotron Lightning, OpenCode Zen free trial",
+      "endpoint": "opencode_zen",
+      "provider": {
+        "provider": "openai_compat",
+        "model": "nemotron-3.5-lightning-free",
+        "credentialRef": "secret://evals/opencode/api-key",
+        "options": {
+          "baseUrl": "https://opencode.ai/zen/v1",
+          "temperature": 0.4,
+          "maxTokens": 200
+        }
+      },
+      "price": null,
+      "freeTier": true,
+      "sources": [
+        "https://opencode.ai/zen/v1/models",
+        "https://opencode.ai/docs/zen/"
+      ],
+      "unverified": [
+        "how, or whether, reasoning is switched off for this model: the Zen page names no request option for it"
+      ],
+      "notes": "The Zen page lists it on the chat completions endpoint as free for a limited time, served from NVIDIA free endpoints for trial use only: requests are logged by NVIDIA, so only the non-personal question bank goes to it."
+    }
+  ]
+}
