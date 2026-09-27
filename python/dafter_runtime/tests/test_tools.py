@@ -11,10 +11,12 @@ from dafter_runtime.consent import Confirmations, answer
 from dafter_runtime.everyday import current_time, go_quiet, who_is_here
 from dafter_runtime.tools import (
     ASK,
+    NO_FILLING,
     NOBODY,
     ROLE,
     STARTED,
     Effect,
+    Filling,
     Registry,
     Speed,
     Tool,
@@ -42,7 +44,13 @@ def tool(
 
 
 class Harness:
-    def __init__(self, *tools: Tool, caller: str | None = ASHA, role: Role | None = None) -> None:
+    def __init__(
+        self,
+        *tools: Tool,
+        caller: str | None = ASHA,
+        role: Role | None = None,
+        filling: Filling | None = None,
+    ) -> None:
         self.caller = caller
         self.delivered: list[tuple[str, str]] = []
         self.registry = Registry(
@@ -51,6 +59,8 @@ class Harness:
             role_of=lambda identity: role,
             confirmations=Confirmations(frozenset({"nivya"})),
             deliver=lambda name, result: self.delivered.append((name, result)),
+            filling=filling or NO_FILLING,
+            shared_filler=filling is not None,
         )
 
     def call(self, name: str, **arguments: Any) -> str:
@@ -213,9 +223,24 @@ def test_a_slow_tool_plays_its_filler_while_it_runs() -> None:
         effect=Effect.READ,
         run=run,
         filler="एक पल रुकिए।",
-        filler_after_s=0,
     )
-    h = Harness(slow)
+    assert ("assistant", "एक पल रुकिए।") in said_while_running(Harness(slow))
+
+
+def test_a_slow_tool_without_its_own_filler_plays_the_sessions_next_phrase() -> None:
+    async def run(arguments: dict[str, Any]) -> str:
+        await asyncio.sleep(0.2)
+        return "found it"
+
+    slow = Tool(name="lookup", description="d", speed=Speed.SLOW, effect=Effect.READ, run=run)
+    phrases = iter(["जी, एक पल।", "अच्छा, ज़रा देखता हूँ।"])
+    filling = Filling(lambda: next(phrases), 0.0)
+    assert ("assistant", "जी, एक पल।") in said_while_running(Harness(slow, filling=filling))
+    with pytest.raises(ToolRefused, match="no filler"):
+        Harness(slow)
+
+
+def said_while_running(h: Harness) -> list[tuple[str, str | None]]:
     stub = StubLLM(calls=["lookup"])
 
     async def session_run() -> list[llm.ChatMessage]:
@@ -226,6 +251,6 @@ def test_a_slow_tool_plays_its_filler_while_it_runs() -> None:
 
     messages = asyncio.run(session_run())
     assert stub.offered[0] == ["lookup"]
-    assert ("assistant", "एक पल रुकिए।") in [(m.role, m.text_content) for m in messages]
     outputs = [i for i in stub.requests[-1].items if isinstance(i, llm.FunctionCallOutput)]
     assert [(o.name, o.output) for o in outputs] == [("lookup", "found it")]
+    return [(m.role, m.text_content) for m in messages]

@@ -18,7 +18,7 @@ from .everyday import current_time, go_quiet, who_is_here
 from .listeners import is_human
 from .naming import words
 from .plan import Plan
-from .tools import Registry, Tool
+from .tools import NO_FILLING, Filling, Registry, Tool
 
 log = logging.getLogger("dafter.runtime.toolbox")
 
@@ -56,7 +56,10 @@ class Answering(Agent):
     ) -> AsyncIterable[rtc.AudioFrame]:
         if self._delivery is not None and isinstance(voice := self.session.tts, Styled):
             voice.style(str(self._delivery.situation))
-        return Agent.default.tts_node(self, text, model_settings)
+        reply = Agent.default.tts_node(self, text, model_settings)
+        if self._delivery is None or not self._delivery.filler.enabled:
+            return reply
+        return self._delivery.filler.ahead(reply, lambda: self.session.current_speech)
 
     async def on_user_turn_completed(
         self, turn_ctx: lk_llm.ChatContext, new_message: lk_llm.ChatMessage
@@ -123,13 +126,17 @@ def registry_for(
     roster: Roster,
     caller: Callable[[], str | None],
     sleep: Callable[[], None] | None,
+    delivery: Delivery | None = None,
 ) -> Registry:
+    filler = delivery.filler if delivery is not None else None
     return Registry(
         everyday(roster, sleep),
         caller=caller,
         role_of=unattested,
         confirmations=Confirmations(name_words(p)),
         deliver=delivered(session),
+        filling=Filling(filler.phrase, filler.after) if filler is not None else NO_FILLING,
+        shared_filler=filler is not None and filler.enabled,
     )
 
 

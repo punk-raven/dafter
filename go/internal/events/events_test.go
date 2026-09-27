@@ -157,6 +157,7 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 		{"unknown layer", "agent-turn-metrics.json", func(p map[string]any) { p["vadDelayMs"] = 10 }},
 		{"missing turn", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "turn") }},
 		{"serial not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["serial"] = "yes" }},
+		{"filler not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["filler"] = "yes" }},
 		{"serial without its layers", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "llmNodeTtfsMs") }},
 		{"unpriced item with a cost", "session-usage.json", func(p map[string]any) { item(p, 1)["costInr"] = 0 }},
 		{"priced item without a cost", "session-usage.json", func(p map[string]any) { delete(item(p, 0), "costInr") }},

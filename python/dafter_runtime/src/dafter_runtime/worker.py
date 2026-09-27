@@ -132,6 +132,7 @@ def watch(
     tracer: trace.Tracer,
     metrics: WorkerMetrics = WORKER,
     usage: Callable[[], AgentSessionUsage] | None = None,
+    filled: Callable[[], bool] = lambda: False,
 ) -> None:
     turns = Turns()
     prices = load_prices()
@@ -154,7 +155,7 @@ def watch(
     def item_added(ev: ConversationItemAddedEvent) -> None:
         if not isinstance(ev.item, ChatMessage):
             return
-        timing = turns.add(ev.item)
+        timing = turns.add(ev.item, filled())
         if timing is None:
             return
         log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
@@ -256,24 +257,25 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(flush)
     called = Called(ctx, p, stages, session, stt_sample_rate(p)) if p.called_by_name else None
-    delivery = Delivery(p.config.agent.speech)
+    delivery = Delivery(p.config.agent.speech, p.config.language)
     caller: Callable[[], str | None]
     if called is not None:
         caller = called.addressee
-        registry = registry_for(p, session, called.roster, caller, called.gate.sleep)
+        registry = registry_for(p, session, called.roster, caller, called.gate.sleep, delivery)
         called.voice.before_answer = registry.heard
         called.voice.announce = events.addressed
     else:
         roster = Roster()
         follow(ctx.room, roster)
         caller = linked(session)
-        registry = registry_for(p, session, roster, caller, None)
+        registry = registry_for(p, session, roster, caller, None, delivery)
     watch(
         session,
         p,
         events,
         telemetry.tracer(provider),
         usage=called.usage if called is not None else None,
+        filled=lambda: delivery.filler.took(session.current_speech),
     )
     await session.start(
         agent=Answering(
@@ -287,6 +289,7 @@ async def entrypoint(ctx: JobContext) -> None:
         room_options=room_options(p, stages.tts.sample_rate),
         record=False,
     )
+    delivery.filler.start(session, stages.tts)
     if called is not None:
         called.listen()
         return

@@ -47,6 +47,7 @@ class TurnTiming:
     turn: int
     interrupted: bool
     seconds: dict[str, float] = field(default_factory=dict)
+    filler: bool = False
 
     def milliseconds(self) -> dict[str, int]:
         return {key: round(value * 1000) for key, value in self.seconds.items()}
@@ -62,6 +63,8 @@ class TurnTiming:
         body.update({PAYLOAD_FIELDS[k]: ms for k, ms in self.milliseconds().items()})
         if (serial := self.serial()) is not None:
             body["serial"] = serial
+        if self.filler:
+            body["filler"] = True
         return body
 
     def span_attributes(self) -> dict[str, int | bool]:
@@ -72,6 +75,8 @@ class TurnTiming:
         attrs.update({f"dafter.turn.{k}_ms": ms for k, ms in self.milliseconds().items()})
         if (serial := self.serial()) is not None:
             attrs["dafter.turn.serial"] = serial
+        if self.filler:
+            attrs["dafter.turn.filler"] = True
         return attrs
 
     def log_fields(self) -> dict[str, Any]:
@@ -79,6 +84,8 @@ class TurnTiming:
         fields.update({k: round(v, 4) for k, v in self.seconds.items()})
         if (serial := self.serial()) is not None:
             fields["serial"] = serial
+        if self.filler:
+            fields["filler"] = True
         return fields
 
     def record(self, tracer: trace.Tracer) -> None:
@@ -90,7 +97,7 @@ class Turns:
         self._count = 0
         self._user: dict[str, float] = {}
 
-    def add(self, item: ChatMessage) -> TurnTiming | None:
+    def add(self, item: ChatMessage, filler: bool = False) -> TurnTiming | None:
         if item.role == "user":
             self._user = _layers(item.metrics, USER_LAYERS)
             return None
@@ -98,6 +105,8 @@ class Turns:
             return None
         seconds = {**self._user, **_layers(item.metrics, AGENT_LAYERS)}
         self._user = {}
-        timing = TurnTiming(turn=self._count, interrupted=item.interrupted, seconds=seconds)
+        timing = TurnTiming(
+            turn=self._count, interrupted=item.interrupted, seconds=seconds, filler=filler
+        )
         self._count += 1
         return timing

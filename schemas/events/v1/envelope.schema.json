@@ -289,6 +289,10 @@
           "$ref": "#/$defs/LayerMs",
           "description": "From the end of the user's speech to the agent starting to speak."
         },
+        "filler": {
+          "type": "boolean",
+          "description": "True when the reply was slow enough that a filler phrase played ahead of it (agent.speech.fillers): ttsNodeTtfbMs and e2eLatencyMs then count from the filler, the first audio the caller heard, while the LLM layers still show what was slow. Present only when a filler played."
+        },
         "serial": {
           "type": "boolean",
           "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs), so the reply waited on more than its first sentence and its latency tracked the length of the reply. Present only when both LLM layers were measured."
