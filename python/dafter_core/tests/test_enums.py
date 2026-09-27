@@ -19,6 +19,8 @@ from dafter_core import (
     PrivacyMode,
     RecordingStart,
     Role,
+    Situation,
+    SpeechNormalization,
     Stage,
     TurnStrategy,
     UsageUnit,
@@ -57,6 +59,8 @@ CASES = [
     (KeyModel, CFG, ("$defs", "EncryptionProfile", "properties", "keyModel", "enum")),
     (EgressLayout, CFG, ("$defs", "Recording", "properties", "layout", "enum")),
     (RecordingStart, CFG, ("$defs", "Recording", "properties", "startAt", "enum")),
+    (SpeechNormalization, CFG, ("$defs", "Speech", "properties", "normalization", "enum")),
+    (Situation, CFG, ("$defs", "Situation", "enum")),
 ]
 
 
