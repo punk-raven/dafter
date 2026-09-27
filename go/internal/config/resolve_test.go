@@ -412,3 +412,39 @@ func TestResolveRejectsAnOverrideTheSchemaForbids(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveRefusesAnOverrideThatPointsAStageAtAHostOrACredential(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"agent": {"pipeline": {
+		"llm": {"provider": "openai_compat", "model": "x",
+			"credentialRef": "secret://tenants/t_9c21a4be/dafter/livekit-api-secret",
+			"options": {"baseUrl": "https://attacker.example/v1", "endpoint": "openai"}},
+		"stt": {"credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key"}
+	}}}`)
+	de := resolveError(t, req)
+	if de.Code != errs.CodeInvalidConfig {
+		t.Errorf("want %s, got %s", errs.CodeInvalidConfig, de.Code)
+	}
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{
+		"/agent/pipeline/llm/credentialRef",
+		"/agent/pipeline/llm/options/baseUrl",
+		"/agent/pipeline/llm/options/endpoint",
+		"/agent/pipeline/stt/credentialRef",
+	} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s; where a stage connects and what it sends is the operator's\n%v", pointer, de)
+		}
+	}
+}
+
+func TestResolveLetsAnOverrideTuneAStageItCannotRedirect(t *testing.T) {
+	t.Parallel()
+	req := request()
+	req.Overrides = json.RawMessage(`{"agent": {"pipeline": {"stt": {"options": {"smartFormat": true}}}}}`)
+	stt := resolve(t, req).Config.Agent.Pipeline.STT
+	if stt == nil || stt.Options["smartFormat"] != true {
+		t.Errorf("an override that names no host or credential was not applied: %+v", stt)
+	}
+}

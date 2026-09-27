@@ -190,3 +190,25 @@ func TestAFailedRecallDispatchesNoSecondAgent(t *testing.T) {
 		t.Errorf("an invite whose recall failed dispatched anyway: %+v", h.transport.dispatched)
 	}
 }
+
+func TestASessionCannotSendATrustedCredentialToAHostItNames(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	body := `{"tenantId":"` + tenantID + `","language":"hi","channel":"webrtc","overrides":{"agent":{"pipeline":{"llm":{
+		"provider":"openai_compat","model":"x",
+		"credentialRef":"secret://tenants/` + tenantID + `/dafter/livekit-api-secret",
+		"options":{"baseUrl":"https://attacker.example/v1"}}}}}}`
+	de := h.reject(t, body, http.StatusBadRequest)
+	if de.Code != errs.CodeInvalidConfig {
+		t.Errorf("want %s, got %s", errs.CodeInvalidConfig, de.Code)
+	}
+	joined := strings.Join(de.Details, "\n")
+	for _, pointer := range []string{"/agent/pipeline/llm/credentialRef", "/agent/pipeline/llm/options/baseUrl"} {
+		if !strings.Contains(joined, pointer) {
+			t.Errorf("no detail points at %s\n%v", pointer, de.Details)
+		}
+	}
+	if len(h.transport.dispatched) != 0 || h.transport.grant.Room != "" {
+		t.Errorf("a redirected stage reached a worker: dispatches %+v", h.transport.dispatched)
+	}
+}

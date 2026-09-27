@@ -3,6 +3,9 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
@@ -31,6 +34,8 @@ type Resolution struct {
 }
 
 var reservedOverrides = []string{"sessionId", "tenantId", "configHash"}
+
+var operatorOnlyStageFields = [][]string{{"credentialRef"}, {"options", "endpoint"}, {"options", "baseUrl"}}
 
 func (c *Catalog) Resolve(req Request) (*Resolution, error) {
 	doc, err := c.compose(req)
@@ -139,7 +144,7 @@ func stampEncryption(doc map[string]any) {
 }
 
 func reservedProblems(overrides json.RawMessage) []string {
-	var m map[string]json.RawMessage
+	var m map[string]any
 	if json.Unmarshal(overrides, &m) != nil {
 		return nil
 	}
@@ -149,7 +154,31 @@ func reservedProblems(overrides json.RawMessage) []string {
 			problems = append(problems, located("/"+k, "is minted by the control plane and cannot be supplied as a session override"))
 		}
 	}
+	return append(problems, operatorOnlyProblems(m)...)
+}
+
+func operatorOnlyProblems(overrides map[string]any) []string {
+	agent, _ := overrides["agent"].(map[string]any)
+	pipeline, _ := agent["pipeline"].(map[string]any)
+	var problems []string
+	for _, stage := range slices.Sorted(maps.Keys(pipeline)) {
+		ref, _ := pipeline[stage].(map[string]any)
+		for _, path := range operatorOnlyStageFields {
+			if present(ref, path) {
+				problems = append(problems, located("/agent/pipeline/"+stage+"/"+strings.Join(path, "/"),
+					"names the endpoint or credential a stage uses, which only the operator's configuration sets, never a session override"))
+			}
+		}
+	}
 	return problems
+}
+
+func present(doc map[string]any, path []string) bool {
+	for _, k := range path[:len(path)-1] {
+		doc, _ = doc[k].(map[string]any)
+	}
+	_, ok := doc[path[len(path)-1]]
+	return ok
 }
 
 func merge(base, over map[string]any) map[string]any {
