@@ -83,7 +83,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     max_tokens = opts.get("maxTokens", int, 200)
     effort = _effort(opts, ref.options)
     extra_body: dict[str, Any] = opts.get("extraBody", dict, {})
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.LLM, credentials.PROVIDER_CREDENTIALS)
     try:
         return CompatLLM(
             model=model,

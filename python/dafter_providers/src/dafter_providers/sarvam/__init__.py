@@ -19,6 +19,7 @@ LLM_MODELS = frozenset({"sarvam-105b", "sarvam-105b-conversations"})
 TTS_MODELS = frozenset({"bulbul:v3"})
 REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
+CREDENTIAL = "SARVAM_API_KEY"
 
 LANGUAGES = {
     "hi": "hi-IN",
@@ -94,7 +95,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn) -> stt.STT[Any]:
     stream_type = opts.choice("chunkMs", CHUNK_PROFILES, 500)
     encoding = opts.choice("encoding", STT_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", STT_SAMPLE_RATES, 16000)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.STT, {CREDENTIAL})
     return _construct(
         Stage.STT,
         lambda: FinalFirstSTT(
@@ -116,7 +117,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     thinking = opts.get("thinking", bool, False)
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.LLM, {CREDENTIAL})
     model = ref.model or ""
     if thinking:
         return _construct(
@@ -153,7 +154,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     voice = opts.get("voice", str, "shubh")
     pace = opts.get("pace", float, 1.0)
     opts.get("prewarm", bool, True)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.TTS, {CREDENTIAL})
     model = ref.model or ""
     return _construct(
         Stage.TTS,

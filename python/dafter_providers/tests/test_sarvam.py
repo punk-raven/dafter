@@ -32,7 +32,7 @@ def test_a_secret_ref_names_its_environment_variable() -> None:
 
 def test_a_missing_credential_fails_at_construction_without_leaking() -> None:
     with pytest.raises(DafterError) as caught:
-        credentials.resolve(KEY_REF, env={})
+        credentials.resolve(ref("sarvam-105b"), Stage.LLM, {sarvam.CREDENTIAL}, env={})
     assert caught.value.code is ErrorCode.AUTHENTICATION_FAILED
     assert "SARVAM_API_KEY" in caught.value.message
 

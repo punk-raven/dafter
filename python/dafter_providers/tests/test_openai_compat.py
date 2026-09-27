@@ -107,18 +107,19 @@ def test_bad_settings_fail_at_construction_located_by_pointer(
     assert any(pointer in d for d in caught.value.details), caught.value.details
 
 
-def test_a_missing_credential_names_its_variable() -> None:
+def test_a_missing_credential_names_its_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     with pytest.raises(DafterError) as caught:
         openai_compat.build_llm(
             ProviderRef(
                 provider="openai_compat",
                 model="m",
-                credential_ref="secret://tenants/t_9c21a4be/groq/api-key",
-                options={"baseUrl": ENDPOINTS[2]},
+                credential_ref="secret://tenants/t_9c21a4be/openrouter/api-key",
+                options={"baseUrl": ENDPOINTS[3]},
             )
         )
     assert caught.value.code is ErrorCode.AUTHENTICATION_FAILED
-    assert "GROQ_API_KEY" in caught.value.message
+    assert "OPENROUTER_API_KEY" in caught.value.message
 
 
 def sse(*contents: str) -> bytes:
