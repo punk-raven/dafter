@@ -76,6 +76,10 @@ py-test: generate ## Run the Python tests
 py-lint: generate ## Lint and type-check the Python packages
 	cd $(PY_DIR) && uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen mypy
 
+.PHONY: js-test
+js-test: ## Test the test client's scripts with Node's built-in runner
+	node --test $(GO_DIR)/cmd/dafter-control/jstest/*.test.mjs
+
 .PHONY: check-tools
 check-tools: $(LINT) $(VULN) ## Build the pinned linter and vulnerability scanner
 
@@ -87,7 +91,7 @@ setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Pyth
 	@./scripts/setup.sh
 
 .PHONY: check
-check: generate-check vet lint test py-lint py-test ## What CI runs
+check: generate-check vet lint test js-test py-lint py-test ## What CI runs
 
 .PHONY: dev
 dev: setup ## Build and start the full dev stack

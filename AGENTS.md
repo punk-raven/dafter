@@ -19,8 +19,9 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 ## Commands
 
 - `./scripts/setup.sh` once per clone (a fresh checkout does not compile until it runs)
-- `make check` (the Go and Python checks CI runs)
+- `make check` (the Go, test client and Python checks CI runs)
 - Go: `make build vet lint test tidy`
+- Test client: `make js-test` (Node 20+, `node --test` over `go/cmd/dafter-control/jstest/`, which loads the browser scripts into a `vm` context with stub rooms; no packages)
 - Python: `make py-lint py-test` (ruff, mypy strict, pytest via `uv run --frozen` from `python/`)
 
 ## Rules enforced in code, kept identical on both halves

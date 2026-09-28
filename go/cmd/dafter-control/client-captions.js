@@ -70,7 +70,10 @@ function captionPanel() {
 }
 
 function captionSpeaker(speaker) {
-  if (speaker.kind === 'agent') return { who: 'agent', label: 'Agent', identity: null };
+  if (speaker.kind === 'agent') {
+    const agent = agentParticipant(captionView.room);
+    return { who: 'agent', label: (agent && agent.name) || 'Agent', identity: null };
+  }
   const local = captionView.room && captionView.room.localParticipant.identity === speaker.participantId;
   return { who: local ? 'you' : 'peer', label: local ? 'You' : speaker.participantId, identity: speaker.participantId };
 }
