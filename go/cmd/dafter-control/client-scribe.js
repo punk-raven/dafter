@@ -129,6 +129,11 @@ function renderNotesBody(body, n, taken) {
   scribeSection(body, 'Notes taken', taken);
 }
 
+function noteTakenText() {
+  const agent = agentParticipant(agentView.room);
+  return `${(agent && agent.name) || 'the agent'} took a note`;
+}
+
 function onScribeEvent(event) {
   const p = event.payload;
   if (event.type === 'scribe.notes') {
@@ -139,7 +144,7 @@ function onScribeEvent(event) {
     log(`scribe notes, revision ${p.revision}`);
   } else if (event.type === 'agent.note_taken') {
     scribeView.taken.set(p.noteId, p.text);
-    log('the agent took a note');
+    log(noteTakenText());
   } else if (event.type === 'agent.turn_scored') {
     if (typeof p.score === 'number') scribeView.scores.push(p.score);
     else scribeView.failed += 1;
