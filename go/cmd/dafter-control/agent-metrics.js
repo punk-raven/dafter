@@ -1,5 +1,6 @@
-const AGENT_LAYER_COLUMNS = ['endOfTurnDelayMs', 'transcriptionDelayMs', 'llmNodeTtftMs', 'ttsNodeTtfbMs', 'e2eLatencyMs'];
+const AGENT_LAYER_COLUMNS = ['endpointMs', 'endOfTurnDelayMs', 'transcriptionDelayMs', 'llmNodeTtftMs', 'ttsNodeTtfbMs', 'e2eLatencyMs'];
 const AGENT_LAYER_LABELS = {
+  endpointMs: 'endpoint',
   endOfTurnDelayMs: 'end of turn',
   transcriptionDelayMs: 'transcription',
   llmNodeTtftMs: 'LLM first token',
@@ -7,6 +8,7 @@ const AGENT_LAYER_LABELS = {
   ttsNodeTtfbMs: 'TTS first byte',
   playbackLatencyMs: 'playback',
   e2eLatencyMs: 'end to end',
+  replyGapMs: 'reply gap',
 };
 const SERIAL_WAIT_MS = 500;
 const TURN_COLUMNS = AGENT_LAYER_COLUMNS.length + 2;
@@ -51,7 +53,7 @@ function onTurnMetrics(payload) {
     .filter(([key]) => payload[key] != null)
     .map(([key, label]) => `${label} ${payload[key]} ms`);
   const serial = payload.serial === true
-    ? `; went serial, the first sentence reached TTS ${payload.llmNodeTtfsMs - payload.llmNodeTtftMs} ms after the LLM's first token (over ${SERIAL_WAIT_MS} ms)`
+    ? `; went serial, the first sentence reached TTS ${payload.llmNodeTtfsMs - payload.llmNodeTtftMs} ms after the LLM's first token (over ${SERIAL_WAIT_MS} ms) and was under 80% of the reply`
     : '';
   row.dataset.agentDetail = `agent turn ${payload.turn}${payload.interrupted ? ' (interrupted)' : ''}: ${layers.join(', ') || 'no layer measured'}${serial}`;
   row.title = turnTitle(row);

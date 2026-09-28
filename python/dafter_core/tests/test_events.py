@@ -141,6 +141,8 @@ def _item(payload: dict[str, Any], i: int) -> dict[str, Any]:
 MUTATIONS: list[tuple[str, str, Callable[[dict[str, Any]], object]]] = [
     ("negative layer", "agent-turn-metrics.json", lambda p: p.update(e2eLatencyMs=-1)),
     ("fractional layer", "agent-turn-metrics.json", lambda p: p.update(llmNodeTtftMs=1.5)),
+    ("negative endpoint", "agent-turn-metrics.json", lambda p: p.update(endpointMs=-1)),
+    ("fractional reply gap", "agent-turn-metrics.json", lambda p: p.update(replyGapMs=2.5)),
     ("unknown layer", "agent-turn-metrics.json", lambda p: p.update(vadDelayMs=10)),
     ("missing turn", "agent-turn-metrics.json", lambda p: p.pop("turn")),
     ("serial not a boolean", "agent-turn-metrics.json", lambda p: p.update(serial="yes")),

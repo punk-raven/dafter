@@ -45,12 +45,13 @@ function agentPanel() {
         <div class="agent-turns-body">
           <table class="agent-turns">
             <thead><tr>
-              <th title="the agent's turn, the greeting is 0; (n) until the worker reports it; orange marks a turn that went serial, its first sentence reaching TTS over 500 ms after the LLM's first token">#</th>
-              <th class="num" title="worker: end of your speech to deciding your turn ended">eot</th>
-              <th class="num" title="worker: end of your speech to the final transcript">stt</th>
+              <th title="the agent's turn, the greeting is 0; (n) until the worker reports it; orange marks a turn that went serial, its first sentence (under 80% of the reply) reaching TTS over 500 ms after the LLM's first token">#</th>
+              <th class="num" title="worker: the last voiced audio of yours it received to the speech-to-text provider releasing end of speech (its silence window and the wait for the final transcript)">ep</th>
+              <th class="num" title="worker: the provider's end of speech to deciding your turn ended">eot</th>
+              <th class="num" title="worker: the provider's end of speech to the final transcript">stt</th>
               <th class="num" title="worker: LLM time to first token">llm</th>
               <th class="num" title="worker: TTS time to first audio">tts</th>
-              <th class="num" title="worker: end of your speech to the agent starting to speak">e2e</th>
+              <th class="num" title="worker: the provider's end of speech to the agent starting to speak, so ep comes before it; the row's tooltip has the reply gap from your last voiced audio">e2e</th>
               <th class="num" title="this browser: end of your speech to the agent's first audio heard here">heard</th>
             </tr></thead>
             <tbody id="agent-turn-rows"><tr class="agent-empty-row"><td colspan="${TURN_COLUMNS}">no turn yet</td></tr></tbody>
