@@ -7,19 +7,19 @@ const ORIGIN = 'http://127.0.0.1:8080';
 const ROOM = 's_1a2b3c4d';
 
 const FORM = {
-  tenant: 't_9c21a4be', language: 'hi', channel: 'webrtc', profile: 'support',
+  tenant: 't_9c21a4be', language: 'hi', channel: 'webrtc', profile: '',
   resolution: '', 'noise-cancellation': '', 'privacy-mode': '', 'agent-mode': '',
   'addressing-mode': '', 'agent-greeting': '', 'recording-layout': '', role: 'participant',
 };
 
-function element(id) {
+function element(id, form) {
   return {
-    id, value: FORM[id] ?? '', textContent: '', innerHTML: '', disabled: false, style: {}, children: [],
+    id, value: form[id] ?? '', textContent: '', innerHTML: '', disabled: false, style: {}, children: [],
     appendChild(child) { this.children.push(child); },
   };
 }
 
-function page({ search = '', answers }) {
+function page({ search = '', answers, form = FORM }) {
   const elements = new Map();
   const calls = [];
   const run = load('agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js');
@@ -27,10 +27,10 @@ function page({ search = '', answers }) {
   Object.assign(global, {
     document: {
       getElementById(id) {
-        if (!elements.has(id)) elements.set(id, element(id));
+        if (!elements.has(id)) elements.set(id, element(id, form));
         return elements.get(id);
       },
-      createElement: () => element(''),
+      createElement: () => element('', form),
     },
     window: { location: { origin: ORIGIN, search, hostname: '127.0.0.1' } },
     URLSearchParams,
@@ -55,8 +55,23 @@ test('Start call creates the session and joins it in one click', async () => {
   assert.deepEqual(calls.map((c) => c.url), ['/sessions', `/sessions/${ROOM}/join`]);
   assert.equal(calls[0].body.language, 'hi');
   assert.equal(calls[0].body.overrides, undefined);
+  assert.equal(calls[0].body.profile, undefined);
   assert.deepEqual(calls[1].body, { role: 'participant' });
   assert.equal(elements.get('btn-start').disabled, false);
+});
+
+test('the Profile field starts empty, so Nivya speaks as the general persona', () => {
+  const html = readFileSync(new URL('../testclient.html', import.meta.url), 'utf8');
+  assert.match(html, /<input id="profile" value="">/);
+});
+
+test('a typed profile is sent with the session', async () => {
+  const { run, calls } = page({
+    form: { ...FORM, profile: ' support ' },
+    answers: { '/sessions': created, [`/sessions/${ROOM}/join`]: joinRefused },
+  });
+  await run('startCall()');
+  assert.equal(calls[0].body.profile, 'support');
 });
 
 test('a refused session is never joined', async () => {
