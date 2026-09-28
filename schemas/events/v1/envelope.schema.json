@@ -126,7 +126,7 @@
     "LayerMs": {
       "type": "integer",
       "minimum": 0,
-      "description": "One layer of a turn's latency in milliseconds, as the agent framework measured it. Absent when the framework did not measure that layer for the turn, never zero in its place."
+      "description": "One layer of a turn's latency in milliseconds, as the worker measured it. Absent when the worker did not measure that layer for the turn, never zero in its place."
     },
 
     "SessionCreatedPayload": {
@@ -259,7 +259,7 @@
       "type": "object",
       "unevaluatedProperties": false,
       "required": ["turn", "interrupted"],
-      "description": "Where one agent turn's latency went, layer by layer, measured inside the worker. The user-side layers come from the user's message that the reply answers, so a turn the agent opened itself (a greeting) carries none of them. A consumer compares e2eLatencyMs with what it measured itself; the difference is the network and playout on its side.",
+      "description": "Where one agent turn's latency went, layer by layer, measured inside the worker. The user-side layers come from the user's message that the reply answers, so a turn the agent opened itself (a greeting) carries none of them. A consumer compares replyGapMs with the gap it heard itself; the difference is the network and playout on its side.",
       "properties": {
         "turn": {
           "type": "integer",
@@ -267,6 +267,10 @@
           "description": "The agent's turn within the session, counted from 0."
         },
         "interrupted": { "type": "boolean" },
+        "endpointMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the last voiced audio of the user's the worker received to the speech-to-text provider releasing end of speech: the provider's silence window and its wait for the final transcript. The framework starts every other user layer at that release, so none of them contains this."
+        },
         "endOfTurnDelayMs": {
           "$ref": "#/$defs/LayerMs",
           "description": "From the end of the user's speech to the decision that their turn ended."
@@ -287,11 +291,15 @@
         },
         "e2eLatencyMs": {
           "$ref": "#/$defs/LayerMs",
-          "description": "From the end of the user's speech to the agent starting to speak."
+          "description": "From the end of the user's speech to the agent starting to speak, as the agent framework measures it: its end of speech is the provider's release, so endpointMs comes before it."
+        },
+        "replyGapMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the last voiced audio of the user's the worker received to the agent starting to speak: endpointMs and everything after it, the reply gap as the worker sees it. A client's heard gap adds the network and playout on both sides."
         },
         "serial": {
           "type": "boolean",
-          "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs), so the reply waited on more than its first sentence and its latency tracked the length of the reply. Present only when both LLM layers were measured."
+          "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs) although that sentence was under 80% of the reply, so the reply waited on more than its first sentence and its latency tracked the length of the reply. A reply that is mostly its first sentence is not serial however long that sentence took. Present only when both LLM layers were measured."
         }
       },
       "dependentRequired": { "serial": ["llmNodeTtftMs", "llmNodeTtfsMs"] }

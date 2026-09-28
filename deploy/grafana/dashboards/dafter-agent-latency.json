@@ -28,7 +28,7 @@
       "id": 1,
       "type": "stat",
       "title": "Reply time p50",
-      "description": "Worker-measured end of the user's speech to the agent starting to speak, median over 15 min. Target under 800 ms (docs/dafter.md, Latency).",
+      "description": "Worker-measured reply gap, from the last voiced audio of the user's it received to the agent starting to speak (reply_gap: endpointing included), median over 15 min. Target under 800 ms (docs/dafter.md, Latency). A caller hears the network and playout on top.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
       "fieldConfig": {
@@ -52,7 +52,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[15m]))) * 1000",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"reply_gap\"}[15m]))) * 1000",
           "legendFormat": "Reply time p50",
           "refId": "A",
           "range": true
@@ -91,7 +91,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[15m]))) * 1000",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"reply_gap\"}[15m]))) * 1000",
           "legendFormat": "Reply time p95",
           "refId": "A",
           "range": true
@@ -102,7 +102,7 @@
       "id": 3,
       "type": "stat",
       "title": "Agent turns (15 min)",
-      "description": "Agent replies measured end to end in the last 15 min. A greeting has no end to end time and is not counted.",
+      "description": "Agent replies measured end to end (e2e_latency) in the last 15 min. A greeting has no end to end time and is not counted.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
       "fieldConfig": {
@@ -134,7 +134,7 @@
       "id": 4,
       "type": "timeseries",
       "title": "Reply time vs targets (p50 / p95)",
-      "description": "Worker-measured end to end reply time. Dashed lines are the targets: p50 under 800 ms, p95 under 1.5 s. The 300 ms barge-in target has no line: the worker does not measure how fast speech stops on barge-in; the test client and dafter-evals do.",
+      "description": "Worker-measured reply gap (reply_gap), from the user's last voiced audio to the agent starting to speak. Dashed lines are the targets: p50 under 800 ms, p95 under 1.5 s. The 300 ms barge-in target has no line: the worker does not measure how fast speech stops on barge-in; the test client and dafter-evals do.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
       "fieldConfig": {
@@ -183,14 +183,14 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[5m]))) * 1000",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"reply_gap\"}[5m]))) * 1000",
           "legendFormat": "p50",
           "refId": "A",
           "range": true
         },
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"e2e_latency\"}[5m]))) * 1000",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"reply_gap\"}[5m]))) * 1000",
           "legendFormat": "p95",
           "refId": "B",
           "range": true
@@ -201,7 +201,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "Where the reply time goes, p50 by layer",
-      "description": "Median of each layer the worker measures. end_of_turn_delay and transcription_delay run in parallel from the end of speech; llm_node_ttft, llm_node_ttfs and tts_node_ttfb follow; e2e_latency is the whole. The dashed line is the 800 ms p50 target for e2e_latency.",
+      "description": "Median of each layer the worker measures. endpoint runs from the user's last voiced audio to the speech-to-text provider releasing end of speech; end_of_turn_delay and transcription_delay run in parallel from that release; llm_node_ttft, llm_node_ttfs and tts_node_ttfb follow; e2e_latency is everything after the release and reply_gap is the whole. The dashed line is the 800 ms p50 target for reply_gap.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
       "fieldConfig": {
@@ -248,7 +248,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "Where the reply time goes, p95 by layer",
-      "description": "The same at p95. The dashed line is the 1.5 s p95 target for e2e_latency.",
+      "description": "The same at p95. The dashed line is the 1.5 s p95 target for reply_gap.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "fieldConfig": {
@@ -295,7 +295,7 @@
       "id": 7,
       "type": "stat",
       "title": "Serial share (1 h)",
-      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs): its reply time tracked the whole reply rather than the first sentence. Share of the turns the rule could judge, both LLM layers measured.",
+      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs) and that sentence was under 80% of the reply: its reply time tracked the whole reply rather than the first sentence. A reply that is mostly its first sentence is never counted. Share of the turns the rule could judge, both LLM layers measured.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
       "fieldConfig": {
@@ -334,7 +334,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Serial turns per minute",
-      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs): its reply time tracked the whole reply rather than the first sentence.",
+      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs) and that sentence was under 80% of the reply: its reply time tracked the whole reply rather than the first sentence. A reply that is mostly its first sentence is never counted.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "fieldConfig": {
