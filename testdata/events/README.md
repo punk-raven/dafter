@@ -15,7 +15,8 @@ anyone; and who woke it is an opaque participant id, never a name.
 `agent-turn-metrics.json` is one agent turn's latency split into its layers, in
 milliseconds. Its first sentence reached TTS 287 ms after the LLM's first
 token, inside the 500 ms the serial rule allows, so `serial` is false; a
-`serial` without both LLM layers is refused.
+`serial` without both LLM layers is refused. It was a reply in Kannada in a
+session that switches languages, so it names its `language`, a language tag.
 
 `session-usage.json` is a session's consumption with one priced item and one
 unpriced one. An unpriced item carries no `costInr` at all, and `costInr` on

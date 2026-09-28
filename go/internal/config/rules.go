@@ -33,6 +33,12 @@ var crossFieldRules = []crossFieldRule{
 		because: "a near miss is a word that must never wake the agent, so one that is also its name or an alias contradicts itself",
 	},
 	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.Agent.LanguageSwitching.LeavesOut(c.Language) },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/languageSwitching/languages",
+		because: "the agent starts in the session's language, so a list of languages to switch between that leaves it out could never switch back to it",
+	},
+	{
 		broken:  func(c *ResolvedSessionConfig) bool { return c.Recording.Enabled && c.Recording.ConsentArtifactID == "" },
 		code:    errs.CodeConsentRequired,
 		pointer: "/recording/consentArtifactId",

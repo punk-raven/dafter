@@ -159,6 +159,7 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 		{"serial not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["serial"] = "yes" }},
 		{"filler not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["filler"] = "yes" }},
 		{"serial without its layers", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "llmNodeTtfsMs") }},
+		{"reply language not a tag", "agent-turn-metrics.json", func(p map[string]any) { p["language"] = "Kannada" }},
 		{"unpriced item with a cost", "session-usage.json", func(p map[string]any) { item(p, 1)["costInr"] = 0 }},
 		{"priced item without a cost", "session-usage.json", func(p map[string]any) { delete(item(p, 0), "costInr") }},
 		{"unknown unit", "session-usage.json", func(p map[string]any) { item(p, 0)["unit"] = "minute" }},

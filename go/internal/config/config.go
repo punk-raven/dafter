@@ -40,6 +40,8 @@ type Agent struct {
 	Pipeline   *Pipeline   `json:"pipeline,omitempty"`
 	Addressing *Addressing `json:"addressing,omitempty"`
 	Speech     *Speech     `json:"speech,omitempty"`
+
+	LanguageSwitching *LanguageSwitching `json:"languageSwitching,omitempty"`
 }
 
 type Addressing struct {

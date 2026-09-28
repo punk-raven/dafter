@@ -296,6 +296,10 @@
         "serial": {
           "type": "boolean",
           "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs), so the reply waited on more than its first sentence and its latency tracked the length of the reply. Present only when both LLM layers were measured."
+        },
+        "language": {
+          "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag",
+          "description": "The language the agent replied in, as a session language tag. Present only in a session that switches languages (agent.languageSwitching), where it can differ from the session's language, so its turns can be measured per language."
         }
       },
       "dependentRequired": { "serial": ["llmNodeTtftMs", "llmNodeTtfsMs"] }

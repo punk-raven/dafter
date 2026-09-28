@@ -17,6 +17,7 @@
     "ttsNodeTtfbMs": 296,
     "playbackLatencyMs": 3,
     "e2eLatencyMs": 1968,
-    "serial": false
+    "serial": false,
+    "language": "kn-IN"
   }
 }

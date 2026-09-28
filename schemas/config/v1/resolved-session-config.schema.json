@@ -63,7 +63,8 @@
         },
         "pipeline": { "$ref": "#/$defs/Pipeline" },
         "addressing": { "$ref": "#/$defs/Addressing" },
-        "speech": { "$ref": "#/$defs/Speech" }
+        "speech": { "$ref": "#/$defs/Speech" },
+        "languageSwitching": { "$ref": "https://schemas.dafter.dev/config/v1/language-switching.schema.json" }
       }
     },
     "turn": { "$ref": "#/$defs/Turn" },

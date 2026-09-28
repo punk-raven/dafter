@@ -25,6 +25,7 @@ from .enums import (
 from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
 from .speech import Backchannel, Speech
+from .switching import LanguageSwitching
 from .validation import validate_document
 
 
@@ -168,6 +169,7 @@ class Agent:
     pipeline: Pipeline | None = None
     addressing: Addressing = field(default_factory=Addressing)
     speech: Speech = field(default_factory=Speech)
+    language_switching: LanguageSwitching = field(default_factory=LanguageSwitching)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Agent:
@@ -179,6 +181,7 @@ class Agent:
             pipeline=Pipeline.from_dict(d["pipeline"]) if d.get("pipeline") else None,
             addressing=Addressing.from_dict(d.get("addressing") or {}),
             speech=Speech.from_dict(d.get("speech") or {}),
+            language_switching=LanguageSwitching.from_dict(d.get("languageSwitching") or {}),
         )
 
 
