@@ -69,7 +69,7 @@ def test_each_named_endpoint_is_reached_with_the_key_it_is_bound_to(name: str) -
 
 def test_the_endpoint_table_binds_each_https_host_to_its_own_provider_key() -> None:
     table = openai_compat.ENDPOINTS
-    assert set(table) == {"google", "openrouter", "opencode_zen", "openai"}
+    assert set(table) == {"google", "openrouter", "opencode_zen", "openai", "nvidia"}
     assert table["google"].base_url == GOOGLE
     keys = [e.credential_env for e in table.values()]
     assert len(set(keys)) == len(keys)

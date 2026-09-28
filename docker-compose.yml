@@ -147,6 +147,7 @@ services:
       DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
     depends_on:
       livekit:
         condition: service_started

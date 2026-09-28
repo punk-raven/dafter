@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/punk-raven/dafter/go/internal/config"
@@ -156,5 +157,64 @@ func TestAScribeRefusalIsReadBackBesideTheAgents(t *testing.T) {
 	}
 	if stored.Code != errs.CodeAuthenticationFailed || view.AgentRefusal != nil {
 		t.Errorf("read back scribe refusal %+v and agent refusal %s", stored, view.AgentRefusal)
+	}
+}
+
+const scribeJobOverrides = `{` + scribeOverrides + `}`
+
+var scribeJobs = []struct {
+	fixture string
+	profile string
+}{
+	{"../../../testdata/scribe/hindi-scribe-job.json", ""},
+	{"../../../testdata/scribe/hindi-scribe-gemini-job.json", "scribe-gemini"},
+	{"../../../testdata/scribe/hindi-scribe-nvidia-job.json", "scribe-nvidia"},
+}
+
+func TestTheScribeJobsArePinnedForTheScribe(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for _, job := range scribeJobs {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Profile: job.profile, Language: "hi",
+			Channel: config.ChannelWebRTC, Overrides: json.RawMessage(scribeJobOverrides),
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", job.fixture, err)
+		}
+		if os.Getenv("DAFTER_UPDATE_FIXTURES") == "1" {
+			if err := os.WriteFile(job.fixture, append(resolved.Document, '\n'), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want, err := os.ReadFile(job.fixture)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(bytes.TrimSpace(want), resolved.Document) {
+			t.Errorf("the scribe job changed; the scribe's tests read %s, so rerun with DAFTER_UPDATE_FIXTURES=1 and check both halves\n got: %s", job.fixture, resolved.Document)
+		}
+	}
+}
+
+func TestAProfileSwitchesTheScribesLLMWithoutCarryingSarvamFields(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for profile, endpoint := range map[string]string{"scribe-gemini": "google", "scribe-nvidia": "nvidia"} {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Profile: profile, Language: "hi",
+			Channel: config.ChannelWebRTC, Overrides: json.RawMessage(scribeJobOverrides),
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", profile, err)
+		}
+		for name, ref := range map[string]*config.ProviderRef{"llm": resolved.Config.Scribe.LLM, "judge": resolved.Config.Scribe.Judge} {
+			if ref.Provider != "openai_compat" || ref.Region != "" || ref.Options["endpoint"] != endpoint {
+				t.Errorf("%s %s resolved to %+v", profile, name, ref)
+			}
+			if _, leaked := ref.Options["thinking"]; leaked {
+				t.Errorf("%s %s carries a Sarvam-only option: %+v", profile, name, ref.Options)
+			}
+		}
 	}
 }
