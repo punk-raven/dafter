@@ -138,7 +138,7 @@ def hindi() -> banks.Bank:
 
 def test_the_hindi_bank_is_the_scripted_hindi_turns() -> None:
     bank = hindi()
-    assert tuple(q.text for q in bank.questions) == HINDI.turns
+    assert tuple(q.text for q in bank.questions if not q.tools) == HINDI.turns
     assert (bank.script, bank.register) == ("Devanagari", "आप")
 
 
@@ -327,10 +327,10 @@ def test_the_cli_writes_a_ranked_table_and_a_spot_check_sample(
     assert run_cli(argv, monkeypatch) == 0
     results = (tmp_path / "results.jsonl").read_text(encoding="utf-8").splitlines()
     sample = (tmp_path / "spot-check.jsonl").read_text(encoding="utf-8").splitlines()
-    assert (len(results), len(sample)) == (2 * 2 * 20, 16)
+    assert (len(results), len(sample)) == (2 * 2 * 23, 19)
     assert json.loads(sample[0])["human"]["correctness"] is None
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
-    assert (summary["language"], summary["runs"], summary["questions"]) == ("hi", 2, 20)
+    assert (summary["language"], summary["runs"], summary["questions"]) == ("hi", 2, 23)
     assert [r["candidate"] for r in summary["ranking"]] == ["gemini_flash_lite", "openai_mini"]
     table = capsys.readouterr().out
     assert table == (tmp_path / "ranking.md").read_text(encoding="utf-8")

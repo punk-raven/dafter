@@ -16,6 +16,7 @@ from .bank import Bank, Question
 from .catalog import Candidate
 from .judge import Judge, digits, markdown
 from .report import Record, Row
+from .tools import check
 from .turn import Classify, Now, Reply, ask
 
 Build = Callable[[ProviderRef], tuple[llm.LLM[Any], Classify]]
@@ -46,6 +47,7 @@ def record(
     settings: Settings, bank: Bank, candidate: Candidate, question: Question, run: int, reply: Reply
 ) -> Record:
     err = reply.error
+    tools = check(question, reply.responses, reply.text)
     return Record(
         date=settings.date,
         candidate=candidate.id,
@@ -71,6 +73,13 @@ def record(
         digits=digits(reply.text) if reply.text else None,
         error=str(err.code) if err else None,
         native_code=err.provider.native_code if err and err.provider else None,
+        expected_tools=list(question.tools),
+        tool_responses=[list(r) for r in reply.responses],
+        missed_tools=tools.missed if err is None else [],
+        unexpected_tools=tools.unexpected,
+        parallel_tool_calls=tools.parallel,
+        tool_quoted=tools.quoted,
+        claimed_without_call=tools.claimed_without_call if err is None else None,
     )
 
 
@@ -80,7 +89,7 @@ async def judged(judge: Judge, rec: Record, reply: Reply, pause: float) -> Recor
     scores = await judge.score(rec.question, rec.reply)
     await asyncio.sleep(pause)
     tool_use = None
-    if reply.tool_calls and reply.history is not None:
+    if (reply.tool_calls or rec.expected_tools) and reply.history is not None:
         tool_use = await judge.tool_use(reply.history)
         await asyncio.sleep(pause)
     return replace(

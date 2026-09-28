@@ -18,6 +18,7 @@ from . import catalog as catalogs
 from .judge import Judge
 from .report import Row, sample, table
 from .run import Screen, Settings, build
+from .tools import TOOLS
 
 FRAMEWORK_LOGGER = "livekit.agents"
 
@@ -90,7 +91,15 @@ async def screen(args: argparse.Namespace) -> int:
         date=started.date().isoformat(), runs=args.runs, pause=args.pause, timeout=args.timeout
     )
     try:
-        run = Screen(settings, bank, persona.instructions, judge, build=build, say=progress)
+        run = Screen(
+            settings,
+            bank,
+            persona.instructions,
+            judge,
+            build=build,
+            say=progress,
+            tools=list(TOOLS),
+        )
         rows = await run.run(picked)
     finally:
         if judge is not None:

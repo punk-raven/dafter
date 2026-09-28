@@ -3,7 +3,7 @@
   "name": "Hindi",
   "script": "Devanagari",
   "register": "आप",
-  "source": "dafter_evals.script.HINDI.turns",
+  "source": "dafter_evals.script.HINDI.turns; hi-21 to hi-23 are the tool probes from the stage 4 screen report",
   "questions": [
     {
       "id": "hi-01",
@@ -84,6 +84,62 @@
     {
       "id": "hi-20",
       "text": "ठीक है, बहुत बहुत धन्यवाद।"
+    },
+    {
+      "id": "hi-21",
+      "text": "दिल्ली में आज मौसम कैसा है?",
+      "tools": [
+        "get_weather"
+      ],
+      "quote": [
+        "इकतीस",
+        "31"
+      ],
+      "claims": [
+        "डिग्री",
+        "बारिश",
+        "धूप",
+        "बादल",
+        "चेक कर",
+        "रुकिए",
+        "मिनट",
+        "थोड़ा समय"
+      ]
+    },
+    {
+      "id": "hi-22",
+      "text": "दिल्ली और मुंबई दोनों का आज का मौसम बताइए।",
+      "tools": [
+        "get_weather",
+        "get_weather"
+      ],
+      "quote": [
+        "इकतीस",
+        "31"
+      ],
+      "claims": [
+        "डिग्री",
+        "बारिश",
+        "धूप",
+        "बादल",
+        "चेक कर",
+        "रुकिए",
+        "मिनट",
+        "थोड़ा समय"
+      ]
+    },
+    {
+      "id": "hi-23",
+      "text": "ठीक है, अब कॉल काट दीजिए।",
+      "tools": [
+        "end_call"
+      ],
+      "claims": [
+        "काट रहा",
+        "काट रही",
+        "काट दी",
+        "बंद कर"
+      ]
     }
   ]
 }

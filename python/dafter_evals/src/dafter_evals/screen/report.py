@@ -47,10 +47,27 @@ class Record:
     judge_reasoning: str = ""
     judge_error: str | None = None
     tool_use: str | None = None
+    expected_tools: list[str] = field(default_factory=list)
+    tool_responses: list[list[str]] = field(default_factory=list)
+    missed_tools: list[str] = field(default_factory=list)
+    unexpected_tools: list[str] = field(default_factory=list)
+    parallel_tool_calls: bool = False
+    tool_quoted: bool | None = None
+    claimed_without_call: bool | None = None
 
     @property
     def answered(self) -> bool:
         return self.error is None and self.reply is not None
+
+    @property
+    def tools_clean(self) -> bool:
+        return not (
+            self.missed_tools
+            or self.unexpected_tools
+            or self.parallel_tool_calls
+            or self.tool_quoted is False
+            or self.claimed_without_call
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -81,6 +98,18 @@ class Row:
         costs = [Decimal(str(r.cost)) for r in self.records if r.answered and r.cost is not None]
         return sum(costs, Decimal(0)) * 1000 / len(costs) if costs else None
 
+    def tool_summary(self) -> dict[str, int]:
+        probes = [r for r in self.records if r.answered and r.expected_tools]
+        return {
+            "toolProbes": len(probes),
+            "toolProbesClean": sum(1 for r in probes if r.tools_clean),
+            "toolMissed": sum(1 for r in self.records if r.missed_tools),
+            "toolUnexpected": sum(1 for r in self.records if r.unexpected_tools),
+            "parallelToolCalls": sum(1 for r in self.records if r.parallel_tool_calls),
+            "toolQuotedWrong": sum(1 for r in self.records if r.tool_quoted is False),
+            "claimedWithoutCall": sum(1 for r in self.records if r.claimed_without_call),
+        }
+
     def summary(self) -> dict[str, Any]:
         per_1k = self.cost_per_1k()
         price = self.candidate.price
@@ -106,6 +135,7 @@ class Row:
             "reasoningTokens": sum(r.reasoning_tokens for r in self.records),
             "reasoningReplies": sum(1 for r in self.records if r.reasoning_tokens),
             "toolUse": [r.tool_use for r in self.records if r.tool_use is not None],
+            **self.tool_summary(),
             "costPer1kReplies": float(per_1k) if per_1k is not None else None,
             "currency": price.currency if price else None,
             "freeTier": self.candidate.free_tier,
@@ -134,14 +164,18 @@ def _pct(value: float | None) -> str:
     return "-" if value is None else f"{round(value * 100)}%"
 
 
+def _probes(s: dict[str, Any]) -> str:
+    return f"{s['toolProbesClean']}/{s['toolProbes']}" if s["toolProbes"] else "-"
+
+
 def table(rows: list[Row], date: str, judge: str | None) -> str:
     head = [
         f"Stage 4 LLM screen, {date}, judge: {judge or 'none'}",
         "",
         "| # | candidate | provider/model | answered | rate limited | TTFT p50/p95 ms "
         "| TTFS p50/p95 ms | quality | correct | language | register | speakable "
-        "| cost per 1k replies | free tier |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| tool probes clean | cost per 1k replies | free tier |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     lines = []
     for n, row in enumerate(rank(rows), start=1):
@@ -149,7 +183,7 @@ def table(rows: list[Row], date: str, judge: str | None) -> str:
         if row.skipped:
             lines.append(
                 f"| - | {s['candidate']} | {s['provider']}/{s['model']} | skipped: "
-                f"{row.skipped} | | | | | | | | | | |"
+                f"{row.skipped} | | | | | | | | | | | |"
             )
             continue
         rates = s["passRates"]
@@ -173,6 +207,7 @@ def table(rows: list[Row], date: str, judge: str | None) -> str:
                     _pct(rates["language"]),
                     _pct(rates["register"]),
                     _pct(rates["speakability"]),
+                    _probes(s),
                     cost,
                     {True: "yes", False: "no", None: "not stated"}[s["freeTier"]] + " |",
                 ]

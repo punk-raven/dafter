@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from importlib import resources
+from typing import Any
+
+from .tools import NAMES
 
 PACKAGE = "dafter_evals.screen"
 LANGUAGES = ("hi", "kn", "en", "mr", "te")
@@ -12,6 +15,9 @@ LANGUAGES = ("hi", "kn", "en", "mr", "te")
 class Question:
     id: str
     text: str
+    tools: tuple[str, ...] = ()
+    quote: tuple[str, ...] = ()
+    claims: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,9 +40,25 @@ class Bank:
         )
 
 
+def _question(raw: dict[str, Any]) -> Question:
+    question = Question(
+        id=raw["id"],
+        text=raw["text"],
+        tools=tuple(raw.get("tools", ())),
+        quote=tuple(raw.get("quote", ())),
+        claims=tuple(raw.get("claims", ())),
+    )
+    unknown = sorted(set(question.tools) - NAMES)
+    if unknown:
+        raise ValueError(f"{question.id} expects tools the screen does not offer: {unknown}")
+    if (question.quote or question.claims) and not question.tools:
+        raise ValueError(f"{question.id} lists quote or claim terms but expects no tool")
+    return question
+
+
 def parse(text: str) -> Bank:
     raw = json.loads(text)
-    questions = tuple(Question(id=q["id"], text=q["text"]) for q in raw["questions"])
+    questions = tuple(_question(q) for q in raw["questions"])
     if len({q.id for q in questions}) != len(questions):
         raise ValueError(f"the {raw['language']} bank repeats a question id")
     if any(not q.text.strip() for q in questions):

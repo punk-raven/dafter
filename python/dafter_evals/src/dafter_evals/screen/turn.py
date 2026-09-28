@@ -62,6 +62,7 @@ class TimedAgent(Agent):
     def __init__(self, instructions: str, clock: Clock, tools: Sequence[llm.Tool]) -> None:
         super().__init__(instructions=instructions, tools=list(tools))
         self.clock = clock
+        self.responses: list[list[str]] = []
 
     async def llm_node(
         self,
@@ -70,7 +71,11 @@ class TimedAgent(Agent):
         model_settings: ModelSettings,
     ) -> AsyncIterable[llm.ChatChunk | str | FlushSentinel]:
         self.clock.started()
+        calls: list[str] = []
+        self.responses.append(calls)
         async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
+            if isinstance(chunk, llm.ChatChunk) and chunk.delta and chunk.delta.tool_calls:
+                calls.extend(c.name for c in chunk.delta.tool_calls)
             if isinstance(chunk, llm.ChatChunk) and chunk.delta and chunk.delta.content:
                 self.clock.saw(chunk.delta.content)
             elif isinstance(chunk, str) and chunk:
@@ -90,6 +95,7 @@ class Reply:
     tool_calls: int
     error: DafterError | None
     reasoning_tokens: int = 0
+    responses: tuple[tuple[str, ...], ...] = ()
     history: llm.ChatContext | None = field(default=None, compare=False)
 
 
@@ -116,9 +122,10 @@ async def ask(
         llm_conn_options=APIConnectOptions(max_retry=0, timeout=timeout)
     )
     session: AgentSession[None] = AgentSession(llm=model, conn_options=options)
+    agent = TimedAgent(instructions, clock, tools or [])
     try:
         async with session:
-            await session.start(TimedAgent(instructions, clock, tools or []))
+            await session.start(agent)
             result: RunResult[None] = await session.run(user_input=question)
             tokens = _tokens(session)
             history = session.history.copy()
@@ -141,5 +148,6 @@ async def ask(
         tool_calls=sum(1 for e in result.events if e.type == "function_call"),
         error=None,
         reasoning_tokens=tokens[2],
+        responses=tuple(tuple(r) for r in agent.responses),
         history=history,
     )
