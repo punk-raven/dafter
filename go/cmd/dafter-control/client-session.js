@@ -40,6 +40,7 @@ async function createSession() {
     }
     const transcription = transcriptionOverride();
     if (transcription) applyTranscriptionOverride(body, transcription);
+    if (scribeOverride()) applyScribeOverride(body);
 
     const resp = await fetch('/sessions', {
       method: 'POST',
@@ -128,6 +129,7 @@ async function joinRoom() {
     room = new Room(roomOptions);
     watchAgent(room, data);
     watchCaptions(room, data);
+    watchScribe(data);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
@@ -249,6 +251,7 @@ async function joinRoom() {
 
 async function leaveSession() {
   if (room) {
+    await requestMinutes(room);
     await room.disconnect();
   }
   cleanup();
@@ -257,6 +260,7 @@ async function leaveSession() {
 function cleanup() {
   stopAgent();
   stopCaptions();
+  stopScribe();
   stopStats();
   syntheticVideo = false;
   if (syntheticIntervalId != null) {

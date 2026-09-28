@@ -159,6 +159,10 @@ function onAgentEvent(payload) {
     onSessionUsage(event.payload);
     return;
   }
+  if (SCRIBE_EVENTS.has(event.type)) {
+    onScribeEvent(event);
+    return;
+  }
   if (event.type !== 'agent.state_changed') return;
   const previous = agentView.state;
   agentView.state = event.payload.state;
