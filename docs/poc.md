@@ -30,6 +30,20 @@ One bot joining as a participant via the server SDK. Background: audio only, no 
 
 **Pass:** background bot absent from composite. Foreground bot visible. Both audible in recording.
 
+**The background bot is the scribe (stage 8, `dafter_scribe`).** It joins
+through the agent framework with hidden, publish-nothing permissions
+(`WorkerPermissions(hidden=True, can_publish=False)`, subscribing to no
+track), so it cannot appear in a composite or a track recording, and it is
+not audible: it speaks nowhere and hears only the captions on the data
+channel. Offline it is checked by unit and text-mode tests with scripted
+LLMs, and its prompts by 12 live Sarvam calls (sarvam-105b writes Hindi notes
+in 5.7-7.3 s and Hindi minutes in about 5 s with a forced tool call, and the
+judge scored a reply in 5.6 s). Not recorded yet: a live call proving it
+absent from a room composite, and the stage's done-when, a 10-minute
+two-person call with live notes and action items in the test client, "abhi
+tak kya discuss hua?" answered in under 1 s, and minutes, a transcript and a
+cost line at the end.
+
 ## 5. Agent - STT, LLM, TTS, VAD, interruptions
 
 Python worker running the cascaded pipeline. Hindi: Sarvam (saaras STT, bulbul TTS, sarvam-105b LLM), local VAD off, provider endpointing, 500ms chunk, raw PCM, prewarmed TTS. English: Deepgram STT, Silero VAD, semantic turn detection. Emits `agent.state_changed` events. 20-turn scripted conversation per language, then barge-in, backchannel ("mm-hmm"), filler ("uh"), and background speech tests.
