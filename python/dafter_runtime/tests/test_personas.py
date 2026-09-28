@@ -9,8 +9,11 @@ SPOKEN = {"hi": "निव्या", "mr": "निव्या", "kn": "ನಿ�
 LANGUAGES = ("hi", "en", "kn", "mr", "te")
 REFS = (DEFAULT_REF, "persona://support/v3")
 EVERY = [(ref, language) for ref in REFS for language in LANGUAGES]
-MASCULINE = {"hi": ("सकता", "रहा हूँ", "देखता", "बताता")}
-FEMININE_FORMS = {"hi": ("सकती", "रही")}
+MASCULINE = {
+    "hi": ("सकता", "रहा हूँ", "देखता", "बताता"),
+    "mr": ("शकतो", "बोलतोय", "बघतो"),
+}
+FEMININE_FORMS = {"hi": ("सकती", "रही"), "mr": ("शकते", "बोलतेय")}
 GENDERED = [(ref, language) for ref, language in EVERY if language in MASCULINE]
 
 

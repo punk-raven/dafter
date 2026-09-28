@@ -14,9 +14,9 @@ var focusLanguages = []struct {
 }{
 	{"hi", config.TurnProviderEndpointing, "priya"},
 	{"en-IN", config.TurnSemantic, "priya"},
-	{"kn-IN", config.TurnProviderEndpointing, "shubh"},
-	{"mr-IN", config.TurnProviderEndpointing, "ratan"},
-	{"te-IN", config.TurnProviderEndpointing, "shubh"},
+	{"kn-IN", config.TurnProviderEndpointing, "priya"},
+	{"mr-IN", config.TurnProviderEndpointing, "priya"},
+	{"te-IN", config.TurnProviderEndpointing, "priya"},
 }
 
 func TestEachFocusLanguageResolvesItsOwnRoute(t *testing.T) {

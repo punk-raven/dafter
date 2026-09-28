@@ -315,7 +315,7 @@ Tools carry two classifications. **`latency_class`** governs delay hiding: `fast
 | Sarvam `saaras:v3-realtime` streaming STT | Y | Y | Y | Y | Y | `SUPPORTED_LANGUAGES` in livekit-plugins-sarvam 1.8.3 `stt_streaming.py`; Sarvam's realtime reference (24 codes with `auto`) |
 | its `codemix` mode (English words kept in Latin script) | Y | Y | - | Y | Y | Sarvam: applied to finals only, partials are plain transcription |
 | its language identification (`language_code=auto`) | Y | Y | Y | Y | Y | Sarvam: `language` on every partial and final, `language_confidence` on finals; the plugin carries both on `SpeechData` |
-| Sarvam `bulbul:v3` TTS | Y | Y | Y | Y | Y | Sarvam: 11 languages, every speaker speaks every one; its picks: kn and te shubh or ratan, hi shubh, mr and en-IN ratan (male), priya or ishita (female) |
+| Sarvam `bulbul:v3` TTS | Y | Y | Y | Y | Y | Sarvam: 11 languages, every speaker speaks every one; its picks: kn and te shubh or ratan, hi shubh, mr and en-IN ratan (male), priya or ishita (female); the catalog speaks priya in all five, one voice across a language switch, which livekit-plugins-sarvam 1.8.3 accepts |
 | Sarvam `sarvam-105b` LLM | Y | Y | Y | Y | Y | Sarvam's language list (23) |
 | LiveKit on-device turn detector `v1-mini` | - | Y | Y | - | - | `LOCAL_LANGUAGES` in livekit-agents 1.8.3 `inference/eot/languages.py` |
 | Deepgram Nova-3, ElevenLabs Scribe v2 Realtime, Soniox, Amazon Transcribe, Azure (streaming STT) | Y | Y | Y | Y | Y | vendor language tables; Deepgram's `multi` code-switching is Hindi and English only |

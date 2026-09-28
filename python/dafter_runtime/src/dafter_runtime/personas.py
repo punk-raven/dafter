@@ -100,6 +100,7 @@ _SUPPORT = (
 
 FEMININE = "You are a woman: whenever you speak about yourself, use feminine grammar."
 _HINDI_FEMININE = " In Hindi say मैं कर सकती हूँ, मैं देख रही हूँ, मैं बताती हूँ, never सकता, रहा or बताता."
+_MARATHI_FEMININE = " In Marathi say मी करू शकते, मी बोलतेय, मी बघते, never शकतो, बोलतोय or बघतो."
 
 SCRIPTS: dict[tuple[str, str], Script] = {
     (DEFAULT_REF, "hi"): Script(
@@ -140,15 +141,15 @@ SCRIPTS: dict[tuple[str, str], Script] = {
     ),
     (DEFAULT_REF, "mr"): Script(
         role=_GENERAL,
-        rules=_MARATHI_VOICE_RULES,
-        greeting="नमस्कार! मी तुमची काय मदत करू शकतो?",
-        introduction="नमस्कार! मी {name}. मी तुमची काय मदत करू शकतो?",
+        rules=_MARATHI_VOICE_RULES + _MARATHI_FEMININE,
+        greeting="नमस्कार! मी तुमची काय मदत करू शकते?",
+        introduction="नमस्कार! मी {name}. मी तुमची काय मदत करू शकते?",
     ),
     ("persona://support/v3", "mr"): Script(
         role=_SUPPORT,
-        rules=_MARATHI_VOICE_RULES,
-        greeting="नमस्कार! मी सहाय्य टीममधून बोलतोय. सांगा, काय अडचण आहे?",
-        introduction="नमस्कार! मी {name}, सहाय्य टीममधून बोलतोय. सांगा, काय अडचण आहे?",
+        rules=_MARATHI_VOICE_RULES + _MARATHI_FEMININE,
+        greeting="नमस्कार! मी सहाय्य टीममधून बोलतेय. सांगा, काय अडचण आहे?",
+        introduction="नमस्कार! मी {name}, सहाय्य टीममधून बोलतेय. सांगा, काय अडचण आहे?",
     ),
     (DEFAULT_REF, "te"): Script(
         role=_GENERAL,
