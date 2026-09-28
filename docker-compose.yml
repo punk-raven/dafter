@@ -127,8 +127,6 @@ services:
       - "9090:9090"
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       control:
         condition: service_started
@@ -152,6 +150,7 @@ services:
 
   tunnel:
     image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
     command: tunnel --no-autoupdate run --token ${DAFTER_CF_TUNNEL_TOKEN}
     depends_on:
       control:
@@ -166,3 +165,10 @@ services:
 volumes:
   control-data:
   minio-data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.213.0.0/24
+          gateway: 10.213.0.1

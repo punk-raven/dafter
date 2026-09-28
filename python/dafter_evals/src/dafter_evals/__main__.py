@@ -12,6 +12,7 @@ import aiohttp
 from dafter_core.config import ResolvedSessionConfig, parse
 from livekit.agents import utils
 
+from .connect import join
 from .measure import compare
 from .probe import Probe
 from .script import HINDI
@@ -67,7 +68,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         voice = Voice(cfg, args.speaker)
         try:
             started = time.monotonic()
-            await probe.connect(created["url"], created["token"])
+            await join(probe, args.control, created)
             scenarios = frozenset(args.scenarios.split(","))
             report = await run(probe, voice, HINDI, args.turns, scenarios, cfg.budgets)
             report["usage"] = usage(probe.events.usage, time.monotonic() - started)

@@ -11,9 +11,13 @@ scrape_configs:
   - job_name: livekit
     static_configs:
       - targets: ["livekit:6789"]
-  # The agent worker runs on the host network, so it is reached through the
-  # host gateway. It serves /metrics from the framework's own Prometheus server
-  # (DAFTER_METRICS_PORT), aggregating every job process.
+  # The agent worker runs on the host network, so it is reached at the gateway
+  # of the compose network, pinned to 10.213.0.1 in docker-compose.yml: that
+  # address is the host network namespace on native Linux and on Docker
+  # Desktop alike, where host.docker.internal is the desktop machine instead
+  # and refuses the connection. The worker serves /metrics from the
+  # framework's own Prometheus server (DAFTER_METRICS_PORT) on every
+  # interface, aggregating every job process.
   - job_name: dafter-agent
     static_configs:
-      - targets: ["host.docker.internal:9464"]
+      - targets: ["10.213.0.1:9464"]

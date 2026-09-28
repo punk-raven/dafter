@@ -115,3 +115,11 @@ def test_a_reply_is_measured_in_the_language_decided_at_the_turn_it_answers() ->
     assert reply is not None and reply.payload()["language"] == "en-IN"
     assert greeting is not None and greeting.payload()["language"] == "hi"
     assert pinned is not None and "language" not in pinned.payload()
+
+
+def test_a_reply_cut_off_before_it_was_heard_keeps_the_language_of_its_turn() -> None:
+    turns = Turns()
+    turns.add(llm.ChatMessage(role="user", content=[ENGLISH]), language="en-IN")
+    cut = turns.unheard()
+    assert cut.interrupted and cut.payload()["language"] == "en-IN"
+    assert "language" not in turns.unheard().payload()
