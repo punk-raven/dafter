@@ -51,6 +51,17 @@
           "pattern": "^[a-z][a-z0-9-]{1,62}$",
           "default": "dafter-py"
         },
+        "name": {
+          "type": "string",
+          "description": "What the agent is called: the name a person sees on its tile and in captions, hears it introduce itself by in every language, and says to call it. The persona, the greeting and the name matcher all read it, so it is stated once, in the script the session's language is usually transcribed in; its other spellings are addressing.aliases. Without one the agent introduces itself by no name, and a mode that waits to be called needs one, which is a cross-field rule.",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "greets": {
+          "type": "boolean",
+          "description": "Whether the agent speaks first when it joins. Off, it joins silently and says nothing until it is spoken to.",
+          "default": false
+        },
         "mode": {
           "type": "string",
           "description": "Cascaded is the default. Half-cascade and speech-to-speech are provider modes, and switching is a config edit.",
@@ -98,15 +109,9 @@
           "enum": ["always", "transcript", "on_device"],
           "default": "always"
         },
-        "name": {
-          "type": "string",
-          "description": "What people call the agent, in the script the session's language is usually transcribed in. A mode that waits to be called needs one, which is a cross-field rule.",
-          "minLength": 1,
-          "maxLength": 32
-        },
         "aliases": {
           "type": "array",
-          "description": "Other spellings of the same name, one per script or common transcription, for example the Devanagari, Kannada and Telugu spellings of a Latin name. Every alias counts as the name in every language, because people in one call mix languages and a recognizer does not always transcribe a name in the session language's script.",
+          "description": "Other spellings of the agent's name (`agent.name`), one per script or common transcription, for example the Devanagari, Kannada and Telugu spellings of a Latin name. Every alias counts as the name in every language, because people in one call mix languages and a recognizer does not always transcribe a name in the session language's script.",
           "items": { "type": "string", "minLength": 1, "maxLength": 32 },
           "maxItems": 32,
           "uniqueItems": true

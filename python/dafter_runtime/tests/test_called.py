@@ -80,12 +80,12 @@ class Call:
         self.clock = Clock()
         self.scheduler = Scheduler()
         self.gate = Gate(
-            Matcher.for_addressing(p.config.agent.addressing),
+            Matcher.for_agent(p.config.agent),
             WINDOW_S,
             self.voice,
             clock=self.clock,
             schedule=self.scheduler,
-            name=p.config.agent.addressing.name,
+            name=p.config.agent.name or "",
         )
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
@@ -125,7 +125,8 @@ def run_call(script: Callable[[Call, StubLLM], Any], calls: list[str] | None = N
 def test_the_called_plan_names_the_agent_and_prompts_the_recognizer() -> None:
     p = called_plan()
     assert p.called_by_name
-    assert "Your name is Nivya." in p.persona.instructions
+    assert p.persona.instructions.startswith("You are Nivya, ")
+    assert "calls you by your name" in p.persona.instructions
     assert p.stt_prompt == "Nivya, निव्या, ನಿವ್ಯ, ನಿವ್ಯಾ, నివ్య, నివ్యా"
     assert p.voice_turn_handling["turn_detection"] == "manual"
     assert p.turn_handling["turn_detection"] == "stt"
@@ -155,7 +156,7 @@ def test_the_agent_stays_silent_until_called_then_answers_with_what_others_said(
     stub = run_call(script)
     [request] = stub.requests
     system = said(request)[0][1] or ""
-    assert "Your name is Nivya." in system
+    assert system.startswith("You are Nivya, ")
     assert said(request)[1:] == [
         (
             "user",

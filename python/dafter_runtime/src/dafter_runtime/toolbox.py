@@ -49,8 +49,8 @@ def unattested(identity: str) -> Role | None:
 
 
 def name_words(p: Plan) -> frozenset[str]:
-    a = p.config.agent.addressing
-    return frozenset(w for n in (a.name, *a.aliases) for w in words(n))
+    agent = p.config.agent
+    return frozenset(w for n in (agent.name or "", *agent.addressing.aliases) for w in words(n))
 
 
 def linked(session: AgentSession[Any]) -> Callable[[], str | None]:

@@ -100,13 +100,12 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> S
             f"this worker serves {pool}",
         )
     check_encryption(cfg, fetches_keys)
-    addressing = cfg.agent.addressing
     return ScribePlan(
         config=cfg,
         writer=_model(scribe.llm, LLM_AT, cfg.language),
         judge=_model(scribe.judge, JUDGE_AT, cfg.language) if scribe.judge else None,
         language=language_of(cfg.language),
-        agent_label=addressing.name if addressing.waits_to_be_called else AGENT_LABEL,
+        agent_label=cfg.agent.name or AGENT_LABEL,
         interval_s=scribe.summary_interval_ms / 1000,
         after_call_s=float(scribe.after_call_timeout_seconds),
     )

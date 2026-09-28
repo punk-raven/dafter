@@ -30,12 +30,12 @@ def test_the_catalog_job_plans_a_sarvam_scribe_with_a_judge() -> None:
     assert p.judge is not None and p.judge.at == "/scribe/judge"
     assert (p.interval_s, p.after_call_s) == (60.0, 900.0)
     assert (p.language.name, p.language.script) == ("Hindi", "Devanagari")
-    assert p.agent_label == AGENT_LABEL
-
-
-def test_a_scribe_that_waits_to_be_called_labels_the_agent_by_its_name() -> None:
-    p = plan(config(agent={"addressing": {"mode": "transcript", "name": "Nivya"}}), "dafter-scribe")
     assert p.agent_label == "Nivya"
+
+
+def test_the_minutes_label_an_unnamed_agent_as_the_agent() -> None:
+    p = plan(config(agent={"name": None, "addressing": {"mode": "always"}}), "dafter-scribe")
+    assert p.agent_label == AGENT_LABEL
 
 
 def test_a_scribe_without_a_judge_scores_nothing() -> None:

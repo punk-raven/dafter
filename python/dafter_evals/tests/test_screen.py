@@ -361,7 +361,7 @@ def test_several_languages_rank_together_and_apart(
     load = banks.load
     english = banks.Bank("en", "English", None, None, (banks.Question("en-01", "Hello?"),))
     monkeypatch.setattr(banks, "load", lambda lang: english if lang == "en" else load(lang))
-    monkeypatch.setattr(cli, "persona_for", lambda ref, lang: Persona(INSTRUCTIONS, "hi"))
+    monkeypatch.setattr(cli, "persona_for", lambda ref, lang, name: Persona(INSTRUCTIONS, "hi"))
     argv = ["--out", str(tmp_path), "--runs", "2", "--candidates", "gemini_flash_lite"]
     assert run_cli([*argv, "--language", "all"], monkeypatch) == 0
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
