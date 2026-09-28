@@ -19,22 +19,28 @@ AGENT_NOTES = 100
 
 NOTES_TOOL = "submit_notes"
 
-_LINES = {"type": "array", "items": {"type": "string"}}
-_ACTION_ITEMS = {
+LINES_SCHEMA = {"type": "array", "items": {"type": "string"}}
+ACTION_ITEMS_SCHEMA = {
     "type": "array",
     "items": {
         "type": "object",
         "properties": {
             "task": {"type": "string"},
-            "owner": {"type": "string"},
-            "due": {"type": "string"},
+            "owner": {
+                "type": "string",
+                "description": "Who will do it, as said. Leave the field out if nobody was named.",
+            },
+            "due": {
+                "type": "string",
+                "description": "When, as said. Leave the field out if no time was said.",
+            },
         },
         "required": ["task"],
     },
 }
 
 
-def _schema(name: str, description: str, properties: dict[str, Any]) -> dict[str, Any]:
+def schema(name: str, description: str, properties: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": name,
         "description": description,
@@ -42,21 +48,27 @@ def _schema(name: str, description: str, properties: dict[str, Any]) -> dict[str
     }
 
 
-NOTES_SCHEMA = _schema(
+NOTES_SCHEMA = schema(
     NOTES_TOOL,
     "Submit the notes of the whole call so far.",
     {
         "summary": {"type": "string"},
-        "decisions": _LINES,
-        "actionItems": _ACTION_ITEMS,
-        "openQuestions": _LINES,
-        "names": _LINES,
-        "numbers": _LINES,
+        "decisions": LINES_SCHEMA,
+        "actionItems": ACTION_ITEMS_SCHEMA,
+        "openQuestions": LINES_SCHEMA,
+        "names": LINES_SCHEMA,
+        "numbers": LINES_SCHEMA,
         "speakers": {
             "type": "array",
             "items": {
                 "type": "object",
-                "properties": {"label": {"type": "string"}, "points": _LINES},
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "Exactly as inside the transcript's square brackets.",
+                    },
+                    "points": LINES_SCHEMA,
+                },
                 "required": ["label", "points"],
             },
         },
@@ -121,29 +133,27 @@ class Notes:
         )
 
 
-def _text(value: object, limit: int) -> str:
+def text(value: object, limit: int) -> str:
     return " ".join(value.split())[:limit] if isinstance(value, str) else ""
 
 
-def _lines(value: object, limit: int, count: int) -> tuple[str, ...]:
+def lines(value: object, limit: int, count: int) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
-    kept = (_text(v, limit) for v in value)
+    kept = (text(v, limit) for v in value)
     return tuple(dict.fromkeys(v for v in kept if v))[:count]
 
 
-def _action_items(value: object) -> tuple[ActionItem, ...]:
+def action_items(value: object) -> tuple[ActionItem, ...]:
     if not isinstance(value, list):
         return ()
     items = []
     for raw in value:
         if not isinstance(raw, dict):
             continue
-        task = _text(raw.get("task"), LINE)
+        task = text(raw.get("task"), LINE)
         if task:
-            items.append(
-                ActionItem(task, _text(raw.get("owner"), NAME), _text(raw.get("due"), NAME))
-            )
+            items.append(ActionItem(task, text(raw.get("owner"), NAME), text(raw.get("due"), NAME)))
     return tuple(items[:ACTION_ITEMS])
 
 
@@ -154,10 +164,10 @@ def _speakers(value: object, labels: Sequence[str]) -> tuple[tuple[str, tuple[st
     for raw in value:
         if not isinstance(raw, dict):
             continue
-        label = _text(raw.get("label"), NAME)
-        points = _lines(raw.get("points"), LINE, POINTS)
-        if label in labels and points and label not in found:
-            found[label] = points
+        label = text(raw.get("label"), NAME).strip("[] ")
+        points = lines(raw.get("points"), LINE, POINTS)
+        if label in labels and points:
+            found[label] = tuple(dict.fromkeys((*found.get(label, ()), *points)))[:POINTS]
     return tuple(found.items())[:SPEAKERS]
 
 
@@ -173,16 +183,16 @@ def arguments(raw: str) -> dict[str, Any]:
 
 def read_notes(raw: str, labels: Sequence[str]) -> Notes:
     doc = arguments(raw)
-    summary = _text(doc.get("summary"), SUMMARY)
+    summary = text(doc.get("summary"), SUMMARY)
     if not summary:
         raise Unreadable("the notes carry no summary")
     return Notes(
         summary=summary,
-        decisions=_lines(doc.get("decisions"), LINE, DECISIONS),
-        action_items=_action_items(doc.get("actionItems")),
-        open_questions=_lines(doc.get("openQuestions"), LINE, QUESTIONS),
-        names=_lines(doc.get("names"), NAME, MENTIONS),
-        numbers=_lines(doc.get("numbers"), NAME, MENTIONS),
+        decisions=lines(doc.get("decisions"), LINE, DECISIONS),
+        action_items=action_items(doc.get("actionItems")),
+        open_questions=lines(doc.get("openQuestions"), LINE, QUESTIONS),
+        names=lines(doc.get("names"), NAME, MENTIONS),
+        numbers=lines(doc.get("numbers"), NAME, MENTIONS),
         speakers=_speakers(doc.get("speakers"), labels),
     )
 
@@ -214,17 +224,24 @@ def notes_payload(
 def with_note(taken: tuple[AgentNote, ...], note: AgentNote) -> tuple[AgentNote, ...]:
     if any(n.note_id == note.note_id for n in taken):
         return taken
-    return (*taken, replace(note, text=_text(note.text, NOTE)))
+    return (*taken, replace(note, text=text(note.text, NOTE)))
 
 
 __all__ = [
+    "ACTION_ITEMS_SCHEMA",
+    "LINES_SCHEMA",
     "NOTES_SCHEMA",
     "NOTES_TOOL",
     "ActionItem",
     "AgentNote",
     "Notes",
     "Unreadable",
+    "action_items",
+    "arguments",
+    "lines",
     "notes_payload",
     "read_notes",
+    "schema",
+    "text",
     "with_note",
 ]

@@ -7,6 +7,7 @@ from dafter_core.enums import EventType
 from dafter_core.errors import DafterError
 from dafter_core.events import EventEnvelope, parse_event
 
+from .closing import Closing
 from .judging import Scorer
 from .notes import AgentNote
 from .writer import Writer
@@ -16,11 +17,16 @@ log = logging.getLogger("dafter.scribe.inbox")
 
 class Scribe:
     def __init__(
-        self, cfg: ResolvedSessionConfig, writer: Writer, scorer: Scorer | None = None
+        self,
+        cfg: ResolvedSessionConfig,
+        writer: Writer,
+        scorer: Scorer | None = None,
+        closing: Closing | None = None,
     ) -> None:
         self._cfg = cfg
         self.writer = writer
         self.scorer = scorer
+        self.closing = closing
 
     def event(self, data: bytes) -> EventEnvelope | None:
         try:
@@ -43,6 +49,8 @@ class Scribe:
         elif event.type is EventType.AGENT_NOTE_TAKEN:
             p = event.payload
             self.writer.note(AgentNote(p["noteId"], p["text"], p.get("takenBy")))
+        elif event.type is EventType.SESSION_USAGE and self.closing is not None:
+            self.closing.usage_seen(event.payload)
 
 
 __all__ = ["Scribe"]

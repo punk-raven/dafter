@@ -47,6 +47,24 @@ def test_the_notes_keep_what_the_schema_allows_and_drop_the_rest() -> None:
     assert got.speakers == (("Asha", ("शुक्रवार तय किया",)),)
 
 
+def test_bracketed_and_repeated_speaker_labels_are_read_as_one_speaker_each() -> None:
+    sarvam_reply = {
+        "speakers": [
+            {"label": "[Asha]", "points": ["तिमाही रिपोर्ट कब तक भेजी जाएगी, यह पूछा।"]},
+            {"label": "[Ravi]", "points": ["शुक्रवार तक तिमाही रिपोर्ट भेजने की बात कही।"]},
+            {"label": "[Asha]", "points": ["बजट के बारे में आशा फाइनेंस से पूछेगी।"]},
+            {"label": "आशा", "points": ["transliterated, so unknown"]},
+        ],
+        "actionItems": [{"task": "आशा फाइनेंस से पूछना", "owner": "आशा", "due": ""}],
+    }
+    got = read_notes(json.dumps({"summary": "s", **sarvam_reply}), ["Asha", "Ravi"])
+    assert got.speakers == (
+        ("Asha", ("तिमाही रिपोर्ट कब तक भेजी जाएगी, यह पूछा।", "बजट के बारे में आशा फाइनेंस से पूछेगी।")),
+        ("Ravi", ("शुक्रवार तक तिमाही रिपोर्ट भेजने की बात कही।",)),
+    )
+    assert [a.to_dict() for a in got.action_items] == [{"task": "आशा फाइनेंस से पूछना", "owner": "आशा"}]
+
+
 @pytest.mark.parametrize(
     "raw",
     ["not json", "[1, 2]", json.dumps({"decisions": ["x"]}), json.dumps({"summary": "   "})],

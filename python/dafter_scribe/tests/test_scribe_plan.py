@@ -77,8 +77,9 @@ def test_an_encrypted_session_needs_the_control_plane_credential() -> None:
 
 
 def test_languages_without_a_bank_are_named_by_their_tag() -> None:
-    assert language_of("ta-IN").instruction() == "Write every field in ta-IN."
-    assert language_of("en-IN").instruction() == "Write every field in English."
+    assert language_of("ta-IN").instruction().startswith("Write every field in ta-IN, ")
+    assert language_of("en-IN").instruction().startswith("Write every field in English, ")
+    assert "Hindi in Devanagari script" in language_of("hi").instruction()
 
 
 def test_the_scribe_joins_hidden_and_can_publish_no_track() -> None:

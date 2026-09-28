@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from dataclasses import dataclass
 
+from dafter_batch.control import ControlPlane as BatchControl
 from dafter_core.config import ResolvedSessionConfig
 from dafter_core.enums import EncryptionMode
 from dafter_core.errors import DafterError
 from dafter_runtime.answering import Roster
 from dafter_runtime.control import ControlPlane, encryption
 from dafter_runtime.events import TOPIC, SessionEvents
-from dafter_runtime.listeners import is_worker
+from dafter_runtime.listeners import is_human, is_worker
 from dafter_runtime.plan import load
 from dafter_runtime.toolbox import follow
 from dafter_runtime.worker import redact_framework_logs, refuse
@@ -18,7 +20,9 @@ from livekit import rtc
 from livekit.agents import AgentServer, AutoSubscribe, JobContext, JobRequest
 from livekit.agents.worker import WorkerPermissions
 
+from .closing import REQUEST_TOPIC, Closing, command
 from .judging import Scorer
+from .keeper import MinutesKeeper
 from .plan import ScribePlan, plan
 from .scribe import Scribe
 from .transcript import Transcript
@@ -27,6 +31,7 @@ from .writer import Writer
 POOL_ENV = "LIVEKIT_AGENT_NAME"
 DEFAULT_POOL = "dafter-scribe"
 HTTP_PORT_ENV = "DAFTER_SCRIBE_HTTP_PORT"
+LONGEST_AFTER_CALL_S = 3600.0
 ROLE = "scribe"
 PERMISSIONS = WorkerPermissions(
     can_publish=False,
@@ -37,6 +42,20 @@ PERMISSIONS = WorkerPermissions(
 )
 
 log = logging.getLogger("dafter.scribe")
+
+
+@dataclass(slots=True)
+class Job:
+    closing: Closing
+    tasks: list[asyncio.Task[None]]
+    deadline_s: float
+
+    def stop(self) -> None:
+        for task in self.tasks:
+            task.cancel()
+
+
+JOBS: dict[str, Job] = {}
 
 
 def pool() -> str:
@@ -102,11 +121,15 @@ async def entrypoint(ctx: JobContext) -> None:
         scorer = Scorer(
             judge, p.judge.vendor.classify, events.emit, p.language, p.interval_s, p.judge.source()
         )
-    scribe = Scribe(p.config, writer, scorer)
+    closing = Closing(p.config, writer, scorer, events.emit, events.envelope)
+    scribe = Scribe(p.config, writer, scorer, closing)
 
     def received(packet: rtc.DataPacket) -> None:
         if packet.topic == TOPIC:
             scribe.received(packet.data, is_worker(packet.participant))
+        elif packet.topic == REQUEST_TOPIC and packet.participant is not None:
+            if is_human(packet.participant, ctx.room) and command(packet.data) == "minutes":
+                closing.requested()
 
     def left(participant: rtc.RemoteParticipant) -> None:
         if not roster.present():
@@ -115,27 +138,55 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.room.on("data_received", received)
     ctx.room.on("participant_disconnected", left)
-    running = [asyncio.ensure_future(writer.run())]
+    job = Job(closing, [asyncio.ensure_future(writer.run())], p.after_call_s)
     if scorer is not None:
-        running.append(asyncio.ensure_future(scorer.run()))
+        job.tasks.append(asyncio.ensure_future(scorer.run()))
+    JOBS[ctx.job.id] = job
 
     async def stop(reason: str) -> None:
-        for task in running:
-            task.cancel()
+        job.stop()
         await events.drain()
 
     ctx.add_shutdown_callback(stop)
     log.info("scribe listening", extra={"session": p.config.session_id})
 
 
+async def after_call(ctx: JobContext) -> None:
+    job = JOBS.pop(ctx.job.id, None)
+    if job is None:
+        return
+    job.stop()
+    control = ControlPlane.from_env(ROLE)
+    keeper = MinutesKeeper(control.url, control.secret) if control is not None else None
+    batch = BatchControl(control.url, control.secret) if control is not None else None
+    try:
+        await asyncio.wait_for(
+            job.closing.after_call(keeper, batch, asyncio.sleep), timeout=job.deadline_s
+        )
+    except TimeoutError:
+        log.warning("after-call work abandoned at the deadline", extra={"job": ctx.job.id})
+
+
 def server() -> AgentServer:
     redact_framework_logs()
     os.environ.setdefault(POOL_ENV, DEFAULT_POOL)
     agent_server = AgentServer(
-        permissions=PERMISSIONS, port=int(os.environ.get(HTTP_PORT_ENV) or 0)
+        permissions=PERMISSIONS,
+        port=int(os.environ.get(HTTP_PORT_ENV) or 0),
+        session_end_timeout=LONGEST_AFTER_CALL_S + 60,
     )
-    agent_server.rtc_session(entrypoint, on_request=on_request)
+    agent_server.rtc_session(entrypoint, on_request=on_request, on_session_end=after_call)
     return agent_server
 
 
-__all__ = ["PERMISSIONS", "entrypoint", "on_request", "pool", "room_key", "server"]
+__all__ = [
+    "JOBS",
+    "PERMISSIONS",
+    "Job",
+    "after_call",
+    "entrypoint",
+    "on_request",
+    "pool",
+    "room_key",
+    "server",
+]

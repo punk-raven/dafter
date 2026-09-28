@@ -21,7 +21,11 @@ COMPLETION_TOKENS = 120
 
 def job(**changes: Any) -> bytes:
     doc = json.loads(JOB.read_bytes())
-    doc["transcription"] = {"mode": "live", "consentArtifactId": "consent_tr"}
+    doc["transcription"] = {
+        **doc["transcription"],
+        "mode": "live",
+        "consentArtifactId": "consent_tr",
+    }
     doc["scribe"] = {**doc["scribe"], "enabled": True, "consentArtifactId": "consent_sc"}
     for key, value in changes.items():
         if isinstance(value, dict) and isinstance(doc.get(key), dict):

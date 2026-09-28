@@ -24,8 +24,11 @@ class Language:
     script: str | None
 
     def instruction(self) -> str:
-        written = f", written in {self.script} script" if self.script else ""
-        return f"Write every field in {self.name}{written}."
+        written = f" in {self.script} script" if self.script else ""
+        return (
+            f"Write every field in {self.name}{written}, the language of the call, even where "
+            "people mix in English words."
+        )
 
 
 @dataclass(frozen=True, slots=True)
