@@ -113,7 +113,7 @@ def watch(
     tracer: trace.Tracer,
     metrics: WorkerMetrics = WORKER,
 ) -> None:
-    turns = Turns()
+    turns = Turns(getattr(session.stt, "take_endpoint", None))
     prices = load_prices()
     recorder = SessionMetrics(metrics, p)
 

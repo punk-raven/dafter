@@ -141,6 +141,8 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 	}{
 		{"negative layer", "agent-turn-metrics.json", func(p map[string]any) { p["e2eLatencyMs"] = -1 }},
 		{"fractional layer", "agent-turn-metrics.json", func(p map[string]any) { p["llmNodeTtftMs"] = 1.5 }},
+		{"negative endpoint", "agent-turn-metrics.json", func(p map[string]any) { p["endpointMs"] = -1 }},
+		{"fractional reply gap", "agent-turn-metrics.json", func(p map[string]any) { p["replyGapMs"] = 2.5 }},
 		{"unknown layer", "agent-turn-metrics.json", func(p map[string]any) { p["vadDelayMs"] = 10 }},
 		{"missing turn", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "turn") }},
 		{"serial not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["serial"] = "yes" }},

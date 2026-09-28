@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 from livekit.agents.llm import ChatMessage
 from opentelemetry import trace
 
+ENDPOINT = "endpoint"
+REPLY_GAP = "reply_gap"
 USER_LAYERS = ("end_of_turn_delay", "transcription_delay")
 AGENT_LAYERS = (
     "llm_node_ttft",
@@ -16,6 +18,7 @@ AGENT_LAYERS = (
     "e2e_latency",
 )
 PAYLOAD_FIELDS = {
+    "endpoint": "endpointMs",
     "end_of_turn_delay": "endOfTurnDelayMs",
     "transcription_delay": "transcriptionDelayMs",
     "llm_node_ttft": "llmNodeTtftMs",
@@ -23,6 +26,7 @@ PAYLOAD_FIELDS = {
     "tts_node_ttfb": "ttsNodeTtfbMs",
     "playback_latency": "playbackLatencyMs",
     "e2e_latency": "e2eLatencyMs",
+    "reply_gap": "replyGapMs",
 }
 SPAN_NAME = "dafter.agent_turn"
 SERIAL_WAIT_MS = 500
@@ -81,17 +85,36 @@ class TurnTiming:
 
 
 class Turns:
-    def __init__(self) -> None:
+    def __init__(self, endpoint: Callable[[], tuple[float, float] | None] | None = None) -> None:
         self._count = 0
+        self._endpoint = endpoint
         self._user: dict[str, float] = {}
+        self._voiced_until: float | None = None
+
+    def _user_turn(self, item: ChatMessage) -> None:
+        self._user = {}
+        self._voiced_until = None
+        found = self._endpoint() if self._endpoint is not None else None
+        if found is not None and found[1] >= found[0]:
+            voiced_until, released_at = found
+            self._user[ENDPOINT] = released_at - voiced_until
+            self._voiced_until = voiced_until
+        self._user.update(_layers(item.metrics, USER_LAYERS))
+
+    def _reply_gap(self, item: ChatMessage) -> dict[str, float]:
+        voiced_until, self._voiced_until = self._voiced_until, None
+        started = item.metrics.get("started_speaking_at")
+        if voiced_until is None or not isinstance(started, int | float) or started < voiced_until:
+            return {}
+        return {REPLY_GAP: float(started) - voiced_until}
 
     def add(self, item: ChatMessage) -> TurnTiming | None:
         if item.role == "user":
-            self._user = _layers(item.metrics, USER_LAYERS)
+            self._user_turn(item)
             return None
         if item.role != "assistant":
             return None
-        seconds = {**self._user, **_layers(item.metrics, AGENT_LAYERS)}
+        seconds = {**self._user, **_layers(item.metrics, AGENT_LAYERS), **self._reply_gap(item)}
         self._user = {}
         timing = TurnTiming(turn=self._count, interrupted=item.interrupted, seconds=seconds)
         self._count += 1

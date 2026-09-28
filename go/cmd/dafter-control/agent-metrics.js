@@ -1,5 +1,6 @@
-const AGENT_LAYER_COLUMNS = ['endOfTurnDelayMs', 'transcriptionDelayMs', 'llmNodeTtftMs', 'ttsNodeTtfbMs', 'e2eLatencyMs'];
+const AGENT_LAYER_COLUMNS = ['endpointMs', 'endOfTurnDelayMs', 'transcriptionDelayMs', 'llmNodeTtftMs', 'ttsNodeTtfbMs', 'e2eLatencyMs'];
 const AGENT_LAYER_LABELS = {
+  endpointMs: 'endpoint',
   endOfTurnDelayMs: 'end of turn',
   transcriptionDelayMs: 'transcription',
   llmNodeTtftMs: 'LLM first token',
@@ -7,6 +8,7 @@ const AGENT_LAYER_LABELS = {
   ttsNodeTtfbMs: 'TTS first byte',
   playbackLatencyMs: 'playback',
   e2eLatencyMs: 'end to end',
+  replyGapMs: 'reply gap',
 };
 const SERIAL_WAIT_MS = 500;
 const TURN_COLUMNS = AGENT_LAYER_COLUMNS.length + 2;
