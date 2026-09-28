@@ -220,3 +220,13 @@ def test_prometheus_scrapes_the_worker_at_the_pinned_compose_gateway() -> None:
     target = re.search(r'targets: \["([^"]+)"\]', job)
     assert gateway and port and target
     assert target.group(1) == f"{gateway.group(1)}:{port.group(1)}"
+
+
+def test_a_layer_of_a_few_milliseconds_lands_in_its_own_bucket() -> None:
+    registry, session = fresh()
+    session.turn(TurnTiming(turn=0, interrupted=False, seconds={"end_of_turn_delay": 0.003}))
+    labels = {"layer": "end_of_turn_delay", **PIPELINE}
+    bucket = "dafter_agent_turn_layer_seconds_bucket"
+    assert registry.get_sample_value(bucket, {**labels, "le": "0.005"}) == 1
+    for le in ("0.01", "0.025", "0.05"):
+        assert registry.get_sample_value(bucket, {**labels, "le": le}) == 1
