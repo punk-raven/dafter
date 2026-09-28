@@ -43,12 +43,23 @@ class SentenceTokenizer(tokenize.SentenceTokenizer):
 
 class SentenceTTS(plugin.TTS):
     def __init__(
-        self, *, voice: Voice, styles: Mapping[str, Voice] | None = None, **options: Any
+        self,
+        *,
+        voice: Voice,
+        styles: Mapping[str, Voice] | None = None,
+        languages: Mapping[str, str] | None = None,
+        **options: Any,
     ) -> None:
         super().__init__(pace=voice.pace, temperature=voice.temperature, **options)
         self._opts.word_tokenizer = SentenceTokenizer()
         self._voice = voice
         self._styles = dict(styles or {})
+        self._languages = dict(languages or {})
+
+    def speak_in(self, language: str) -> None:
+        code = self._languages.get(language)
+        if code is not None and code != self._opts.target_language_code:
+            self.update_options(target_language_code=code)
 
     def style(self, situation: str) -> None:
         voice = self._styles.get(situation, self._voice)

@@ -21,8 +21,9 @@ class Vendor:
     name: str
     languages: frozenset[str]
     native_endpointing: bool
+    detects_language: bool
     vad: Callable[[ProviderRef], lk_vad.VAD] | None
-    stt: Callable[[ProviderRef, str, Turn, str | None], lk_stt.STT[Any]] | None
+    stt: Callable[[ProviderRef, str | None, Turn, str | None], lk_stt.STT[Any]] | None
     llm: Callable[[ProviderRef], lk_llm.LLM[Any]] | None
     tts: Callable[[ProviderRef, str], lk_tts.TTS[Any]] | None
     wants_prewarm: Callable[[ProviderRef], bool]
@@ -35,6 +36,7 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             name=sarvam.NAME,
             languages=frozenset(sarvam.LANGUAGES),
             native_endpointing=True,
+            detects_language=True,
             vad=None,
             stt=sarvam.build_stt,
             llm=sarvam.build_llm,
@@ -46,6 +48,7 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             name=silero.NAME,
             languages=frozenset(),
             native_endpointing=False,
+            detects_language=False,
             vad=silero.build_vad,
             stt=None,
             llm=None,

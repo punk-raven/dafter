@@ -21,6 +21,7 @@ from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
 from .stages import Stages, hearing
+from .switching import Switching
 
 log = logging.getLogger("dafter.runtime.called")
 
@@ -87,9 +88,16 @@ def command(data: bytes) -> str | None:
 
 class Called:
     def __init__(
-        self, ctx: JobContext, p: Plan, stages: Stages, session: AgentSession[Any], sample_rate: int
+        self,
+        ctx: JobContext,
+        p: Plan,
+        stages: Stages,
+        session: AgentSession[Any],
+        sample_rate: int,
+        switching: Switching | None = None,
     ) -> None:
         self._ctx = ctx
+        self._switching = switching if switching is not None and switching.enabled else None
         self._session = session
         self.roster = Roster()
         self.voice = Voice(session, self.roster, interruptible=p.config.turn.interruption.enabled)
@@ -124,11 +132,15 @@ class Called:
         follow(self.barge_in, speaker, session)
 
     def _hearing(self, speaker: str) -> Filter:
-        return acknowledged(
+        sieve = acknowledged(
             self._acknowledgements,
             self._floor,
             lambda: self.barge_in.acknowledged(speaker),
         )
+        if self._switching is None:
+            return sieve
+        observe = self._switching.observe(speaker)
+        return lambda events: sieve(observe(events))
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.ensure_future(work)

@@ -7,7 +7,7 @@ import pytest
 from dafter_core.config import ProviderRef, parse
 from dafter_core.enums import ErrorCode
 from dafter_core.errors import DafterError
-from dafter_providers import Styled, sarvam
+from dafter_providers import Multilingual, Styled, sarvam
 from dafter_providers.sarvam.sentences import SentenceTTS
 
 KEY_REF = "secret://tenants/t_9c21a4be/sarvam/api-key"
@@ -102,3 +102,14 @@ def test_sarvam_declares_no_markup_so_the_frameworks_expressive_mode_stays_off()
     built = tts()
     assert built.capabilities.streaming
     assert built.markup.llm_instructions() is None
+
+
+def test_the_voice_speaks_the_language_it_is_switched_to_and_ignores_others() -> None:
+    t = tts()
+    assert isinstance(t, Multilingual)
+    t.speak_in("kn-IN")
+    assert str(t._opts.target_language_code) == "kn-IN"
+    t.speak_in("hi")
+    assert str(t._opts.target_language_code) == "hi-IN"
+    t.speak_in("fr-FR")
+    assert str(t._opts.target_language_code) == "hi-IN"

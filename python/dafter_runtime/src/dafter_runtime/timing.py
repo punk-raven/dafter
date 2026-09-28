@@ -48,6 +48,7 @@ class TurnTiming:
     interrupted: bool
     seconds: dict[str, float] = field(default_factory=dict)
     filler: bool = False
+    language: str | None = None
 
     def milliseconds(self) -> dict[str, int]:
         return {key: round(value * 1000) for key, value in self.seconds.items()}
@@ -65,10 +66,12 @@ class TurnTiming:
             body["serial"] = serial
         if self.filler:
             body["filler"] = True
+        if self.language is not None:
+            body["language"] = self.language
         return body
 
-    def span_attributes(self) -> dict[str, int | bool]:
-        attrs: dict[str, int | bool] = {
+    def span_attributes(self) -> dict[str, int | bool | str]:
+        attrs: dict[str, int | bool | str] = {
             "dafter.turn.index": self.turn,
             "dafter.turn.interrupted": self.interrupted,
         }
@@ -77,6 +80,8 @@ class TurnTiming:
             attrs["dafter.turn.serial"] = serial
         if self.filler:
             attrs["dafter.turn.filler"] = True
+        if self.language is not None:
+            attrs["dafter.turn.language"] = self.language
         return attrs
 
     def log_fields(self) -> dict[str, Any]:
@@ -86,6 +91,8 @@ class TurnTiming:
             fields["serial"] = serial
         if self.filler:
             fields["filler"] = True
+        if self.language is not None:
+            fields["language"] = self.language
         return fields
 
     def record(self, tracer: trace.Tracer) -> None:
@@ -96,17 +103,26 @@ class Turns:
     def __init__(self) -> None:
         self._count = 0
         self._user: dict[str, float] = {}
+        self._answering_in: str | None = None
 
-    def add(self, item: ChatMessage, filler: bool = False) -> TurnTiming | None:
+    def add(
+        self, item: ChatMessage, filler: bool = False, language: str | None = None
+    ) -> TurnTiming | None:
         if item.role == "user":
             self._user = _layers(item.metrics, USER_LAYERS)
+            self._answering_in = language
             return None
         if item.role != "assistant":
             return None
         seconds = {**self._user, **_layers(item.metrics, AGENT_LAYERS)}
-        self._user = {}
+        replied_in = self._answering_in or language
+        self._user, self._answering_in = {}, None
         timing = TurnTiming(
-            turn=self._count, interrupted=item.interrupted, seconds=seconds, filler=filler
+            turn=self._count,
+            interrupted=item.interrupted,
+            seconds=seconds,
+            filler=filler,
+            language=replied_in,
         )
         self._count += 1
         return timing

@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from dafter_core.config import Pipeline, ProviderRef, ResolvedSessionConfig, Turn, parse
+from dafter_core.config import (
+    Addressing,
+    Pipeline,
+    ProviderRef,
+    ResolvedSessionConfig,
+    Turn,
+    parse,
+)
 from dafter_core.enums import (
     AddressingMode,
     AgentMode,
@@ -35,6 +42,11 @@ class Plan:
     turn_handling: dict[str, Any]
     persona: Persona
     stt_prompt: str | None = None
+    personas: dict[str, Persona] = field(default_factory=dict)
+
+    @property
+    def hearing(self) -> str | None:
+        return None if self.config.agent.language_switching.enabled else self.config.language
 
     @property
     def called_by_name(self) -> bool:
@@ -226,17 +238,66 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     }
 
 
+def voiced(ref: str | None, language: str, addressing: Addressing) -> Persona:
+    persona = persona_for(ref, language)
+    return called_by_name(persona, addressing.name) if addressing.waits_to_be_called else persona
+
+
+def _switchable(cfg: ResolvedSessionConfig, vendors: tuple[Vendor, ...]) -> dict[str, Persona]:
+    switching = cfg.agent.language_switching
+    if not switching.enabled:
+        return {}
+    stt = vendors[0]
+    if not stt.detects_language:
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "the session switches languages and its STT cannot identify one",
+            "/agent/languageSwitching/enabled",
+            f"{stt.name} does not identify the language of an utterance",
+        )
+    personas: dict[str, Persona] = {}
+    bases: set[str] = set()
+    for i, tag in enumerate(switching.languages):
+        pointer = f"/agent/languageSwitching/languages/{i}"
+        if base_language(tag) in bases:
+            raise _refuse(
+                ErrorCode.INVALID_CONFIG,
+                "two languages the session may switch into share a base language",
+                pointer,
+                "an identified language could mean either",
+            )
+        bases.add(base_language(tag))
+        for vendor in vendors:
+            if tag not in vendor.languages:
+                raise _refuse(
+                    ErrorCode.UNSUPPORTED_CAPABILITY,
+                    "a provider does not serve a language the session may switch into",
+                    pointer,
+                    f"not declared by {vendor.name}",
+                )
+        try:
+            personas[tag] = voiced(cfg.agent.persona_ref, tag, cfg.agent.addressing)
+        except DafterError as exc:
+            raise _refuse(
+                ErrorCode.UNSUPPORTED_CAPABILITY,
+                "no persona document is available for a language the session may switch into",
+                pointer,
+                "not registered in this worker for the language",
+            ) from exc
+    return personas
+
+
 def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> Plan:
     pipeline = _check_session(cfg, pool, fetches_keys)
     stt = _vendor(pipeline.stt, Stage.STT, cfg.language)
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
     detection = turn_detection(cfg.turn, stt, cfg.language)
-    persona = persona_for(cfg.agent.persona_ref, cfg.language)
     addressing = cfg.agent.addressing
+    persona = voiced(cfg.agent.persona_ref, cfg.language, addressing)
+    personas = _switchable(cfg, (stt, llm, tts)) or {cfg.language: persona}
     prompt = None
     if addressing.waits_to_be_called:
-        persona = called_by_name(persona, addressing.name)
         prompt = ", ".join(dict.fromkeys((addressing.name, *addressing.aliases)))
     return Plan(
         config=cfg,
@@ -249,4 +310,5 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         turn_handling=turn_handling(cfg.turn, detection),
         persona=persona,
         stt_prompt=prompt,
+        personas=personas,
     )

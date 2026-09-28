@@ -58,6 +58,12 @@
           }
         },
         "expressive": false
+      },
+      "languageSwitching": {
+        "enabled": false,
+        "languages": ["hi", "en-IN", "kn-IN", "mr-IN", "te-IN"],
+        "minConfidence": 0.8,
+        "minWords": 3
       }
     },
     "turn": {

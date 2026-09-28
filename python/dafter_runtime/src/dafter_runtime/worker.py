@@ -7,6 +7,7 @@ from typing import Any
 
 from dafter_core.enums import EncryptionMode, EventType, Stage
 from dafter_core.errors import DafterError
+from dafter_providers import Multilingual
 from livekit import local_inference, rtc
 from livekit.agents import (
     AgentServer,
@@ -40,6 +41,7 @@ from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
 from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
+from .switching import Switching
 from .timing import Turns
 from .toolbox import Answering, follow, linked, registry_for
 
@@ -133,6 +135,7 @@ def watch(
     metrics: WorkerMetrics = WORKER,
     usage: Callable[[], AgentSessionUsage] | None = None,
     filled: Callable[[], bool] = lambda: False,
+    language: Callable[[], str | None] = lambda: None,
 ) -> None:
     turns = Turns()
     prices = load_prices()
@@ -155,7 +158,7 @@ def watch(
     def item_added(ev: ConversationItemAddedEvent) -> None:
         if not isinstance(ev.item, ChatMessage):
             return
-        timing = turns.add(ev.item, filled())
+        timing = turns.add(ev.item, filled(), language())
         if timing is None:
             return
         log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
@@ -209,8 +212,11 @@ def watch(
     session.on("close", closed)
 
 
-def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
-    spoken = SpeechPlan(p.config.agent.speech, p.config.language).transforms()
+def new_session(
+    p: Plan, stages: Stages, speech_plan: SpeechPlan | None = None
+) -> AgentSession[Any]:
+    planned = speech_plan or SpeechPlan(p.config.agent.speech, p.config.language)
+    spoken = planned.transforms()
     if p.called_by_name:
         return AgentSession(
             stt=NOT_GIVEN,
@@ -248,7 +254,8 @@ async def entrypoint(ctx: JobContext) -> None:
         await ctx.room.local_participant.publish_data(body, reliable=True, topic=TOPIC)
 
     events = SessionEvents(p.config, publish)
-    session = new_session(p, stages)
+    speech_plan = SpeechPlan(p.config.agent.speech, p.config.language)
+    session = new_session(p, stages, speech_plan)
 
     async def flush() -> None:
         await events.drain()
@@ -256,19 +263,25 @@ async def entrypoint(ctx: JobContext) -> None:
             provider.force_flush()
 
     ctx.add_shutdown_callback(flush)
-    called = Called(ctx, p, stages, session, stt_sample_rate(p)) if p.called_by_name else None
+    switching = Switching(p.config.agent.language_switching, p.config.language, p.personas)
     delivery = Delivery(p.config.agent.speech, p.config.language)
+    follow_language(switching, speech_plan, delivery, stages)
+    called = (
+        Called(ctx, p, stages, session, stt_sample_rate(p), switching) if p.called_by_name else None
+    )
     caller: Callable[[], str | None]
     if called is not None:
         caller = called.addressee
-        registry = registry_for(p, session, called.roster, caller, called.gate.sleep, delivery)
-        called.voice.before_answer = registry.heard
+        registry = registry_for(
+            p, session, called.roster, caller, called.gate.sleep, delivery, switching
+        )
+        called.voice.before_answer = answering(switching, registry.heard)
         called.voice.announce = events.addressed
     else:
         roster = Roster()
         follow(ctx.room, roster)
         caller = linked(session)
-        registry = registry_for(p, session, roster, caller, None, delivery)
+        registry = registry_for(p, session, roster, caller, None, delivery, switching)
     watch(
         session,
         p,
@@ -276,6 +289,7 @@ async def entrypoint(ctx: JobContext) -> None:
         telemetry.tracer(provider),
         usage=called.usage if called is not None else None,
         filled=lambda: delivery.filler.took(session.current_speech),
+        language=lambda: switching.language if switching.enabled else None,
     )
     await session.start(
         agent=Answering(
@@ -284,6 +298,7 @@ async def entrypoint(ctx: JobContext) -> None:
             caller,
             Acknowledgements.of(p.config.turn.interruption.backchannel),
             delivery,
+            switching,
         ),
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate),
@@ -294,6 +309,28 @@ async def entrypoint(ctx: JobContext) -> None:
         called.listen()
         return
     session.say(p.persona.greeting, allow_interruptions=True)
+
+
+def follow_language(
+    switching: Switching, speech_plan: SpeechPlan, delivery: Delivery, stages: Stages
+) -> None:
+    if not switching.enabled:
+        return
+    tts = stages.tts
+    if isinstance(tts, Multilingual):
+        switching.follow_with(tts.speak_in)
+    switching.follow_with(speech_plan.speak_in)
+    switching.follow_with(lambda language: delivery.filler.speak_in(language, tts))
+
+
+def answering(
+    switching: Switching, heard: Callable[[str, str], None]
+) -> Callable[[str, str], None]:
+    def before_answer(speaker: str, text: str) -> None:
+        switching.answering(speaker)
+        heard(speaker, text)
+
+    return before_answer
 
 
 def prewarm(proc: JobProcess) -> None:

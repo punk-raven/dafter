@@ -1,6 +1,7 @@
 package control_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/punk-raven/dafter/go/internal/config"
@@ -49,5 +50,32 @@ func TestEachFocusLanguageResolvesItsOwnRoute(t *testing.T) {
 				t.Errorf("%s on %s left a turn constant to the provider's default: %+v", l.language, channel, turn)
 			}
 		}
+	}
+}
+
+func TestASessionOverrideTurnsOnSwitchingBetweenEveryFocusLanguage(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for _, l := range focusLanguages {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: l.language, Channel: config.ChannelWebRTC,
+			Overrides: json.RawMessage(`{"agent": {"languageSwitching": {"enabled": true}}}`),
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", l.language, err)
+		}
+		s := resolved.Config.Agent.LanguageSwitching
+		if s == nil || !s.Enabled || len(s.Languages) != len(focusLanguages) {
+			t.Errorf("%s: switching resolved to %+v", l.language, s)
+		}
+	}
+	plain, err := catalog.Resolve(config.Request{
+		SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelWebRTC,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.Config.Agent.LanguageSwitching.Enabled {
+		t.Error("a session switches languages without asking to")
 	}
 }

@@ -64,7 +64,8 @@ Frames = list[rtc.AudioFrame]
 
 class Filler:
     def __init__(self, fillers: Fillers, language: str) -> None:
-        self._phrases = fillers.phrases.get(base_language(language), ()) if fillers.enabled else ()
+        self._fillers = fillers
+        self._phrases = self._of(language)
         self.after = fillers.after_ms / 1000
         self._audio: dict[str, Frames] = {}
         self._turn = 0
@@ -73,9 +74,21 @@ class Filler:
         self._played: weakref.WeakSet[Any] = weakref.WeakSet()
         self._preparing: asyncio.Future[None] | None = None
 
+    def _of(self, language: str) -> tuple[str, ...]:
+        if not self._fillers.enabled:
+            return ()
+        return tuple(self._fillers.phrases.get(base_language(language), ()))
+
     @property
     def enabled(self) -> bool:
         return bool(self._phrases)
+
+    def speak_in(self, language: str, tts: lk_tts.TTS[Any]) -> None:
+        self._phrases = self._of(language)
+        self._turn = 0
+        missing = tuple(p for p in self._phrases if p not in self._audio)
+        if missing:
+            self._preparing = asyncio.ensure_future(self.prepare(tts, missing))
 
     def phrase(self) -> str | None:
         if not self._phrases:
@@ -84,8 +97,8 @@ class Filler:
         self._turn += 1
         return phrase
 
-    async def prepare(self, tts: lk_tts.TTS[Any]) -> None:
-        for phrase in self._phrases:
+    async def prepare(self, tts: lk_tts.TTS[Any], phrases: tuple[str, ...] = ()) -> None:
+        for phrase in phrases or self._phrases:
             try:
                 self._audio[phrase] = [ev.frame async for ev in tts.synthesize(phrase)]
             except Exception:

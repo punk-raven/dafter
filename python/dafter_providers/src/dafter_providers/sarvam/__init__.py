@@ -36,6 +36,7 @@ LANGUAGES = {
     "pa-IN": "pa-IN",
     "or-IN": "or-IN",
 }
+IDENTIFY = "auto"
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
 STT_MODES = {"transcribe": "transcribe", "codemix": "codemix"}
 STT_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
@@ -92,7 +93,9 @@ def _construct(stage: Stage, build: Callable[[], T]) -> T:
         ) from exc
 
 
-def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -> stt.STT[Any]:
+def build_stt(
+    ref: ProviderRef, language: str | None, turn: Turn, prompt: str | None
+) -> stt.STT[Any]:
     _checked(ref, Stage.STT, STT_MODELS)
     opts = Options(
         Stage.STT,
@@ -100,7 +103,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -
         ref.options,
         ("chunkMs", "encoding", "sampleRate", "finalGraceMs", "mode"),
     )
-    code = language_code(language, Stage.STT)
+    code = IDENTIFY if language is None else language_code(language, Stage.STT)
     stream_type = opts.choice("chunkMs", CHUNK_PROFILES, 500)
     mode = opts.choice("mode", STT_MODES, "transcribe")
     encoding = opts.choice("encoding", STT_ENCODINGS, "pcm_s16le")
@@ -204,6 +207,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         lambda: SentenceTTS(
             voice=voice,
             styles=styles,
+            languages=LANGUAGES,
             target_language_code=code,
             model=model,
             speaker=speaker,

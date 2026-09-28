@@ -9,15 +9,17 @@ from dafter_providers import Styled
 from livekit import rtc
 from livekit.agents import Agent, AgentSession, FlushSentinel, ModelSettings
 from livekit.agents import llm as lk_llm
+from livekit.agents.voice.generation import update_instructions
 
 from .answering import Roster
 from .backchannel import Acknowledgements, Events, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
-from .everyday import current_time, go_quiet, who_is_here
+from .everyday import current_time, go_quiet, switch_language, who_is_here
 from .listeners import is_human
 from .naming import words
 from .plan import Plan
+from .switching import Switching
 from .tools import NO_FILLING, Filling, Registry, Tool
 
 log = logging.getLogger("dafter.runtime.toolbox")
@@ -31,18 +33,22 @@ class Answering(Agent):
         caller: Callable[[], str | None],
         acknowledgements: Acknowledgements | None = None,
         delivery: Delivery | None = None,
+        switching: Switching | None = None,
     ):
         super().__init__(instructions=instructions, tools=registry.function_tools())
         self._registry = registry
         self._caller = caller
         self._acknowledgements = acknowledgements
         self._delivery = delivery
+        self._switching = switching if switching is not None and switching.enabled else None
         self._floor: SessionFloor | None = None
 
     def stt_node(
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
     ) -> Events:
-        events = Agent.default.stt_node(self, audio, model_settings)
+        events: Events = Agent.default.stt_node(self, audio, model_settings)
+        if self._switching is not None:
+            events = self._switching.observe()(events)
         if self._floor is None:
             self._floor = SessionFloor(self.session)
         return acknowledged(self._acknowledgements, self._floor)(events)
@@ -52,6 +58,10 @@ class Answering(Agent):
     ) -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
         if self._delivery is not None:
             self._delivery.heard(chat_ctx)
+        if self._switching is not None:
+            chat_ctx = chat_ctx.copy()
+            instructions = self._switching.persona.instructions
+            update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
         return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
 
     def tts_node(
@@ -116,10 +126,14 @@ def follow(room: rtc.Room, roster: Roster) -> None:
         joined(participant)
 
 
-def everyday(roster: Roster, sleep: Callable[[], None] | None) -> list[Tool]:
+def everyday(
+    roster: Roster, sleep: Callable[[], None] | None, switching: Switching | None = None
+) -> list[Tool]:
     tools = [current_time(), who_is_here(roster.present)]
     if sleep is not None:
         tools.append(go_quiet(sleep))
+    if switching is not None and switching.enabled:
+        tools.append(switch_language(switching.languages, switching.ask))
     return tools
 
 
@@ -130,10 +144,11 @@ def registry_for(
     caller: Callable[[], str | None],
     sleep: Callable[[], None] | None,
     delivery: Delivery | None = None,
+    switching: Switching | None = None,
 ) -> Registry:
     filler = delivery.filler if delivery is not None else None
     return Registry(
-        everyday(roster, sleep),
+        everyday(roster, sleep, switching),
         caller=caller,
         role_of=unattested,
         confirmations=Confirmations(name_words(p)),

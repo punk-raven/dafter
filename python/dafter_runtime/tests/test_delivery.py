@@ -145,3 +145,20 @@ def test_a_slow_reply_plays_one_filler_ahead_of_it_and_says_so() -> None:
 def test_a_quick_reply_plays_no_filler() -> None:
     c = converse(0.0, "मेरा बिल देखिए")
     assert c.filled == [False, False]
+
+
+def test_a_switched_language_fills_with_its_own_phrases_synthesized_once() -> None:
+    delivery = Delivery(CFG.agent.speech, "hi")
+    reader = SlowReader(0.1)
+
+    async def run() -> None:
+        await delivery.filler.prepare(reader)
+        delivery.filler.speak_in("kn-IN", reader)
+        await until(lambda: len(reader.read) == len(CFG.agent.speech.fillers.phrases["hi"]) + 2)
+        delivery.filler.speak_in("hi", reader)
+        await asyncio.sleep(0.05)
+
+    asyncio.run(run())
+    assert reader.read[-2:] == list(CFG.agent.speech.fillers.phrases["kn"])
+    assert len(reader.read) == len(CFG.agent.speech.fillers.phrases["hi"]) + 2
+    assert delivery.filler.phrase() == CFG.agent.speech.fillers.phrases["hi"][0]

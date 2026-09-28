@@ -190,3 +190,12 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
         vendor_for(ProviderRef(provider="deepgram"), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
     assert set(VENDORS) == {"sarvam", "silero"}
+
+
+def test_stt_identifies_the_language_when_the_session_switches() -> None:
+    assert VENDORS["sarvam"].detects_language and not VENDORS["silero"].detects_language
+    stt = sarvam.build_stt(ref("saaras:v3-realtime", mode="codemix"), None, TURN, None)
+    opts = stt._opts  # type: ignore[attr-defined]
+    assert (opts.language, opts.mode) == ("auto", "codemix")
+    url = stt_streaming._build_realtime_ws_url(opts.base_url, opts)
+    assert parse_qs(urlsplit(url).query)["language_code"] == ["auto"]
