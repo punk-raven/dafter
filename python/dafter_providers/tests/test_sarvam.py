@@ -34,7 +34,7 @@ def test_a_secret_ref_names_its_environment_variable() -> None:
 
 def test_a_missing_credential_fails_at_construction_without_leaking() -> None:
     with pytest.raises(DafterError) as caught:
-        credentials.resolve(KEY_REF, env={})
+        credentials.resolve(ref("sarvam-105b"), Stage.LLM, {sarvam.CREDENTIAL}, env={})
     assert caught.value.code is ErrorCode.AUTHENTICATION_FAILED
     assert "SARVAM_API_KEY" in caught.value.message
 
@@ -171,4 +171,4 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
     with pytest.raises(DafterError) as caught:
         vendor_for(ProviderRef(provider="deepgram"), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
-    assert set(VENDORS) == {"sarvam", "silero"}
+    assert set(VENDORS) == {"sarvam", "silero", "openai_compat"}

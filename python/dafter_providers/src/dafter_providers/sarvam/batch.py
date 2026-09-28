@@ -20,6 +20,7 @@ NAME = "sarvam"
 BASE_URL = "https://api.sarvam.ai"
 JOB_PATH = "/speech-to-text/job/v1"
 KEY_HEADER = "api-subscription-key"
+CREDENTIAL = "SARVAM_API_KEY"
 BLOB_HEADERS = {"x-ms-blob-type": "BlockBlob"}
 BATCH_MODELS = frozenset({"saaras:v3", "saaras:v4"})
 REGIONS = frozenset({"ap-south-1"})
@@ -288,7 +289,8 @@ def build_batch(ref: ProviderRef) -> SarvamBatch:
             f"at '{opts.pointer('timeoutSeconds')}': between {TIMEOUT_SECONDS[0]} and "
             f"{TIMEOUT_SECONDS[1]} seconds",
         )
-    return SarvamBatch(credentials.resolve(ref.credential_ref), ref.model or "", float(timeout_s))
+    key = credentials.resolve(ref, Stage.STT, {CREDENTIAL}, pointer=POINTER)
+    return SarvamBatch(key, ref.model or "", float(timeout_s))
 
 
 __all__ = ["BATCH_MODELS", "MODES", "SarvamBatch", "build_batch", "chunks_of", "transcript_of"]
