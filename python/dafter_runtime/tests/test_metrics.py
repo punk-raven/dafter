@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -207,3 +208,15 @@ def test_a_session_adds_no_series_beyond_the_ones_it_started_with() -> None:
     session.usage(priced(usage, load_prices()))
     session.closed(priced(usage, {}))
     assert series(registry) == before
+
+
+def test_prometheus_scrapes_the_worker_at_the_pinned_compose_gateway() -> None:
+    root = JOB.parents[2]
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    scrape = (root / "deploy" / "prometheus.yml").read_text(encoding="utf-8")
+    gateway = re.search(r"^\s+gateway: (\S+)$", compose, re.MULTILINE)
+    port = re.search(rf'{PORT_ENV}: "(\d+)"', compose)
+    job = scrape.split("job_name: dafter-agent", 1)[1]
+    target = re.search(r'targets: \["([^"]+)"\]', job)
+    assert gateway and port and target
+    assert target.group(1) == f"{gateway.group(1)}:{port.group(1)}"
