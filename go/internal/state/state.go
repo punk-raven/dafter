@@ -53,6 +53,8 @@ type SessionStore interface {
 	AddTranscript(ctx context.Context, t Transcript) (Transcript, bool, error)
 	Transcripts(ctx context.Context, sessionID string) ([]Transcript, error)
 	Transcript(ctx context.Context, sessionID string, version int) (Transcript, error)
+	AddMinutes(ctx context.Context, m Minutes) (Minutes, error)
+	LatestMinutes(ctx context.Context, sessionID string) (Minutes, error)
 	Close() error
 }
 
@@ -119,8 +121,10 @@ func Open(ctx context.Context, path string) (*Store, error) {
 			return nil, closing(db, err)
 		}
 	}
-	if _, err := db.ExecContext(ctx, transcriptsMigration); err != nil {
-		return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
+	for _, migration := range []string{transcriptsMigration, minutesMigration} {
+		if _, err := db.ExecContext(ctx, migration); err != nil {
+			return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
+		}
 	}
 	return &Store{db: db}, nil
 }

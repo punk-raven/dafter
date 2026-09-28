@@ -47,6 +47,8 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/transcripts", s.storeTranscript)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts", s.listTranscripts)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
+	mux.HandleFunc("POST /sessions/{sessionID}/minutes", s.storeMinutes)
+	mux.HandleFunc("GET /sessions/{sessionID}/minutes", s.readMinutes)
 	return mux
 }
 

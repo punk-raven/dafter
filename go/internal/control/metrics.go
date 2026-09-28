@@ -113,6 +113,8 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/transcripts", s.storeTranscript)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts", s.listTranscripts)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
+	mux.HandleFunc("POST /sessions/{sessionID}/minutes", s.storeMinutes)
+	mux.HandleFunc("GET /sessions/{sessionID}/minutes", s.readMinutes)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()
@@ -134,7 +136,7 @@ func normalizePath(p string) string {
 	if strings.Contains(p, "/transcripts/") {
 		return "/sessions/{id}/transcripts/{version}"
 	}
-	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/scribe/key", "/scribe/refusal", "/transcription/sources", "/transcripts"} {
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/scribe/key", "/scribe/refusal", "/transcription/sources", "/transcripts", "/minutes"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
 		}
