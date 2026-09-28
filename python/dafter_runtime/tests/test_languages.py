@@ -103,7 +103,7 @@ def test_every_focus_language_plans_with_personas_in_its_own_script(
     assert (p.stt.name, p.llm.name, p.tts.name) == ("sarvam", "sarvam", "sarvam")
     base = base_language(language)
     for ref in (None, "persona://support/v3"):
-        persona = persona_for(ref, language)
+        persona = persona_for(ref, language, None)
         assert in_script(persona.greeting, base), persona.greeting
         assert "Reply only in" in persona.instructions
         if base not in {"hi", "en"}:

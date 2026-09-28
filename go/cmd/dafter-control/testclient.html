@@ -147,10 +147,16 @@
         </select>
         <label>Agent answers</label>
         <select id="addressing-mode">
-          <option value="" selected>follow the catalog</option>
+          <option value="" selected>follow the catalog (called by name)</option>
           <option value="always">always - every turn of one person</option>
           <option value="transcript">transcript - only when called by name</option>
           <option value="on_device">on_device - local name spotting, refused until built</option>
+        </select>
+        <label>Greeting</label>
+        <select id="agent-greeting">
+          <option value="" selected>follow the catalog (silent)</option>
+          <option value="on">on - the agent speaks first</option>
+          <option value="off">off - silent until spoken to</option>
         </select>
         <label>Recording</label>
         <select id="recording-layout">

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from dafter_core.config import (
-    Addressing,
+    Agent,
     Pipeline,
     ProviderRef,
     ResolvedSessionConfig,
@@ -57,6 +57,10 @@ class Plan:
         if self.called_by_name:
             return {**self.turn_handling, "turn_detection": "manual"}
         return self.turn_handling
+
+    @property
+    def opening(self) -> str | None:
+        return self.persona.greeting if self.config.agent.greets else None
 
 
 def load(metadata: str | bytes) -> ResolvedSessionConfig:
@@ -238,9 +242,9 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     }
 
 
-def voiced(ref: str | None, language: str, addressing: Addressing) -> Persona:
-    persona = persona_for(ref, language)
-    return called_by_name(persona, addressing.name) if addressing.waits_to_be_called else persona
+def voiced(agent: Agent, language: str) -> Persona:
+    persona = persona_for(agent.persona_ref, language, agent.name)
+    return called_by_name(persona) if agent.addressing.waits_to_be_called else persona
 
 
 def _switchable(cfg: ResolvedSessionConfig, vendors: tuple[Vendor, ...]) -> dict[str, Persona]:
@@ -276,7 +280,7 @@ def _switchable(cfg: ResolvedSessionConfig, vendors: tuple[Vendor, ...]) -> dict
                     f"not declared by {vendor.name}",
                 )
         try:
-            personas[tag] = voiced(cfg.agent.persona_ref, tag, cfg.agent.addressing)
+            personas[tag] = voiced(cfg.agent, tag)
         except DafterError as exc:
             raise _refuse(
                 ErrorCode.UNSUPPORTED_CAPABILITY,
@@ -294,11 +298,11 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
     detection = turn_detection(cfg.turn, stt, cfg.language)
     addressing = cfg.agent.addressing
-    persona = voiced(cfg.agent.persona_ref, cfg.language, addressing)
+    persona = voiced(cfg.agent, cfg.language)
     personas = _switchable(cfg, (stt, llm, tts)) or {cfg.language: persona}
     prompt = None
     if addressing.waits_to_be_called:
-        prompt = ", ".join(dict.fromkeys((addressing.name, *addressing.aliases)))
+        prompt = ", ".join(dict.fromkeys((cfg.agent.name or "", *addressing.aliases)))
     return Plan(
         config=cfg,
         pipeline=pipeline,

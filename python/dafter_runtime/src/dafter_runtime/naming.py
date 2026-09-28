@@ -4,7 +4,7 @@ import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 
-from dafter_core.config import Addressing
+from dafter_core.config import Agent
 
 from . import vocabulary
 
@@ -88,8 +88,9 @@ class Matcher:
         self._near_misses = {w for m in near_misses for w in words(m)}
 
     @classmethod
-    def for_addressing(cls, addressing: Addressing) -> Matcher:
-        return cls(addressing.name, addressing.aliases, addressing.near_misses)
+    def for_agent(cls, agent: Agent) -> Matcher:
+        addressing = agent.addressing
+        return cls(agent.name or "", addressing.aliases, addressing.near_misses)
 
     def _is_name_word(self, word: str) -> bool:
         if word in self._single:

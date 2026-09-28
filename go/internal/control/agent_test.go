@@ -102,6 +102,36 @@ func TestASessionOverrideSelectsTheTurnDetectorForHindi(t *testing.T) {
 	}
 }
 
+func TestTheCatalogAgentIsNamedWaitsToBeCalledAndGreetsOnlyWhenASessionAsks(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for _, tc := range []struct {
+		overrides string
+		greets    bool
+	}{
+		{"", false},
+		{`{"agent":{"greets":true}}`, true},
+	} {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelWebRTC,
+			Overrides: json.RawMessage(tc.overrides),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := config.Parse(resolved.Document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Agent.Name != "Nivya" || cfg.Agent.Greets == nil || *cfg.Agent.Greets != tc.greets {
+			t.Errorf("overrides %q resolved agent name %q greets %v; want Nivya greeting %v", tc.overrides, cfg.Agent.Name, cfg.Agent.Greets, tc.greets)
+		}
+		if !cfg.Agent.Addressing.WaitsToBeCalled() || cfg.Agent.Addressing.Mode != config.AddressingTranscript {
+			t.Errorf("overrides %q resolved addressing %+v; the catalog agent waits to be called by name", tc.overrides, cfg.Agent.Addressing)
+		}
+	}
+}
+
 func TestNoAgentMeansNoDispatch(t *testing.T) {
 	t.Parallel()
 	h := serve(t)
