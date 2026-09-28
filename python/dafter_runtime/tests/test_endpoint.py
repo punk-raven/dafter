@@ -147,3 +147,19 @@ def test_the_worker_takes_the_endpoint_its_speech_to_text_held() -> None:
     assert registry.get_sample_value(
         "dafter_agent_turn_layer_seconds_sum", labels
     ) == pytest.approx(1.2)
+
+
+def test_a_reply_nobody_heard_spends_the_user_layers_it_answered() -> None:
+    turns = Turns(Held(Endpoint(STOPPED, STOPPED + 1.0)).take_endpoint)
+    turns.add(message("user", USER))
+    cut = turns.unheard()
+    later = turns.add(message("assistant", REPLY))
+    assert cut.payload() == {
+        "turn": 0,
+        "interrupted": True,
+        "endpointMs": 1000,
+        "endOfTurnDelayMs": 3,
+        "transcriptionDelayMs": 0,
+    }
+    assert later is not None and later.turn == 1
+    assert "endpointMs" not in later.payload() and "replyGapMs" not in later.payload()

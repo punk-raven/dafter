@@ -119,3 +119,10 @@ class Turns:
         timing = TurnTiming(turn=self._count, interrupted=item.interrupted, seconds=seconds)
         self._count += 1
         return timing
+
+    def unheard(self) -> TurnTiming:
+        timing = TurnTiming(turn=self._count, interrupted=True, seconds=self._user)
+        self._user = {}
+        self._voiced_until = None
+        self._count += 1
+        return timing

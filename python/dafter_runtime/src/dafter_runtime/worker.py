@@ -21,6 +21,7 @@ from livekit.agents.voice.events import (
     CloseEvent,
     ConversationItemAddedEvent,
     ErrorEvent,
+    SpeechCreatedEvent,
 )
 from livekit.agents.voice.room_io import AudioInputOptions, AudioOutputOptions, RoomOptions
 from opentelemetry import trace
@@ -32,7 +33,7 @@ from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
 from .stages import Stages, build
-from .timing import Turns
+from .timing import Turns, TurnTiming
 
 POOL_ENV = "LIVEKIT_AGENT_NAME"
 DEFAULT_POOL = "dafter-py"
@@ -136,6 +137,17 @@ def watch(
         timing = turns.add(ev.item)
         if timing is None:
             return
+        report(timing)
+
+    def speech_created(ev: SpeechCreatedEvent) -> None:
+        handle = ev.speech_handle
+        handle.add_done_callback(lambda _: unheard(handle.scheduled and not handle.chat_items))
+
+    def unheard(cut_off: bool) -> None:
+        if cut_off:
+            report(turns.unheard())
+
+    def report(timing: TurnTiming) -> None:
         log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
         timing.record(tracer)
         recorder.turn(timing)
@@ -183,6 +195,7 @@ def watch(
 
     session.on("agent_state_changed", state_changed)
     session.on("conversation_item_added", item_added)
+    session.on("speech_created", speech_created)
     session.on("error", failed)
     session.on("close", closed)
 
