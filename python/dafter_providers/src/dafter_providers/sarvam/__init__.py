@@ -11,6 +11,7 @@ from livekit.plugins import sarvam as plugin
 
 from .. import credentials
 from ..options import Options
+from .llm import SarvamLLM
 from .realtime import FinalFirstSTT
 
 NAME = "sarvam"
@@ -122,7 +123,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     if thinking:
         return _construct(
             Stage.LLM,
-            lambda: plugin.LLM(
+            lambda: SarvamLLM(
                 model=model,
                 api_key=key,
                 base_url=LLM_BASE_URL,
@@ -132,7 +133,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
         )
     return _construct(
         Stage.LLM,
-        lambda: plugin.LLM(
+        lambda: SarvamLLM(
             model=model,
             api_key=key,
             base_url=LLM_BASE_URL,
