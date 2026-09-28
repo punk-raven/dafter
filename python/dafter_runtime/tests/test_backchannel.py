@@ -317,8 +317,8 @@ def test_a_reply_the_caller_had_not_heard_yet_is_not_answered() -> None:
         ("ठीक है न\uff1f", True),
         ("आप आएँगे?।", True),
         ('क्या आप "हाँ" कहेंगे?"', True),
-        ("मैं ऑर्डर कैंसिल कर देता हूँ।", False),
-        ("क्या? मैं बताता हूँ।", False),
+        ("मैं ऑर्डर कैंसिल कर देती हूँ।", False),
+        ("क्या? मैं बताती हूँ।", False),
         ("", False),
     ],
 )

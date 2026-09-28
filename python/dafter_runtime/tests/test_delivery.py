@@ -69,7 +69,7 @@ class LateStream(StubStream):
 
 class LateLLM(StubLLM):
     def __init__(self, late: float) -> None:
-        super().__init__("ठीक है, मैं देखता हूँ।")
+        super().__init__("ठीक है, मैं देखती हूँ।")
         self.late = late
 
     def chat(
