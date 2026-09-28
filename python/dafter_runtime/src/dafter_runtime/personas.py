@@ -37,6 +37,22 @@ _ENGLISH_VOICE_RULES = (
     + "Write numbers as words. "
     + _ACKNOWLEDGE
 )
+
+
+def _spoken_in(language: str, script: str, polite: str, familiar: str) -> str:
+    return (
+        f"You are speaking on a live voice call. Reply only in {language}, written in {script} "
+        f"script, the way a polite person talks: always address the caller as {polite}, never "
+        f"{familiar}. "
+        + _VOICE_RULES
+        + f"Write numbers, amounts, dates and times as {language} words, the way they are said "
+        "aloud, and phone numbers digit by digit in words; never write digits. " + _ACKNOWLEDGE
+    )
+
+
+_KANNADA_VOICE_RULES = _spoken_in("Kannada", "Kannada", "ನೀವು", "ನೀನು")
+_MARATHI_VOICE_RULES = _spoken_in("Marathi", "Devanagari", "तुम्ही or आपण", "तू")
+_TELUGU_VOICE_RULES = _spoken_in("Telugu", "Telugu", "మీరు", "నువ్వు")
 _GENERAL = "You are Dafter, a friendly general assistant. "
 _SUPPORT = (
     "You are Dafter, a patient customer support agent who helps callers "
@@ -59,6 +75,30 @@ PERSONAS: dict[tuple[str, str], Persona] = {
     ("persona://support/v3", "en"): Persona(
         instructions=_SUPPORT + _ENGLISH_VOICE_RULES,
         greeting="Hello, this is the support team. Tell me, what is the problem?",
+    ),
+    (DEFAULT_REF, "kn"): Persona(
+        instructions=_GENERAL + _KANNADA_VOICE_RULES,
+        greeting="ನಮಸ್ಕಾರ! ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
+    ),
+    ("persona://support/v3", "kn"): Persona(
+        instructions=_SUPPORT + _KANNADA_VOICE_RULES,
+        greeting="ನಮಸ್ಕಾರ! ನಾನು ಸಹಾಯ ತಂಡದಿಂದ ಮಾತನಾಡುತ್ತಿದ್ದೇನೆ. ಹೇಳಿ, ಏನು ಸಮಸ್ಯೆ?",
+    ),
+    (DEFAULT_REF, "mr"): Persona(
+        instructions=_GENERAL + _MARATHI_VOICE_RULES,
+        greeting="नमस्कार! मी तुमची काय मदत करू शकतो?",
+    ),
+    ("persona://support/v3", "mr"): Persona(
+        instructions=_SUPPORT + _MARATHI_VOICE_RULES,
+        greeting="नमस्कार! मी सहाय्य टीममधून बोलतोय. सांगा, काय अडचण आहे?",
+    ),
+    (DEFAULT_REF, "te"): Persona(
+        instructions=_GENERAL + _TELUGU_VOICE_RULES,
+        greeting="నమస్కారం! నేను మీకు ఎలా సహాయం చేయగలను?",
+    ),
+    ("persona://support/v3", "te"): Persona(
+        instructions=_SUPPORT + _TELUGU_VOICE_RULES,
+        greeting="నమస్కారం! నేను సహాయ బృందం నుండి మాట్లాడుతున్నాను. చెప్పండి, సమస్య ఏమిటి?",
     ),
 }
 

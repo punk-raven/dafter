@@ -6,9 +6,10 @@ from typing import Any
 
 import pytest
 from dafter_core.enums import TurnStrategy
+from dafter_core.hashing import seal
 from dafter_providers import VENDORS, sarvam
-from dafter_runtime.personas import base_language
-from dafter_runtime.plan import TURN_DETECTOR_LANGUAGES, load, turn_detection
+from dafter_runtime.personas import base_language, persona_for
+from dafter_runtime.plan import TURN_DETECTOR_LANGUAGES, load, plan, turn_detection
 
 ROOT = Path(__file__).resolve().parents[3]
 CATALOG = ROOT / "go" / "cmd" / "dafter-control" / "catalog.json"
@@ -77,3 +78,43 @@ def test_every_indic_language_keeps_the_english_words_its_callers_mix_in(
     stt = sarvam.build_stt(cfg.agent.pipeline.stt, language, cfg.turn, None)
     expected = "transcribe" if base_language(language) == "en" else "codemix"
     assert stt._opts.mode == expected  # type: ignore[attr-defined]
+
+
+SCRIPTS = {
+    "hi": (0x0900, 0x097F),
+    "mr": (0x0900, 0x097F),
+    "kn": (0x0C80, 0x0CFF),
+    "te": (0x0C00, 0x0C7F),
+}
+
+
+def in_script(text: str, base: str) -> bool:
+    if base == "en":
+        return text.isascii()
+    low, high = SCRIPTS[base]
+    return all(low <= ord(c) <= high for c in text if c.isalpha())
+
+
+@pytest.mark.parametrize(("language", "fixture"), sorted(FOCUS.items()))
+def test_every_focus_language_plans_with_personas_in_its_own_script(
+    language: str, fixture: str
+) -> None:
+    p = plan(load((JOBS / fixture).read_bytes().strip()), "dafter-py")
+    assert (p.stt.name, p.llm.name, p.tts.name) == ("sarvam", "sarvam", "sarvam")
+    base = base_language(language)
+    for ref in (None, "persona://support/v3"):
+        persona = persona_for(ref, language)
+        assert in_script(persona.greeting, base), persona.greeting
+        assert "Reply only in" in persona.instructions
+        if base not in {"hi", "en"}:
+            assert "never write digits" in persona.instructions
+
+
+def test_a_session_may_switch_between_all_five_focus_languages() -> None:
+    doc = json.loads((JOBS / FOCUS["kn-IN"]).read_bytes())
+    doc["agent"]["languageSwitching"]["enabled"] = True
+    sealed, _ = seal(json.dumps(doc))
+    p = plan(load(sealed), "dafter-py")
+    assert p.hearing is None
+    assert set(p.personas) == set(FOCUS)
+    assert p.personas["kn-IN"] == p.persona
