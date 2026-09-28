@@ -37,6 +37,7 @@ class Record:
     reasoning_tokens: int
     cost: float | None
     currency: str | None
+    cost_inr: float | None
     free_tier: bool | None
     tool_calls: int
     markdown: bool | None
@@ -96,7 +97,9 @@ class Row:
         return sum(scores) / len(scores) if scores else None
 
     def cost_per_1k(self) -> Decimal | None:
-        costs = [Decimal(str(r.cost)) for r in self.records if r.answered and r.cost is not None]
+        costs = [
+            Decimal(str(r.cost_inr)) for r in self.records if r.answered and r.cost_inr is not None
+        ]
         return sum(costs, Decimal(0)) * 1000 / len(costs) if costs else None
 
     def tool_summary(self) -> dict[str, int]:
@@ -137,8 +140,8 @@ class Row:
             "reasoningReplies": sum(1 for r in self.records if r.reasoning_tokens),
             "toolUse": [r.tool_use for r in self.records if r.tool_use is not None],
             **self.tool_summary(),
-            "costPer1kReplies": float(per_1k) if per_1k is not None else None,
-            "currency": price.currency if price else None,
+            "costPer1kRepliesInr": float(per_1k) if per_1k is not None else None,
+            "priceCurrency": price.currency if price else None,
             "freeTier": self.candidate.free_tier,
             "unverified": list(self.candidate.unverified),
         }
@@ -187,7 +190,7 @@ def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str
         "",
         "| # | candidate | provider/model | answered | rate limited | TTFT p50/p95 ms "
         "| TTFS p50/p95 ms | quality | correct | language | register | speakable "
-        "| tool probes clean | cost per 1k replies | free tier |",
+        "| tool probes clean | INR per 1k replies | free tier |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     lines = []
@@ -204,11 +207,8 @@ def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str
         ranked = s["quality"] is not None
         if ranked:
             place += 1
-        cost = (
-            f"{s['currency']} {s['costPer1kReplies']:.4f}"
-            if s["costPer1kReplies"] is not None
-            else "-"
-        )
+        per_1k = s["costPer1kRepliesInr"]
+        cost = "-" if per_1k is None else f"{per_1k:.4f}"
         lines.append(
             " | ".join(
                 [

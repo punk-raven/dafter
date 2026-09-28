@@ -1,5 +1,10 @@
 {
   "asOf": "2026-09-27",
+  "usdToInr": {
+    "inrPerUsd": 95.82,
+    "asOf": "2026-09-25",
+    "source": "https://api.frankfurter.dev/v1/2026-09-25?from=USD&to=INR"
+  },
   "endpoints": {
     "google": {
       "modelList": "https://generativelanguage.googleapis.com/v1beta/models",

@@ -279,6 +279,8 @@ def test_the_screen_records_rate_limits_and_skips_a_candidate_it_cannot_build() 
         "gemini-3.5-flash-lite",
     )
     assert record.cost == pytest.approx((50 * 0.3 + 7 * 2.5) / 1_000_000)
+    assert record.cost_inr == pytest.approx(record.cost * 95.82)
+    assert ok.summary()["costPer1kRepliesInr"] == pytest.approx(record.cost_inr * 1000)
     assert slow.records[0].native_code == "429"
 
 
@@ -336,6 +338,8 @@ def test_the_cli_writes_a_ranked_table_and_a_spot_check_sample(
     table = capsys.readouterr().out
     assert table == (tmp_path / "ranking.md").read_text(encoding="utf-8")
     assert "judge: judge_gemini_flash" in table and "openai_compat/gpt-5.4-mini" in table
+    assert "USD prices converted at USD 1 = INR 95.82 on 2026-09-25 (https://" in table
+    assert summary["usdToInr"]["inrPerUsd"] == 95.82
 
 
 def test_empty_banks_are_skipped_with_their_reason_and_the_rest_run(

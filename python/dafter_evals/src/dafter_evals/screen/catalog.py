@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 from importlib import resources
@@ -29,16 +29,33 @@ ENDPOINT_FIELDS = frozenset({"modelList", "listedOn", "docs"})
 
 
 @dataclass(frozen=True, slots=True)
+class Rate:
+    inr_per_usd: Decimal
+    as_of: date
+    source: str
+
+    def to_inr(self, currency: str) -> Decimal:
+        return Decimal(1) if currency == "INR" else self.inr_per_usd
+
+    def stated(self) -> str:
+        return f"USD 1 = INR {self.inr_per_usd} on {self.as_of.isoformat()} ({self.source})"
+
+
+@dataclass(frozen=True, slots=True)
 class Price:
     currency: str
     input: Decimal
     output: Decimal
     per: Decimal
     source: str
+    to_inr: Decimal = Decimal(1)
 
     def cost(self, input_tokens: int, output_tokens: int) -> Decimal:
         spent = self.input * input_tokens + self.output * output_tokens
         return spent / self.per
+
+    def cost_inr(self, input_tokens: int, output_tokens: int) -> Decimal:
+        return self.cost(input_tokens, output_tokens) * self.to_inr
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +88,7 @@ class Candidate:
 @dataclass(frozen=True, slots=True)
 class Catalog:
     as_of: date
+    usd_to_inr: Rate
     endpoints: dict[str, Endpoint]
     judge: Candidate
     candidates: tuple[Candidate, ...]
@@ -91,7 +109,20 @@ def _https(where: str, url: object) -> str:
     return url
 
 
-def _price(where: str, raw: object) -> Price | None:
+def _rate(raw: object) -> Rate:
+    if not isinstance(raw, dict) or set(raw) != {"inrPerUsd", "asOf", "source"}:
+        raise ValueError("usdToInr: exactly inrPerUsd, asOf and source")
+    rate = Rate(
+        inr_per_usd=Decimal(str(raw["inrPerUsd"])),
+        as_of=date.fromisoformat(raw["asOf"]),
+        source=_https("usdToInr", raw["source"]),
+    )
+    if rate.inr_per_usd <= 0:
+        raise ValueError("usdToInr: inrPerUsd is positive")
+    return rate
+
+
+def _price(where: str, raw: object, rate: Rate) -> Price | None:
     if raw is None:
         return None
     if not isinstance(raw, dict) or raw.get("currency") not in CURRENCIES:
@@ -108,7 +139,7 @@ def _price(where: str, raw: object) -> Price | None:
         raise ValueError(f"{where}: price lacks {exc}") from exc
     if price.input < 0 or price.output < 0 or price.per <= 0:
         raise ValueError(f"{where}: prices are >= 0 per a positive token count")
-    return price
+    return replace(price, to_inr=rate.to_inr(price.currency))
 
 
 def _endpoint(name: str, raw: dict[str, Any]) -> Endpoint:
@@ -143,7 +174,7 @@ def _served_by(where: str, ref: ProviderRef, endpoints: dict[str, Endpoint]) -> 
     return endpoint
 
 
-def _candidate(raw: dict[str, Any], endpoints: dict[str, Endpoint]) -> Candidate:
+def _candidate(raw: dict[str, Any], endpoints: dict[str, Endpoint], rate: Rate) -> Candidate:
     where = f"candidate {raw.get('id', '?')}"
     ref = ProviderRef.from_dict(raw["provider"])
     vendor = VENDORS.get(ref.provider)
@@ -165,7 +196,7 @@ def _candidate(raw: dict[str, Any], endpoints: dict[str, Endpoint]) -> Candidate
         family=raw["family"],
         endpoint=_served_by(where, ref, endpoints),
         ref=ref,
-        price=_price(where, raw["price"]),
+        price=_price(where, raw["price"], rate),
         free_tier=free_tier,
         sources=sources,
         unverified=tuple(str(u) for u in raw["unverified"]),
@@ -177,15 +208,18 @@ def parse(text: str) -> Catalog:
     raw = json.loads(text)
     try:
         endpoints = {n: _endpoint(n, e) for n, e in raw["endpoints"].items()}
-        judge = _candidate(raw["judge"], endpoints)
-        candidates = tuple(_candidate(c, endpoints) for c in raw["candidates"])
+        rate = _rate(raw["usdToInr"])
+        judge = _candidate(raw["judge"], endpoints, rate)
+        candidates = tuple(_candidate(c, endpoints, rate) for c in raw["candidates"])
         as_of = date.fromisoformat(raw["asOf"])
     except KeyError as exc:
         raise ValueError(f"the catalog lacks {exc}") from exc
     ids = [c.id for c in (judge, *candidates)]
     if len(set(ids)) != len(ids):
         raise ValueError("candidate ids repeat")
-    return Catalog(as_of=as_of, endpoints=endpoints, judge=judge, candidates=candidates)
+    return Catalog(
+        as_of=as_of, usd_to_inr=rate, endpoints=endpoints, judge=judge, candidates=candidates
+    )
 
 
 def load(text: str | None = None) -> Catalog:

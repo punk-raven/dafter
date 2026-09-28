@@ -129,10 +129,12 @@ def report(
     skipped: dict[str, str],
     date: str,
     judge: str | None,
+    rate: catalogs.Rate,
 ) -> str:
     parts = [table(rows, date, judge, list(by_language))]
     if len(by_language) > 1:
         parts += [table(found, date, judge, [lang]) for lang, found in by_language.items()]
+    parts.append(f"Costs are at paid prices in INR; USD prices converted at {rate.stated()}.\n")
     if skipped:
         parts.append("".join(f"Skipped {lang}: {why}\n" for lang, why in skipped.items()))
     return "\n".join(parts)
@@ -170,7 +172,7 @@ async def screen(args: argparse.Namespace) -> int:
             await judging[0].aclose()
     rows = merged(list(by_language.values()))
     judged_by = f"{catalog.judge.id} ({catalog.judge.ref.model})" if judging else None
-    text = report(rows, by_language, skipped, settings.date, judged_by)
+    text = report(rows, by_language, skipped, settings.date, judged_by, catalog.usd_to_inr)
     meta = {
         "date": settings.date,
         "startedAt": started.isoformat(),
@@ -179,6 +181,11 @@ async def screen(args: argparse.Namespace) -> int:
         "runs": args.runs,
         "questions": {bank.language: len(bank.questions) for bank, _ in ready},
         "catalogAsOf": catalog.as_of.isoformat(),
+        "usdToInr": {
+            "inrPerUsd": float(catalog.usd_to_inr.inr_per_usd),
+            "asOf": catalog.usd_to_inr.as_of.isoformat(),
+            "source": catalog.usd_to_inr.source,
+        },
         "judge": judged_by,
         "sampleSeed": args.seed,
     }

@@ -93,6 +93,17 @@ def test_price_is_per_token_count_in_the_stated_currency() -> None:
     assert catalog.load().pick(["gemma_4_moe"])[0].price is None
 
 
+def test_every_price_converts_to_inr_at_the_one_dated_rate() -> None:
+    c = catalog.load()
+    assert (c.usd_to_inr.inr_per_usd, str(c.usd_to_inr.as_of)) == (Decimal("95.82"), "2026-09-25")
+    assert c.usd_to_inr.source.startswith("https://")
+    usd = c.pick(["gemini_flash_lite"])[0].price
+    inr = c.pick(["sarvam_105b"])[0].price
+    assert usd is not None and inr is not None and inr.currency == "INR"
+    assert usd.cost_inr(1_000_000, 1_000_000) == Decimal("2.8") * Decimal("95.82")
+    assert inr.cost_inr(1000, 1000) == inr.cost(1000, 1000)
+
+
 OPENAI = "secret://evals/openai/api-key"
 
 
@@ -116,6 +127,10 @@ def broken(change: Any) -> str:
         (lambda d: d["candidates"][1].__setitem__("freeTier", "yes"), "freeTier"),
         (lambda d: d["candidates"][1].__setitem__("role", "winner"), "role"),
         (lambda d: d["candidates"][1]["price"].__setitem__("currency", "EUR"), "currency"),
+        (lambda d: d.pop("usdToInr"), "usdToInr"),
+        (lambda d: d["usdToInr"].__setitem__("inrPerUsd", 0), "positive"),
+        (lambda d: d["usdToInr"].__setitem__("source", "http://x"), "https"),
+        (lambda d: d["usdToInr"].pop("asOf"), "exactly inrPerUsd"),
         (lambda d: d["candidates"][1]["provider"].pop("model"), "pinned model"),
         (lambda d: d.pop("judge"), "judge"),
         (lambda d: options(d).__setitem__("endpoint", "nowhere"), "nowhere"),

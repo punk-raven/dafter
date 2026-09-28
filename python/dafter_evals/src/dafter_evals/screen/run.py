@@ -37,10 +37,12 @@ def build(ref: ProviderRef) -> tuple[llm.LLM[Any], Classify]:
     return vendor.llm(ref), vendor.classify
 
 
-def _cost(candidate: Candidate, reply: Reply) -> float | None:
-    if candidate.price is None or reply.error is not None:
+def _cost(candidate: Candidate, reply: Reply, inr: bool = False) -> float | None:
+    price = candidate.price
+    if price is None or reply.error is not None:
         return None
-    return float(candidate.price.cost(reply.input_tokens, reply.output_tokens))
+    spend = price.cost_inr if inr else price.cost
+    return float(spend(reply.input_tokens, reply.output_tokens))
 
 
 def record(
@@ -67,6 +69,7 @@ def record(
         reasoning_tokens=reply.reasoning_tokens,
         cost=_cost(candidate, reply),
         currency=candidate.price.currency if candidate.price else None,
+        cost_inr=_cost(candidate, reply, inr=True),
         free_tier=candidate.free_tier,
         tool_calls=reply.tool_calls,
         markdown=markdown(reply.text) if reply.text else None,

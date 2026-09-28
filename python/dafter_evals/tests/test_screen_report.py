@@ -31,6 +31,7 @@ def rec(candidate: str, n: int, **fields: Any) -> Record:
         reasoning_tokens=0,
         cost=0.00001,
         currency="USD",
+        cost_inr=0.0009582,
         free_tier=c.free_tier,
         tool_calls=0,
         markdown=False,
@@ -62,7 +63,7 @@ def test_the_table_names_date_judge_and_every_candidate() -> None:
         "Stage 4 LLM screen, 2026-09-27, languages: hi, kn, judge: judge_gemini_flash (a-model)"
     )
     assert lines[4].startswith("| 1 | openai_mini | openai_compat/gpt-5.4-mini")
-    assert "| 150/150 |" in lines[4] and "USD 0.0100" in lines[4] and "not stated" in lines[4]
+    assert "| 150/150 |" in lines[4] and "| 0.9582 |" in lines[4] and "not stated" in lines[4]
     assert "skipped: authentication_failed: no key" in lines[-1]
 
 
