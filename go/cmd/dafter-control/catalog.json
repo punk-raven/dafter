@@ -32,10 +32,10 @@
           "enabled": true,
           "afterMs": 1000,
           "phrases": {
-            "hi": ["जी, एक पल।", "अच्छा, ज़रा देखता हूँ।", "हम्म, बस एक सेकंड।"],
+            "hi": ["जी, एक पल।", "अच्छा, ज़रा देखती हूँ।", "हम्म, बस एक सेकंड।"],
             "en": ["One moment.", "Let me check.", "Just a second."],
             "kn": ["ಒಂದು ನಿಮಿಷ.", "ಸ್ವಲ್ಪ ನೋಡುತ್ತೇನೆ."],
-            "mr": ["एक क्षण हं.", "थांबा, बघतो."],
+            "mr": ["एक क्षण हं.", "थांबा, बघते."],
             "te": ["ఒక్క నిమిషం.", "చూస్తాను, ఒక్క క్షణం."]
           }
         },
@@ -163,7 +163,7 @@
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
               "options": {
-                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh", "minBufferSize": 30,
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
                 "pace": 1.0, "temperature": 0.6,
                 "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
               }
@@ -203,7 +203,7 @@
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
               "options": {
-                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "ratan", "minBufferSize": 30,
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
                 "pace": 1.0, "temperature": 0.6,
                 "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
               }

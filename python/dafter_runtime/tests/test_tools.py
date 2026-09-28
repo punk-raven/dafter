@@ -233,7 +233,7 @@ def test_a_slow_tool_without_its_own_filler_plays_the_sessions_next_phrase() -> 
         return "found it"
 
     slow = Tool(name="lookup", description="d", speed=Speed.SLOW, effect=Effect.READ, run=run)
-    phrases = iter(["जी, एक पल।", "अच्छा, ज़रा देखता हूँ।"])
+    phrases = iter(["जी, एक पल।", "अच्छा, ज़रा देखती हूँ।"])
     filling = Filling(lambda: next(phrases), 0.0)
     assert ("assistant", "जी, एक पल।") in said_while_running(Harness(slow, filling=filling))
     with pytest.raises(ToolRefused, match="no filler"):

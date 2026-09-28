@@ -196,7 +196,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         )
     encoding = opts.choice("encoding", TTS_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", TTS_SAMPLE_RATES, 24000)
-    speaker = opts.get("voice", str, "shubh")
+    speaker = opts.get("voice", str, "priya")
     voice, styles = voices(opts)
     dictionary = opts.optional("dictionaryId", str)
     opts.get("prewarm", bool, True)

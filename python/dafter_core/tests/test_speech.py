@@ -82,3 +82,14 @@ def test_the_catalog_states_every_language_it_hears_acknowledgements_and_fillers
     assert backchannel.answer_within_ms == 1500
     assert set(c.agent.speech.fillers.phrases) == {"hi", "en", "kn", "mr", "te"}
     assert c.agent.speech.fillers.after_ms == 1000
+
+
+MASCULINE = {"hi": ("देखता", "सकता", "रहा हूँ", "बताता"), "mr": ("बघतो", "शकतो", "बोलतोय")}
+
+
+@pytest.mark.parametrize("language", sorted(MASCULINE))
+def test_the_catalog_fillers_speak_of_the_agent_as_a_woman(language: str) -> None:
+    phrases = parse(JOB.read_bytes()).agent.speech.fillers.phrases[language]
+    assert phrases
+    for phrase in phrases:
+        assert not any(form in phrase for form in MASCULINE[language]), phrase
