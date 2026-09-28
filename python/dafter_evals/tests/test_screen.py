@@ -18,6 +18,7 @@ from dafter_evals.screen.run import Screen, Settings
 from dafter_evals.screen.turn import Classify, ask
 from dafter_evals.script import HINDI
 from dafter_providers import openai_compat
+from dafter_runtime.personas import Persona
 from livekit.agents import (
     DEFAULT_API_CONNECT_OPTIONS,
     APIConnectOptions,
@@ -330,11 +331,66 @@ def test_the_cli_writes_a_ranked_table_and_a_spot_check_sample(
     assert (len(results), len(sample)) == (2 * 2 * 23, 19)
     assert json.loads(sample[0])["human"]["correctness"] is None
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
-    assert (summary["language"], summary["runs"], summary["questions"]) == ("hi", 2, 23)
+    assert (summary["languages"], summary["runs"], summary["questions"]) == (["hi"], 2, {"hi": 23})
     assert [r["candidate"] for r in summary["ranking"]] == ["gemini_flash_lite", "openai_mini"]
     table = capsys.readouterr().out
     assert table == (tmp_path / "ranking.md").read_text(encoding="utf-8")
     assert "judge: judge_gemini_flash" in table and "openai_compat/gpt-5.4-mini" in table
+
+
+def test_empty_banks_are_skipped_with_their_reason_and_the_rest_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    argv = ["--out", str(tmp_path), "--runs", "1", "--candidates", "gemini_flash_lite"]
+    assert run_cli([*argv, "--language", "kn,hi,kn"], monkeypatch) == 0
+    assert "skipped: the Kannada (kn) question bank is empty" in capsys.readouterr().err
+    summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert summary["languages"] == ["hi"] and list(summary["skippedLanguages"]) == ["kn"]
+    ranking = (tmp_path / "ranking.md").read_text(encoding="utf-8")
+    assert "languages: hi," in ranking
+    assert "\n\nSkipped kn: the Kannada (kn) question bank is empty" in ranking
+
+
+def test_several_languages_rank_together_and_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    load = banks.load
+    english = banks.Bank("en", "English", None, None, (banks.Question("en-01", "Hello?"),))
+    monkeypatch.setattr(banks, "load", lambda lang: english if lang == "en" else load(lang))
+    monkeypatch.setattr(cli, "persona_for", lambda ref, lang: Persona(INSTRUCTIONS, "hi"))
+    argv = ["--out", str(tmp_path), "--runs", "2", "--candidates", "gemini_flash_lite"]
+    assert run_cli([*argv, "--language", "all"], monkeypatch) == 0
+    summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert summary["languages"] == ["hi", "en"]
+    assert sorted(summary["skippedLanguages"]) == ["kn", "mr", "te"]
+    assert summary["ranking"][0]["calls"] == 2 * (23 + 1)
+    assert [s["calls"] for s in summary["byLanguage"]["en"]] == [2]
+    tables = (tmp_path / "ranking.md").read_text(encoding="utf-8").split("\n\n")
+    heads = [t.splitlines()[0] for t in tables if t.startswith("Stage 4")]
+    assert [h.split(", judge")[0].split("languages: ")[1] for h in heads] == ["hi, en", "hi", "en"]
+
+
+def test_a_language_without_a_persona_is_skipped_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    english = banks.Bank("en", "English", None, None, (banks.Question("en-01", "Hello?"),))
+    monkeypatch.setattr(banks, "load", lambda lang: english)
+    assert run_cli(["--out", str(tmp_path), "--language", "en"], monkeypatch) == 2
+    assert "skipped: no English persona: no persona document" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("value", "picked"),
+    [("all", banks.LANGUAGES), ("hi", ("hi",)), ("kn, hi,kn", ("kn", "hi"))],
+)
+def test_languages_are_a_list_or_all(value: str, picked: tuple[str, ...]) -> None:
+    assert cli.arguments(["--out", "x", "--language", value]).language == picked
+
+
+def test_an_unknown_language_is_refused_before_anything_runs() -> None:
+    with pytest.raises(SystemExit) as exited:
+        cli.arguments(["--out", "x", "--language", "hi,fr"])
+    assert exited.value.code == 2
 
 
 def test_the_cli_refuses_an_empty_bank(

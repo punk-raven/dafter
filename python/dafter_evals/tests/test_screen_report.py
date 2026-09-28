@@ -4,7 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from dafter_evals.screen import catalog as catalogs
-from dafter_evals.screen.report import Record, Row, rank, sample, table
+from dafter_evals.screen.report import Record, Row, merged, rank, sample, table
 
 CATALOG = catalogs.load()
 PICK = {c.id: c for c in CATALOG.candidates}
@@ -56,9 +56,11 @@ def test_quality_ranks_first_then_time_to_first_sentence_and_skips_go_last() -> 
 
 
 def test_the_table_names_date_judge_and_every_candidate() -> None:
-    text = table(rows(), "2026-09-27", "judge_gemini_flash (a-model)")
+    text = table(rows(), "2026-09-27", "judge_gemini_flash (a-model)", ["hi", "kn"])
     lines = text.splitlines()
-    assert lines[0] == "Stage 4 LLM screen, 2026-09-27, judge: judge_gemini_flash (a-model)"
+    assert lines[0] == (
+        "Stage 4 LLM screen, 2026-09-27, languages: hi, kn, judge: judge_gemini_flash (a-model)"
+    )
     assert lines[4].startswith("| 1 | openai_mini | openai_compat/gpt-5.4-mini")
     assert "| 150/150 |" in lines[4] and "USD 0.0100" in lines[4] and "not stated" in lines[4]
     assert "skipped: authentication_failed: no key" in lines[-1]
@@ -79,3 +81,18 @@ def test_the_spot_check_sample_is_a_fifth_of_answered_replies_and_repeatable() -
     assert all(s["reply"] is not None for s in first)
     assert sample(records, seed=8) != first
     assert sample([], seed=7) == []
+
+
+def test_rows_from_several_languages_merge_per_candidate_in_first_seen_order() -> None:
+    hindi = rows()
+    kannada = [
+        Row(PICK["gemini_flash"], [rec("gemini_flash", n, language="kn") for n in range(3)]),
+        Row(PICK["sarvam_105b"], [], skipped="authentication_failed: no key"),
+    ]
+    together = merged([hindi, kannada])
+    assert [r.candidate.id for r in together] == [r.candidate.id for r in hindi]
+    by = {r.candidate.id: r for r in together}
+    assert len(by["gemini_flash"].records) == 13
+    assert {r.language for r in by["gemini_flash"].records} == {"hi", "kn"}
+    assert by["sarvam_105b"].skipped == "authentication_failed: no key"
+    assert len(hindi[1].records) == 10

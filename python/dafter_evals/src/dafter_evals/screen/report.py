@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 from typing import Any
@@ -143,6 +144,18 @@ class Row:
         }
 
 
+def merged(per_language: list[list[Row]]) -> list[Row]:
+    order: dict[str, Row] = {}
+    for rows in per_language:
+        for row in rows:
+            seen = order.get(row.candidate.id)
+            if seen is None:
+                order[row.candidate.id] = Row(row.candidate, list(row.records), row.skipped)
+            else:
+                seen.records.extend(row.records)
+    return list(order.values())
+
+
 def rank(rows: list[Row]) -> list[Row]:
     def key(row: Row) -> tuple[int, float, float]:
         quality = row.quality()
@@ -168,9 +181,9 @@ def _probes(s: dict[str, Any]) -> str:
     return f"{s['toolProbesClean']}/{s['toolProbes']}" if s["toolProbes"] else "-"
 
 
-def table(rows: list[Row], date: str, judge: str | None) -> str:
+def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str]) -> str:
     head = [
-        f"Stage 4 LLM screen, {date}, judge: {judge or 'none'}",
+        f"Stage 4 LLM screen, {date}, languages: {', '.join(languages)}, judge: {judge or 'none'}",
         "",
         "| # | candidate | provider/model | answered | rate limited | TTFT p50/p95 ms "
         "| TTFS p50/p95 ms | quality | correct | language | register | speakable "

@@ -11,20 +11,34 @@ from pathlib import Path
 from typing import Any
 
 from dafter_core.errors import DafterError
-from dafter_runtime.personas import DEFAULT_REF, persona_for
+from dafter_runtime.personas import DEFAULT_REF, Persona, persona_for
+from livekit.agents import llm
 
 from . import bank as banks
 from . import catalog as catalogs
 from .judge import Judge
-from .report import Row, sample, table
+from .report import Row, merged, sample, table
 from .run import Screen, Settings, build
 from .tools import TOOLS
+from .turn import Classify
 
 FRAMEWORK_LOGGER = "livekit.agents"
 
 
 def progress(line: str) -> None:
     sys.stderr.write(line + "\n")
+
+
+def languages(value: str) -> tuple[str, ...]:
+    if value == "all":
+        return banks.LANGUAGES
+    picked = tuple(dict.fromkeys(v.strip() for v in value.split(",") if v.strip()))
+    unknown = [v for v in picked if v not in banks.LANGUAGES]
+    if not picked or unknown:
+        raise argparse.ArgumentTypeError(
+            f"one or more of {', '.join(banks.LANGUAGES)} separated by commas, or all"
+        )
+    return picked
 
 
 def arguments(argv: list[str] | None = None) -> argparse.Namespace:
@@ -36,7 +50,12 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     p.add_argument("--out", type=Path, required=True, help="directory for the result files")
-    p.add_argument("--language", default="hi", choices=banks.LANGUAGES)
+    p.add_argument(
+        "--language",
+        type=languages,
+        default=("hi",),
+        help=f"comma-separated, from {', '.join(banks.LANGUAGES)}, or all; default hi",
+    )
     p.add_argument("--runs", type=int, default=5)
     p.add_argument("--candidates", default=None, help="comma-separated catalog ids; default all")
     p.add_argument("--no-judge", action="store_true", help="measure speed and errors only")
@@ -49,7 +68,14 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def write(out: Path, rows: list[Row], text: str, seed: int, meta: dict[str, Any]) -> None:
+def write(
+    out: Path,
+    rows: list[Row],
+    by_language: dict[str, list[Row]],
+    text: str,
+    seed: int,
+    meta: dict[str, Any],
+) -> None:
     out.mkdir(parents=True, exist_ok=True)
     records = [r for row in rows for r in row.records]
     with (out / "results.jsonl").open("w", encoding="utf-8") as f:
@@ -58,14 +84,18 @@ def write(out: Path, rows: list[Row], text: str, seed: int, meta: dict[str, Any]
     with (out / "spot-check.jsonl").open("w", encoding="utf-8") as f:
         for s in sample(records, seed):
             f.write(json.dumps(s, ensure_ascii=False) + "\n")
-    summary = {**meta, "ranking": [row.summary() for row in rows]}
+    summary = {
+        **meta,
+        "ranking": [row.summary() for row in rows],
+        "byLanguage": {lang: [r.summary() for r in found] for lang, found in by_language.items()},
+    }
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     (out / "ranking.md").write_text(text, encoding="utf-8")
 
 
-def judge_for(catalog: catalogs.Catalog, bank: banks.Bank, timeout: float) -> Judge:
+def judge_model(catalog: catalogs.Catalog) -> tuple[llm.LLM[Any], Classify]:
     try:
-        model, classify = build(catalog.judge.ref)
+        return build(catalog.judge.ref)
     except DafterError as exc:
         raise replace(
             exc,
@@ -74,49 +104,85 @@ def judge_for(catalog: catalogs.Catalog, bank: banks.Bank, timeout: float) -> Ju
                 "to screen speed and errors without quality scores"
             ),
         ) from exc
-    return Judge(model, classify, bank, timeout)
+
+
+def runnable(
+    picked: tuple[str, ...],
+) -> tuple[list[tuple[banks.Bank, Persona]], dict[str, str]]:
+    ready: list[tuple[banks.Bank, Persona]] = []
+    skipped: dict[str, str] = {}
+    for language in picked:
+        bank = banks.load(language)
+        if bank.empty:
+            skipped[language] = bank.refusal()
+            continue
+        try:
+            ready.append((bank, persona_for(DEFAULT_REF, language)))
+        except DafterError as exc:
+            skipped[language] = f"no {bank.name} persona: {exc.message}"
+    return ready, skipped
+
+
+def report(
+    rows: list[Row],
+    by_language: dict[str, list[Row]],
+    skipped: dict[str, str],
+    date: str,
+    judge: str | None,
+) -> str:
+    parts = [table(rows, date, judge, list(by_language))]
+    if len(by_language) > 1:
+        parts += [table(found, date, judge, [lang]) for lang, found in by_language.items()]
+    if skipped:
+        parts.append("".join(f"Skipped {lang}: {why}\n" for lang, why in skipped.items()))
+    return "\n".join(parts)
 
 
 async def screen(args: argparse.Namespace) -> int:
-    bank = banks.load(args.language)
-    if bank.empty:
-        sys.stderr.write(bank.refusal() + "\n")
+    ready, skipped = runnable(args.language)
+    for reason in skipped.values():
+        sys.stderr.write(f"skipped: {reason}\n")
+    if not ready:
         return 2
     catalog = catalogs.load()
     picked = catalog.pick(args.candidates.split(",") if args.candidates else None)
-    persona = persona_for(DEFAULT_REF, bank.language)
-    judge = None if args.no_judge else judge_for(catalog, bank, args.timeout)
+    judging = None if args.no_judge else judge_model(catalog)
     started = datetime.now(UTC)
     settings = Settings(
         date=started.date().isoformat(), runs=args.runs, pause=args.pause, timeout=args.timeout
     )
+    by_language: dict[str, list[Row]] = {}
     try:
-        run = Screen(
-            settings,
-            bank,
-            persona.instructions,
-            judge,
-            build=build,
-            say=progress,
-            tools=list(TOOLS),
-        )
-        rows = await run.run(picked)
+        for bank, persona in ready:
+            judge = Judge(judging[0], judging[1], bank, args.timeout) if judging else None
+            run = Screen(
+                settings,
+                bank,
+                persona.instructions,
+                judge,
+                build=build,
+                say=progress,
+                tools=list(TOOLS),
+            )
+            by_language[bank.language] = await run.run(picked)
     finally:
-        if judge is not None:
-            await judge.model.aclose()
-    judged_by = f"{catalog.judge.id} ({catalog.judge.ref.model})" if judge else None
-    text = table(rows, settings.date, judged_by)
+        if judging is not None:
+            await judging[0].aclose()
+    rows = merged(list(by_language.values()))
+    judged_by = f"{catalog.judge.id} ({catalog.judge.ref.model})" if judging else None
+    text = report(rows, by_language, skipped, settings.date, judged_by)
     meta = {
         "date": settings.date,
         "startedAt": started.isoformat(),
-        "language": bank.language,
+        "languages": list(by_language),
+        "skippedLanguages": skipped,
         "runs": args.runs,
-        "questions": len(bank.questions),
+        "questions": {bank.language: len(bank.questions) for bank, _ in ready},
         "catalogAsOf": catalog.as_of.isoformat(),
         "judge": judged_by,
         "sampleSeed": args.seed,
     }
-    write(args.out, rows, text, args.seed, meta)
+    write(args.out, rows, by_language, text, args.seed, meta)
     sys.stdout.write(text)
     return 0
 
