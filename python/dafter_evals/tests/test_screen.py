@@ -287,11 +287,13 @@ lookup_order = function_tool(
 )
 
 
-def run_cli(argv: list[str], monkeypatch: pytest.MonkeyPatch) -> int:
+def run_cli(argv: list[str], monkeypatch: pytest.MonkeyPatch, judge_key: bool = True) -> int:
     judge_model = catalogs.load().judge.ref.model
     stubs: dict[str, Llm] = {"gemini-3.5-flash-lite": Stub(), "gpt-5.4-mini-2026-03-17": Stub()}
 
     def build(ref: ProviderRef) -> tuple[llm.LLM[Any], Classify]:
+        if ref.model == judge_model and not judge_key:
+            raise DafterError(ErrorCode.AUTHENTICATION_FAILED, "GEMINI_API_KEY is not set")
         return (judge_stub() if ref.model == judge_model else stubs[ref.model or ""]), classify
 
     monkeypatch.setattr(cli, "build", build)
@@ -323,3 +325,15 @@ def test_the_cli_refuses_an_empty_bank(
     assert run_cli(["--out", str(tmp_path), "--language", "kn"], monkeypatch) == 2
     assert "Kannada (kn) question bank is empty" in capsys.readouterr().err
     assert not (tmp_path / "results.jsonl").exists()
+
+
+def test_a_judge_that_cannot_run_refuses_the_screen_and_names_the_way_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    argv = ["--out", str(tmp_path), "--candidates", "gemini_flash_lite"]
+    assert run_cli(argv, monkeypatch, judge_key=False) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("screen refused: authentication_failed: the judge judge_gemini_flash")
+    assert "GEMINI_API_KEY is not set" in err and "pass --no-judge" in err
+    assert not (tmp_path / "results.jsonl").exists()
+    assert run_cli([*argv, "--no-judge"], monkeypatch, judge_key=False) == 0

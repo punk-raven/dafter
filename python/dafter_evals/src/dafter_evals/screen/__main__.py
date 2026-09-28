@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,20 @@ def write(out: Path, rows: list[Row], text: str, seed: int, meta: dict[str, Any]
     (out / "ranking.md").write_text(text, encoding="utf-8")
 
 
+def judge_for(catalog: catalogs.Catalog, bank: banks.Bank, timeout: float) -> Judge:
+    try:
+        model, classify = build(catalog.judge.ref)
+    except DafterError as exc:
+        raise replace(
+            exc,
+            message=(
+                f"the judge {catalog.judge.id} cannot run: {exc.message}; pass --no-judge "
+                "to screen speed and errors without quality scores"
+            ),
+        ) from exc
+    return Judge(model, classify, bank, timeout)
+
+
 async def screen(args: argparse.Namespace) -> int:
     bank = banks.load(args.language)
     if bank.empty:
@@ -69,10 +84,7 @@ async def screen(args: argparse.Namespace) -> int:
     catalog = catalogs.load()
     picked = catalog.pick(args.candidates.split(",") if args.candidates else None)
     persona = persona_for(DEFAULT_REF, bank.language)
-    judge: Judge | None = None
-    if not args.no_judge:
-        model, classify = build(catalog.judge.ref)
-        judge = Judge(model, classify, bank, args.timeout)
+    judge = None if args.no_judge else judge_for(catalog, bank, args.timeout)
     started = datetime.now(UTC)
     settings = Settings(
         date=started.date().isoformat(), runs=args.runs, pause=args.pause, timeout=args.timeout
