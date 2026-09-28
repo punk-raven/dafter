@@ -15,6 +15,9 @@ from livekit.agents import (
     JobContext,
     JobProcess,
     JobRequest,
+    llm,
+    stt,
+    tts,
 )
 from livekit.agents.llm import ChatMessage
 from livekit.agents.metrics import AgentSessionUsage
@@ -24,6 +27,7 @@ from livekit.agents.voice.events import (
     CloseEvent,
     ConversationItemAddedEvent,
     ErrorEvent,
+    SpeechCreatedEvent,
 )
 from livekit.agents.voice.room_io import AudioInputOptions, AudioOutputOptions, RoomOptions
 from opentelemetry import trace
@@ -33,14 +37,14 @@ from .answering import Roster
 from .backchannel import Acknowledgements
 from .called import Called
 from .control import ControlPlane, encryption
-from .cost import load_prices, priced, usage_payload
+from .cost import OutputTokens, load_prices, priced, usage_payload
 from .delivery import Delivery
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
 from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
-from .timing import Turns
+from .timing import Turns, TurnTiming
 from .toolbox import Answering, follow, linked, registry_for
 
 POOL_ENV = "LIVEKIT_AGENT_NAME"
@@ -134,7 +138,8 @@ def watch(
     usage: Callable[[], AgentSessionUsage] | None = None,
     filled: Callable[[], bool] = lambda: False,
 ) -> None:
-    turns = Turns()
+    turns = Turns(getattr(session.stt, "take_endpoint", None))
+    generated = OutputTokens()
     prices = load_prices()
     recorder = SessionMetrics(metrics, p)
     spent = usage or (lambda: session.usage)
@@ -158,20 +163,31 @@ def watch(
         timing = turns.add(ev.item, filled())
         if timing is None:
             return
-        log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
+        report(timing)
+
+    def speech_created(ev: SpeechCreatedEvent) -> None:
+        handle = ev.speech_handle
+        handle.add_done_callback(lambda _: unheard(handle.scheduled and not handle.chat_items))
+
+    def unheard(cut_off: bool) -> None:
+        if cut_off:
+            report(turns.unheard())
+
+    def report(timing: TurnTiming) -> None:
         timing.record(tracer)
         recorder.turn(timing)
         events.emit(EventType.AGENT_TURN_METRICS, timing.payload(), current_trace_id())
-        report_usage(final=False)
+        tokens = generated.turn(report_usage(final=False))
+        fields = {**timing.log_fields(), "output_tokens": tokens}
+        log.info("agent turn", extra={"session": p.config.session_id, **fields})
 
     def failed(ev: ErrorEvent) -> None:
         stage, vendor = Stage.CONTROL, p.stt
-        source = type(ev.source).__module__
-        if ".tts" in source:
+        if isinstance(ev.source, tts.TTS):
             stage, vendor = Stage.TTS, p.tts
-        elif ".llm" in source:
+        elif isinstance(ev.source, llm.LLM):
             stage, vendor = Stage.LLM, p.llm
-        elif ".stt" in source:
+        elif isinstance(ev.source, stt.STT):
             stage, vendor = Stage.STT, p.stt
         inner = getattr(ev.error, "error", ev.error)
         err = vendor.classify(inner, stage) if isinstance(inner, BaseException) else None
@@ -205,6 +221,7 @@ def watch(
 
     session.on("agent_state_changed", state_changed)
     session.on("conversation_item_added", item_added)
+    session.on("speech_created", speech_created)
     session.on("error", failed)
     session.on("close", closed)
 

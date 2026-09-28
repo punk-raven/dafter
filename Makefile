@@ -117,4 +117,4 @@ loadtest-media: $(LK) ## Concurrent video calls through the control plane and th
 
 .PHONY: dev-down
 dev-down: ## Tear down the dev stack and volumes
-	docker compose down -v
+	docker compose --profile tunnel down -v
