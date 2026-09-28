@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from dafter_runtime.personas import DEFAULT_REF, SCRIPTS, persona_for
+from dafter_runtime.personas import DEFAULT_REF, SCRIPTS, persona_for, written_in
 
 NAME = "Nivya"
+ALIASES = ("निव्या", "ನಿವ್ಯ", "ನಿವ್ಯಾ", "నివ్య", "నివ్యా")
+SPOKEN = {"hi": "निव्या", "mr": "निव्या", "kn": "ನಿವ್ಯ", "te": "నివ్య", "en": "Nivya"}
 LANGUAGES = ("hi", "en", "kn", "mr", "te")
 REFS = (DEFAULT_REF, "persona://support/v3")
 EVERY = [(ref, language) for ref in REFS for language in LANGUAGES]
@@ -27,3 +29,15 @@ def test_an_unnamed_agent_introduces_itself_by_no_name(ref: str, language: str) 
     assert persona.instructions.startswith("You are a ")
     assert persona.greeting == SCRIPTS[(ref, language)].greeting
     assert "dafter" not in (persona.instructions + persona.greeting).casefold()
+
+
+@pytest.mark.parametrize(("ref", "language"), EVERY)
+def test_the_greeting_says_the_name_in_its_own_script(ref: str, language: str) -> None:
+    persona = persona_for(ref, language, NAME, ALIASES)
+    assert persona.instructions.startswith(f"You are {NAME}, ")
+    assert SPOKEN[language] in persona.greeting
+    assert written_in(persona.greeting, language), persona.greeting
+
+
+def test_a_language_without_a_spelling_of_its_own_says_the_configured_name() -> None:
+    assert "Nivya" in persona_for(DEFAULT_REF, "kn", NAME, ("निव्या",)).greeting

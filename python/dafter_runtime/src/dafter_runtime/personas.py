@@ -21,15 +21,35 @@ class Script:
     greeting: str
     introduction: str
 
-    def spoken_by(self, name: str | None) -> Persona:
+    def spoken_by(self, name: str | None, spelling: str | None = None) -> Persona:
         if not name:
             return Persona(
                 instructions=f"You are {self.role}. {self.rules}", greeting=self.greeting
             )
         return Persona(
             instructions=f"You are {name}, {self.role}. {self.rules}",
-            greeting=self.introduction.format(name=name),
+            greeting=self.introduction.format(name=spelling or name),
         )
+
+
+LETTERS: dict[str, tuple[int, int]] = {
+    "hi": (0x0900, 0x097F),
+    "mr": (0x0900, 0x097F),
+    "kn": (0x0C80, 0x0CFF),
+    "te": (0x0C00, 0x0C7F),
+}
+
+
+def written_in(text: str, language: str) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    if language not in LETTERS:
+        return all(c.isascii() for c in letters)
+    low, high = LETTERS[language]
+    return all(low <= ord(c) <= high for c in letters)
+
+
+def spelled_for(language: str, name: str, aliases: tuple[str, ...]) -> str:
+    return next((s for s in (name, *aliases) if written_in(s, language)), name)
 
 
 _VOICE_RULES = (
@@ -159,8 +179,11 @@ def base_language(tag: str) -> str:
     return tag.split("-", 1)[0].lower()
 
 
-def persona_for(ref: str | None, language: str, name: str | None) -> Persona:
-    key = (ref or DEFAULT_REF, base_language(language))
+def persona_for(
+    ref: str | None, language: str, name: str | None, aliases: tuple[str, ...] = ()
+) -> Persona:
+    base = base_language(language)
+    key = (ref or DEFAULT_REF, base)
     script = SCRIPTS.get(key)
     if script is None:
         raise DafterError(
@@ -168,4 +191,4 @@ def persona_for(ref: str | None, language: str, name: str | None) -> Persona:
             "no persona document is available for this reference and language",
             details=("at '/agent/personaRef': not registered in this worker for the language",),
         )
-    return script.spoken_by(name)
+    return script.spoken_by(name, spelled_for(base, name, aliases) if name else None)

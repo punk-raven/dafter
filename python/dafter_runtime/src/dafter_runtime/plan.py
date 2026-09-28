@@ -243,7 +243,7 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
 
 
 def voiced(agent: Agent, language: str) -> Persona:
-    persona = persona_for(agent.persona_ref, language, agent.name)
+    persona = persona_for(agent.persona_ref, language, agent.name, agent.addressing.aliases)
     return called_by_name(persona) if agent.addressing.waits_to_be_called else persona
 
 
