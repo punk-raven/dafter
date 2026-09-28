@@ -62,7 +62,7 @@ def _refuse(code: ErrorCode, message: str, pointer: str, because: str) -> Dafter
     return DafterError(code, message, details=(f"at '{pointer}': {because}",))
 
 
-def _check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
+def check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
     if cfg.media.encryption.stated_mode is not EncryptionMode.E2EE:
         return
     if not cfg.media.encryption.mints_shared_key:
@@ -117,7 +117,7 @@ def _check_session(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool) ->
             "/agent/mode",
             "half_cascade and speech_to_speech need a realtime provider",
         )
-    _check_encryption(cfg, fetches_keys)
+    check_encryption(cfg, fetches_keys)
     _check_addressing(cfg)
     if cfg.agent.pipeline is None:
         raise _refuse(

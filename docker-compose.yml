@@ -131,6 +131,28 @@ services:
     restart: unless-stopped
     logging: *logging
 
+  scribe:
+    build:
+      context: ./python
+      args:
+        PACKAGE: dafter-scribe
+    entrypoint: ["dafter-scribe"]
+    network_mode: host
+    environment:
+      LIVEKIT_URL: ws://127.0.0.1:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+      LIVEKIT_AGENT_NAME: dafter-scribe
+      DAFTER_CONTROL_URL: http://127.0.0.1:8080
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      livekit:
+        condition: service_started
+    restart: unless-stopped
+    logging: *logging
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
