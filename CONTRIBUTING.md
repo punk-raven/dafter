@@ -2,8 +2,9 @@
 
 ## Setup
 
-`go`, `uv` and a C compiler (for the race detector) are the only
-prerequisites, and the setup script offers to install whichever is missing.
+`go`, `uv`, a C compiler (for the race detector) and Node 20 or newer (for
+the test client's script tests) are the only prerequisites, and the setup
+script offers to install whichever is missing.
 `go/go.mod` pins the Go toolchain and `python/uv.lock` pins every Python
 dependency, so a clean checkout reproduces exactly what CI runs.
 
