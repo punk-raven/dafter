@@ -233,12 +233,14 @@ def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str
     return "\n".join([*head, *lines]) + "\n"
 
 
-def sample(records: list[Record], seed: int, share: float = SAMPLE_SHARE) -> list[dict[str, Any]]:
-    answered = [r for r in records if r.answered]
-    if not answered:
+def sample(
+    records: list[Record], seed: int, judged: bool = False, share: float = SAMPLE_SHARE
+) -> list[dict[str, Any]]:
+    pool = [r for r in records if r.answered and (r.verdicts or not judged)]
+    if not pool:
         return []
-    k = max(1, math.ceil(len(answered) * share))
-    picked = random.Random(seed).sample(answered, k)
+    k = max(1, math.ceil(len(pool) * share))
+    picked = random.Random(seed).sample(pool, k)
     return [
         {
             "date": r.date,

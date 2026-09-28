@@ -113,3 +113,15 @@ def test_a_row_without_quality_scores_is_listed_but_not_numbered() -> None:
         ["| -", "openai_mini"],
         ["| -", "gemini_flash_lite"],
     ]
+
+
+def test_after_a_judge_ran_the_sample_is_drawn_from_judged_replies_only() -> None:
+    judged = [rec("gemini_flash", n) for n in range(10)]
+    failed = [
+        rec("gemini_flash", 10 + n, verdicts={}, judge_error="rate_limited") for n in range(10)
+    ]
+    picked = sample([*judged, *failed], seed=7, judged=True)
+    assert len(picked) == 2
+    assert all(s["judge"]["verdicts"] for s in picked)
+    assert len(sample([*judged, *failed], seed=7)) == 4
+    assert sample(failed, seed=7, judged=True) == []

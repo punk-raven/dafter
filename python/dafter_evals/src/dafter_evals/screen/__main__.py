@@ -82,7 +82,7 @@ def write(
         for r in records:
             f.write(json.dumps(r.to_dict(), ensure_ascii=False) + "\n")
     with (out / "spot-check.jsonl").open("w", encoding="utf-8") as f:
-        for s in sample(records, seed):
+        for s in sample(records, seed, judged=meta["judge"] is not None):
             f.write(json.dumps(s, ensure_ascii=False) + "\n")
     summary = {
         **meta,
