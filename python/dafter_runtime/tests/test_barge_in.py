@@ -203,7 +203,7 @@ def test_a_called_session_barges_in_on_stage_1s_minimum_for_whoever_woke_it() ->
     responder = Responder()
     scheduler = Scheduler()
     gate = Gate(
-        Matcher.for_addressing(p.config.agent.addressing),
+        Matcher.for_agent(p.config.agent),
         20.0,
         responder,
         clock=Clock(),
@@ -308,17 +308,17 @@ def test_a_stop_command_ends_the_reply_and_sleeps_whatever_the_interruption_sett
     doc = json.loads(JOB.read_bytes())
     doc["agent"]["addressing"]["mode"] = "transcript"
     sealed, _ = seal(json.dumps(doc))
-    addressing = plan(load(sealed), "dafter-py").config.agent.addressing
+    agent = plan(load(sealed), "dafter-py").config.agent
 
     async def script(session: AgentSession[None], held: HeldLLM) -> None:
         voice = Voice(session, Roster(), interruptible=interruptible)
         gate = Gate(
-            Matcher.for_addressing(addressing),
+            Matcher.for_agent(agent),
             20.0,
             voice,
             clock=Clock(),
             schedule=Scheduler(),
-            name=addressing.name,
+            name=agent.name or "",
         )
         gate.heard(ASHA, "Nivya, what time is it?")
         await replying(session)

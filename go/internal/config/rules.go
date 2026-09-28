@@ -20,14 +20,14 @@ var crossFieldRules = []crossFieldRule{
 	},
 	{
 		broken: func(c *ResolvedSessionConfig) bool {
-			return c.Agent.Addressing.WaitsToBeCalled() && c.Agent.Addressing.Name == ""
+			return c.Agent.Addressing.WaitsToBeCalled() && c.Agent.Name == ""
 		},
 		code:    errs.CodeInvalidConfig,
-		pointer: "/agent/addressing/name",
+		pointer: "/agent/name",
 		because: "an agent that stays quiet until it is called by name needs a name to be called by",
 	},
 	{
-		broken:  func(c *ResolvedSessionConfig) bool { return c.Agent.Addressing.NearMissIsTheName() },
+		broken:  func(c *ResolvedSessionConfig) bool { return c.Agent.NearMissIsItsName() },
 		code:    errs.CodeInvalidConfig,
 		pointer: "/agent/addressing/nearMisses",
 		because: "a near miss is a word that must never wake the agent, so one that is also its name or an alias contradicts itself",

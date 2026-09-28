@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dafter_core.enums import AgentState, EventType
 from dafter_core.events import parse_event
+from dafter_core.hashing import seal
 from dafter_runtime.events import SessionEvents, agent_state
 from dafter_runtime.plan import load
 
@@ -19,7 +20,10 @@ def emitter(sent: list[bytes]) -> SessionEvents:
         await asyncio.sleep(0)
         sent.append(body)
 
-    cfg = load(JOB.read_bytes().strip())
+    doc = json.loads(JOB.read_bytes())
+    doc["agent"]["addressing"]["mode"] = "always"
+    sealed, _ = seal(json.dumps(doc))
+    cfg = load(sealed)
     return SessionEvents(cfg, publish, clock=lambda: datetime(2026, 9, 24, 10, 0, tzinfo=UTC))
 
 

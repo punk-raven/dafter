@@ -103,7 +103,7 @@ function agentTurnLevels(userAudible, agentAudible, now) {
 function transcriptSpeaker(room, identity) {
   if (identity === room.localParticipant.identity) return { who: 'you', label: 'You' };
   const p = room.remoteParticipants.get(identity);
-  if (p && p.isAgent) return { who: 'agent', label: 'Agent' };
+  if (p && p.isAgent) return { who: 'agent', label: p.name || 'Agent' };
   return { who: 'peer', label: identity };
 }
 

@@ -13,8 +13,7 @@ function waitsToBeCalled(config) {
 }
 
 function agentName(config) {
-  const addressing = config && config.agent && config.agent.addressing;
-  return (addressing && addressing.name) || 'the agent';
+  return (config && config.agent && config.agent.name) || 'the agent';
 }
 
 function resetAgentAddressing() {

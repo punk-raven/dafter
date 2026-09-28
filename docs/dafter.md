@@ -394,7 +394,11 @@ handed to the LLM as context when it is called. A session that picks
 `transcript` is a session whose consent covers every participant being
 transcribed by that provider, not only the one who talks to the agent; the
 provider, region and residency rules are the same ones the pipeline already
-names. `on_device` is the mode that keeps speech local until the name is
+names. **The catalog's default is `transcript`**: every new session gets one
+agent, Nivya, that joins silently (`agent.greets` is off) and speaks only when
+someone says its name or presses Wake, so a session created with the defaults
+is such a session, and one that wants the agent to answer a single person's
+every turn states `always`. `on_device` is the mode that keeps speech local until the name is
 spotted; it is declared in the schema and refused by the worker until a local
 spotter exists. Events about the agent's addressing carry who woke it as an
 opaque participant id and never what anyone said.

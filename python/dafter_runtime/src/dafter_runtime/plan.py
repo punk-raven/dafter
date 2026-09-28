@@ -46,6 +46,10 @@ class Plan:
             return {**self.turn_handling, "turn_detection": "manual"}
         return self.turn_handling
 
+    @property
+    def opening(self) -> str | None:
+        return self.persona.greeting if self.config.agent.greets else None
+
 
 def load(metadata: str | bytes) -> ResolvedSessionConfig:
     cfg = parse(metadata)
@@ -232,12 +236,12 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
     detection = turn_detection(cfg.turn, stt, cfg.language)
-    persona = persona_for(cfg.agent.persona_ref, cfg.language)
+    persona = persona_for(cfg.agent.persona_ref, cfg.language, cfg.agent.name)
     addressing = cfg.agent.addressing
     prompt = None
     if addressing.waits_to_be_called:
-        persona = called_by_name(persona, addressing.name)
-        prompt = ", ".join(dict.fromkeys((addressing.name, *addressing.aliases)))
+        persona = called_by_name(persona)
+        prompt = ", ".join(dict.fromkeys((cfg.agent.name or "", *addressing.aliases)))
     return Plan(
         config=cfg,
         pipeline=pipeline,
