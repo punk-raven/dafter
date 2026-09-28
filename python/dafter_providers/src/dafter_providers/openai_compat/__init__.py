@@ -33,6 +33,7 @@ QUOTA_CODES = frozenset(
 TIMEOUT_STATUSES = frozenset({408, 504})
 CONFIG_STATUSES = frozenset({400, 404, 422})
 OPTIONS = ("endpoint", "temperature", "maxTokens", "reasoningEffort", "extraBody")
+AGENT_LLM = "/agent/pipeline/llm"
 
 __all__ = [
     "ENDPOINTS",
@@ -55,19 +56,19 @@ def _refuse(code: ErrorCode, message: str, pointer: str, because: str) -> Dafter
     )
 
 
-def _model(ref: ProviderRef) -> str:
+def _model(ref: ProviderRef, at: str) -> str:
     if not ref.model:
         raise _refuse(
             ErrorCode.INVALID_CONFIG,
             f"{NAME} llm names no model",
-            "/agent/pipeline/llm/model",
+            f"{at}/model",
             "the endpoint's model id, pinned",
         )
     if ref.region is not None:
         raise _refuse(
             ErrorCode.RESIDENCY_VIOLATION,
             f"{NAME} cannot vouch for where an endpoint serves, so it takes no region pin",
-            "/agent/pipeline/llm/region",
+            f"{at}/region",
             "must be absent",
         )
     return ref.model
@@ -79,9 +80,9 @@ def _effort(opts: Options, raw: dict[str, Any]) -> NotGivenOr[Effort]:
     return opts.choice("reasoningEffort", EFFORTS, None)
 
 
-def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
-    model = _model(ref)
-    opts = Options(Stage.LLM, NAME, ref.options, OPTIONS)
+def build_llm(ref: ProviderRef, at: str = AGENT_LLM) -> llm.LLM[Any]:
+    model = _model(ref, at)
+    opts = Options(Stage.LLM, NAME, ref.options, OPTIONS, base=at)
     endpoint = ENDPOINTS.get(opts.get("endpoint", str, ""))
     if endpoint is None:
         raise opts.error(
@@ -92,7 +93,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     max_tokens = opts.get("maxTokens", int, 200)
     effort = _effort(opts, ref.options)
     extra_body: dict[str, Any] = opts.get("extraBody", dict, {})
-    key = credentials.resolve(ref, Stage.LLM, {endpoint.credential_env})
+    key = credentials.resolve(ref, Stage.LLM, {endpoint.credential_env}, pointer=at)
     try:
         return CompatLLM(
             model=model,

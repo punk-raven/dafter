@@ -23,6 +23,7 @@ LLM_MODELS = frozenset({"sarvam-105b", "sarvam-105b-conversations"})
 TTS_MODELS = frozenset({"bulbul:v3"})
 REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
+AGENT_LLM = "/agent/pipeline/llm"
 CREDENTIAL = "SARVAM_API_KEY"
 
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
@@ -36,15 +37,16 @@ MIN_BUFFER_CHARS = (30, 200)
 T = TypeVar("T")
 
 
-def _checked(ref: ProviderRef, stage: Stage, models: frozenset[str]) -> None:
+def _checked(ref: ProviderRef, stage: Stage, models: frozenset[str], at: str | None = None) -> None:
     context = ProviderContext(NAME)
+    base = at or f"/agent/pipeline/{stage}"
     if ref.model not in models:
         raise DafterError(
             ErrorCode.UNSUPPORTED_CAPABILITY,
             f"{NAME} {stage} is pinned to a model this worker does not run",
             stage=stage,
             provider=context,
-            details=(f"at '/agent/pipeline/{stage}/model': one of {', '.join(sorted(models))}",),
+            details=(f"at '{base}/model': one of {', '.join(sorted(models))}",),
         )
     if ref.region is not None and ref.region not in REGIONS:
         raise DafterError(
@@ -100,16 +102,16 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -
     )
 
 
-def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
-    _checked(ref, Stage.LLM, LLM_MODELS)
+def build_llm(ref: ProviderRef, at: str = AGENT_LLM) -> llm.LLM[Any]:
+    _checked(ref, Stage.LLM, LLM_MODELS, at)
     opts = Options(
-        Stage.LLM, NAME, ref.options, ("prewarm", "thinking", "temperature", "maxTokens")
+        Stage.LLM, NAME, ref.options, ("prewarm", "thinking", "temperature", "maxTokens"), base=at
     )
     opts.get("prewarm", bool, True)
     thinking = opts.get("thinking", bool, False)
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
-    key = credentials.resolve(ref, Stage.LLM, {CREDENTIAL})
+    key = credentials.resolve(ref, Stage.LLM, {CREDENTIAL}, pointer=at)
     model = ref.model or ""
     if thinking:
         return _construct(
