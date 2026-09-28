@@ -150,7 +150,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     code = language_code(language, Stage.TTS)
     encoding = opts.choice("encoding", TTS_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", TTS_SAMPLE_RATES, 24000)
-    voice = opts.get("voice", str, "shubh")
+    voice = opts.get("voice", str, "priya")
     pace = opts.get("pace", float, 1.0)
     opts.get("prewarm", bool, True)
     key = credentials.resolve(ref.credential_ref)
