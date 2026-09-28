@@ -20,6 +20,9 @@ and pinned; the audio is never committed.
   revision. It is gated: pinning or fetching it needs `HF_TOKEN` from an
   account that has accepted the dataset's terms on
   https://huggingface.co/datasets/ai4bharat/Svarah (automatic approval).
+  Rows and audio come from the Hugging Face datasets server, which
+  rate-limits a pin partway through; `dafter-asr` retries a 429 or 5xx with
+  backoff and stops at once on any other refusal.
 
 `<dataset>-<language>.json` is one pinned sample: the source it came from,
 the selection rule, and per clip its id, its member in the source, its

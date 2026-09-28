@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import io
 import json
+import urllib.error
+import urllib.request
 import wave
 import zipfile
+from email.message import Message
 from typing import Any
 
 import pytest
@@ -140,3 +143,44 @@ def test_a_svarah_sample_spreads_over_first_languages_at_the_pinned_revision() -
     assert "first language" in sample.selection
     with pytest.raises(ValueError, match="pinned"):
         svarah.pin_svarah(Hub("r2").get, SVARAH, "en-IN", 3)
+
+
+class Answers:
+    def __init__(self, *codes: int) -> None:
+        self.codes = list(codes)
+        self.urls: list[str] = []
+        self.tokens: list[str | None] = []
+
+    def urlopen(self, request: urllib.request.Request, timeout: float) -> io.BytesIO:
+        self.urls.append(request.full_url)
+        self.tokens.append(request.get_header("Authorization"))
+        code = self.codes.pop(0)
+        if code != 200:
+            raise urllib.error.HTTPError(request.full_url, code, "no", Message(), None)
+        return io.BytesIO(b"rows")
+
+
+def test_the_hub_is_asked_again_after_a_rate_limit_and_never_after_a_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    waits: list[float] = []
+    answers = Answers(429, 503, 200)
+    monkeypatch.setattr(urllib.request, "urlopen", answers.urlopen)
+    assert svarah.authorized("t", waits.append)("https://example.invalid/rows") == b"rows"
+    assert waits == [svarah.BACKOFF_S, 2 * svarah.BACKOFF_S]
+    assert answers.tokens == ["Bearer t"] * 3
+
+    waits.clear()
+    answers = Answers(403)
+    monkeypatch.setattr(urllib.request, "urlopen", answers.urlopen)
+    with pytest.raises(urllib.error.HTTPError, match="403"):
+        svarah.authorized("t", waits.append)("https://example.invalid/rows")
+    assert waits == []
+
+    waits.clear()
+    answers = Answers(*[429] * (svarah.RETRIES + 1))
+    monkeypatch.setattr(urllib.request, "urlopen", answers.urlopen)
+    with pytest.raises(urllib.error.HTTPError, match="429"):
+        svarah.authorized("t", waits.append)("https://example.invalid/rows")
+    assert len(answers.urls) == svarah.RETRIES + 1
+    assert max(waits) == svarah.MAX_BACKOFF_S

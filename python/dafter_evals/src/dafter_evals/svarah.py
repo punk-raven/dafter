@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator
@@ -12,16 +15,32 @@ from .remote import TIMEOUT_S
 ROWS = "https://datasets-server.huggingface.co/rows"
 DATASETS = "https://huggingface.co/api/datasets"
 PAGE = 100
+RETRIES = 8
+RETRYABLE = frozenset({429, 500, 502, 503, 504})
+BACKOFF_S = 15
+MAX_BACKOFF_S = 240
 
 Get = Callable[[str], bytes]
 
 
-def authorized(token: str) -> Get:
-    def get(url: str) -> bytes:
+def authorized(token: str, sleep: Callable[[float], None] = time.sleep) -> Get:
+    def once(url: str) -> bytes:
         request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
         with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
             data: bytes = response.read()
             return data
+
+    def get(url: str) -> bytes:
+        for attempt in range(RETRIES):
+            try:
+                return once(url)
+            except urllib.error.HTTPError as error:
+                if error.code not in RETRYABLE:
+                    raise
+                wait = min(BACKOFF_S * 2**attempt, MAX_BACKOFF_S)
+                print(f"HTTP {error.code}, retrying in {wait}s", file=sys.stderr)
+                sleep(wait)
+        return once(url)
 
     return get
 
