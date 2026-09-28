@@ -65,7 +65,7 @@ What frame encryption in that session covers and what it does not:
 
 | Language | transcribe | codemix (Latin words, floor) | codemix, language identified | identified right | last final after the audio, p50 |
 |---|---|---|---|---|---|
-| hi | 10.3% | 18.0% (22, 9.0%) | 18.0% | 20 of 20 clips | 364ms |
+| hi | 10.2% | 18.0% (22, 9.0%) | 18.0% | 20 of 20 clips | 364ms |
 | kn-IN | 18.8% | 25.2% (16, 17.9%) | 25.2% | 20 of 20 | 474ms |
 | mr-IN | 16.0% | 21.8% (14, 15.6%) | 21.8% | 19 of 20 | 380ms |
 | te-IN | 20.3% | 28.2% (19, 18.8%) | 30.2% | 19 of 20 | 327ms |
