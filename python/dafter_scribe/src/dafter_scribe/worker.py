@@ -18,6 +18,7 @@ from livekit import rtc
 from livekit.agents import AgentServer, AutoSubscribe, JobContext, JobRequest
 from livekit.agents.worker import WorkerPermissions
 
+from .judging import Scorer
 from .plan import ScribePlan, plan
 from .scribe import Scribe
 from .transcript import Transcript
@@ -72,6 +73,7 @@ async def entrypoint(ctx: JobContext) -> None:
     p: ScribePlan = plan(load(ctx.job.metadata), pool(), fetches_keys=control is not None)
     try:
         model = p.writer.build()
+        judge = p.judge.build() if p.judge is not None else None
     except DafterError as exc:
         await refuse(control, p.config.session_id, exc)
         raise
@@ -94,7 +96,13 @@ async def entrypoint(ctx: JobContext) -> None:
         p.interval_s,
         p.writer.source(),
     )
-    scribe = Scribe(p.config, writer)
+    scorer = None
+    if p.judge is not None and judge is not None:
+        writer.spend.watch(judge)
+        scorer = Scorer(
+            judge, p.judge.vendor.classify, events.emit, p.language, p.interval_s, p.judge.source()
+        )
+    scribe = Scribe(p.config, writer, scorer)
 
     def received(packet: rtc.DataPacket) -> None:
         if packet.topic == TOPIC:
@@ -107,10 +115,13 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.room.on("data_received", received)
     ctx.room.on("participant_disconnected", left)
-    running = asyncio.ensure_future(writer.run())
+    running = [asyncio.ensure_future(writer.run())]
+    if scorer is not None:
+        running.append(asyncio.ensure_future(scorer.run()))
 
     async def stop(reason: str) -> None:
-        running.cancel()
+        for task in running:
+            task.cancel()
         await events.drain()
 
     ctx.add_shutdown_callback(stop)

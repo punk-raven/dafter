@@ -12,6 +12,7 @@ from dafter_core.errors import DafterError
 from dafter_providers import sarvam
 from dafter_runtime.control import ControlPlane
 from dafter_runtime.events import SessionEvents
+from dafter_scribe.judging import Scorer
 from dafter_scribe.plan import language_of
 from dafter_scribe.scribe import Scribe
 from dafter_scribe.transcript import Transcript
@@ -21,7 +22,7 @@ from scribe_stub import ASHA, ScriptedLLM, Sent, caption, config
 AT = datetime(2026, 9, 24, 10, 0, tzinfo=UTC)
 
 
-def inbox() -> Scribe:
+def inbox(scored: bool = False) -> Scribe:
     cfg = config()
     w = Writer(
         ScriptedLLM(),
@@ -33,7 +34,12 @@ def inbox() -> Scribe:
         5.0,
         {"provider": "sarvam", "model": "sarvam-105b"},
     )
-    return Scribe(cfg, w)
+    scorer = (
+        Scorer(ScriptedLLM(), sarvam.classify, Sent(), language_of("hi"), 5.0, {})
+        if scored
+        else None
+    )
+    return Scribe(cfg, w, scorer)
 
 
 def packet(event_type: EventType, payload: dict[str, Any], session: str | None = None) -> bytes:
@@ -63,6 +69,16 @@ def test_the_scribe_reads_final_captions_and_taken_notes_from_the_agent_worker()
     )
     assert [line.text for line in s.writer.transcript.pending] == ["रवि, कब?"]
     assert [n.text for n in s.writer.taken] == ["याद रखो"]
+
+
+def test_every_final_caption_also_reaches_the_judge() -> None:
+    s = inbox(scored=True)
+    s.received(
+        packet(EventType.TRANSCRIPT_FINAL, caption("sg_0000000000000001", "कब?", ASHA)), True
+    )
+    s.received(packet(EventType.TRANSCRIPT_FINAL, caption("sg_0000000000000002", "कल।")), True)
+    assert s.scorer is not None
+    assert [(t.question, t.reply) for t in s.scorer._turns] == [("कब?", "कल।")]
 
 
 def test_the_scribe_ignores_what_a_person_or_another_session_sends() -> None:

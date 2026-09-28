@@ -9,7 +9,7 @@ from typing import Any
 from dafter_core.enums import EventType, Stage
 from dafter_core.errors import DafterError
 from livekit.agents import APIConnectOptions, function_tool, llm
-from livekit.agents.metrics import LLMModelUsage
+from livekit.agents.metrics import LLMMetrics, LLMModelUsage
 
 from .notes import NOTES_SCHEMA, NOTES_TOOL, AgentNote, Notes, notes_payload, read_notes, with_note
 from .plan import Language
@@ -48,13 +48,15 @@ def tool(schema: dict[str, Any]) -> llm.Tool:
 class Spend:
     usage: dict[tuple[str, str], LLMModelUsage] = field(default_factory=dict)
 
-    def add(self, model: llm.LLM[Any], used: llm.CompletionUsage | None) -> None:
-        if used is None:
-            return
-        key = (model.provider, model.model)
-        found = self.usage.setdefault(key, LLMModelUsage(provider=key[0], model=key[1]))
-        found.input_tokens += used.prompt_tokens
-        found.output_tokens += used.completion_tokens
+    def watch(self, model: llm.LLM[Any]) -> llm.LLM[Any]:
+        def collected(metrics: LLMMetrics) -> None:
+            key = (model.provider, model.model)
+            found = self.usage.setdefault(key, LLMModelUsage(provider=key[0], model=key[1]))
+            found.input_tokens += metrics.prompt_tokens
+            found.output_tokens += metrics.completion_tokens
+
+        model.on("metrics_collected", collected)
+        return model
 
     def models(self) -> list[LLMModelUsage]:
         return list(self.usage.values())
@@ -66,7 +68,6 @@ async def ask(
     content: str,
     schema: dict[str, Any],
     timeout_s: float,
-    spend: Spend,
 ) -> str:
     ctx = llm.ChatContext()
     ctx.add_message(role="system", content=system)
@@ -78,7 +79,6 @@ async def ask(
         conn_options=APIConnectOptions(max_retry=0, timeout=timeout_s),
     )
     response = await asyncio.wait_for(stream.collect(), timeout=timeout_s)
-    spend.add(model, response.usage)
     calls = [c for c in response.tool_calls if c.name == schema["name"]]
     if not calls:
         raise ValueError(f"the model called no {schema['name']}")
@@ -108,6 +108,7 @@ class Writer:
         self._interval_s = interval_s
         self._source = source
         self.spend = spend or Spend()
+        self.spend.watch(model)
         self.notes = Notes()
         self.revision = 0
         self.taken: tuple[AgentNote, ...] = ()
@@ -141,7 +142,6 @@ class Writer:
                     self.content(lines),
                     NOTES_SCHEMA,
                     self._interval_s,
-                    self.spend,
                 )
                 notes = read_notes(raw, list(self.transcript.speakers))
             except Exception as exc:
