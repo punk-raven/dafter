@@ -56,6 +56,15 @@ def test_parses_a_minimal_document() -> None:
     assert c.turn.local_vad_enabled is True
 
 
+def test_the_agent_name_and_greeting_are_read_and_unstated_means_unnamed_and_silent() -> None:
+    c = parse(doc(agent={"enabled": True, "pool": "dafter-py", "name": "Nivya", "greets": True}))
+    assert (c.agent.name, c.agent.greets) == ("Nivya", True)
+    assert (parse(doc()).agent.name, parse(doc()).agent.greets) == (None, False)
+    assert refuse(doc(agent={"enabled": True, "pool": "dafter-py", "name": ""})).code is (
+        ErrorCode.INVALID_CONFIG
+    )
+
+
 def test_defaults_come_from_the_schema_not_the_dataclass() -> None:
     c = parse(doc(recording={"enabled": True, "consentArtifactId": "consent_1"}))
     assert c.recording.layout is EgressLayout.TRACK

@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from aiohttp import web
-from dafter_evals.connect import join, livekit_url
+from dafter_evals.connect import join, livekit_url, session_overrides
 from dafter_evals.probe import Probe
 
 
@@ -21,6 +21,15 @@ def test_the_media_server_is_reached_the_way_the_browser_client_reaches_it(
     control: str, given: str, used: str
 ) -> None:
     assert livekit_url(control, given) == used
+
+
+def test_the_harness_asks_for_the_greeting_it_waits_for() -> None:
+    assert session_overrides(None) == {"agent": {"greets": True}}
+    assert session_overrides({"agent": {"enabled": True}, "turn": {"silenceMs": 900}}) == {
+        "agent": {"greets": True, "enabled": True},
+        "turn": {"silenceMs": 900},
+    }
+    assert session_overrides({"agent": {"greets": False}}) == {"agent": {"greets": False}}
 
 
 class Unreachable(Probe):

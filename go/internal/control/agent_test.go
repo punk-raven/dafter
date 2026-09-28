@@ -62,6 +62,40 @@ func TestTheHindiAgentJobIsPinnedForTheWorker(t *testing.T) {
 	}
 }
 
+func TestTheCatalogAgentIsNamedAndJoinsSilentlyUnlessASessionAsksItToGreet(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := config.LoadCatalog(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		overrides string
+		greets    bool
+	}{
+		{"", false},
+		{`{"agent":{"greets":true}}`, true},
+	} {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelWebRTC,
+			Overrides: json.RawMessage(tc.overrides),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := config.Parse(resolved.Document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.Agent.Name != "Nivya" || cfg.Agent.Greets == nil || *cfg.Agent.Greets != tc.greets {
+			t.Errorf("overrides %q resolved agent name %q greets %v; want Nivya greeting %v", tc.overrides, cfg.Agent.Name, cfg.Agent.Greets, tc.greets)
+		}
+	}
+}
+
 func TestNoAgentMeansNoDispatch(t *testing.T) {
 	t.Parallel()
 	h := serve(t)
