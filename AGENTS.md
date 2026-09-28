@@ -51,7 +51,7 @@ depguard in `go/.golangci.yml` holds the whole graph: core below everything, sta
 
 ## Dev stack
 
-`make dev` from a clean clone builds and starts everything: control plane, LiveKit SFU, Redis, MinIO (recordings), Jaeger (tracing), Prometheus, Grafana, and CF tunnel (if configured). `make dev-down` tears it down. Config lives in `deploy/livekit.yaml` and `deploy/egress.yaml`; dev credentials are `devkey`/`secret`. The control plane is at `http://127.0.0.1:8080`. Recording storage reaches the control plane as `DAFTER_EGRESS_S3_*` (set in `docker-compose.yml` to match `deploy/egress.yaml`); without a bucket it boots and refuses recording starts. The egress container is on the host network, so it reaches the SFU and MinIO at `127.0.0.1`.
+`make dev` from a clean clone builds and starts everything: control plane, LiveKit SFU, Redis, MinIO (recordings), Jaeger (tracing), Prometheus, Grafana, and the Cloudflare tunnel only when `.env` sets `COMPOSE_PROFILES=tunnel` with its token (`.env.example`). `make dev-down` tears it all down. Config lives in `deploy/livekit.yaml` and `deploy/egress.yaml`; dev credentials are `devkey`/`secret`. The control plane is at `http://127.0.0.1:8080`. Recording storage reaches the control plane as `DAFTER_EGRESS_S3_*` (set in `docker-compose.yml` to match `deploy/egress.yaml`); without a bucket it boots and refuses recording starts. The egress container is on the host network, so it reaches the SFU and MinIO at `127.0.0.1`.
 
 The SFU advertises `--node-ip` (`LIVEKIT_NODE_IP`, default 127.0.0.1) on the one published UDP port; anything else in `rtc` (a port range, `use_external_ip`) breaks local media, see the comments in `deploy/livekit.yaml`. LiveKit metrics are on port 6789, not 7880.
 
