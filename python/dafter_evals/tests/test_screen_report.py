@@ -96,3 +96,19 @@ def test_rows_from_several_languages_merge_per_candidate_in_first_seen_order() -
     assert {r.language for r in by["gemini_flash"].records} == {"hi", "kn"}
     assert by["sarvam_105b"].skipped == "authentication_failed: no key"
     assert len(hindi[1].records) == 10
+
+
+def test_a_row_without_quality_scores_is_listed_but_not_numbered() -> None:
+    unjudged = [
+        Row(
+            PICK["openai_mini"], [rec("openai_mini", n, score=None, verdicts={}) for n in range(3)]
+        ),
+        Row(PICK["gemini_flash"], [rec("gemini_flash", n) for n in range(3)]),
+        Row(PICK["gemini_flash_lite"], [rec("gemini_flash_lite", n, score=None) for n in range(3)]),
+    ]
+    lines = table(unjudged, "2026-09-28", None, ["hi"]).splitlines()[4:]
+    assert [line.split(" | ")[:2] for line in lines] == [
+        ["| 1", "gemini_flash"],
+        ["| -", "openai_mini"],
+        ["| -", "gemini_flash_lite"],
+    ]

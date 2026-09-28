@@ -191,7 +191,8 @@ def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     lines = []
-    for n, row in enumerate(rank(rows), start=1):
+    place = 0
+    for row in rank(rows):
         s = row.summary()
         if row.skipped:
             lines.append(
@@ -200,6 +201,9 @@ def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str
             )
             continue
         rates = s["passRates"]
+        ranked = s["quality"] is not None
+        if ranked:
+            place += 1
         cost = (
             f"{s['currency']} {s['costPer1kReplies']:.4f}"
             if s["costPer1kReplies"] is not None
@@ -208,7 +212,7 @@ def table(rows: list[Row], date: str, judge: str | None, languages: Sequence[str
         lines.append(
             " | ".join(
                 [
-                    f"| {n}",
+                    f"| {place if ranked else '-'}",
                     s["candidate"],
                     f"{s['provider']}/{s['model']}",
                     f"{s['answered']}/{s['calls']}",
