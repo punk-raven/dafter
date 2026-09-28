@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
 import aiohttp
 from dafter_providers.sarvam.realtime import FinalFirstStream, FinalFirstSTT
+from livekit import rtc
 from livekit.agents import stt
 
 Kind = stt.SpeechEventType
 
 
 class Recorder:
+    closed = False
+
     def __init__(self) -> None:
         self.kinds: list[Kind] = []
 
@@ -58,6 +62,33 @@ def test_end_of_speech_is_held_until_the_final_transcript_arrives() -> None:
             return recorder.kinds
 
     assert asyncio.run(run()) == [Kind.START_OF_SPEECH, Kind.FINAL_TRANSCRIPT, Kind.END_OF_SPEECH]
+
+
+def frame(level: int) -> rtc.AudioFrame:
+    return rtc.AudioFrame(level.to_bytes(2, "little", signed=True) * 160, 16000, 1, 160)
+
+
+def test_the_endpoint_runs_from_the_last_voiced_frame_to_the_held_end_of_speech() -> None:
+    async def run() -> float:
+        async with stream() as (s, _):
+            model = s._stt
+            assert isinstance(model, FinalFirstSTT)
+            await s._handle_message({"event": "vad.speech_start", "utterance_idx": 0})
+            s.push_frame(frame(8000))
+            voiced_by = time.time()
+            await asyncio.sleep(0.1)
+            s.push_frame(frame(0))
+            s.push_frame(frame(200))
+            await s._handle_message({"event": "vad.speech_end", "utterance_idx": 0})
+            assert model.take_endpoint() is None
+            await asyncio.sleep(0.1)
+            await s._handle_message(final("नमस्ते"))
+            found = model.take_endpoint()
+            assert found is not None and found.voiced_until <= voiced_by
+            assert model.take_endpoint() is None
+            return found.released_at - found.voiced_until
+
+    assert asyncio.run(run()) >= 0.2
 
 
 def test_a_final_that_beat_the_speech_end_is_released_by_it() -> None:

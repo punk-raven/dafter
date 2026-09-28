@@ -10,6 +10,7 @@
   "payload": {
     "turn": 1,
     "interrupted": false,
+    "endpointMs": 1012,
     "endOfTurnDelayMs": 612,
     "transcriptionDelayMs": 488,
     "llmNodeTtftMs": 734,
@@ -17,6 +18,7 @@
     "ttsNodeTtfbMs": 296,
     "playbackLatencyMs": 3,
     "e2eLatencyMs": 1968,
+    "replyGapMs": 2980,
     "serial": false
   }
 }
