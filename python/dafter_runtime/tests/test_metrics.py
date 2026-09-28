@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from dafter_core.enums import Stage, UsageUnit
-from dafter_runtime.cost import Item
+from dafter_runtime.cost import Item, load_prices, priced
 from dafter_runtime.metrics import (
     MULTIPROC_ENV,
     PORT_ENV,
@@ -18,7 +18,8 @@ from dafter_runtime.metrics import (
     exposition,
 )
 from dafter_runtime.plan import Plan, load, plan
-from dafter_runtime.timing import TurnTiming
+from dafter_runtime.timing import PAYLOAD_FIELDS, TurnTiming
+from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage, STTModelUsage, TTSModelUsage
 from prometheus_client import CollectorRegistry
 from prometheus_client.multiprocess import MultiProcessCollector
 
@@ -138,3 +139,71 @@ def test_a_job_process_turn_reaches_the_workers_metrics_endpoint(tmp_path: Path)
     MultiProcessCollector(registry, path=str(tmp_path))  # type: ignore[no-untyped-call]
     e2e = {"layer": "e2e_latency", **PIPELINE}
     assert registry.get_sample_value("dafter_agent_turn_layer_seconds_count", e2e) == 1
+
+
+def test_every_series_a_session_can_produce_reads_zero_before_its_first_turn() -> None:
+    registry, _ = fresh()
+    for layer in PAYLOAD_FIELDS:
+        labels = {"layer": layer, **PIPELINE}
+        assert registry.get_sample_value("dafter_agent_turn_layer_seconds_count", labels) == 0
+    assert registry.get_sample_value("dafter_agent_serial_checked_turns_total", PIPELINE) == 0
+    assert registry.get_sample_value("dafter_agent_serial_turns_total", PIPELINE) == 0
+    assert registry.get_sample_value("dafter_agent_session_cost_inr_count", PLACE) == 0
+    spends = {
+        "stt": ("saaras:v3-realtime", ("audio_second",)),
+        "llm": ("sarvam-105b", ("input_token", "output_token")),
+        "tts": ("bulbul:v3", ("character",)),
+    }
+    for stage, (model, units) in spends.items():
+        spend = {**PLACE, "stage": stage, "provider": "sarvam", "model": model}
+        assert registry.get_sample_value("dafter_agent_cost_inr_total", spend) == 0
+        for unit in units:
+            labels = {**spend, "unit": unit}
+            assert registry.get_sample_value("dafter_agent_unpriced_items_total", labels) == 0
+
+
+def test_a_job_process_exposes_zero_series_before_any_turn(tmp_path: Path) -> None:
+    job_process = textwrap.dedent(
+        f"""
+        from pathlib import Path
+        from dafter_runtime.metrics import WORKER, SessionMetrics
+        from dafter_runtime.plan import load, plan
+
+        SessionMetrics(WORKER, plan(load(Path({str(JOB)!r}).read_bytes().strip()), "dafter-py"))
+        """
+    )
+    env = {**os.environ, MULTIPROC_ENV: str(tmp_path)}
+    subprocess.run([sys.executable, "-c", job_process], env=env, check=True, timeout=120)
+    registry = CollectorRegistry()
+    MultiProcessCollector(registry, path=str(tmp_path))  # type: ignore[no-untyped-call]
+    e2e = {"layer": "e2e_latency", **PIPELINE}
+    assert registry.get_sample_value("dafter_agent_turn_layer_seconds_count", e2e) == 0
+    assert registry.get_sample_value("dafter_agent_serial_turns_total", PIPELINE) == 0
+    assert registry.get_sample_value("dafter_agent_session_cost_inr_count", PLACE) == 0
+    assert registry.get_sample_value("dafter_agent_cost_inr_total", LLM) == 0
+
+
+def series(registry: CollectorRegistry) -> set[tuple[str, tuple[tuple[str, str], ...]]]:
+    return {
+        (sample.name, tuple(sorted(sample.labels.items())))
+        for family in registry.collect()
+        for sample in family.samples
+        if not sample.name.endswith("_created")
+    }
+
+
+def test_a_session_adds_no_series_beyond_the_ones_it_started_with() -> None:
+    registry, session = fresh()
+    before = series(registry)
+    usage = AgentSessionUsage(
+        model_usage=[
+            LLMModelUsage(provider="Sarvam", model="sarvam-105b", input_tokens=90, output_tokens=9),
+            TTSModelUsage(provider="Sarvam", model="bulbul:v3", characters_count=40),
+            STTModelUsage(provider="Sarvam", model="saaras:v3-realtime", audio_duration=4.0),
+        ]
+    )
+    seconds = {layer: 0.5 for layer in PAYLOAD_FIELDS}
+    session.turn(TurnTiming(turn=0, interrupted=False, seconds={**seconds, "llm_node_ttfs": 2.0}))
+    session.usage(priced(usage, load_prices()))
+    session.closed(priced(usage, {}))
+    assert series(registry) == before

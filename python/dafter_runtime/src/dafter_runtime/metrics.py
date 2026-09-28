@@ -7,11 +7,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from dafter_core.config import ProviderRef
+from dafter_core.enums import Stage
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram
 
-from .cost import Item, model_name, provider_name
+from .cost import UNITS, Item, model_name, provider_name
 from .plan import Plan
-from .timing import SERIAL_WAIT_MS, TurnTiming
+from .timing import PAYLOAD_FIELDS, SERIAL_WAIT_MS, TurnTiming
 
 PORT_ENV = "DAFTER_METRICS_PORT"
 MULTIPROC_ENV = "PROMETHEUS_MULTIPROC_DIR"
@@ -125,6 +126,31 @@ class SessionMetrics:
             vendor(p.pipeline.tts),
         )
         self._spent: dict[ItemKey, Decimal] = {}
+        self._zero(p)
+
+    def _zero(self, p: Plan) -> None:
+        for layer in PAYLOAD_FIELDS:
+            self._metrics.layers.labels(layer, *self._pipeline)
+        self._metrics.serial_checked.labels(*self._pipeline)
+        self._metrics.serial.labels(*self._pipeline)
+        self._metrics.session_cost.labels(*self._place)
+        stages = (
+            (Stage.STT, p.pipeline.stt),
+            (Stage.LLM, p.pipeline.llm),
+            (Stage.TTS, p.pipeline.tts),
+        )
+        for stage, ref in stages:
+            if ref is None:
+                continue
+            spend = (
+                *self._place,
+                str(stage),
+                provider_name(ref.provider),
+                model_name(ref.model or ""),
+            )
+            self._metrics.cost.labels(*spend)
+            for unit in UNITS[stage]:
+                self._metrics.unpriced.labels(*spend, str(unit))
 
     def turn(self, timing: TurnTiming) -> None:
         for layer, seconds in timing.seconds.items():

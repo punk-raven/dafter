@@ -20,6 +20,11 @@ MODEL_MAX = 128
 COST_PLACES = Decimal("0.000001")
 
 Key = tuple[str, str, UsageUnit]
+UNITS: dict[Stage, tuple[UsageUnit, ...]] = {
+    Stage.STT: (UsageUnit.AUDIO_SECOND,),
+    Stage.LLM: (UsageUnit.INPUT_TOKEN, UsageUnit.OUTPUT_TOKEN),
+    Stage.TTS: (UsageUnit.CHARACTER,),
+}
 
 
 @dataclass(frozen=True, slots=True)
