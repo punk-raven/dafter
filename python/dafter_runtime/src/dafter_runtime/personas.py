@@ -24,10 +24,11 @@ class Script:
     def spoken_by(self, name: str | None) -> Persona:
         if not name:
             return Persona(
-                instructions=f"You are {self.role}. {self.rules}", greeting=self.greeting
+                instructions=f"You are {self.role}. {FEMININE} {self.rules}",
+                greeting=self.greeting,
             )
         return Persona(
-            instructions=f"You are {name}, {self.role}. {self.rules}",
+            instructions=f"You are {name}, {self.role}. {FEMININE} {self.rules}",
             greeting=self.introduction.format(name=name),
         )
 
@@ -61,18 +62,21 @@ _SUPPORT = (
     "step by step"
 )
 
+FEMININE = "You are a woman: whenever you speak about yourself, use feminine grammar."
+_HINDI_FEMININE = " In Hindi say मैं कर सकती हूँ, मैं देख रही हूँ, मैं बताती हूँ, never सकता, रहा or बताता."
+
 SCRIPTS: dict[tuple[str, str], Script] = {
     (DEFAULT_REF, "hi"): Script(
         role=_GENERAL,
-        rules=_HINDI_VOICE_RULES,
-        greeting="नमस्ते! मैं आपकी क्या मदद कर सकता हूँ?",
-        introduction="नमस्ते! मैं {name} हूँ। मैं आपकी क्या मदद कर सकता हूँ?",
+        rules=_HINDI_VOICE_RULES + _HINDI_FEMININE,
+        greeting="नमस्ते! मैं आपकी क्या मदद कर सकती हूँ?",
+        introduction="नमस्ते! मैं {name} हूँ। मैं आपकी क्या मदद कर सकती हूँ?",
     ),
     ("persona://support/v3", "hi"): Script(
         role=_SUPPORT,
-        rules=_HINDI_VOICE_RULES,
-        greeting="नमस्ते! मैं सहायता टीम से बात कर रहा हूँ। बताइए, क्या समस्या है?",
-        introduction="नमस्ते! मैं {name}, सहायता टीम से बात कर रहा हूँ। बताइए, क्या समस्या है?",
+        rules=_HINDI_VOICE_RULES + _HINDI_FEMININE,
+        greeting="नमस्ते! मैं सहायता टीम से बात कर रही हूँ। बताइए, क्या समस्या है?",
+        introduction="नमस्ते! मैं {name}, सहायता टीम से बात कर रही हूँ। बताइए, क्या समस्या है?",
     ),
     (DEFAULT_REF, "en"): Script(
         role=_GENERAL,
