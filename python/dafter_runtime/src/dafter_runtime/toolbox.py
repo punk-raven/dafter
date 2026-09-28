@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -15,6 +16,7 @@ from .everyday import current_time, go_quiet, who_is_here
 from .listeners import is_human
 from .naming import words
 from .plan import Plan
+from .scribing import Scribing
 from .tools import Registry, Tool
 
 log = logging.getLogger("dafter.runtime.toolbox")
@@ -25,6 +27,14 @@ class Answering(Agent):
         super().__init__(instructions=instructions, tools=registry.function_tools())
         self._registry = registry
         self._caller = caller
+        self._persona = instructions
+        self._briefing: set[asyncio.Task[None]] = set()
+
+    def brief(self, context: str) -> None:
+        instructions = f"{self._persona}\n\n{context}" if context else self._persona
+        task = asyncio.ensure_future(self.update_instructions(instructions))
+        self._briefing.add(task)
+        task.add_done_callback(self._briefing.discard)
 
     async def on_user_turn_completed(
         self, turn_ctx: lk_llm.ChatContext, new_message: lk_llm.ChatMessage
@@ -91,9 +101,13 @@ def registry_for(
     roster: Roster,
     caller: Callable[[], str | None],
     sleep: Callable[[], None] | None,
+    scribing: Scribing | None = None,
 ) -> Registry:
+    tools = everyday(roster, sleep)
+    if scribing is not None:
+        tools.extend(scribing.tools(caller))
     return Registry(
-        everyday(roster, sleep),
+        tools,
         caller=caller,
         role_of=unattested,
         confirmations=Confirmations(name_words(p)),

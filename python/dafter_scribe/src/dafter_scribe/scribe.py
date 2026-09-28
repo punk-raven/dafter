@@ -6,16 +6,11 @@ from dafter_core.config import ResolvedSessionConfig
 from dafter_core.enums import EventType
 from dafter_core.errors import DafterError
 from dafter_core.events import EventEnvelope, parse_event
-from livekit import rtc
 
 from .notes import AgentNote
 from .writer import Writer
 
 log = logging.getLogger("dafter.scribe.inbox")
-
-
-def from_worker(participant: rtc.RemoteParticipant | None) -> bool:
-    return participant is None or participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT
 
 
 class Scribe:
@@ -44,4 +39,4 @@ class Scribe:
             self.writer.note(AgentNote(p["noteId"], p["text"], p.get("takenBy")))
 
 
-__all__ = ["Scribe", "from_worker"]
+__all__ = ["Scribe"]

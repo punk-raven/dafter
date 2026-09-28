@@ -42,6 +42,10 @@ def is_human(participant: rtc.RemoteParticipant, room: rtc.Room) -> bool:
     return behalf != room.local_participant.identity
 
 
+def is_worker(participant: rtc.RemoteParticipant | None) -> bool:
+    return participant is None or participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT
+
+
 def listener_session(
     stt: lk_stt.STT[Any], vad: lk_vad.VAD | None, turn_handling: dict[str, Any]
 ) -> AgentSession[Any]:
@@ -117,4 +121,11 @@ class Listeners:
         return [*self._spent, *live]
 
 
-__all__ = ["Listener", "Listeners", "is_human", "listener_options", "listener_session"]
+__all__ = [
+    "Listener",
+    "Listeners",
+    "is_human",
+    "is_worker",
+    "listener_options",
+    "listener_session",
+]

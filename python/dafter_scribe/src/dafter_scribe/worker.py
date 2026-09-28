@@ -10,6 +10,7 @@ from dafter_core.errors import DafterError
 from dafter_runtime.answering import Roster
 from dafter_runtime.control import ControlPlane, encryption
 from dafter_runtime.events import TOPIC, SessionEvents
+from dafter_runtime.listeners import is_worker
 from dafter_runtime.plan import load
 from dafter_runtime.toolbox import follow
 from dafter_runtime.worker import redact_framework_logs, refuse
@@ -18,7 +19,7 @@ from livekit.agents import AgentServer, AutoSubscribe, JobContext, JobRequest
 from livekit.agents.worker import WorkerPermissions
 
 from .plan import ScribePlan, plan
-from .scribe import Scribe, from_worker
+from .scribe import Scribe
 from .transcript import Transcript
 from .writer import Writer
 
@@ -97,7 +98,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     def received(packet: rtc.DataPacket) -> None:
         if packet.topic == TOPIC:
-            scribe.received(packet.data, from_worker(packet.participant))
+            scribe.received(packet.data, is_worker(packet.participant))
 
     def left(participant: rtc.RemoteParticipant) -> None:
         if not roster.present():
