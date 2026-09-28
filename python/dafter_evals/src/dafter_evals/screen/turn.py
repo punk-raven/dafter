@@ -89,12 +89,17 @@ class Reply:
     output_tokens: int
     tool_calls: int
     error: DafterError | None
+    reasoning_tokens: int = 0
     history: llm.ChatContext | None = field(default=None, compare=False)
 
 
-def _tokens(session: AgentSession[Any]) -> tuple[int, int]:
+def _tokens(session: AgentSession[Any]) -> tuple[int, int, int]:
     used = [u for u in session.usage.model_usage if isinstance(u, LLMModelUsage)]
-    return sum(u.input_tokens for u in used), sum(u.output_tokens for u in used)
+    return (
+        sum(u.input_tokens for u in used),
+        sum(u.output_tokens for u in used),
+        sum(u.output_reasoning_tokens for u in used),
+    )
 
 
 async def ask(
@@ -135,5 +140,6 @@ async def ask(
         output_tokens=tokens[1],
         tool_calls=sum(1 for e in result.events if e.type == "function_call"),
         error=None,
+        reasoning_tokens=tokens[2],
         history=history,
     )

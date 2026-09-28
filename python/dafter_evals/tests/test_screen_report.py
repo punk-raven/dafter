@@ -28,6 +28,7 @@ def rec(candidate: str, n: int, **fields: Any) -> Record:
         total_ms=300,
         input_tokens=50,
         output_tokens=7,
+        reasoning_tokens=0,
         cost=0.00001,
         currency="USD",
         free_tier=c.free_tier,

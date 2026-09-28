@@ -6,6 +6,8 @@ from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions, llm
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 from livekit.plugins import openai, sarvam
 
+from .usage import report_reasoning
+
 
 class SarvamLLM(sarvam.LLM):
     def chat(
@@ -19,6 +21,7 @@ class SarvamLLM(sarvam.LLM):
         response_format: NotGivenOr[Any] = NOT_GIVEN,
         extra_kwargs: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
     ) -> openai.llm.LLMStream:
+        report_reasoning(self._client)
         stream: openai.llm.LLMStream = super().chat(
             chat_ctx=chat_ctx,
             tools=tools,

@@ -73,7 +73,12 @@ class StubStream(llm.LLMStream):
             return
         for piece in owner.chunks:
             self._send(llm.ChoiceDelta(role="assistant", content=piece))
-        usage = llm.CompletionUsage(completion_tokens=7, prompt_tokens=50, total_tokens=57)
+        usage = llm.CompletionUsage(
+            completion_tokens=7,
+            prompt_tokens=50,
+            total_tokens=57,
+            reasoning_tokens=owner.reasoning,
+        )
         self._event_ch.send_nowait(llm.ChatChunk(id="stub", usage=usage))
 
 
@@ -84,8 +89,10 @@ class Stub(llm.LLM[Any]):
         error: BaseException | None = None,
         judge: dict[str, str] | None = None,
         tool_calls: list[llm.FunctionToolCall] | None = None,
+        reasoning: int = 0,
     ) -> None:
         super().__init__()
+        self.reasoning = reasoning
         self.chunks = chunks
         self.error = error
         self.judge = judge or {}
@@ -154,6 +161,7 @@ def test_a_reply_is_timed_to_its_first_token_and_first_sentence() -> None:
     assert reply.text == "नमस्ते! आप कैसे हैं?"
     assert (reply.ttft_ms, reply.ttfs_ms, reply.total_ms) == (100, 200, 300)
     assert (reply.input_tokens, reply.output_tokens, reply.tool_calls) == (50, 7, 0)
+    assert reply.reasoning_tokens == 0
 
 
 def test_a_whitespace_chunk_is_not_the_first_token() -> None:
@@ -242,6 +250,16 @@ def screen(
     s = Screen(settings, bank, INSTRUCTIONS, graded, build, ticks(), said.append, tools)
     candidates = catalogs.load().pick(["gemini_flash_lite", "gemini_flash", "openai_mini"])
     return asyncio.run(s.run(candidates)), said
+
+
+def test_reasoning_tokens_are_recorded_per_reply_and_summed_per_candidate() -> None:
+    rows, _ = screen({"gemini-3.5-flash-lite": Stub(), "gemini-3.6-flash": Stub(reasoning=5)})
+    by = {row.candidate.id: row for row in rows}
+    off, on = by["gemini_flash_lite"], by["gemini_flash"]
+    assert [r.reasoning_tokens for r in on.records] == [5, 5]
+    assert (on.summary()["reasoningTokens"], on.summary()["reasoningReplies"]) == (10, 2)
+    assert (off.summary()["reasoningTokens"], off.summary()["reasoningReplies"]) == (0, 0)
+    assert on.records[0].to_dict()["reasoning_tokens"] == 5
 
 
 def test_the_screen_records_rate_limits_and_skips_a_candidate_it_cannot_build() -> None:

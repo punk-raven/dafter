@@ -62,6 +62,7 @@ def record(
         total_ms=reply.total_ms,
         input_tokens=reply.input_tokens,
         output_tokens=reply.output_tokens,
+        reasoning_tokens=reply.reasoning_tokens,
         cost=_cost(candidate, reply),
         currency=candidate.price.currency if candidate.price else None,
         free_tier=candidate.free_tier,

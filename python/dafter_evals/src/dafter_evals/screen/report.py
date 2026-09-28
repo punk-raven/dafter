@@ -33,6 +33,7 @@ class Record:
     total_ms: int | None
     input_tokens: int
     output_tokens: int
+    reasoning_tokens: int
     cost: float | None
     currency: str | None
     free_tier: bool | None
@@ -102,6 +103,8 @@ class Row:
             "passRates": {c: self._pass_rate(c) for c in CRITERIA},
             "markdownReplies": sum(1 for r in self.records if r.markdown),
             "digitReplies": sum(1 for r in self.records if r.digits),
+            "reasoningTokens": sum(r.reasoning_tokens for r in self.records),
+            "reasoningReplies": sum(1 for r in self.records if r.reasoning_tokens),
             "toolUse": [r.tool_use for r in self.records if r.tool_use is not None],
             "costPer1kReplies": float(per_1k) if per_1k is not None else None,
             "currency": price.currency if price else None,

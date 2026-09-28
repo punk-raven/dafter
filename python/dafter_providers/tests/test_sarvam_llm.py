@@ -86,3 +86,25 @@ def test_llm_asks_for_one_tool_call_at_a_time_only_when_tools_are_offered() -> N
     assert "parallel_tool_calls" not in sent[0]
     assert sent[1]["parallel_tool_calls"] is False
     assert sent[1]["tools"][0]["function"]["name"] == "get_weather"
+
+
+def usage(**fields: Any) -> dict[str, Any]:
+    counts = {"completion_tokens": 60, "prompt_tokens": 17, "total_tokens": 77}
+    return {**said(""), "choices": [], "usage": {**counts, **fields}}
+
+
+@pytest.mark.parametrize(
+    ("fields", "reasoning"),
+    [
+        ({"completion_tokens_details": None, "reasoning_tokens": 60}, 60),
+        ({"completion_tokens_details": {"reasoning_tokens": 12}, "reasoning_tokens": 60}, 12),
+        ({"completion_tokens_details": None}, 0),
+    ],
+)
+def test_the_reasoning_tokens_sarvam_reports_reach_the_usage(
+    fields: dict[str, Any], reasoning: int
+) -> None:
+    response = asked(stubbed([], sse(said("ठीक है।"), usage(**fields))))
+    assert response.usage is not None
+    assert (response.usage.completion_tokens, response.usage.reasoning_tokens) == (60, reasoning)
+    assert response.text == "ठीक है।"
