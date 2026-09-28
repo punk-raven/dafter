@@ -141,7 +141,7 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
             },
             "llm": {
               "provider": "sarvam",
@@ -181,7 +181,7 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "transcribe" }
             },
             "llm": {
               "provider": "sarvam",
@@ -221,7 +221,7 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
             },
             "llm": {
               "provider": "sarvam",
@@ -261,7 +261,7 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
             },
             "llm": {
               "provider": "sarvam",
@@ -301,7 +301,7 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
             },
             "llm": {
               "provider": "sarvam",

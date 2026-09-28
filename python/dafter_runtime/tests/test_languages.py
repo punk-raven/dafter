@@ -66,3 +66,14 @@ def test_each_job_vector_hears_and_speaks_its_own_language(language: str, fixtur
     assert stt._opts.language == code  # type: ignore[attr-defined]
     assert str(tts._opts.target_language_code) == code  # type: ignore[attr-defined]
     assert tts._opts.speaker == pipeline.tts.options["voice"]  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(("language", "fixture"), sorted(FOCUS.items()))
+def test_every_indic_language_keeps_the_english_words_its_callers_mix_in(
+    language: str, fixture: str
+) -> None:
+    cfg = load((JOBS / fixture).read_bytes().strip())
+    assert cfg.agent.pipeline is not None and cfg.agent.pipeline.stt is not None
+    stt = sarvam.build_stt(cfg.agent.pipeline.stt, language, cfg.turn, None)
+    expected = "transcribe" if base_language(language) == "en" else "codemix"
+    assert stt._opts.mode == expected  # type: ignore[attr-defined]

@@ -37,6 +37,7 @@ LANGUAGES = {
     "or-IN": "or-IN",
 }
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
+STT_MODES = {"transcribe": "transcribe", "codemix": "codemix"}
 STT_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
 STT_SAMPLE_RATES = {8000: 8000, 16000: 16000}
 TTS_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
@@ -94,10 +95,14 @@ def _construct(stage: Stage, build: Callable[[], T]) -> T:
 def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -> stt.STT[Any]:
     _checked(ref, Stage.STT, STT_MODELS)
     opts = Options(
-        Stage.STT, NAME, ref.options, ("chunkMs", "encoding", "sampleRate", "finalGraceMs")
+        Stage.STT,
+        NAME,
+        ref.options,
+        ("chunkMs", "encoding", "sampleRate", "finalGraceMs", "mode"),
     )
     code = language_code(language, Stage.STT)
     stream_type = opts.choice("chunkMs", CHUNK_PROFILES, 500)
+    mode = opts.choice("mode", STT_MODES, "transcribe")
     encoding = opts.choice("encoding", STT_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", STT_SAMPLE_RATES, 16000)
     final_grace_ms = opts.get("finalGraceMs", int, 1500)
@@ -112,6 +117,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -
         lambda: FinalFirstSTT(
             language=code,
             stream_type=stream_type,
+            mode=mode,
             endpointing="vad",
             encoding=encoding,
             sample_rate=sample_rate,
