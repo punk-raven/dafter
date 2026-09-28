@@ -87,7 +87,7 @@ def test_the_first_tts_chunk_size_and_the_llm_prewarm_are_options() -> None:
 
 
 def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
-    tts = sarvam.build_tts(ref("bulbul:v3", sampleRate=24000, voice="shubh"), "hi")
+    tts = sarvam.build_tts(ref("bulbul:v3", sampleRate=24000, voice="priya"), "hi")
     assert tts.sample_rate == 24000
     assert tts._opts.output_audio_codec == "linear16"  # type: ignore[attr-defined]
     assert tts._opts.target_language_code == "hi-IN"  # type: ignore[attr-defined]
@@ -140,6 +140,11 @@ def test_bad_settings_fail_at_construction_located_by_pointer(
         build()
     assert caught.value.code is code
     assert any(pointer in d for d in caught.value.details), caught.value.details
+
+
+def test_tts_speaks_in_a_female_voice_unless_told_otherwise() -> None:
+    tts = sarvam.build_tts(ref("bulbul:v3"), "hi")
+    assert tts._opts.speaker == "priya"  # type: ignore[attr-defined]
 
 
 def test_a_speaker_the_model_lacks_is_refused_at_construction() -> None:

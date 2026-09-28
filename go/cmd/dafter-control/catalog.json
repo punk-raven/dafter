@@ -169,7 +169,7 @@
               "model": "bulbul:v3",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh", "minBufferSize": 30 }
+              "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30 }
             }
           }
         }
@@ -210,7 +210,7 @@
               "model": "bulbul:v3",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh", "minBufferSize": 30 }
+              "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30 }
             }
           }
         }
