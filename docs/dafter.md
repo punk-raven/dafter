@@ -308,6 +308,24 @@ Tools carry two classifications. **`latency_class`** governs delay hiding: `fast
 
 **Evaluate on our audio, not public benchmarks.** Top providers cluster on clean English; differences appear on accented, noisy, code-mixed, and narrowband audio. Format-invariant accuracy (getting "4471", not "forty four seventy one") matters more than raw word error rate for agents that act on numbers.
 
+**Focus languages** (kn-IN, hi, en-IN, mr-IN, te-IN), checked 2026-09-28 against the installed packages and the providers' own documentation. Y covers, P preview, - does not.
+
+| Layer | kn | hi | en-IN | mr | te | Checked against |
+|---|---|---|---|---|---|---|
+| Sarvam `saaras:v3-realtime` streaming STT | Y | Y | Y | Y | Y | `SUPPORTED_LANGUAGES` in livekit-plugins-sarvam 1.8.3 `stt_streaming.py`; Sarvam's realtime reference (24 codes with `auto`) |
+| its `codemix` mode (English words kept in Latin script) | Y | Y | - | Y | Y | Sarvam: applied to finals only, partials are plain transcription |
+| its language identification (`language_code=auto`) | Y | Y | Y | Y | Y | Sarvam: `language` on every partial and final, `language_confidence` on finals; the plugin carries both on `SpeechData` |
+| Sarvam `bulbul:v3` TTS | Y | Y | Y | Y | Y | Sarvam: 11 languages, every speaker speaks every one; its picks: kn and te shubh or ratan, hi shubh, mr and en-IN ratan (male), priya or ishita (female) |
+| Sarvam `sarvam-105b` LLM | Y | Y | Y | Y | Y | Sarvam's language list (23) |
+| LiveKit on-device turn detector `v1-mini` | - | Y | Y | - | - | `LOCAL_LANGUAGES` in livekit-agents 1.8.3 `inference/eot/languages.py` |
+| Deepgram Nova-3, ElevenLabs Scribe v2 Realtime, Soniox, Amazon Transcribe, Azure (streaming STT) | Y | Y | Y | Y | Y | vendor language tables; Deepgram's `multi` code-switching is Hindi and English only |
+| Google Chirp 3 (streaming STT, `us` and `eu` only) | P | Y | Y | P | P | Google's Chirp 3 language table |
+| AI4Bharat IndicConformer 600M (open, utterance-level) | Y | Y | - | Y | Y | model card |
+| NVIDIA Nemotron 3.5 ASR, Parakeet 1.1B multilingual | - | Y | - | - | - | model card, NIM support matrix |
+| ElevenLabs `eleven_v3_conversational`, Google Chirp 3 HD, Cartesia Sonic 3.6, AI4Bharat Indic Parler-TTS (TTS) | Y | Y | Y | Y | Y | vendor language tables, model card |
+
+Two gaps between Sarvam and livekit-plugins-sarvam 1.8.3: the plugin refuses every realtime model but `saaras:v3-realtime` (Sarvam also serves `saaras:v4` there), and it validates bulbul:v3 speakers against its own list of 30, so voices Sarvam lists since (anand, gokul, mani, mohit, niharika, rehan, soham, sunny, tarun, vijay; mani scores best in Sarvam's pronunciation ranking) are refused at construction.
+
 **Terminology service.** One Dafter component layers tenant glossary, session terms, and discovered entities, deduped and ranked by expected impact (providers cap the biasing list), and compiled per provider from the capability matrix, with a post-processing correction dictionary where a provider supports no biasing. It **feeds TTS pronunciation too**: one source, two consumers.
 
 ### Translation
