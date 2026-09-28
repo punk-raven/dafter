@@ -28,7 +28,7 @@ from opentelemetry import trace
 
 from . import telemetry
 from .control import ControlPlane, encryption
-from .cost import load_prices, priced, usage_payload
+from .cost import OutputTokens, load_prices, priced, usage_payload
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
@@ -115,6 +115,7 @@ def watch(
     metrics: WorkerMetrics = WORKER,
 ) -> None:
     turns = Turns(getattr(session.stt, "take_endpoint", None))
+    generated = OutputTokens()
     prices = load_prices()
     recorder = SessionMetrics(metrics, p)
 
@@ -148,11 +149,12 @@ def watch(
             report(turns.unheard())
 
     def report(timing: TurnTiming) -> None:
-        log.info("agent turn", extra={"session": p.config.session_id, **timing.log_fields()})
         timing.record(tracer)
         recorder.turn(timing)
         events.emit(EventType.AGENT_TURN_METRICS, timing.payload(), current_trace_id())
-        report_usage(final=False)
+        tokens = generated.turn(report_usage(final=False))
+        fields = {**timing.log_fields(), "output_tokens": tokens}
+        log.info("agent turn", extra={"session": p.config.session_id, **fields})
 
     def failed(ev: ErrorEvent) -> None:
         stage, vendor = Stage.CONTROL, p.stt

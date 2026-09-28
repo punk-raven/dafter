@@ -48,7 +48,7 @@ function agentPanel() {
         <div class="agent-turns-body">
           <table class="agent-turns">
             <thead><tr>
-              <th title="the agent's turn, the greeting is 0; (n) until the worker reports it; orange marks a turn that went serial, its first sentence reaching TTS over 500 ms after the LLM's first token">#</th>
+              <th title="the agent's turn, the greeting is 0; (n) until the worker reports it; orange marks a turn that went serial, its first sentence (under 80% of the reply) reaching TTS over 500 ms after the LLM's first token">#</th>
               <th class="num" title="worker: the last voiced audio of yours it received to the speech-to-text provider releasing end of speech (its silence window and the wait for the final transcript)">ep</th>
               <th class="num" title="worker: the provider's end of speech to deciding your turn ended">eot</th>
               <th class="num" title="worker: the provider's end of speech to the final transcript">stt</th>

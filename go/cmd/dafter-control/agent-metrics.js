@@ -53,7 +53,7 @@ function onTurnMetrics(payload) {
     .filter(([key]) => payload[key] != null)
     .map(([key, label]) => `${label} ${payload[key]} ms`);
   const serial = payload.serial === true
-    ? `; went serial, the first sentence reached TTS ${payload.llmNodeTtfsMs - payload.llmNodeTtftMs} ms after the LLM's first token (over ${SERIAL_WAIT_MS} ms)`
+    ? `; went serial, the first sentence reached TTS ${payload.llmNodeTtfsMs - payload.llmNodeTtftMs} ms after the LLM's first token (over ${SERIAL_WAIT_MS} ms) and was under 80% of the reply`
     : '';
   row.dataset.agentDetail = `agent turn ${payload.turn}${payload.interrupted ? ' (interrupted)' : ''}: ${layers.join(', ') || 'no layer measured'}${serial}`;
   row.title = turnTitle(row);

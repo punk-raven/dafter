@@ -295,7 +295,7 @@
       "id": 7,
       "type": "stat",
       "title": "Serial share (1 h)",
-      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs): its reply time tracked the whole reply rather than the first sentence. Share of the turns the rule could judge, both LLM layers measured.",
+      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs) and that sentence was under 80% of the reply: its reply time tracked the whole reply rather than the first sentence. A reply that is mostly its first sentence is never counted. Share of the turns the rule could judge, both LLM layers measured.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
       "fieldConfig": {
@@ -334,7 +334,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Serial turns per minute",
-      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs): its reply time tracked the whole reply rather than the first sentence.",
+      "description": "A turn has gone serial when the first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs - llmNodeTtftMs) and that sentence was under 80% of the reply: its reply time tracked the whole reply rather than the first sentence. A reply that is mostly its first sentence is never counted.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "fieldConfig": {

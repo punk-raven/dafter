@@ -137,3 +137,15 @@ def usage_payload(items: list[Item], final: bool) -> dict[str, Any]:
         "unpricedItems": sum(1 for i in items if i.cost is None),
         "items": [i.to_dict() for i in items],
     }
+
+
+class OutputTokens:
+    def __init__(self) -> None:
+        self._seen = 0.0
+
+    def turn(self, usage: dict[str, Any]) -> int:
+        total = float(
+            sum(i["quantity"] for i in usage["items"] if i["unit"] == str(UsageUnit.OUTPUT_TOKEN))
+        )
+        spent, self._seen = total - self._seen, total
+        return round(spent)
