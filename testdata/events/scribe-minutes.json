@@ -1,0 +1,21 @@
+{
+  "eventId": "e_6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e",
+  "type": "scribe.minutes",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 11,
+  "occurredAt": "2026-09-24T10:10:31.500Z",
+  "payload": {
+    "final": true,
+    "summary": "तिमाही रिपोर्ट की समय-सीमा शुक्रवार तय हुई; बजट का आंकड़ा अभी खुला है।",
+    "decisions": ["रिपोर्ट शुक्रवार तक जमा होगी"],
+    "actionItems": [{ "task": "तिमाही रिपोर्ट भेजना", "owner": "रवि", "due": "शुक्रवार" }],
+    "openQuestions": ["बजट का आंकड़ा किसके पास है?"],
+    "notes": [{ "noteId": "n_3f9a1c07b2e4d856", "text": "रवि शुक्रवार तक रिपोर्ट भेजेगा" }],
+    "costInr": 4.21,
+    "unpricedItems": 1,
+    "quality": { "turnsScored": 4, "meanScore": 0.875 },
+    "source": { "provider": "sarvam", "model": "sarvam-105b" }
+  }
+}

@@ -42,3 +42,16 @@ omitted, and both halves pin it:
 `python/dafter_core/tests/test_transcript_events.py`. The config hash in it is
 illustrative. `go/internal/events/transcript_test.go` and the same Python file
 refuse the same mutations of all three.
+
+`scribe-notes.json`, `scribe-minutes.json`, `agent-note-taken.json` and
+`agent-turn-scored.json` are what the scribe and the agent publish around the
+scribe: its rolling notes (revision 3, with an action item that has an owner
+and a due date as they were said, who said what by participant id, and a note
+the agent took), the minutes written when the call ended with the session's
+cost and how the agent's replies scored, one note taken, and one reply graded
+by the judge. A note id and a segment id are opaque; a scored turn names its
+reply by segment and carries either a score with its criteria or an error,
+never both. Notes, minutes and taken notes carry call content and are never
+logged; a scored turn carries none. `go/internal/events/scribe_test.go` and
+`python/dafter_core/tests/test_scribe_events.py` parse them and refuse the
+same mutations.

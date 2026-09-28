@@ -1,0 +1,10 @@
+{
+  "eventId": "e_7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f",
+  "type": "agent.note_taken",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 14,
+  "occurredAt": "2026-09-24T10:02:12.300Z",
+  "payload": { "noteId": "n_3f9a1c07b2e4d856", "text": "रवि शुक्रवार तक रिपोर्ट भेजेगा", "takenBy": "p_9c2e11aa" }
+}

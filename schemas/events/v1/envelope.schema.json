@@ -91,6 +91,22 @@
     {
       "if": { "properties": { "type": { "const": "transcript.version_created" } }, "required": ["type"] },
       "then": { "properties": { "payload": { "$ref": "#/$defs/TranscriptVersionPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "agent.turn_scored" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/AgentTurnScoredPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "agent.note_taken" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/AgentNote" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "scribe.notes" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/ScribeNotesPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "scribe.minutes" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/ScribeMinutesPayload" } }, "required": ["payload"] }
     }
   ],
 
@@ -109,10 +125,14 @@
         "agent.dispatched",
         "agent.state_changed",
         "agent.turn_metrics",
+        "agent.turn_scored",
+        "agent.note_taken",
         "agent.handoff_requested",
         "transcript.partial",
         "transcript.final",
         "transcript.version_created",
+        "scribe.notes",
+        "scribe.minutes",
         "translation.final",
         "recording.started",
         "recording.completed",
@@ -464,6 +484,128 @@
       "if": { "properties": { "priced": { "const": true } }, "required": ["priced"] },
       "then": { "required": ["costInr"] },
       "else": { "not": { "required": ["costInr"] } }
+    },
+
+    "NoteLine": { "type": "string", "minLength": 1, "maxLength": 300 },
+
+    "AgentNote": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["noteId", "text"],
+      "description": "A note the voice agent took because someone in the call asked it to (take_note): published as agent.note_taken when it is taken, and carried in the scribe's notes and minutes from then on. It is what somebody asked to have written down, so it carries call content like a caption and is never logged.",
+      "properties": {
+        "noteId": { "type": "string", "pattern": "^n_[0-9a-f]{16}$", "description": "Opaque and minted by the agent worker." },
+        "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "takenBy": {
+          "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId",
+          "description": "Who asked for it, as an opaque participant id. Absent when the agent could not tell who was talking to it."
+        }
+      }
+    },
+
+    "ScribeActionItem": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["task"],
+      "description": "Something someone in the call committed to. The owner and the due date are as they were said (a name, 'Friday'), because they are call content, not identifiers.",
+      "properties": {
+        "task": { "$ref": "#/$defs/NoteLine" },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "due": { "type": "string", "minLength": 1, "maxLength": 100 }
+      }
+    },
+
+    "ScribeSpeakerPoints": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["speaker", "points"],
+      "description": "What one speaker has said so far, in a few points: who said what, named by opaque participant id.",
+      "properties": {
+        "speaker": { "$ref": "#/$defs/Speaker" },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/NoteLine" }, "minItems": 1, "maxItems": 10 }
+      }
+    },
+
+    "ScribeNotesPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["revision", "summary", "decisions", "actionItems", "openQuestions", "mentions", "speakers", "notes", "source"],
+      "description": "The scribe's rolling notes on the call so far, rewritten about every scribe.summaryIntervalMs while people talk. Each revision replaces the one before, so a consumer keeps only the latest. The voice agent reads them as the call's context and answers summarize_call from them, as data and never as instructions, because they are derived from what anyone in the call said. They carry call content like a caption, and are allowed here for the same reason: published only to the call's own participants over its data channel while the session's scribe consent holds, and never logged.",
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "summary": { "type": "string", "maxLength": 2000 },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/NoteLine" }, "maxItems": 50 },
+        "actionItems": { "type": "array", "items": { "$ref": "#/$defs/ScribeActionItem" }, "maxItems": 50 },
+        "openQuestions": { "type": "array", "items": { "$ref": "#/$defs/NoteLine" }, "maxItems": 30 },
+        "mentions": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "required": ["names", "numbers"],
+          "description": "Names and numbers (amounts, dates, times, phone or reference numbers) said in the call, as said, so the agent can use them without re-reading the transcript.",
+          "properties": {
+            "names": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 100 }, "maxItems": 50 },
+            "numbers": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 100 }, "maxItems": 50 }
+          }
+        },
+        "speakers": { "type": "array", "items": { "$ref": "#/$defs/ScribeSpeakerPoints" }, "maxItems": 50 },
+        "notes": { "type": "array", "items": { "$ref": "#/$defs/AgentNote" }, "maxItems": 100 },
+        "source": { "$ref": "#/$defs/TranscriptSource", "description": "The LLM that wrote them." }
+      }
+    },
+
+    "ScribeMinutesPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["final", "summary", "decisions", "actionItems", "openQuestions", "notes", "costInr", "unpricedItems", "source"],
+      "description": "The minutes of the call: what it covered, what was decided, who will do what, and what it cost. Written once more when the call ends and stored by the control plane; also written as minutes so far when a participant asks as they leave. Call content like the notes, published only to the call's own participants and never logged.",
+      "properties": {
+        "final": { "type": "boolean", "description": "True for the minutes written when the call ended, the ones the control plane keeps." },
+        "summary": { "type": "string", "maxLength": 4000 },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/NoteLine" }, "maxItems": 50 },
+        "actionItems": { "type": "array", "items": { "$ref": "#/$defs/ScribeActionItem" }, "maxItems": 50 },
+        "openQuestions": { "type": "array", "items": { "$ref": "#/$defs/NoteLine" }, "maxItems": 30 },
+        "notes": { "type": "array", "items": { "$ref": "#/$defs/AgentNote" }, "maxItems": 100 },
+        "costInr": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The session's cost so far in INR: the agent worker's last session.usage figure plus the scribe's own LLM use. A floor while unpricedItems is above zero."
+        },
+        "unpricedItems": { "type": "integer", "minimum": 0 },
+        "quality": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "required": ["turnsScored"],
+          "description": "How the agent's replies scored with the judge, when the session names one.",
+          "properties": {
+            "turnsScored": { "type": "integer", "minimum": 0 },
+            "meanScore": { "type": "number", "minimum": 0, "maximum": 1, "description": "Absent while no turn has a score." }
+          }
+        },
+        "source": { "$ref": "#/$defs/TranscriptSource", "description": "The LLM that wrote them." }
+      }
+    },
+
+    "AgentTurnScoredPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["segmentId", "source"],
+      "description": "One agent reply graded by the scribe's judge on the stage 4 criteria, so every real call feeds the evaluation and not only scripted runs. The reply is named by its caption segment rather than quoted, so this carries no call content. A judge that failed says why in error instead of scoring.",
+      "properties": {
+        "segmentId": { "type": "string", "pattern": "^sg_[0-9a-f]{16}$", "description": "The agent's caption segment for the reply." },
+        "score": { "type": "number", "minimum": 0, "maximum": 1, "description": "The mean over the criteria, pass 1, maybe 0.5, fail 0." },
+        "criteria": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[a-z][a-zA-Z]{1,31}$" },
+          "additionalProperties": { "type": "string", "enum": ["pass", "fail", "maybe"] }
+        },
+        "error": { "$ref": "https://schemas.dafter.dev/errors/v1/error.schema.json#/$defs/ErrorCode" },
+        "source": { "$ref": "#/$defs/TranscriptSource", "description": "The judge." }
+      },
+      "oneOf": [
+        { "required": ["score", "criteria"], "not": { "required": ["error"] } },
+        { "required": ["error"], "not": { "anyOf": [{ "required": ["score"] }, { "required": ["criteria"] }] } }
+      ]
     },
 
     "SessionUsagePayload": {
