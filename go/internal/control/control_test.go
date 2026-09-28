@@ -289,6 +289,20 @@ func TestHindiAndEnglishResolveDifferentTurnStrategies(t *testing.T) {
 	}
 }
 
+func TestEveryLanguageSpeaksInAFemaleVoiceByDefault(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	for _, language := range []string{"hi", "en-IN"} {
+		cfg, err := config.Parse(h.create(t, request(language, "webrtc")).Config)
+		if err != nil {
+			t.Fatalf("%s: the returned document is not a valid resolved config: %v", language, err)
+		}
+		if voice := cfg.Agent.Pipeline.TTS.Options["voice"]; voice != "priya" {
+			t.Errorf("%s speaks with %v, want priya", language, voice)
+		}
+	}
+}
+
 func TestTheSameRequestResolvesToTheSameHash(t *testing.T) {
 	t.Parallel()
 	h := serve(t)
