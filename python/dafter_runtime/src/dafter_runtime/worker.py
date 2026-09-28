@@ -14,6 +14,9 @@ from livekit.agents import (
     AutoSubscribe,
     JobContext,
     JobRequest,
+    llm,
+    stt,
+    tts,
 )
 from livekit.agents.llm import ChatMessage
 from livekit.agents.voice.events import (
@@ -158,12 +161,11 @@ def watch(
 
     def failed(ev: ErrorEvent) -> None:
         stage, vendor = Stage.CONTROL, p.stt
-        source = type(ev.source).__module__
-        if ".tts" in source:
+        if isinstance(ev.source, tts.TTS):
             stage, vendor = Stage.TTS, p.tts
-        elif ".llm" in source:
+        elif isinstance(ev.source, llm.LLM):
             stage, vendor = Stage.LLM, p.llm
-        elif ".stt" in source:
+        elif isinstance(ev.source, stt.STT):
             stage, vendor = Stage.STT, p.stt
         inner = getattr(ev.error, "error", ev.error)
         err = vendor.classify(inner, stage) if isinstance(inner, BaseException) else None
