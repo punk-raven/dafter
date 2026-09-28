@@ -22,6 +22,7 @@ Every target regenerates before it runs, so a clone only needs `./scripts/setup.
 - `make check` (the Go and Python checks CI runs)
 - Go: `make build vet lint test tidy`
 - Python: `make py-lint py-test` (ruff, mypy strict, pytest via `uv run --frozen` from `python/`)
+- Test client: `make js-test` (Node's built-in runner over `go/cmd/dafter-control/jstest/`). The main screen holds only the call; every other control lives under the one closed Advanced section, pinned by `jstest/layout.test.mjs`.
 
 ## Rules enforced in code, kept identical on both halves
 

@@ -55,7 +55,7 @@ jobs:
         with:
           path: go/bin
           key: golangci-${{ runner.os }}-${{ hashFiles('go/tools/golangci/go.sum') }}
-      - run: make vet lint test
+      - run: make vet lint test js-test
 
   python:
     name: python ${{ matrix.python }}

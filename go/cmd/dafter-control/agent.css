@@ -29,13 +29,6 @@
 .agent-pill-speaking { background: #2a1f4a; color: #c4b5fd; }
 .agent-pill-off { background: #1f1f1f; color: #6b7280; }
 .agent-pill-dormant { background: #1f1b2e; color: #8b83b3; }
-.agent-btn { width: auto; margin: 0 0 0 auto; padding: 4px 12px; font-size: 11px; background: #7c3aed; color: white; flex-shrink: 0; }
-.agent-btn:hover { background: #6d28d9; }
-.agent-btn-remove { background: #374151; color: #fca5a5; }
-.agent-btn-remove:hover { background: #4b5563; }
-.agent-btn.agent-btn-wake { margin-left: 0; background: #1d4ed8; }
-.agent-btn.agent-btn-wake:hover { background: #1e40af; }
-.agent-btn:disabled { background: #262626; color: #666; cursor: not-allowed; }
 .agent-reason { font-size: 11px; color: #fbbf24; padding: 6px 12px; border-bottom: 1px solid #1c1c1c; }
 .agent-reason:empty { display: none; }
 

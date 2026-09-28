@@ -36,10 +36,8 @@ function agentPanel() {
   panel.className = 'agent-panel';
   panel.innerHTML = `
     <div class="agent-bar">
-      <strong>Agent</strong>
+      <strong id="agent-title">Agent</strong>
       <span id="agent-presence" class="agent-pill agent-pill-off">not in call</span>
-      <button id="agent-toggle" class="agent-btn" type="button">Invite agent</button>
-      <button id="agent-wake" class="agent-btn agent-btn-wake" type="button" style="display:none">Wake</button>
     </div>
     <div id="agent-reason" class="agent-reason"></div>
     <div class="agent-body">
@@ -71,8 +69,6 @@ function agentPanel() {
   stage.className = 'agent-stage';
   grid.parentNode.insertBefore(stage, grid);
   stage.append(grid, panel);
-  document.getElementById('agent-toggle').addEventListener('click', toggleAgent);
-  document.getElementById('agent-wake').addEventListener('click', wakeAgent);
   return panel;
 }
 
@@ -85,10 +81,10 @@ function agentBlockedReason(config) {
 
 function renderAgentControls() {
   const button = document.getElementById('agent-toggle');
-  if (!button) return;
+  const presence = document.getElementById('agent-presence');
+  if (!presence) return;
   const reason = agentBlockedReason(agentView.config);
   const present = agentParticipant(agentView.room) !== null;
-  const presence = document.getElementById('agent-presence');
   const pending = agentView.pending === (present ? 'leaving' : 'joining') ? agentView.pending : null;
   const dormant = present && agentAddressing.dormant === true;
   presence.textContent = pending || (present ? (dormant ? 'dormant' : (agentView.state || 'joining')) : 'not in call');
@@ -97,7 +93,7 @@ function renderAgentControls() {
   renderWakeButton(present);
   document.getElementById('agent-reason').textContent = reason || agentRefusalText();
   button.textContent = present ? 'Remove agent' : 'Invite agent';
-  button.className = `agent-btn ${present ? 'agent-btn-remove' : ''}`;
+  button.className = present ? 'btn-agent btn-agent-remove' : 'btn-agent';
   button.disabled = agentView.busy || pending !== null || (!present && reason !== '');
   button.title = reason;
 }
@@ -175,6 +171,7 @@ function watchAgent(room, data) {
   agentView.state = null;
   resetAgentAddressing();
   agentPanel().style.display = '';
+  document.getElementById('agent-title').textContent = (data.config && data.config.agent && data.config.agent.name) || 'Agent';
   resetAgentTurns();
   watchTranscripts(room);
 
