@@ -9,12 +9,12 @@ import aiohttp
 from .probe import Probe
 
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost"})
-GREETED: dict[str, Any] = {"greets": True}
+ANSWERS_THE_PROBE: dict[str, Any] = {"greets": True, "addressing": {"mode": "always"}}
 
 
 def session_overrides(given: dict[str, Any] | None) -> dict[str, Any]:
     stated = given or {}
-    return {**stated, "agent": {**GREETED, **stated.get("agent", {})}}
+    return {**stated, "agent": {**ANSWERS_THE_PROBE, **stated.get("agent", {})}}
 
 
 def livekit_url(control: str, url: str) -> str:

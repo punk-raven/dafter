@@ -45,7 +45,6 @@ type Agent struct {
 
 type Addressing struct {
 	Mode             AddressingMode `json:"mode"`
-	Name             string         `json:"name,omitempty"`
 	Aliases          []string       `json:"aliases,omitempty"`
 	NearMisses       []string       `json:"nearMisses,omitempty"`
 	FollowUpWindowMs int            `json:"followUpWindowMs,omitempty"`
@@ -55,12 +54,12 @@ func (a *Addressing) WaitsToBeCalled() bool {
 	return a != nil && a.Mode != AddressingAlways
 }
 
-func (a *Addressing) NearMissIsTheName() bool {
-	if a == nil {
+func (a Agent) NearMissIsItsName() bool {
+	if a.Addressing == nil {
 		return false
 	}
-	for _, miss := range a.NearMisses {
-		if miss == a.Name || slices.Contains(a.Aliases, miss) {
+	for _, miss := range a.Addressing.NearMisses {
+		if miss == a.Name || slices.Contains(a.Addressing.Aliases, miss) {
 			return true
 		}
 	}

@@ -240,8 +240,8 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     addressing = cfg.agent.addressing
     prompt = None
     if addressing.waits_to_be_called:
-        persona = called_by_name(persona, addressing.name)
-        prompt = ", ".join(dict.fromkeys((addressing.name, *addressing.aliases)))
+        persona = called_by_name(persona)
+        prompt = ", ".join(dict.fromkeys((cfg.agent.name or "", *addressing.aliases)))
     return Plan(
         config=cfg,
         pipeline=pipeline,

@@ -132,7 +132,6 @@ class Turn:
 @dataclass(frozen=True, slots=True)
 class Addressing:
     mode: AddressingMode = AddressingMode.ALWAYS
-    name: str = ""
     aliases: tuple[str, ...] = ()
     near_misses: tuple[str, ...] = ()
     follow_up_window_ms: int = 20000
@@ -141,15 +140,10 @@ class Addressing:
     def waits_to_be_called(self) -> bool:
         return self.mode is not AddressingMode.ALWAYS
 
-    @property
-    def near_miss_is_the_name(self) -> bool:
-        return any(m == self.name or m in self.aliases for m in self.near_misses)
-
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Addressing:
         return cls(
             mode=AddressingMode(d.get("mode", AddressingMode.ALWAYS)),
-            name=d.get("name", ""),
             aliases=tuple(d.get("aliases", ())),
             near_misses=tuple(d.get("nearMisses", ())),
             follow_up_window_ms=d.get("followUpWindowMs", 20000),
@@ -166,6 +160,11 @@ class Agent:
     persona_ref: str | None = None
     pipeline: Pipeline | None = None
     addressing: Addressing = field(default_factory=Addressing)
+
+    @property
+    def near_miss_is_its_name(self) -> bool:
+        spellings = {self.name, *self.addressing.aliases}
+        return any(m in spellings for m in self.addressing.near_misses)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Agent:

@@ -99,7 +99,7 @@ func TestASessionOverrideSelectsTheTurnDetectorForHindi(t *testing.T) {
 	}
 }
 
-func TestTheCatalogAgentIsNamedAndJoinsSilentlyUnlessASessionAsksItToGreet(t *testing.T) {
+func TestTheCatalogAgentIsNamedWaitsToBeCalledAndGreetsOnlyWhenASessionAsks(t *testing.T) {
 	t.Parallel()
 	catalog := embeddedCatalog(t)
 	for _, tc := range []struct {
@@ -122,6 +122,9 @@ func TestTheCatalogAgentIsNamedAndJoinsSilentlyUnlessASessionAsksItToGreet(t *te
 		}
 		if cfg.Agent.Name != "Nivya" || cfg.Agent.Greets == nil || *cfg.Agent.Greets != tc.greets {
 			t.Errorf("overrides %q resolved agent name %q greets %v; want Nivya greeting %v", tc.overrides, cfg.Agent.Name, cfg.Agent.Greets, tc.greets)
+		}
+		if !cfg.Agent.Addressing.WaitsToBeCalled() || cfg.Agent.Addressing.Mode != config.AddressingTranscript {
+			t.Errorf("overrides %q resolved addressing %+v; the catalog agent waits to be called by name", tc.overrides, cfg.Agent.Addressing)
 		}
 	}
 }

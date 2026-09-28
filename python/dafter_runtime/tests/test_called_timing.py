@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from dafter_core.config import Addressing
+from dafter_core.config import Agent as AgentConfig
 from dafter_core.enums import AddressingMode
 from dafter_runtime.addressing import Gate, Timing
 from dafter_runtime.answering import Roster, Voice
@@ -16,7 +17,12 @@ from livekit.agents.voice.events import ConversationItemAddedEvent
 from stub_llm import StubLLM
 
 ASHA = "p_4b81e0d7"
-ADDRESSING = Addressing(mode=AddressingMode.TRANSCRIPT, name="Nivya")
+AGENT = AgentConfig(
+    enabled=True,
+    pool="dafter-py",
+    name="Nivya",
+    addressing=Addressing(mode=AddressingMode.TRANSCRIPT),
+)
 
 
 class Never:
@@ -50,12 +56,12 @@ def called_turn(say: Callable[[Gate], None]) -> tuple[TurnTiming, list[llm.ChatM
             roster.join(ASHA)
             voice = Voice(session, roster, interruptible=True)
             gate = Gate(
-                Matcher.for_addressing(ADDRESSING),
+                Matcher.for_agent(AGENT),
                 20.0,
                 voice,
                 clock=time.monotonic,
                 schedule=never,
-                name=ADDRESSING.name,
+                name="Nivya",
             )
             say(gate)
             assert voice.reply is not None

@@ -16,7 +16,7 @@ LANGUAGES = ("en", "hi", "mr", "kn", "te")
 
 
 def catalog_matcher() -> Matcher:
-    return Matcher.for_addressing(load(JOB.read_bytes().strip()).agent.addressing)
+    return Matcher.for_agent(load(JOB.read_bytes().strip()).agent)
 
 
 MATCHER = catalog_matcher()
