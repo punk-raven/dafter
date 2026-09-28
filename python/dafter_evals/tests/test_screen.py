@@ -156,6 +156,12 @@ def test_a_reply_is_timed_to_its_first_token_and_first_sentence() -> None:
     assert (reply.input_tokens, reply.output_tokens, reply.tool_calls) == (50, 7, 0)
 
 
+def test_a_whitespace_chunk_is_not_the_first_token() -> None:
+    stub = Stub(chunks=("\n", " ", "नमस्ते", "! आप कैसे हैं?"))
+    reply = asyncio.run(ask(stub, classify, INSTRUCTIONS, "नमस्ते", 5.0, ticks()))
+    assert (reply.ttft_ms, reply.ttfs_ms, reply.total_ms) == (300, 400, 500)
+
+
 def test_a_reply_without_a_sentence_end_is_one_sentence() -> None:
     stub = Stub(chunks=("हाँ", " जी"))
     reply = asyncio.run(ask(stub, classify, INSTRUCTIONS, "ठीक है", 5.0, ticks()))

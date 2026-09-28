@@ -41,7 +41,7 @@ class Clock:
 
     def saw(self, piece: str) -> None:
         at = self.now()
-        if self.first_token is None:
+        if self.first_token is None and piece.strip():
             self.first_token = at
         self.text += piece
         if self.first_sentence is None and SENTENCE_END.search(self.text):
