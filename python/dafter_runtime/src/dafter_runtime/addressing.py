@@ -73,8 +73,8 @@ class Gate:
     def heard(self, speaker: str, text: str, timing: Timing | None = None) -> None:
         heard = self._matcher.hear(text)
         if heard is Heard.STOPPED or (heard is Heard.STOP and not self.dormant):
-            self._responder.hush()
             self.sleep()
+            self._responder.hush()
             return
         if heard is Heard.CALLED:
             self._wake(speaker, WakeSource.NAME)

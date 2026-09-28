@@ -69,7 +69,7 @@ class Voice:
         self.reply = self._session.generate_reply(user_input=said)
 
     def hush(self) -> None:
-        self._session.interrupt()
+        self._session.interrupt(force=True)
 
     def barge_in(self) -> None:
         speech = self._interruptible_speech()
