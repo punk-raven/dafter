@@ -11,12 +11,16 @@ import aiohttp
 from dafter_core.config import parse
 from livekit.agents import utils
 
-from .connect import join
+from .connect import join, session_overrides
 from .measure import compare
 from .probe import Probe
 from .script import HINDI
 from .turns import SCENARIOS, run
 from .voice import Voice
+
+
+def overrides(args: argparse.Namespace) -> dict[str, Any]:
+    return session_overrides(json.loads(args.overrides) if args.overrides else None)
 
 
 def arguments() -> argparse.Namespace:
@@ -47,8 +51,7 @@ async def create_session(args: argparse.Namespace) -> dict[str, Any]:
         "language": args.language,
         "channel": args.channel,
     }
-    if args.overrides:
-        body["overrides"] = json.loads(args.overrides)
+    body["overrides"] = overrides(args)
     async with (
         aiohttp.ClientSession() as http,
         http.post(f"{args.control}/sessions", json=body) as resp,
@@ -78,7 +81,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "agentDispatchId": created.get("agentDispatchId"),
         "language": args.language,
         "channel": args.channel,
-        "overrides": json.loads(args.overrides) if args.overrides else None,
+        "overrides": overrides(args),
     }
     return report
 

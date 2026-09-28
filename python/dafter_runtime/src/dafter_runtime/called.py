@@ -29,18 +29,18 @@ COMMANDS = frozenset({"wake"})
 
 
 def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
-    addressing = p.config.agent.addressing
+    agent = p.config.agent
 
     def schedule(delay: float, callback: Callable[[], None]) -> Timer:
         return loop.call_later(delay, callback)
 
     return Gate(
-        Matcher.for_addressing(addressing),
-        addressing.follow_up_window_ms / 1000,
+        Matcher.for_agent(agent),
+        agent.addressing.follow_up_window_ms / 1000,
         voice,
         clock=loop.time,
         schedule=schedule,
-        name=addressing.name,
+        name=agent.name or "",
     )
 
 

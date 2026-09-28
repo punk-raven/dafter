@@ -1,9 +1,9 @@
 # Addressing vectors
 
 `utterances.json` pins what the name matcher decides for one transcribed
-utterance, under the addressing block the embedded catalog resolves by default
-(name Nivya, its Devanagari, Kannada and Telugu spellings, and the near
-misses), as carried by `testdata/agent/hindi-webrtc-job.json`.
+utterance, under the agent name and addressing block the embedded catalog resolves by
+default (`agent.name` Nivya, its Devanagari, Kannada and Telugu spellings in
+`addressing.aliases`, and the near misses), as carried by `testdata/agent/hindi-webrtc-job.json`.
 
 Each case is a language, the text a recognizer might return, what the matcher
 must hear and why:

@@ -14,7 +14,10 @@ const AGENT_PENDING_MS = 20000;
 
 function agentOverride() {
   const value = document.getElementById('agent-mode').value;
-  return value === '' ? null : { enabled: value === 'on' };
+  const greeting = document.getElementById('agent-greeting').value;
+  const override = value === '' ? {} : { enabled: value === 'on' };
+  if (greeting !== '' && value !== 'off') override.greets = greeting === 'on';
+  return Object.keys(override).length ? override : null;
 }
 
 function agentParticipant(room) {
@@ -49,7 +52,7 @@ function agentPanel() {
         <div class="agent-turns-body">
           <table class="agent-turns">
             <thead><tr>
-              <th title="the agent's turn, the greeting is 0; (n) until the worker reports it; orange marks a turn that went serial, its first sentence (under 80% of the reply) reaching TTS over 500 ms after the LLM's first token">#</th>
+              <th title="the agent's turn, counted from 0 (the greeting, when it greets); (n) until the worker reports it; orange marks a turn that went serial, its first sentence (under 80% of the reply) reaching TTS over 500 ms after the LLM's first token">#</th>
               <th class="num" title="worker: the last voiced audio of yours it received to the speech-to-text provider releasing end of speech (its silence window and the wait for the final transcript)">ep</th>
               <th class="num" title="worker: the provider's end of speech to deciding your turn ended">eot</th>
               <th class="num" title="worker: the provider's end of speech to the final transcript">stt</th>

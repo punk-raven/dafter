@@ -48,6 +48,7 @@ def offline_plan(**turn: Any) -> Plan:
     doc["agent"]["pipeline"]["tts"]["options"]["prewarm"] = False
     doc["agent"]["pipeline"]["llm"]["options"]["prewarm"] = False
     doc["turn"].update(turn)
+    doc["agent"]["addressing"]["mode"] = "always"
     sealed, _ = seal(json.dumps(doc))
     return plan(load(sealed), "dafter-py")
 
