@@ -41,6 +41,8 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
+	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
 	mux.HandleFunc("POST /sessions/{sessionID}/transcripts", s.storeTranscript)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts", s.listTranscripts)
@@ -70,7 +72,8 @@ type createSessionResponse struct {
 
 	EncryptionKey string `json:"encryptionKey,omitempty"`
 
-	AgentDispatchID string `json:"agentDispatchId,omitempty"`
+	AgentDispatchID  string `json:"agentDispatchId,omitempty"`
+	ScribeDispatchID string `json:"scribeDispatchId,omitempty"`
 }
 
 func mintEncryptionKey() (string, error) {
@@ -157,6 +160,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	scribeDispatchID := s.dispatchScribe(r.Context(), sess, resolved.Config)
 
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sessionID,
@@ -191,7 +195,8 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ICEServers:    iceServers,
 		EncryptionKey: keyFor(resolved.Config, sess, req.Role),
 
-		AgentDispatchID: dispatchID,
+		AgentDispatchID:  dispatchID,
+		ScribeDispatchID: scribeDispatchID,
 	})
 }
 

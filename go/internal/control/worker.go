@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"io"
@@ -23,6 +24,10 @@ type agentKeyResponse struct {
 }
 
 func (s *Service) agentKey(w http.ResponseWriter, r *http.Request) {
+	s.discloseKey(w, r, "agent", func(c *config.ResolvedSessionConfig) bool { return c.Agent.Enabled }, "/agent/enabled")
+}
+
+func (s *Service) discloseKey(w http.ResponseWriter, r *http.Request, who string, runs func(*config.ResolvedSessionConfig) bool, pointer string) {
 	if !s.authenticWorker(w, r) {
 		return
 	}
@@ -34,7 +39,7 @@ func (s *Service) agentKey(w http.ResponseWriter, r *http.Request) {
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10))
 	d.DisallowUnknownFields()
 	if err := d.Decode(&req); err != nil {
-		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "decode agent key request"))
+		s.fail(w, errs.Wrap(errs.CodeInvalidConfig, err, "decode %s key request", who))
 		return
 	}
 	if req.ConfigHash != sess.ConfigHash {
@@ -46,8 +51,8 @@ func (s *Service) agentKey(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, errs.Wrap(errs.CodeInternal, err, "stored session document"))
 		return
 	}
-	if !cfg.Agent.Enabled {
-		s.fail(w, located(errs.CodeInvalidConfig, "/agent/enabled", "the agent is off in this session's stored config"))
+	if !runs(cfg) {
+		s.fail(w, located(errs.CodeInvalidConfig, pointer, "the "+who+" is off in this session's stored config"))
 		return
 	}
 	if !cfg.PrivacyMode.DisclosesKeyTo(config.RoleAgent) {
@@ -59,11 +64,15 @@ func (s *Service) agentKey(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, located(errs.CodeUnsupportedCapability, "/media/encryption/keyModel", "the control plane holds no shared key for this session"))
 		return
 	}
-	s.log().Info("session key disclosed to the agent", "session", sess.SessionID)
+	s.log().Info("session key disclosed to the "+who, "session", sess.SessionID)
 	s.write(w, http.StatusOK, agentKeyResponse{SessionID: sess.SessionID, EncryptionKey: key})
 }
 
 func (s *Service) agentRefusal(w http.ResponseWriter, r *http.Request) {
+	s.recordRefusal(w, r, "agent", s.Store.SetAgentRefusal)
+}
+
+func (s *Service) recordRefusal(w http.ResponseWriter, r *http.Request, who string, store func(context.Context, string, json.RawMessage) error) {
 	if !s.authenticWorker(w, r) {
 		return
 	}
@@ -76,11 +85,11 @@ func (s *Service) agentRefusal(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	if err := s.Store.SetAgentRefusal(r.Context(), sess.SessionID, refusal); err != nil {
+	if err := store(r.Context(), sess.SessionID, refusal); err != nil {
 		s.fail(w, err)
 		return
 	}
-	s.log().Warn("agent refused the session", "session", sess.SessionID)
+	s.log().Warn(who+" refused the session", "session", sess.SessionID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -39,7 +39,8 @@ type sessionView struct {
 	Config     json.RawMessage `json:"config"`
 	Recordings []recordingView `json:"recordings"`
 
-	AgentRefusal json.RawMessage `json:"agentRefusal"`
+	AgentRefusal  json.RawMessage `json:"agentRefusal"`
+	ScribeRefusal json.RawMessage `json:"scribeRefusal"`
 }
 
 func recordingRequest(layout, startAt string) string {
