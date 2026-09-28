@@ -1,3 +1,5 @@
+x-minio-image: &minio-image cgr.dev/chainguard/minio@sha256:6a1d0b45c8669726bba580ced0bfa4cb9fdeed1ed636dfabd81d1577beb6937b
+
 services:
   redis:
     image: redis:7-alpine
@@ -9,7 +11,7 @@ services:
       retries: 5
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: *minio-image
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -25,7 +27,7 @@ services:
       retries: 5
 
   minio-setup:
-    image: quay.io/minio/minio:latest
+    image: *minio-image
     depends_on:
       minio:
         condition: service_healthy
