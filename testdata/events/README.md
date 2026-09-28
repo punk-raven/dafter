@@ -13,7 +13,9 @@ thinking. Awake, it must say who woke it and how; dormant, it must not name
 anyone; and who woke it is an opaque participant id, never a name.
 
 `agent-turn-metrics.json` is one agent turn's latency split into its layers, in
-milliseconds. Its first sentence reached TTS 287 ms after the LLM's first
+milliseconds. `endpointMs` (the provider holding end of speech after the user's
+last voiced audio) comes before every framework layer, so `replyGapMs`, from
+that audio to the agent speaking, is `endpointMs` plus `e2eLatencyMs` here. Its first sentence reached TTS 287 ms after the LLM's first
 token, inside the 500 ms the serial rule allows, so `serial` is false; a
 `serial` without both LLM layers is refused.
 

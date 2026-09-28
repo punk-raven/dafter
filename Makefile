@@ -117,8 +117,8 @@ loadtest-media: $(LK) ## Concurrent video calls through the control plane and th
 
 .PHONY: dev-down
 dev-down: ## Tear down the dev stack and volumes
-	docker compose down -v
+	docker compose --profile tunnel down -v
 
 .PHONY: dev-clean
 dev-clean: ## Tear down the dev stack, its volumes and its images (the build cache stays: docker builder prune)
-	docker compose down -v --rmi all --remove-orphans
+	docker compose --profile tunnel down -v --rmi all --remove-orphans
