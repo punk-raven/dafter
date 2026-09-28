@@ -114,6 +114,8 @@ class Turn:
 class Agent:
     enabled: bool
     pool: str
+    name: str | None = None
+    greets: bool = False
     mode: AgentMode = AgentMode.CASCADED
     persona_ref: str | None = None
     pipeline: Pipeline | None = None
@@ -123,6 +125,8 @@ class Agent:
         return cls(
             enabled=d["enabled"],
             pool=d["pool"],
+            name=d.get("name"),
+            greets=d.get("greets", False),
             mode=AgentMode(d.get("mode", AgentMode.CASCADED)),
             persona_ref=d.get("personaRef"),
             pipeline=Pipeline.from_dict(d["pipeline"]) if d.get("pipeline") else None,

@@ -25,6 +25,10 @@ class Plan:
     turn_handling: dict[str, Any]
     persona: Persona
 
+    @property
+    def opening(self) -> str | None:
+        return self.persona.greeting if self.config.agent.greets else None
+
 
 def load(metadata: str | bytes) -> ResolvedSessionConfig:
     cfg = parse(metadata)
@@ -159,5 +163,5 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         tts=tts,
         turn_detection=detection,
         turn_handling=turn_handling(cfg.turn, detection),
-        persona=persona_for(cfg.agent.persona_ref, cfg.language),
+        persona=persona_for(cfg.agent.persona_ref, cfg.language, cfg.agent.name),
     )

@@ -117,7 +117,7 @@ def runnable(
             skipped[language] = bank.refusal()
             continue
         try:
-            ready.append((bank, persona_for(DEFAULT_REF, language)))
+            ready.append((bank, persona_for(DEFAULT_REF, language, None)))
         except DafterError as exc:
             skipped[language] = f"no {bank.name} persona: {exc.message}"
     return ready, skipped

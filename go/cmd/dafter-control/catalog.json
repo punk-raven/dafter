@@ -5,6 +5,8 @@
     "agent": {
       "enabled": true,
       "pool": "dafter-py",
+      "name": "Nivya",
+      "greets": false,
       "mode": "cascaded"
     },
     "turn": {
