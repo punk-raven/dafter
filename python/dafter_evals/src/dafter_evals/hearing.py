@@ -24,7 +24,7 @@ Clock = Callable[[], float]
 class Heard:
     text: str
     languages: tuple[str, ...]
-    confidences: tuple[float, ...]
+    confidences: tuple[float | None, ...]
     final_after_audio_ms: int | None
 
 
@@ -49,6 +49,13 @@ def frames(samples: np.ndarray) -> Iterator[rtc.AudioFrame]:
         yield rtc.AudioFrame(chunk.tobytes(), RATE, 1, len(chunk))
 
 
+def confidence_of(metadata: dict[str, Any] | None) -> float | None:
+    confidence = (metadata or {}).get("language_confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, int | float):
+        return None
+    return float(confidence)
+
+
 async def hear(
     recognizer: stt.STT[Any], wav: bytes, pace: float = 1.0, clock: Clock = time.monotonic
 ) -> Heard:
@@ -57,7 +64,7 @@ async def hear(
     stream = recognizer.stream()
     texts: list[str] = []
     languages: list[str] = []
-    confidences: list[float] = []
+    confidences: list[float | None] = []
     last_final: list[float] = []
 
     async def listen() -> None:
@@ -66,9 +73,7 @@ async def hear(
                 said = event.alternatives[0]
                 texts.append(said.text)
                 languages.append(str(said.language))
-                confidence = (said.metadata or {}).get("language_confidence")
-                if isinstance(confidence, int | float) and not isinstance(confidence, bool):
-                    confidences.append(float(confidence))
+                confidences.append(confidence_of(said.metadata))
                 last_final.append(clock())
 
     listening = asyncio.ensure_future(listen())

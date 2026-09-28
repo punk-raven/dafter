@@ -49,7 +49,7 @@ class EchoStream(stt.RecognizeStream):
             data = stt.SpeechData(
                 language=LanguageCode(language),
                 text=text,
-                metadata={"language_confidence": confidence},
+                metadata=None if confidence is None else {"language_confidence": confidence},
             )
             self._event_ch.send_nowait(
                 stt.SpeechEvent(type=stt.SpeechEventType.FINAL_TRANSCRIPT, alternatives=[data])
@@ -57,7 +57,7 @@ class EchoStream(stt.RecognizeStream):
 
 
 class Echo(stt.STT[Any]):
-    def __init__(self, finals: list[tuple[str, str, float]]) -> None:
+    def __init__(self, finals: list[tuple[str, str, float | None]]) -> None:
         super().__init__(capabilities=stt.STTCapabilities(streaming=True, interim_results=False))
         self.finals = finals
 
@@ -80,11 +80,11 @@ class Echo(stt.STT[Any]):
 
 
 def test_a_clip_is_heard_through_the_stream_as_its_finals_and_languages() -> None:
-    echo = Echo([("ನಮಸ್ಕಾರ", "kn-IN", 0.97), ("hello", "en-IN", 0.6)])
+    echo = Echo([("ನಮಸ್ಕಾರ", "kn-IN", 0.97), ("hello", "en-IN", None), ("ಸರಿ", "kn-IN", 0.6)])
     heard = asyncio.run(hear(echo, wav(0.2), pace=50))
-    assert heard.text == "ನಮಸ್ಕಾರ hello"
-    assert heard.languages == ("kn-IN", "en-IN")
-    assert heard.confidences == (0.97, 0.6)
+    assert heard.text == "ನಮಸ್ಕಾರ hello ಸರಿ"
+    assert heard.languages == ("kn-IN", "en-IN", "kn-IN")
+    assert heard.confidences == (0.97, None, 0.6)
     assert heard.final_after_audio_ms is not None and heard.final_after_audio_ms >= 0
 
 
@@ -130,6 +130,7 @@ def test_a_run_scores_every_clip_and_reports_the_language_it_identified() -> Non
     assert summary["finalAfterAudioMs"] == {"p50": 500, "p95": 590}
     assert summary["costInr"] == float(estimate(setting, trimmed) or 0) > 0
     assert report["failures"] == [{"id": s.clips[2].id, "error": "ConnectionError"}]
+    assert [c["languageConfidences"] for c in report["clips"]] == [[0.9], [0.5]]
 
 
 def test_latin_script_words_are_counted_so_a_codemix_run_can_be_read_fairly() -> None:

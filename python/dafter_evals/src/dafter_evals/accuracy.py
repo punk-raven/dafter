@@ -90,6 +90,7 @@ def clip_row(clip: Clip, heard: Heard, result: Score, sample: Sample) -> dict[st
         **result.to_dict(),
         "latinWords": latin_words(heard.text),
         "languages": list(heard.languages),
+        "languageConfidences": list(heard.confidences),
         "identified": identified(sample, heard),
         "finalAfterAudioMs": heard.final_after_audio_ms,
     }
