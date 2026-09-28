@@ -51,6 +51,17 @@
           "pattern": "^[a-z][a-z0-9-]{1,62}$",
           "default": "dafter-py"
         },
+        "name": {
+          "type": "string",
+          "description": "What the agent is called: the name a person sees on its tile and in captions, and hears it introduce itself by in every language. The agent's persona and greeting read it, so it is stated once. Without one the agent introduces itself by no name.",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "greets": {
+          "type": "boolean",
+          "description": "Whether the agent speaks first when it joins. Off, it joins silently and says nothing until it is spoken to.",
+          "default": false
+        },
         "mode": {
           "type": "string",
           "description": "Cascaded is the default. Half-cascade and speech-to-speech are provider modes, and switching is a config edit.",

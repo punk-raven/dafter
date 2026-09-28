@@ -56,6 +56,19 @@ def test_the_pinned_hindi_job_plans_the_sarvam_cascade() -> None:
     assert p.voice_turn_handling is p.turn_handling
 
 
+def test_the_catalog_agent_is_named_and_joins_without_a_greeting() -> None:
+    p = plan(load(job()), POOL)
+    assert p.config.agent.name == "Nivya"
+    assert p.persona.instructions.startswith("You are Nivya, ")
+    assert p.opening is None
+
+
+def test_a_session_that_asks_for_the_greeting_hears_the_agent_introduce_itself() -> None:
+    p = plan(load(variant(lambda d: d["agent"].update(greets=True))), POOL)
+    assert p.opening == p.persona.greeting
+    assert p.opening is not None and "Nivya" in p.opening
+
+
 def test_a_document_that_does_not_match_its_hash_is_refused() -> None:
     doc = json.loads(job())
     doc["turn"]["silenceMs"] = 900

@@ -83,12 +83,12 @@ async def refuse(control: ControlPlane | None, session_id: str, exc: DafterError
 async def on_request(req: JobRequest) -> None:
     control = ControlPlane.from_env()
     try:
-        plan(load(req.job.metadata), pool(), fetches_keys=control is not None)
+        p = plan(load(req.job.metadata), pool(), fetches_keys=control is not None)
     except DafterError as exc:
         await refuse(control, req.room.name, exc)
         await req.reject()
         return
-    await req.accept(name="Dafter agent", attributes={"dafter.role": "agent"})
+    await req.accept(name=p.config.agent.name or "", attributes={"dafter.role": "agent"})
 
 
 async def room_encryption(p: Plan, control: ControlPlane) -> rtc.E2EEOptions | None:
@@ -291,8 +291,8 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     if called is not None:
         called.listen()
-        return
-    session.say(p.persona.greeting, allow_interruptions=True)
+    if p.opening is not None:
+        session.say(p.opening, allow_interruptions=True)
 
 
 def prewarm(proc: JobProcess) -> None:

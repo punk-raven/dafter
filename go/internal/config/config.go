@@ -35,6 +35,8 @@ type Residency struct {
 type Agent struct {
 	Enabled    bool        `json:"enabled"`
 	Pool       string      `json:"pool"`
+	Name       string      `json:"name,omitempty"`
+	Greets     *bool       `json:"greets,omitempty"`
 	Mode       AgentMode   `json:"mode,omitempty"`
 	PersonaRef string      `json:"personaRef,omitempty"`
 	Pipeline   *Pipeline   `json:"pipeline,omitempty"`
