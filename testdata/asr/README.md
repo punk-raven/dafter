@@ -19,15 +19,16 @@ and pinned; the audio is never committed.
   (https://arxiv.org/abs/2305.15760), CC-BY-4.0, pinned by its Hugging Face
   revision. It is gated: pinning or fetching it needs `HF_TOKEN` from an
   account that has accepted the dataset's terms on
-  https://huggingface.co/datasets/ai4bharat/Svarah (automatic approval). No
-  Svarah sample is committed yet.
+  https://huggingface.co/datasets/ai4bharat/Svarah (automatic approval).
 
 `<dataset>-<language>.json` is one pinned sample: the source it came from,
 the selection rule, and per clip its id, its member in the source, its
 speaker, duration, sha256 and the dataset's reference transcript. The rule:
 rows 3 to 12 s long, in path order, one clip per speaker, taken in turn from
 each gender, 20 clips. Each committed Kathbath sample is 20 speakers, 10 of
-each gender, 136 to 178 s of audio.
+each gender, 136 to 178 s of audio. Svarah names no speaker, so its sample
+takes one clip per first language and district instead: 20 of them, 124 s of
+audio.
 
 ## Commands
 
