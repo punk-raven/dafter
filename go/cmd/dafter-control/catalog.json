@@ -67,6 +67,26 @@
     },
     "recording": { "enabled": false },
     "transcription": { "mode": "off" },
+    "scribe": {
+      "enabled": false,
+      "pool": "dafter-scribe",
+      "llm": {
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "region": "ap-south-1",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+        "options": { "thinking": false, "temperature": 0.2, "maxTokens": 1500 }
+      },
+      "judge": {
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "region": "ap-south-1",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+        "options": { "thinking": false, "temperature": 0, "maxTokens": 400 }
+      },
+      "summaryIntervalMs": 60000,
+      "afterCallTimeoutSeconds": 900
+    },
     "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 300 }
   },
 

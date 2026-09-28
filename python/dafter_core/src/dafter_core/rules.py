@@ -177,6 +177,45 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         ),
     ),
     CrossFieldRule(
+        broken=lambda c: c.privacy_mode is PrivacyMode.SEALED and c.scribe.enabled,
+        code=ErrorCode.PRIVACY_MODE_FORBIDS,
+        pointer="/scribe/enabled",
+        because=(
+            "a sealed session never has a scribe, because it reads what everyone said and "
+            "sends it to its LLM provider"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.scribe.enabled and not c.scribe.consent_artifact_id,
+        code=ErrorCode.CONSENT_REQUIRED,
+        pointer="/scribe/consentArtifactId",
+        because="the scribe cannot read the call and keep its minutes without a consent artifact",
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.scribe.enabled and not c.transcription.live,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/transcription/mode",
+        because=(
+            "the scribe reads the live captions the agent worker publishes rather than "
+            "transcribing again, so it needs transcription live or both"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.scribe.enabled and c.scribe.llm is None,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/scribe/llm",
+        because="the scribe writes its notes and minutes with an LLM, and the session pins none",
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.scribe.enabled and c.scribe.pool == c.agent.pool,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/scribe/pool",
+        because=(
+            "the scribe runs a different program from the agent, so a pool serving both would "
+            "hand the agent's job to the scribe or the scribe's to the agent"
+        ),
+    ),
+    CrossFieldRule(
         broken=lambda c: (
             c.turn.strategy is TurnStrategy.PROVIDER_ENDPOINTING and c.turn.local_vad_enabled
         ),
