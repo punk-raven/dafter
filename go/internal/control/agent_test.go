@@ -40,6 +40,9 @@ var agentJobs = []struct {
 	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", ""},
 	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", semanticOverride},
 	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", ""},
+	{"../../../testdata/agent/kannada-webrtc-job.json", "kn-IN", ""},
+	{"../../../testdata/agent/marathi-webrtc-job.json", "mr-IN", ""},
+	{"../../../testdata/agent/telugu-webrtc-job.json", "te-IN", ""},
 }
 
 func embeddedCatalog(t *testing.T) *config.Catalog {
