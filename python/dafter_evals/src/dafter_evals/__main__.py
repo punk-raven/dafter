@@ -11,6 +11,7 @@ import aiohttp
 from dafter_core.config import parse
 from livekit.agents import utils
 
+from .connect import join
 from .probe import Probe
 from .script import HINDI
 from .turns import SCENARIOS, run
@@ -58,7 +59,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     async with utils.http_context.open():
         voice = Voice(cfg, args.speaker)
         try:
-            await probe.connect(created["url"], created["token"])
+            await join(probe, args.control, created)
             scenarios = frozenset(args.scenarios.split(","))
             report = await run(probe, voice, HINDI, args.turns, scenarios)
         finally:
