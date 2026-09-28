@@ -594,6 +594,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "dafter-core" },
     { name = "dafter-providers" },
+    { name = "dafter-runtime" },
     { name = "livekit-agents" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -604,6 +605,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.10" },
     { name = "dafter-core", editable = "dafter_core" },
     { name = "dafter-providers", editable = "dafter_providers" },
+    { name = "dafter-runtime", editable = "dafter_runtime" },
     { name = "livekit-agents", specifier = "==1.8.3" },
     { name = "numpy", specifier = ">=1.26" },
 ]

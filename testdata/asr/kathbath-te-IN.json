@@ -1,0 +1,173 @@
+{
+  "dataset": "kathbath",
+  "language": "te-IN",
+  "source": {
+    "archive": "https://indicwhisper.objectstore.e2enetworks.net/vistaar_benchmarks/kathbath.zip",
+    "bytes": 3457654951,
+    "etag": "\"bab49044464c3d44b500ec4258894da7-207\"",
+    "license": "CC-BY-4.0"
+  },
+  "selection": "rows whose duration is 3 to 12 s, ordered by audio path; one clip per speaker, taken in turn from each gender group, until 20 are chosen",
+  "clips": [
+    {
+      "id": "844424930595992-860-f",
+      "member": "kathbath/telugu/wavs/844424930595992-860-f.wav",
+      "speaker": "860",
+      "durationS": 10.2632,
+      "sha256": "60dc7a085e13458566fdda1bc9b9a9f1f7836e0688f60ba02c395fb10b1be000",
+      "reference": "ఈ ప్రక్రియను ఆగస్టు చివరి మాసంలో పూర్తి చేసి పేదింటి స్వంతింటి కళను సాకారం చేస్తామన్నారు"
+    },
+    {
+      "id": "844424930563393-1123-m",
+      "member": "kathbath/telugu/wavs/844424930563393-1123-m.wav",
+      "speaker": "1123",
+      "durationS": 8.4289,
+      "sha256": "bdc0b1e44f58f272ca9f556912114f0d16b7095797b3db7774018d9fa766fe77",
+      "reference": "ఒకచోట ఏకగ్రీవం కోసం వేలం జరిగినట్లు గుర్తించి ఎన్నిక రద్దు చేశామన్నారు"
+    },
+    {
+      "id": "844424931140320-213-f",
+      "member": "kathbath/telugu/wavs/844424931140320-213-f.wav",
+      "speaker": "213",
+      "durationS": 8.8468,
+      "sha256": "c8c68ed17adab73a74e6435fd8976adedb317512a03c5271d1d37618e8e82a86",
+      "reference": "ఇంటెల్ మరియు మైక్రోసాఫ్ట్ తో కలిసి ఈ ల్యాప్టాప్ను నిర్ణయించిన ధర వద్ద పొందగలిగేలా తయారుచేసింది"
+    },
+    {
+      "id": "844424930593493-831-m",
+      "member": "kathbath/telugu/wavs/844424930593493-831-m.wav",
+      "speaker": "831",
+      "durationS": 6.6177,
+      "sha256": "474e5d04b6b6a79e8d803f79903c913ce4f339448d5dc8938cde097aaec2ce61",
+      "reference": "కొమరం పులి తో తెలుగు తెరకు పరిచయమయిన భామ నికీషా పటేల్"
+    },
+    {
+      "id": "844424931189472-76-f",
+      "member": "kathbath/telugu/wavs/844424931189472-76-f.wav",
+      "speaker": "76",
+      "durationS": 8.4056,
+      "sha256": "d5ace847e603ef7e2959ccf325c7a877f3bd523cb5e9889a5858d14fceada632",
+      "reference": "త్వరగా మరియు నొప్పి లేకుండా పాస్ ఏ సంక్లిష్టత చికిత్స కేరీస్"
+    },
+    {
+      "id": "844424930594192-352-m",
+      "member": "kathbath/telugu/wavs/844424930594192-352-m.wav",
+      "speaker": "352",
+      "durationS": 8.0573,
+      "sha256": "9fe6b6913afa40ddf2152950c90910c3b1f6f066471ade970a852b1f156edaf3",
+      "reference": "గౌతమ్ మీనన్ మార్క్ స్టైలిష్ యాక్షన్ ఎంటర్టైనర్గా ఈ సినిమా ఉండనుందని తెలుస్తోంది"
+    },
+    {
+      "id": "844424931279374-194-f",
+      "member": "kathbath/telugu/wavs/844424931279374-194-f.wav",
+      "speaker": "194",
+      "durationS": 7.1517,
+      "sha256": "6a307560392a0e3e47ee0988666fec6dca7662f46deead5b266c13be7c47473b",
+      "reference": "తన విజయం కోసం కృషి చేసిన వారికి ఆయన ధన్యవాదాలు తెలిపారు"
+    },
+    {
+      "id": "844424933276805-192-m",
+      "member": "kathbath/telugu/wavs/844424933276805-192-m.wav",
+      "speaker": "192",
+      "durationS": 4.7137,
+      "sha256": "3a5b04cbc9f4dbdeabe2457a7ff6795ade9dda085d11a2f7647ccb5feb678933",
+      "reference": "వాస్తవ సంఖ్యలు అన్ని రకాల సంఖ్యలు ఈ కోవలోకి వస్తాయి"
+    },
+    {
+      "id": "844424931358523-879-f",
+      "member": "kathbath/telugu/wavs/844424931358523-879-f.wav",
+      "speaker": "879",
+      "durationS": 5.8282,
+      "sha256": "2caa5ac7e1d2714b44e738bd97261963724165eee72a2b5d0c63f61bf07549c4",
+      "reference": "భారత్లో అత్యధిక టెస్ట్ విజయాలు సాధించిన కెప్టెన్గా నిలిచేందుకు అడుగుదూరంలో నిలిచాడు"
+    },
+    {
+      "id": "844424933311375-1113-m",
+      "member": "kathbath/telugu/wavs/844424933311375-1113-m.wav",
+      "speaker": "1113",
+      "durationS": 10.8205,
+      "sha256": "9794b553ca36dc4a621fbfaac0bdafd91d625e4c03d3d68785c8bdb4552603bb",
+      "reference": "యాక్షన్ ఎయిడ్ స్వచ్ఛంద సంస్థలో చేరి బధిరుల తల్లిదండ్రులకు పిల్లలకు అవగాహన కల్పించింది"
+    },
+    {
+      "id": "844424932537135-1154-f",
+      "member": "kathbath/telugu/wavs/844424932537135-1154-f.wav",
+      "speaker": "1154",
+      "durationS": 10.4258,
+      "sha256": "9cc42bd7d29198d92602107ec144280b87b005b6b969e81b7a4287e99b159089",
+      "reference": "భారతీయ రిజర్వ్ బ్యాంక్ నోట్ ముద్రణ్ సంస్థ ఈ ఆర్థిక సంవత్సరంలో ఒక్క నోటు కూడా ముద్రించలేదు"
+    },
+    {
+      "id": "844424933323888-406-m",
+      "member": "kathbath/telugu/wavs/844424933323888-406-m.wav",
+      "speaker": "406",
+      "durationS": 5.7817,
+      "sha256": "b70621ee2cea4b10a4cec552cb14f7b74439edb8b245115bcf0dd13b68449f4f",
+      "reference": "కానీ తరువాత సంగీత దర్శకుడు జైకిషన్ వారిద్దరి మధ్య విభేదాలను పరిష్కరించారు"
+    },
+    {
+      "id": "844424932542936-377-f",
+      "member": "kathbath/telugu/wavs/844424932542936-377-f.wav",
+      "speaker": "377",
+      "durationS": 10.3561,
+      "sha256": "e975c4bd2df95b269b599b100965c81f1b52ad078372a8a8f1e64fb1b356adfe",
+      "reference": "తాజా పరిణామాల నేపథ్యంలో జూన్ రెండవవారంలో చైనాను భారత్ రెండుసార్లు ఫ్లాగ్ మీటింగ్కు ఆహ్వానించింది"
+    },
+    {
+      "id": "844424933324189-119-m",
+      "member": "kathbath/telugu/wavs/844424933324189-119-m.wav",
+      "speaker": "119",
+      "durationS": 11.1456,
+      "sha256": "4b91322856cda50aec498cab591ac50aa5c2431b68627c9465fe676045c11917",
+      "reference": "కుడి తొడపై కూర్చుంటారని కనుక పుత్రికా సమానమని కనుక వివాహమాడనని కుమారుడైన శంతనుని వివాహమాడమని ప్రతీపుడు చెప్పాడు"
+    },
+    {
+      "id": "844424932651824-944-f",
+      "member": "kathbath/telugu/wavs/844424932651824-944-f.wav",
+      "speaker": "944",
+      "durationS": 8.9165,
+      "sha256": "1dbca9755e4f17b2c1c3f9f4be214d102eb69ec66b69030e98ce639f181ccdd4",
+      "reference": "అయితే ప్రియాంక ఎంత ఫ్రీ షో ఇచ్చినా కానీ బేవాచ్ చిత్రానికి అది హెల్ప్ కాలేదు"
+    },
+    {
+      "id": "844424933324888-810-m",
+      "member": "kathbath/telugu/wavs/844424933324888-810-m.wav",
+      "speaker": "810",
+      "durationS": 6.966,
+      "sha256": "8c34ed661238ce2fad1c65cf55418534ac9fc3ba2dffe0c139da051d165a2c2e",
+      "reference": "పరశురాముని ఆత్మలింగము జడల రామలింగేశ్వరాలయానికి దరిదాపుల్లో వేరొక గుహలో ఉంది"
+    },
+    {
+      "id": "844424932652026-822-f",
+      "member": "kathbath/telugu/wavs/844424932652026-822-f.wav",
+      "speaker": "822",
+      "durationS": 10.6115,
+      "sha256": "403147bc80cc058397db4fa4b004a9a4fec509a1a3de6d2f0bbe8098a1132907",
+      "reference": "ఇలాంటి నేపథ్యంలో హీరోల మెహర్బానీకి పోయి అక్కర్లేని ఫిగర్లు సర్క్యులేట్ చేస్తే ఇబ్బందిలో పడేది నిర్మాతలే"
+    },
+    {
+      "id": "844424933327792-772-m",
+      "member": "kathbath/telugu/wavs/844424933327792-772-m.wav",
+      "speaker": "772",
+      "durationS": 8.7075,
+      "sha256": "d07079da2ff54272e11531fbdba5fdcc724798c9214b53ed9f2c642ad7c9a560",
+      "reference": "ఇద్దరూ పరాగ్వేకు అంతర్జాతీయంగా ప్రజాస్వామ్య రిపబ్లికన్ భావన కలిగించడానికి ప్రయత్నించారు"
+    },
+    {
+      "id": "844424932662403-108-f",
+      "member": "kathbath/telugu/wavs/844424932662403-108-f.wav",
+      "speaker": "108",
+      "durationS": 5.4799,
+      "sha256": "4cac1d245246e70be02785cee4b4d5f949cafd88495a8b276153ef349d6fb635",
+      "reference": "అయితే ప్రమాదం జరిగిన బస్సులో ఎక్కువగా విద్యార్థులు ఉన్నట్లు సమాచారం"
+    },
+    {
+      "id": "844424933340271-1150-m",
+      "member": "kathbath/telugu/wavs/844424933340271-1150-m.wav",
+      "speaker": "1150",
+      "durationS": 8.9861,
+      "sha256": "597f8b4dbc6e8305bc4d44595fbff5787c07377a39aff7c8894c6e2b458688f8",
+      "reference": "మా పల్లెల ప్రజలు ఆయన పట్ల చూపే భక్తి ప్రేరణ నన్ను రచయితను చేసింది"
+    }
+  ]
+}

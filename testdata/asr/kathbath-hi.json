@@ -1,0 +1,173 @@
+{
+  "dataset": "kathbath",
+  "language": "hi",
+  "source": {
+    "archive": "https://indicwhisper.objectstore.e2enetworks.net/vistaar_benchmarks/kathbath.zip",
+    "bytes": 3457654951,
+    "etag": "\"bab49044464c3d44b500ec4258894da7-207\"",
+    "license": "CC-BY-4.0"
+  },
+  "selection": "rows whose duration is 3 to 12 s, ordered by audio path; one clip per speaker, taken in turn from each gender group, until 20 are chosen",
+  "clips": [
+    {
+      "id": "844424930325467-497-f",
+      "member": "kathbath/hindi/wavs/844424930325467-497-f.wav",
+      "speaker": "497",
+      "durationS": 5.1781,
+      "sha256": "2db3d7775454fb28e4cb99c57baca3da60c601c354666e6f033a6a473b1b929a",
+      "reference": "इन स्कीमों को लागू करने में यहां कोई बिचौलिया नहीं है"
+    },
+    {
+      "id": "844424930324566-536-m",
+      "member": "kathbath/hindi/wavs/844424930324566-536-m.wav",
+      "speaker": "536",
+      "durationS": 3.8313,
+      "sha256": "429e4aca558072949ecacdbb3537813877dc7f1edd44249d9ec000dca5f1866b",
+      "reference": "इसे अब तक दस लाख से ज्यादा लोग देख चुके हैं"
+    },
+    {
+      "id": "844424930560795-620-f",
+      "member": "kathbath/hindi/wavs/844424930560795-620-f.wav",
+      "speaker": "620",
+      "durationS": 6.3158,
+      "sha256": "73c8514db9ff4647fa32069a08fe4cdabadf126b1e4d2c7d489daa1bb2df1d10",
+      "reference": "इसके लिए उन्होंने लिम्का बुक ऑफ वर्ल्ड रिकॉर्ड में अपना नाम दर्ज कराया"
+    },
+    {
+      "id": "844424931190172-526-m",
+      "member": "kathbath/hindi/wavs/844424931190172-526-m.wav",
+      "speaker": "526",
+      "durationS": 9.5202,
+      "sha256": "5834e87f985b9df5f65b26aceefa7752a6ad6b6ac2ae7fe8606e205457814109",
+      "reference": "इस ताम्रपत्र के अनुसार हर्षवर्धन के पूर्वजों में प्रथम नाम नरवर्धन का उल्लिखित मिलता है"
+    },
+    {
+      "id": "844424930570495-160-f",
+      "member": "kathbath/hindi/wavs/844424930570495-160-f.wav",
+      "speaker": "160",
+      "durationS": 6.5713,
+      "sha256": "95ef3411898ca701b97ae806baa51323737a35e05291d80d62b24b77c6dd3ffd",
+      "reference": "एक बेल्ट जो आपके मोबाइल की बैटरी को हर समय चार्ज रखेगी"
+    },
+    {
+      "id": "844424932314843-730-m",
+      "member": "kathbath/hindi/wavs/844424932314843-730-m.wav",
+      "speaker": "730",
+      "durationS": 4.853,
+      "sha256": "dd9d37e2645fafede24a84f58d197e1f0f34f668be9d2f6ecfcf885097789389",
+      "reference": "आग लगने के कारणों का पता नहीं चल सका था"
+    },
+    {
+      "id": "844424930627593-153-f",
+      "member": "kathbath/hindi/wavs/844424930627593-153-f.wav",
+      "speaker": "153",
+      "durationS": 8.0806,
+      "sha256": "ff72613f221200e1e40065b6c8033ff041240aa86c89d6fe5cf31adbeb4cb2bd",
+      "reference": "समीक्षा इस दवा के बारे में स्त्रीरोग विशेषज्ञ विश्वास प्रेरित करते हैं"
+    },
+    {
+      "id": "844424932406055-866-m",
+      "member": "kathbath/hindi/wavs/844424932406055-866-m.wav",
+      "speaker": "866",
+      "durationS": 6.757,
+      "sha256": "795699dbf77dad0de74b94d1e850a95621617b1135fd96ab098f2e91da481ec3",
+      "reference": "आज भरपूर ऊर्जा रहेगी और काम के घंटे भी बहुत अधिक रहेंगे"
+    },
+    {
+      "id": "844424930898358-574-f",
+      "member": "kathbath/hindi/wavs/844424930898358-574-f.wav",
+      "speaker": "574",
+      "durationS": 6.6874,
+      "sha256": "9e3b6fd1f7dfc817701e2b89f02041f13a6a570b2c9f01777a2f47131266e4b1",
+      "reference": "यही कारण है कि समय के साथ इनकी संख्या घटती चली गई"
+    },
+    {
+      "id": "844424932406154-532-m",
+      "member": "kathbath/hindi/wavs/844424932406154-532-m.wav",
+      "speaker": "532",
+      "durationS": 9.9381,
+      "sha256": "045750a679b8b02e4a947361b12080f30c9cc95d62e9675c5f085cca1897622f",
+      "reference": "इसमें कुलपति बताएंगे कि पांच साल में उनका क्या एक्शन प्लान होगा"
+    },
+    {
+      "id": "844424930918828-564-f",
+      "member": "kathbath/hindi/wavs/844424930918828-564-f.wav",
+      "speaker": "564",
+      "durationS": 7.2679,
+      "sha256": "7916a2765f9402d50811ad6f5700f3e22af39d5a8709bbe5ceeeb2955c6e9a0c",
+      "reference": "स्टीव स्मिथ अबतक तीन अर्धशतक बना चुके हैं और अच्छे लय में दिख रहे हैं"
+    },
+    {
+      "id": "844424932563057-769-m",
+      "member": "kathbath/hindi/wavs/844424932563057-769-m.wav",
+      "speaker": "769",
+      "durationS": 6.3391,
+      "sha256": "69e605a6d9371c5ef68a6052550e2e4225dfbea265cbc10939497bdfaec82965",
+      "reference": "फोर्ड रेंजर के बदलाव यूके में डीजल इंजन के साथ उपलब्ध हैं"
+    },
+    {
+      "id": "844424930929529-1190-f",
+      "member": "kathbath/hindi/wavs/844424930929529-1190-f.wav",
+      "speaker": "1190",
+      "durationS": 11.8189,
+      "sha256": "02c14d9f84d9cb419cab457b2b8a7eb7f12d6f20f9c069ca46379ce9456af829",
+      "reference": "दक्षिणी सुमात्रा और जावा द्वीपों के बीच स्थित सुंडा द्वीप में यह ज्वालामुखी फटा है"
+    },
+    {
+      "id": "844424933261563-1183-m",
+      "member": "kathbath/hindi/wavs/844424933261563-1183-m.wav",
+      "speaker": "1183",
+      "durationS": 5.6424,
+      "sha256": "f81dc0654883ed5d1e16beec1189a4dbe603bb8ddfdf263e69396b15c43cb0c8",
+      "reference": "इन्होंने क्रमश इलाहाबाद लखनऊ तथा ढाका विश्वविद्यालय में अध्यापन कार्य किया"
+    },
+    {
+      "id": "844424932410055-267-f",
+      "member": "kathbath/hindi/wavs/844424932410055-267-f.wav",
+      "speaker": "267",
+      "durationS": 5.2477,
+      "sha256": "c86830dcabbb6650d2fc85e85258ea0000d351b9ec6b7ff4fee4994fce099eaf",
+      "reference": "निवेशकों ने इस आशय की शिकायत ईओडल्यू के भोपाल मुख्यालय की थी"
+    },
+    {
+      "id": "844424933454584-288-m",
+      "member": "kathbath/hindi/wavs/844424933454584-288-m.wav",
+      "speaker": "288",
+      "durationS": 6.9196,
+      "sha256": "2a2b142c917aa885b38adaec40cb447a269eabbded370e56a0eeb47418f2f9a3",
+      "reference": "उनकी दिलचस्पी जमीन का मालिकाना मिल जाने तक ही रहेगी"
+    },
+    {
+      "id": "844424932574078-221-f",
+      "member": "kathbath/hindi/wavs/844424932574078-221-f.wav",
+      "speaker": "221",
+      "durationS": 8.2199,
+      "sha256": "9089e8c4ee1a1c9b98afd194b6e1c68641f7de87e87e36ea2c1e4010cbb327fc",
+      "reference": "५८३ ईसा पूर्व ईसा मसीह के जन्म से पूर्व के वर्षों को दर्शाता है"
+    },
+    {
+      "id": "844424933456084-312-m",
+      "member": "kathbath/hindi/wavs/844424933456084-312-m.wav",
+      "speaker": "312",
+      "durationS": 6.3158,
+      "sha256": "c15d7df6670b02ee8da1e92bf2fcd9050db6eaaa88b4a01dfec455cc099b33f3",
+      "reference": "स्पार्ता में उसकी पूजा ज्यूस अगामेम्नान के नाम से होती थी"
+    },
+    {
+      "id": "844424932919548-1202-f",
+      "member": "kathbath/hindi/wavs/844424932919548-1202-f.wav",
+      "speaker": "1202",
+      "durationS": 4.1564,
+      "sha256": "b3d39bbd16a990e3b21b0cc2b6a363ee65e63471c2da1c2d8af14623ad86d32e",
+      "reference": "वह टेलीविजन रियलिटी शो की भी मेजबानी कर चुकी हैं"
+    },
+    {
+      "id": "844424933474083-540-m",
+      "member": "kathbath/hindi/wavs/844424933474083-540-m.wav",
+      "speaker": "540",
+      "durationS": 6.5481,
+      "sha256": "86839412643f9602a6a55d1b9961abcaa138fdb9f4ba10d9472884127f639ba3",
+      "reference": "शरीर में रक्तपायी कीटों के दंश से प्रविष्ट हो ये रक्तप्रवाह में बहते हैं"
+    }
+  ]
+}
