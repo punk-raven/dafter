@@ -50,7 +50,7 @@ async function createSession() {
     if (!resp.ok) {
       log(`Create failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
-      return;
+      return null;
     }
 
     lastRoomId = data.room;
@@ -58,23 +58,24 @@ async function createSession() {
     log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
     if (data.agentDispatchId) log(`Agent dispatched to ${data.config.agent.pool} (${data.agentDispatchId}); join to talk to it`, 'success');
 
-    const joinUrl = `${window.location.origin}?room=${data.room}`;
     document.getElementById('created-room-id').textContent = data.room;
-    document.getElementById('join-link').value = joinUrl;
+    document.getElementById('join-link').value = joinLink(data.room);
     document.getElementById('session-created-info').style.display = 'block';
     document.getElementById('room-id').value = data.room;
-
+    btn.disabled = false;
+    return data.room;
   } catch (err) {
     log(`Error: ${err.message}`, 'error');
   }
   btn.disabled = false;
+  return null;
 }
 
 async function joinRoom() {
   const roomId = document.getElementById('room-id').value.trim();
   if (!roomId) {
     log('Enter a Room ID or create a session first', 'error');
-    return;
+    return false;
   }
 
   const btn = document.getElementById('btn-join');
@@ -93,11 +94,12 @@ async function joinRoom() {
     if (!resp.ok) {
       log(`Join failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
-      return;
+      return false;
     }
 
     log(`Joined session: ${data.sessionId} | Participant: ${data.participantId}`, 'success');
     localParticipantId = data.participantId;
+    lastRoomId = roomId;
 
     const icePolicy = document.getElementById('ice-policy').value;
     const hasICEServers = data.iceServers && data.iceServers.length > 0;
@@ -231,16 +233,17 @@ async function joinRoom() {
     document.getElementById('panel-create').style.display = 'none';
     document.getElementById('panel-join').style.display = 'none';
     document.getElementById('session-created-info').style.display = 'none';
-    document.getElementById('btn-leave').style.display = 'block';
+    setInCall(true);
     showRecordingPanel(data);
 
     startStats(data);
     monitorICE();
-
+    return true;
   } catch (err) {
     log(`Error: ${err.message}`, 'error');
     btn.disabled = false;
     setBadge('disconnected');
+    return false;
   }
 }
 
@@ -279,7 +282,7 @@ function cleanup() {
   document.getElementById('panel-join').style.display = 'block';
   document.getElementById('btn-create').disabled = false;
   document.getElementById('btn-join').disabled = false;
-  document.getElementById('btn-leave').style.display = 'none';
+  setInCall(false);
   document.getElementById('ice-info').style.display = 'none';
   document.getElementById('panel-recording').style.display = 'none';
 }
