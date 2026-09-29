@@ -38,7 +38,7 @@ from .answering import Roster
 from .backchannel import Acknowledgements
 from .called import Called
 from .control import ControlPlane, encryption
-from .cost import OutputTokens, load_prices, priced, usage_payload
+from .cost import OutputTokens, load_prices, model_name, priced, provider_name, usage_payload
 from .delivery import Delivery
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
@@ -258,12 +258,29 @@ def new_session(
     )
 
 
+async def built(p: Plan, control: ControlPlane | None) -> Stages:
+    try:
+        stages = build(p)
+    except DafterError as exc:
+        await refuse(control, p.config.session_id, exc)
+        raise
+    log.info("agent stages", extra={"session": p.config.session_id, **served(p, stages)})
+    return stages
+
+
+def served(p: Plan, stages: Stages) -> dict[str, str]:
+    return {
+        "llm": f"{provider_name(stages.llm.provider)}/{model_name(stages.llm.model)}",
+        "llm_route": p.config.llm or "language",
+    }
+
+
 async def entrypoint(ctx: JobContext) -> None:
     redact_framework_logs()
     control = ControlPlane.from_env()
     p = plan(load(ctx.job.metadata), pool(), fetches_keys=control is not None)
     provider = telemetry.install(p.config)
-    stages: Stages = build(p)
+    stages = await built(p, control)
     room_key = await room_encryption(p, control) if control is not None else None
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY, encryption=room_key)

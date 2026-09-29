@@ -7,7 +7,7 @@ const ORIGIN = 'http://127.0.0.1:8080';
 const ROOM = 's_1a2b3c4d';
 
 const FORM = {
-  tenant: 't_9c21a4be', language: 'hi', channel: 'webrtc', profile: '',
+  tenant: 't_9c21a4be', language: 'hi', llm: 'groq/qwen/qwen3.8-27b', channel: 'webrtc', profile: '',
   resolution: '', 'noise-cancellation': '', 'privacy-mode': '', 'agent-mode': '',
   'addressing-mode': '', 'agent-greeting': '', 'recording-layout': '', role: 'participant',
 };
@@ -22,7 +22,7 @@ function element(id, form) {
 function page({ search = '', answers, form = FORM }) {
   const elements = new Map();
   const calls = [];
-  const run = load('agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js');
+  const run = load('agent-llm.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js');
   const global = run('globalThis');
   Object.assign(global, {
     document: {
@@ -54,6 +54,7 @@ test('Start call creates the session and joins it in one click', async () => {
   await run('startCall()');
   assert.deepEqual(calls.map((c) => c.url), ['/sessions', `/sessions/${ROOM}/join`]);
   assert.equal(calls[0].body.language, 'hi');
+  assert.equal(calls[0].body.llm, 'groq/qwen/qwen3.8-27b');
   assert.equal(calls[0].body.overrides, undefined);
   assert.equal(calls[0].body.profile, undefined);
   assert.deepEqual(calls[1].body, { role: 'participant' });

@@ -390,6 +390,7 @@ class ResolvedSessionConfig:
     media: Media = field(default_factory=Media)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
+    llm: str | None = None
 
     def validate_cross_field_rules(self) -> None:
         broken = [rule for rule in CROSS_FIELD_RULES if rule.broken(self)]
@@ -421,6 +422,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         media=Media.from_dict(doc.get("media") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
+        llm=doc.get("llm"),
     )
     cfg.validate_cross_field_rules()
     return cfg

@@ -21,6 +21,7 @@ LLM_MODELS = frozenset({"sarvam-105b", "sarvam-105b-conversations"})
 TTS_MODELS = frozenset({"bulbul:v3"})
 REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
+CREDENTIAL = "SARVAM_API_KEY"
 
 LANGUAGES = {
     "hi": "hi-IN",
@@ -114,7 +115,7 @@ def build_stt(
             "an option is out of range",
             f"at '{opts.pointer('finalGraceMs')}': between 0 and {MAX_FINAL_GRACE_MS}",
         )
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.STT, {CREDENTIAL})
     return _construct(
         Stage.STT,
         lambda: FinalFirstSTT(
@@ -142,7 +143,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     thinking = opts.get("thinking", bool, False)
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.LLM, {CREDENTIAL})
     model = ref.model or ""
     if thinking:
         return _construct(
@@ -202,7 +203,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     dictionary = opts.optional("dictionaryId", str)
     first_sentence_alone = opts.get("firstSentenceAlone", bool, False)
     opts.get("prewarm", bool, True)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.TTS, {CREDENTIAL})
     model = ref.model or ""
     return _construct(
         Stage.TTS,

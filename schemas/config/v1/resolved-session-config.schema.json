@@ -25,6 +25,11 @@
     },
     "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
     "channel": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Channel" },
+    "llm": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}/[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+      "description": "The operator's LLM route the session chose by name, as provider/model. Resolution lands it after the language and channel overlays, so agent.pipeline.llm states the route in full; absent, the session runs the language's own LLM. A session names a route and never an endpoint or a credential, which stay in the operator's table."
+    },
     "residency": {
       "type": "object",
       "unevaluatedProperties": false,

@@ -89,7 +89,8 @@
 
   .start { display: flex; flex-direction: column; }
   .start label { font-size: 13px; color: #aaa; }
-  .start select { padding: 10px; font-size: 15px; }
+  .start select { padding: 10px; font-size: 15px; text-overflow: ellipsis; }
+  .start .llm-provider { float: right; color: #666; font-size: 12px; }
   .btn-start { background: #7c3aed; color: white; padding: 12px 16px; font-size: 15px; margin-top: 12px; }
   .btn-start:hover { background: #6d28d9; }
   .btn-start:disabled { background: #333; color: #666; cursor: not-allowed; }
@@ -119,6 +120,14 @@
   .advanced .stats-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
   .advanced .log-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
   .lobby-hint { margin: auto; color: #555; font-size: 14px; }
+
+  @media (max-width: 640px) {
+    .header { padding: 12px 16px; }
+    .layout { flex-direction: column; height: auto; min-height: calc(100vh - 49px); }
+    .sidebar, .sidebar:has(.advanced[open]) { width: auto; min-width: 0; border-right: none; border-bottom: 1px solid #222; overflow-y: visible; }
+    .main { flex: 1; min-height: 50vh; }
+    .lobby-hint { padding: 24px 16px; text-align: center; }
+  }
 </style>
 </head>
 <body>
@@ -140,6 +149,8 @@
         <option value="mr-IN">Marathi</option>
         <option value="te-IN">Telugu</option>
       </select>
+      <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
+      <select id="llm" onchange="rememberLlm()"></select>
       <button id="btn-start" class="btn-start" onclick="startCall()">Start call</button>
     </div>
 
@@ -321,11 +332,11 @@
 
   <div class="main">
     <div id="video-grid" class="video-grid"></div>
-    <div class="lobby-hint">Pick a language, then Start call</div>
+    <div class="lobby-hint">Pick a language and an LLM, then Start call</div>
   </div>
 </div>
 
-<script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
+<script src="/agent-llm.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
 <script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script>
 </body>
 </html>

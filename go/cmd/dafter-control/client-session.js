@@ -8,6 +8,7 @@ async function createSession() {
       tenantId: document.getElementById('tenant').value,
       language: document.getElementById('language').value,
       channel: document.getElementById('channel').value,
+      llm: chosenLlm(),
     };
     const profile = document.getElementById('profile').value.trim();
     if (profile) body.profile = profile;

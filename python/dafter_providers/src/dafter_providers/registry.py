@@ -13,7 +13,7 @@ from livekit.agents import stt as lk_stt
 from livekit.agents import tts as lk_tts
 from livekit.agents import vad as lk_vad
 
-from . import sarvam, silero
+from . import openai_compat, sarvam, silero
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +56,21 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             wants_prewarm=lambda _: False,
             classify=silero.classify,
         ),
+        **{
+            name: Vendor(
+                name=name,
+                languages=openai_compat.LANGUAGES,
+                native_endpointing=False,
+                detects_language=False,
+                vad=None,
+                stt=None,
+                llm=openai_compat.builder(endpoint),
+                tts=None,
+                wants_prewarm=openai_compat.wants_prewarm,
+                classify=openai_compat.classifier(endpoint),
+            )
+            for name, endpoint in openai_compat.ENDPOINTS.items()
+        },
     }
 )
 

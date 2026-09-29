@@ -39,6 +39,7 @@ function agentPanel() {
       <strong id="agent-title">Agent</strong>
       <span id="agent-presence" class="agent-pill agent-pill-off">not in call</span>
     </div>
+    <div id="agent-llm" class="agent-llm"></div>
     <div id="agent-reason" class="agent-reason"></div>
     <div class="agent-body">
       <div class="agent-col agent-transcript">
@@ -150,6 +151,7 @@ function onAgentEvent(payload) {
   }
   if (event.type === 'session.usage') {
     onSessionUsage(event.payload);
+    renderAgentLlm(agentView.config, event.payload.items);
     return;
   }
   if (event.type !== 'agent.state_changed') return;
@@ -173,6 +175,7 @@ function watchAgent(room, data) {
   agentPanel().style.display = '';
   document.getElementById('agent-title').textContent = (data.config && data.config.agent && data.config.agent.name) || 'Agent';
   resetAgentTurns();
+  renderAgentLlm(data.config, null);
   watchTranscripts(room);
 
   room.on(RoomEvent.DataReceived, (payload, participant, kind, topic) => {

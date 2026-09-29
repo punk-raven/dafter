@@ -19,6 +19,7 @@ type ResolvedSessionConfig struct {
 	PrivacyMode PrivacyMode `json:"privacyMode"`
 	Language    string      `json:"language"`
 	Channel     Channel     `json:"channel"`
+	LLM         string      `json:"llm,omitempty"`
 
 	Residency *Residency `json:"residency,omitempty"`
 	Agent     Agent      `json:"agent"`

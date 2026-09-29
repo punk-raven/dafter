@@ -223,6 +223,7 @@ async function monitorICE() {
 }
 
 fillNoiseFilterChoices();
+fillLlmChoices();
 
 (function seedFromURL() {
   const roomParam = new URLSearchParams(window.location.search).get('room');
