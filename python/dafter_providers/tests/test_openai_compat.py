@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any
 
 import httpx
-import openai
 import pytest
 from dafter_core.config import ProviderRef
 from dafter_core.enums import ErrorCode, Stage
@@ -13,6 +13,7 @@ from dafter_core.errors import DafterError
 from dafter_providers import VENDORS, credentials, openai_compat, vendor_for
 from dafter_providers.openai_compat import endpoints
 from dafter_providers.openai_compat.client import CompatLLM
+from dafter_providers.openai_compat.wire import http_client
 from livekit.agents import (
     APIConnectionError,
     APIConnectOptions,
@@ -192,13 +193,15 @@ def stubbed(status: int, body: bytes, sent: list[dict[str, Any]]) -> CompatLLM:
         kind = "text/event-stream" if status == 200 else "application/json"
         return httpx.Response(status, content=body, headers={"content-type": kind})
 
-    client = openai.AsyncClient(
+    return CompatLLM(
+        vendor="groq",
+        model="a-model",
         api_key="test-only-not-a-key",
         base_url=GROQ,
-        max_retries=0,
-        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+        http=http_client("groq", httpx.MockTransport(handle)),
+        max_completion_tokens=50,
+        reasoning_effort="none",
     )
-    return CompatLLM(vendor="groq", model="a-model", client=client, max_completion_tokens=50)
 
 
 async def accept(raw_arguments: dict[str, object]) -> None:
@@ -238,6 +241,46 @@ def test_parallel_tool_calls_are_turned_off_only_when_tools_are_offered() -> Non
     assert "parallel_tool_calls" not in sent[0]
     assert sent[1]["parallel_tool_calls"] is False
     assert sent[0]["max_completion_tokens"] == 50
+
+
+def test_every_request_is_logged_with_its_settings_and_status_but_no_words(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="dafter.providers.openai_compat")
+    ask(stubbed(200, sse("ठीक"), []), tools=[lookup_order])
+    with pytest.raises(APIStatusError):
+        ask(stubbed(429, json.dumps({"error": {"message": "slow down"}}).encode(), []))
+    ok, limited = (r.__dict__ for r in caplog.records if r.getMessage() == "llm request")
+    assert (ok["vendor"], ok["status"], ok["model"]) == ("groq", 200, "a-model")
+    assert (ok["reasoning_effort"], ok["max_completion_tokens"]) == ("none", 50)
+    assert (ok["messages"], ok["tools"], ok["parallel_tool_calls"]) == (1, "lookup_order", False)
+    assert isinstance(ok["headers_ms"], int)
+    assert limited["status"] == 429
+    assert "नमस्ते" not in caplog.text and "slow down" not in caplog.text
+
+
+def test_a_prewarm_opens_the_connection_the_chat_requests_reuse() -> None:
+    seen: list[tuple[str, str]] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url)))
+        return httpx.Response(404)
+
+    made = CompatLLM(
+        vendor="groq",
+        model="a-model",
+        api_key="k",
+        base_url=GROQ,
+        http=http_client("groq", httpx.MockTransport(handle)),
+    )
+
+    async def run() -> None:
+        made.prewarm()
+        await asyncio.sleep(0.05)
+        await made.aclose()
+
+    asyncio.run(run())
+    assert seen == [("HEAD", GROQ)]
 
 
 def failure(status: int, body: object) -> BaseException:

@@ -1,6 +1,27 @@
 const AGENT_REFUSAL_POLL_MS = 1500;
 
-const agentRefusal = { timer: null, shown: null, warned: false };
+const agentRefusal = { timer: null, shown: null, warned: false, degraded: null };
+
+function agentDegradedText() {
+  const d = agentRefusal.degraded;
+  if (!d) return '';
+  const e = d.error;
+  const provider = e.provider ? `${e.provider.name}${e.provider.nativeCode ? ` (HTTP ${e.provider.nativeCode})` : ''}` : 'the provider';
+  const outcome = d.recoverable ? 'retrying' : 'gave up, so this reply is lost';
+  return `${(e.stage || 'pipeline').toUpperCase()} ${provider} failed: ${e.code}; ${outcome}`;
+}
+
+function showAgentDegraded(payload) {
+  agentRefusal.degraded = payload;
+  log(agentDegradedText(), 'error');
+  renderAgentControls();
+}
+
+function clearAgentDegraded() {
+  if (!agentRefusal.degraded) return;
+  agentRefusal.degraded = null;
+  renderAgentControls();
+}
 
 function agentRefusalText() {
   const r = agentRefusal.shown;
@@ -17,6 +38,7 @@ function stopExpectingAgent() {
 function clearAgentRefusal() {
   stopExpectingAgent();
   agentRefusal.shown = null;
+  agentRefusal.degraded = null;
   renderAgentControls();
 }
 

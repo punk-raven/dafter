@@ -79,3 +79,44 @@ func TestASessionRequestChoosesItsLLMRouteByName(t *testing.T) {
 		t.Errorf("an unknown route was not located at /llm: %+v", de)
 	}
 }
+
+func TestTheTestClientSpeechTogglesResolveForEveryFocusLanguage(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	off := json.RawMessage(`{
+		"agent": {"speech": {"fillers": {"enabled": false}, "normalization": "provider"}},
+		"turn": {"interruption": {"backchannel": {"enabled": false}}}
+	}`)
+	for _, l := range focusLanguages {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: l.language, Channel: config.ChannelWebRTC,
+			LLM: "groq/qwen/qwen3.8-27b", Overrides: off,
+		})
+		if err != nil {
+			t.Fatalf("%s: an overlay pins a setting the test client toggles: %v", l.language, err)
+		}
+		var doc struct {
+			Agent struct {
+				Speech struct {
+					Normalization string `json:"normalization"`
+					Fillers       struct {
+						Enabled bool `json:"enabled"`
+					} `json:"fillers"`
+				} `json:"speech"`
+			} `json:"agent"`
+			Turn struct {
+				Interruption struct {
+					Backchannel struct {
+						Enabled bool `json:"enabled"`
+					} `json:"backchannel"`
+				} `json:"interruption"`
+			} `json:"turn"`
+		}
+		if err := json.Unmarshal(resolved.Document, &doc); err != nil {
+			t.Fatal(err)
+		}
+		if doc.Agent.Speech.Fillers.Enabled || doc.Turn.Interruption.Backchannel.Enabled || doc.Agent.Speech.Normalization != "provider" {
+			t.Errorf("%s resolved the toggles to %+v", l.language, doc)
+		}
+	}
+}

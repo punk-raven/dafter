@@ -91,6 +91,9 @@
   .start label { font-size: 13px; color: #aaa; }
   .start select { padding: 10px; font-size: 15px; text-overflow: ellipsis; }
   .start .llm-provider { float: right; color: #666; font-size: 12px; }
+  .speech-toggles { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; }
+  .start .speech-toggle { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: #aaa; cursor: pointer; }
+  .speech-toggle input { width: auto; margin: 0; accent-color: #7c3aed; }
   .btn-start { background: #7c3aed; color: white; padding: 12px 16px; font-size: 15px; margin-top: 12px; }
   .btn-start:hover { background: #6d28d9; }
   .btn-start:disabled { background: #333; color: #666; cursor: not-allowed; }
@@ -151,6 +154,7 @@
       </select>
       <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
       <select id="llm" onchange="rememberLlm()"></select>
+      <div id="speech-toggles" class="speech-toggles"></div>
       <button id="btn-start" class="btn-start" onclick="startCall()">Start call</button>
     </div>
 
@@ -336,7 +340,7 @@
   </div>
 </div>
 
-<script src="/agent-llm.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
+<script src="/agent-llm.js"></script><script src="/agent-speech.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
 <script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script>
 </body>
 </html>

@@ -94,14 +94,18 @@ const usage = (provider, model) => [
 test('the page names the LLM the agent reported, not the dropdown, and flags a mismatch', () => {
   const { run, elements } = page(memory());
   const el = () => elements.get('agent-llm');
-  run(`renderAgentLlm(${JSON.stringify(config)}, null)`);
+  const show = (served) => run(`renderAgentLlm(${JSON.stringify(config)}, ${JSON.stringify(served)})`);
+  show([]);
   assert.equal(el().textContent, 'LLM groq/qwen/qwen3.8-27b');
   assert.equal(el().className, 'agent-llm agent-llm-asked');
 
-  run(`renderAgentLlm(${JSON.stringify(config)}, ${JSON.stringify(usage('groq', 'qwen/qwen3.8-27b'))})`);
+  show(run(`reportedLlm({ llm: { provider: 'groq', model: 'qwen/qwen3.8-27b' } })`));
   assert.equal(el().className, 'agent-llm agent-llm-served');
 
-  run(`renderAgentLlm(${JSON.stringify(config)}, ${JSON.stringify(usage('sarvam', 'sarvam-105b'))})`);
+  show(run(`servedLlms(${JSON.stringify(usage('groq', 'qwen/qwen3.8-27b'))})`));
+  assert.equal(el().className, 'agent-llm agent-llm-served');
+
+  show(run(`servedLlms(${JSON.stringify(usage('sarvam', 'sarvam-105b'))})`));
   assert.equal(el().textContent, 'LLM sarvam/sarvam-105b - config asked groq/qwen/qwen3.8-27b');
   assert.equal(el().className, 'agent-llm agent-llm-mismatch');
 });

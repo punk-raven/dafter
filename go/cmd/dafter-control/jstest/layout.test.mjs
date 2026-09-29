@@ -7,7 +7,7 @@ const html = readFileSync(new URL('testclient.html', dir), 'utf8');
 const scripts = readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8'));
 const advancedAt = html.indexOf('<details id="advanced"');
 
-const MAIN_SCREEN = ['language', 'llm', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave'];
+const MAIN_SCREEN = ['language', 'llm', 'speech-toggles', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave'];
 const ADVANCED = [
   'tenant', 'channel', 'profile', 'privacy-mode', 'resolution', 'noise-cancellation', 'agent-mode',
   'addressing-mode', 'agent-greeting', 'recording-layout', 'btn-create', 'room-id', 'role', 'ice-policy',

@@ -13,6 +13,7 @@ from .. import credentials
 from ..options import Options
 from .client import CompatLLM, Effort
 from .endpoints import ENDPOINTS, Endpoint
+from .wire import http_client
 
 LANGUAGES = frozenset({"hi", "hi-IN", "en-IN", "kn-IN", "mr-IN", "te-IN"})
 EFFORTS: dict[str, Effort] = {
@@ -96,6 +97,7 @@ def builder(endpoint: Endpoint) -> Callable[[ProviderRef], llm.LLM[Any]]:
                 model=model,
                 api_key=key,
                 base_url=endpoint.base_url,
+                http=http_client(endpoint.name),
                 temperature=temperature,
                 max_completion_tokens=max_tokens,
                 reasoning_effort=effort,

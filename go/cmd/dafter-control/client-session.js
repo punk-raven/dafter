@@ -32,7 +32,8 @@ async function createSession() {
     if (addressing && !(overrides.agent && overrides.agent.enabled === false)) {
       overrides.agent = Object.assign(overrides.agent || {}, { addressing });
     }
-    if (Object.keys(overrides).length) body.overrides = overrides;
+    speechOverrides(overrides);
+    body.overrides = overrides;
 
     const layout = document.getElementById('recording-layout').value;
     if (layout) {

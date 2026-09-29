@@ -91,11 +91,14 @@ function servedLlms(items) {
   return [...new Set(items.filter((i) => i.stage === 'llm').map((i) => `${i.provider}/${i.model}`))];
 }
 
-function renderAgentLlm(config, items) {
+function reportedLlm(effective) {
+  return effective && effective.llm ? [`${effective.llm.provider}/${effective.llm.model}`] : [];
+}
+
+function renderAgentLlm(config, served) {
   const el = document.getElementById('agent-llm');
   if (!el) return;
   const asked = configuredLlm(config);
-  const served = items ? servedLlms(items) : [];
   if (!asked) {
     el.className = 'agent-llm';
     el.textContent = '';
@@ -103,7 +106,7 @@ function renderAgentLlm(config, items) {
   }
   if (!served.length) {
     el.textContent = `LLM ${asked}`;
-    el.title = 'from the session config; the agent confirms the LLM it ran after its first reply';
+    el.title = 'from the session config; waiting for the agent to report the LLM it built';
     el.className = 'agent-llm agent-llm-asked';
     return;
   }

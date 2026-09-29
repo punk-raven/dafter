@@ -37,6 +37,7 @@ from . import telemetry
 from .answering import Roster
 from .backchannel import Acknowledgements
 from .called import Called
+from .configured import configured
 from .control import ControlPlane, encryption
 from .cost import OutputTokens, load_prices, model_name, priced, provider_name, usage_payload
 from .delivery import Delivery
@@ -195,6 +196,10 @@ def watch(
             stage, vendor = Stage.STT, p.stt
         inner = getattr(ev.error, "error", ev.error)
         err = vendor.classify(inner, stage) if isinstance(inner, BaseException) else None
+        recoverable = bool(getattr(ev.error, "recoverable", False))
+        if err is not None:
+            degraded = {"error": err.to_dict(), "recoverable": recoverable}
+            events.emit(EventType.PROVIDER_DEGRADED, degraded, current_trace_id())
         log.error(
             "pipeline stage failed",
             extra={
@@ -202,7 +207,7 @@ def watch(
                 "stage": str(stage),
                 "code": str(err.code) if err else "internal",
                 "native": err.provider.native_code if err and err.provider else None,
-                "recoverable": getattr(ev.error, "recoverable", None),
+                "recoverable": recoverable,
             },
         )
 
@@ -266,6 +271,11 @@ async def built(p: Plan, control: ControlPlane | None) -> Stages:
         raise
     log.info("agent stages", extra={"session": p.config.session_id, **served(p, stages)})
     return stages
+
+
+def flat(effective: dict[str, Any]) -> dict[str, Any]:
+    llm = effective["llm"]
+    return {**effective, "llm": f"{llm['provider']}/{llm['model']}"}
 
 
 def served(p: Plan, stages: Stages) -> dict[str, str]:
@@ -343,6 +353,11 @@ async def entrypoint(ctx: JobContext) -> None:
         record=False,
     )
     delivery.filler.start(session, stages.tts)
+    effective = configured(
+        stages.llm, speech_plan, delivery.filler.enabled, p.config.turn.interruption.backchannel
+    )
+    events.emit(EventType.AGENT_CONFIGURED, effective, current_trace_id())
+    log.info("agent configured", extra={"session": p.config.session_id, **flat(effective)})
     if called is not None:
         called.listen()
     if p.opening is not None:

@@ -58,6 +58,10 @@ class SpeechPlan:
         platform = self._speech.normalization is SpeechNormalization.PLATFORM
         self._normalize = NORMALIZERS.get(base) if platform else None
 
+    @property
+    def normalizes(self) -> bool:
+        return self._normalize is not None
+
     def spoken(self, text: str) -> str:
         text = self._substitute(LIST_MARKER.sub("", text))
         return self._normalize(text) if self._normalize is not None else text

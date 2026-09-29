@@ -127,6 +127,8 @@ def vector(name: str) -> dict[str, Any]:
         ("agent-state-changed.json", EventType.AGENT_STATE_CHANGED),
         ("agent-turn-metrics.json", EventType.AGENT_TURN_METRICS),
         ("session-usage.json", EventType.SESSION_USAGE),
+        ("agent-configured.json", EventType.AGENT_CONFIGURED),
+        ("provider-degraded.json", EventType.PROVIDER_DEGRADED),
     ],
 )
 def test_measurement_vectors_parse(name: str, typ: EventType) -> None:
@@ -168,6 +170,17 @@ MUTATIONS: list[tuple[str, str, Callable[[dict[str, Any]], object]]] = [
     ("woken by a name", "agent-state-changed.json", lambda p: p.update(wokenBy="Asha")),
     ("woken without how", "agent-state-changed.json", lambda p: p.pop("wokenVia")),
     ("unknown wake source", "agent-state-changed.json", lambda p: p.update(wokenVia="wake_word")),
+    ("configured without its LLM", "agent-configured.json", lambda p: p.pop("llm")),
+    (
+        "configured LLM by vendor spelling",
+        "agent-configured.json",
+        lambda p: p["llm"].update(provider="Groq"),
+    ),
+    ("normalization not a mode", "agent-configured.json", lambda p: p.update(normalization="on")),
+    ("fillers not a boolean", "agent-configured.json", lambda p: p.update(fillers="off")),
+    ("degraded without its error", "provider-degraded.json", lambda p: p.pop("error")),
+    ("degraded error without a code", "provider-degraded.json", lambda p: p["error"].pop("code")),
+    ("degraded without recoverable", "provider-degraded.json", lambda p: p.pop("recoverable")),
 ]
 
 

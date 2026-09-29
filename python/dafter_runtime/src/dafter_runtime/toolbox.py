@@ -16,6 +16,7 @@ from .backchannel import Acknowledgements, Events, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
+from .labels import unlabeled
 from .listeners import is_human
 from .naming import words
 from .plan import Plan
@@ -63,7 +64,7 @@ class Answering(Agent):
             chat_ctx = chat_ctx.copy()
             instructions = self._switching.persona.instructions
             update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
-        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+        return unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
 
     def tts_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
