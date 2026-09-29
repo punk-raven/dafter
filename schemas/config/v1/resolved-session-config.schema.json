@@ -269,7 +269,7 @@
     "Fillers": {
       "type": "object",
       "unevaluatedProperties": false,
-      "description": "A short phrase spoken only when a reply is slow, never on every turn: when no reply text has reached TTS afterMs after the reply started, and while a slow tool runs. Phrases rotate and come from the session's language; a language with none plays none.",
+      "description": "A short phrase spoken only when a reply is slow, never on every turn: when no reply audio is ready afterMs after the reply started, and while a slow tool runs. It never starts while anyone in the call is speaking. Phrases rotate and come from the session's language; a language with none plays none.",
       "properties": {
         "enabled": { "type": "boolean", "default": true },
         "afterMs": { "type": "integer", "minimum": 100, "maximum": 10000, "default": 1000 },

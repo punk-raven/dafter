@@ -184,6 +184,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
             "styles",
             "dictionaryId",
             "minBufferSize",
+            "firstSentenceAlone",
         ),
     )
     code = language_code(language, Stage.TTS)
@@ -199,6 +200,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     speaker = opts.get("voice", str, "priya")
     voice, styles = voices(opts)
     dictionary = opts.optional("dictionaryId", str)
+    first_sentence_alone = opts.get("firstSentenceAlone", bool, False)
     opts.get("prewarm", bool, True)
     key = credentials.resolve(ref.credential_ref)
     model = ref.model or ""
@@ -213,6 +215,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
             speaker=speaker,
             speech_sample_rate=sample_rate,
             min_buffer_size=min_buffer,
+            first_sentence_alone=first_sentence_alone,
             dict_id=dictionary,
             api_key=key,
             output_audio_codec=encoding,

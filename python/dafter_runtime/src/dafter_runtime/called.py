@@ -95,8 +95,10 @@ class Called:
         session: AgentSession[Any],
         sample_rate: int,
         switching: Switching | None = None,
+        hears: Callable[[AgentSession[Any]], None] = lambda _: None,
     ) -> None:
         self._ctx = ctx
+        self._hears = hears
         self._switching = switching if switching is not None and switching.enabled else None
         self._session = session
         self.roster = Roster()
@@ -130,6 +132,7 @@ class Called:
 
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)
+        self._hears(session)
 
     def _hearing(self, speaker: str) -> Filter:
         sieve = acknowledged(

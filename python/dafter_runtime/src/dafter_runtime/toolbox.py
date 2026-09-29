@@ -58,6 +58,7 @@ class Answering(Agent):
     ) -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
         if self._delivery is not None:
             self._delivery.heard(chat_ctx)
+            self._delivery.filler.generating()
         if self._switching is not None:
             chat_ctx = chat_ctx.copy()
             instructions = self._switching.persona.instructions

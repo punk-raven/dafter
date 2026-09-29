@@ -299,7 +299,7 @@
         },
         "filler": {
           "type": "boolean",
-          "description": "True when the reply was slow enough that a filler phrase played ahead of it (agent.speech.fillers): ttsNodeTtfbMs and e2eLatencyMs then count from the filler, the first audio the caller heard, while the LLM layers still show what was slow. Present only when a filler played."
+          "description": "True when the reply was slow enough that a filler phrase played ahead of it (agent.speech.fillers): e2eLatencyMs and replyGapMs then count to the filler, the first audio the caller heard, while llmNodeTtfsMs and ttsNodeTtfbMs stay the reply's own, measured on its first audio after the filler. Present only when a filler played."
         },
         "serial": {
           "type": "boolean",

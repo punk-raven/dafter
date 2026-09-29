@@ -14,7 +14,11 @@ from dafter_runtime.plan import plan
 from dafter_runtime.toolbox import Answering, registry_for
 from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, AgentSession, APIConnectOptions, llm
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
-from livekit.agents.voice.events import ConversationItemAddedEvent
+from livekit.agents.voice.events import (
+    AgentStateChangedEvent,
+    ConversationItemAddedEvent,
+    UserStateChangedEvent,
+)
 from session_rig import SlowReader, Speaker, until
 from stub_llm import StubLLM, StubStream
 
@@ -90,6 +94,11 @@ def speech_config(after_ms: int) -> Any:
     return replace(CFG.agent.speech, fillers=fillers)
 
 
+def speaking(session: AgentSession[Any]) -> None:
+    ev = UserStateChangedEvent(old_state="listening", new_state="speaking")
+    session.emit("user_state_changed", ev)
+
+
 class Conversation:
     def __init__(self, late: float, after_ms: int = 150) -> None:
         self.reader = StyledReader(0.3)
@@ -98,11 +107,22 @@ class Conversation:
         self.session.output.audio = self.speaker
         self.delivery = Delivery(speech_config(after_ms), "hi")
         self.filled: list[bool] = []
+        self.reply_layers: list[dict[str, float]] = []
+        self.framework_ttfb: list[float | None] = []
+        self.talks_over: AgentSession[Any] | None = None
         self.session.on("conversation_item_added", self._added)
+        self.session.on("agent_state_changed", self._thinking)
 
     def _added(self, ev: ConversationItemAddedEvent) -> None:
         if isinstance(ev.item, llm.ChatMessage) and ev.item.role == "assistant":
-            self.filled.append(self.delivery.filler.took(self.session.current_speech))
+            speech = self.session.current_speech
+            self.filled.append(self.delivery.filler.took(speech))
+            self.reply_layers.append(self.delivery.filler.reply_layers(speech))
+            self.framework_ttfb.append(ev.item.metrics.get("tts_node_ttfb"))
+
+    def _thinking(self, ev: AgentStateChangedEvent) -> None:
+        if ev.new_state == "thinking" and self.talks_over is not None:
+            speaking(self.talks_over)
 
     async def start(self) -> None:
         p = plan(CFG, "dafter-py")
@@ -110,17 +130,26 @@ class Conversation:
         agent = Answering(p.persona.instructions, registry, lambda: None, None, self.delivery)
         await self.session.start(agent, record=False)
         self.delivery.filler.start(self.session, self.reader)
-        await until(lambda: len(self.reader.read) >= 3)
+        await until(lambda: len(self.reader.read) >= len(CFG.agent.speech.fillers.phrases["hi"]))
 
     async def turn(self, said: str) -> None:
         await self.session.generate_reply(user_input=said)
         await until(lambda: self.session.agent_state == "listening")
 
 
-def converse(late: float, *turns: str) -> Conversation:
+def converse(
+    late: float, *turns: str, aged: float = 0.0, talker: str | None = None
+) -> Conversation:
     async def run() -> Conversation:
         conversation = Conversation(late)
         await conversation.start()
+        if talker == "caller":
+            conversation.talks_over = conversation.session
+        elif talker == "listener":
+            listener: AgentSession[Any] = AgentSession()
+            conversation.delivery.filler.hears(listener)
+            conversation.talks_over = listener
+        await asyncio.sleep(aged)
         await conversation.session.say("नमस्ते! बताइए।")
         for said in turns:
             await conversation.turn(said)
@@ -138,7 +167,7 @@ def test_each_reply_is_voiced_for_the_situation_of_the_turn_it_answers() -> None
 def test_a_slow_reply_plays_one_filler_ahead_of_it_and_says_so() -> None:
     c = converse(0.6, "मेरा बिल देखिए")
     fillers = CFG.agent.speech.fillers.phrases["hi"]
-    assert c.reader.read[:3] == list(fillers)
+    assert c.reader.read[: len(fillers)] == list(fillers)
     assert c.filled == [False, True]
 
 
@@ -147,18 +176,36 @@ def test_a_quick_reply_plays_no_filler() -> None:
     assert c.filled == [False, False]
 
 
+def test_a_filled_turn_reports_the_replys_own_first_byte_and_sentence_not_the_calls_age() -> None:
+    late, aged = 0.6, 1.5
+    c = converse(late, "मेरा बिल देखिए", aged=aged)
+    assert c.filled == [False, True]
+    layers = c.reply_layers[1]
+    assert 0 <= layers["tts_node_ttfb"] < 0.25, layers
+    assert late <= layers["llm_node_ttfs"] < late + 0.25, layers
+    framework = c.framework_ttfb[1]
+    assert framework is None or framework < aged, framework
+
+
+@pytest.mark.parametrize("talker", ["caller", "listener"])
+def test_no_filler_plays_while_someone_is_talking(talker: str) -> None:
+    c = converse(0.6, "मेरा बिल देखिए", talker=talker)
+    assert c.filled == [False, False]
+
+
 def test_a_switched_language_fills_with_its_own_phrases_synthesized_once() -> None:
     delivery = Delivery(CFG.agent.speech, "hi")
     reader = SlowReader(0.1)
+    hindi, kannada = (CFG.agent.speech.fillers.phrases[lang] for lang in ("hi", "kn"))
 
     async def run() -> None:
         await delivery.filler.prepare(reader)
         delivery.filler.speak_in("kn-IN", reader)
-        await until(lambda: len(reader.read) == len(CFG.agent.speech.fillers.phrases["hi"]) + 2)
+        await until(lambda: len(reader.read) == len(hindi) + len(kannada))
         delivery.filler.speak_in("hi", reader)
         await asyncio.sleep(0.05)
 
     asyncio.run(run())
-    assert reader.read[-2:] == list(CFG.agent.speech.fillers.phrases["kn"])
-    assert len(reader.read) == len(CFG.agent.speech.fillers.phrases["hi"]) + 2
-    assert delivery.filler.phrase() == CFG.agent.speech.fillers.phrases["hi"][0]
+    assert reader.read[len(hindi) :] == list(kannada)
+    assert len(reader.read) == len(hindi) + len(kannada)
+    assert delivery.filler.phrase() == hindi[0]

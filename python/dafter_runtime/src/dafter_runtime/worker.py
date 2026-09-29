@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from dafter_core.enums import EncryptionMode, EventType, Stage
@@ -139,6 +139,7 @@ def watch(
     metrics: WorkerMetrics = WORKER,
     usage: Callable[[], AgentSessionUsage] | None = None,
     filled: Callable[[], bool] = lambda: False,
+    after_filler: Callable[[], Mapping[str, float]] = dict,
     language: Callable[[], str | None] = lambda: None,
 ) -> None:
     turns = Turns(getattr(session.stt, "take_endpoint", None))
@@ -163,7 +164,7 @@ def watch(
     def item_added(ev: ConversationItemAddedEvent) -> None:
         if not isinstance(ev.item, ChatMessage):
             return
-        timing = turns.add(ev.item, filled(), language())
+        timing = turns.add(ev.item, filled(), language(), after_filler())
         if timing is None:
             return
         report(timing)
@@ -284,7 +285,9 @@ async def entrypoint(ctx: JobContext) -> None:
     delivery = Delivery(p.config.agent.speech, p.config.language)
     follow_language(switching, speech_plan, delivery, stages)
     called = (
-        Called(ctx, p, stages, session, stt_sample_rate(p), switching) if p.called_by_name else None
+        Called(ctx, p, stages, session, stt_sample_rate(p), switching, delivery.filler.hears)
+        if p.called_by_name
+        else None
     )
     caller: Callable[[], str | None]
     if called is not None:
@@ -306,6 +309,7 @@ async def entrypoint(ctx: JobContext) -> None:
         telemetry.tracer(provider),
         usage=called.usage if called is not None else None,
         filled=lambda: delivery.filler.took(session.current_speech),
+        after_filler=lambda: delivery.filler.reply_layers(session.current_speech),
         language=lambda: switching.language if switching.enabled else None,
     )
     await session.start(

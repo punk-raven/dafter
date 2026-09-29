@@ -4,10 +4,11 @@ import asyncio
 from dataclasses import asdict, dataclass
 from typing import Any
 
+import numpy as np
 from dafter_core.config import Budgets
 
 from .measure import CALLER, CLOCKS, caller, percentile, state_stop, verdict, worker
-from .probe import Events, Probe, now
+from .probe import SAMPLE_RATE, Events, Probe, now
 from .script import Script
 from .voice import Voice
 
@@ -17,6 +18,8 @@ STOP_QUIET = 0.4
 CONTINUE_WINDOW = 1.5
 CONTINUE_GAP = 0.6
 SPEAKING_AT_ONSET = 0.3
+PAUSE_MS = 300
+PAUSED = "paused"
 
 
 @dataclass
@@ -26,6 +29,8 @@ class TurnResult:
     gap_ms: int | None
     endpoint_ms: int | None
     reply_ms: int | None
+    early: bool = False
+    paused: bool = False
 
 
 @dataclass
@@ -45,8 +50,16 @@ def ms(seconds: float | None) -> int | None:
     return None if seconds is None else round(seconds * 1000)
 
 
+async def hesitating(voice: Voice, first: str, second: str) -> np.ndarray:
+    pause = np.zeros(SAMPLE_RATE * PAUSE_MS // 1000, dtype=np.int16)
+    return np.concatenate([await voice.say(first), pause, await voice.say(second)])
+
+
 async def turn(probe: Probe, voice: Voice, index: int, text: str) -> TurnResult:
-    pcm = await voice.say(text)
+    return await heard_turn(probe, index, await voice.say(text))
+
+
+async def heard_turn(probe: Probe, index: int, pcm: np.ndarray, paused: bool = False) -> TurnResult:
     await probe.settle()
     await asyncio.sleep(0.5)
     spoken = await probe.speak(pcm)
@@ -56,12 +69,17 @@ async def turn(probe: Probe, voice: Voice, index: int, text: str) -> TurnResult:
         first_audio = probe.meter.first_loud_after(spoken.ended)
         await asyncio.sleep(0.01)
     thinking = next((t for t, s in probe.states if t > spoken.started and s == "thinking"), None)
+    early = thinking is not None and thinking < spoken.ended
+    if early:
+        thinking = None
     return TurnResult(
         index=index,
         speech_ms=ms(spoken.ended - spoken.started) or 0,
         gap_ms=ms(first_audio - spoken.ended) if first_audio else None,
         endpoint_ms=ms(thinking - spoken.ended) if thinking else None,
         reply_ms=ms(first_audio - thinking) if first_audio and thinking else None,
+        early=early,
+        paused=paused,
     )
 
 
@@ -124,6 +142,10 @@ async def run(
     if "turns" in scenarios:
         for i, text in enumerate(script.turns[:turns]):
             results.append(await turn(probe, voice, i, text))
+    if PAUSED in scenarios:
+        for i, (first, second) in enumerate(script.paused, start=len(results)):
+            pcm = await hesitating(voice, first, second)
+            results.append(await heard_turn(probe, i, pcm, paused=True))
     plans = (
         ("barge_in", script.interruptions, True),
         ("backchannel", script.backchannels, False),
@@ -141,15 +163,24 @@ async def run(
 def summarize(
     results: list[TurnResult], overlaps: list[OverlapResult], events: Events, budgets: Budgets
 ) -> dict[str, Any]:
-    gaps = [r.gap_ms for r in results if r.gap_ms is not None]
-    ends = [r.endpoint_ms for r in results if r.endpoint_ms is not None]
-    replies = [r.reply_ms for r in results if r.reply_ms is not None]
+    whole = [r for r in results if not r.paused]
+    hesitated = [r for r in results if r.paused]
+    gaps = [r.gap_ms for r in whole if r.gap_ms is not None]
+    ends = [r.endpoint_ms for r in whole if r.endpoint_ms is not None]
+    replies = [r.reply_ms for r in whole if r.reply_ms is not None]
     summary: dict[str, Any] = {
         "clocks": CLOCKS,
-        "turns": len(results),
+        "turns": len(whole),
         "answered": len(gaps),
         "caller": caller(gaps, ends, replies),
         "worker": worker(events.turn_metrics),
+        "early_endpoints": {
+            "clock": CALLER,
+            "turns": sum(r.early for r in whole),
+            "paused_trials": len(hesitated),
+            "paused_cut_off": sum(r.early for r in hesitated),
+            "pause_ms": PAUSE_MS,
+        },
         "event_errors": events.errors,
     }
     for kind in ("barge_in", "backchannel", "filler"):

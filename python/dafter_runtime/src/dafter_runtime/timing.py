@@ -146,7 +146,11 @@ class Turns:
         return {REPLY_GAP: float(started) - voiced_until}
 
     def add(
-        self, item: ChatMessage, filler: bool = False, language: str | None = None
+        self,
+        item: ChatMessage,
+        filler: bool = False,
+        language: str | None = None,
+        reply: Mapping[str, float] | None = None,
     ) -> TurnTiming | None:
         if item.role == "user":
             self._user_turn(item)
@@ -154,7 +158,8 @@ class Turns:
             return None
         if item.role != "assistant":
             return None
-        seconds = {**self._user, **_layers(item.metrics, AGENT_LAYERS), **self._reply_gap(item)}
+        agent = {**_layers(item.metrics, AGENT_LAYERS), **_layers(reply or {}, AGENT_LAYERS)}
+        seconds = {**self._user, **agent, **self._reply_gap(item)}
         replied_in = self._answering_in or language
         self._user, self._answering_in = {}, None
         timing = TurnTiming(

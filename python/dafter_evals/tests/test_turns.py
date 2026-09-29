@@ -50,3 +50,22 @@ def test_the_summary_counts_only_answered_turns() -> None:
         "state_stop_p50_ms": 180,
         "state_stop_p95_ms": 180,
     }
+
+
+def test_a_turn_the_agent_took_before_the_caller_finished_is_an_early_endpoint() -> None:
+    turns = [
+        TurnResult(0, 900, 700, 300, 400),
+        TurnResult(1, 900, 1500, None, None, early=True),
+        TurnResult(2, 1400, 800, 320, 480, paused=True),
+        TurnResult(3, 1400, 2400, None, None, early=True, paused=True),
+    ]
+    s = summarize(turns, [], Events(), BUDGETS)["summary"]
+    assert (s["turns"], s["answered"]) == (2, 2)
+    assert s["caller"]["gap_ms"]["p50"] == 1100
+    assert s["early_endpoints"] == {
+        "clock": "caller",
+        "turns": 1,
+        "paused_trials": 2,
+        "paused_cut_off": 1,
+        "pause_ms": 300,
+    }

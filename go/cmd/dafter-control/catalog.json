@@ -30,13 +30,13 @@
         "normalization": "platform",
         "fillers": {
           "enabled": true,
-          "afterMs": 1000,
+          "afterMs": 600,
           "phrases": {
-            "hi": ["जी, एक पल।", "अच्छा, ज़रा देखती हूँ।", "हम्म, बस एक सेकंड।"],
-            "en": ["One moment.", "Let me check.", "Just a second."],
-            "kn": ["ಒಂದು ನಿಮಿಷ.", "ಸ್ವಲ್ಪ ನೋಡುತ್ತೇನೆ."],
-            "mr": ["एक क्षण हं.", "थांबा, बघते."],
-            "te": ["ఒక్క నిమిషం.", "చూస్తాను, ఒక్క క్షణం."]
+            "hi": ["हम्म, एक second।", "अच्छा, check करती हूँ।", "हाँ जी, बस एक second।", "जी, देखती हूँ।"],
+            "en": ["Hmm, one second.", "Okay, let me check.", "Just a second."],
+            "kn": ["ಹಾಂ, ಒಂದ್ second.", "ಸರಿ, check ಮಾಡ್ತೀನಿ.", "ಒಂದ್ ನಿಮಿಷ."],
+            "mr": ["हं, एक second.", "थांबा, check करते.", "हो, बघते हं."],
+            "te": ["హా, ఒక్క second.", "సరే, check చేస్తా.", "ఒక్క నిమిషం అండి."]
           }
         },
         "situations": {

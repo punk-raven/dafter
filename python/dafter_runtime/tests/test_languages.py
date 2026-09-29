@@ -92,7 +92,7 @@ def in_script(text: str, base: str) -> bool:
     if base == "en":
         return text.isascii()
     low, high = SCRIPTS[base]
-    return all(low <= ord(c) <= high for c in text if c.isalpha())
+    return all(low <= ord(c) <= high for c in text if c.isalpha() and not c.isascii())
 
 
 @pytest.mark.parametrize(("language", "fixture"), sorted(FOCUS.items()))
