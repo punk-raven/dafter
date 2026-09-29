@@ -1,60 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Media-level load test: N concurrent video calls through the control plane
-# and the LiveKit SFU.
-#
-# For every room the script creates a session on the control plane
-# (POST /sessions) and joins the remaining participants (POST /sessions/{id}/join),
-# so every token is minted by dafter and every room is a dafter room, then
-# drives real WebRTC participants into that room with `lk load-test`: video
-# publishers plus subscribers that receive every published track. All rooms
-# are held concurrently for DURATION and the per-track packet loss and
-# bitrate that lk reports are folded into one summary.
-#
-# lk mints its own join tokens from the API key: it has no flag to join with
-# a supplied JWT, so the dafter-minted tokens are verified (signature-free
-# decode of the room claim) but not used for the media connection. lk's
-# publishers do not subscribe; every subscriber receives every published
-# track in its room, which is the equivalent of the participants of a call
-# watching each other.
-#
-# The generator, the SFU and the whole docker stack share one box, so the
-# script refuses to start with less than MEM_MIN_MB available and aborts the
-# run, killing every lk process, if MemAvailable falls under MEM_FLOOR_MB.
-# RAMP runs a series of sizes in turn, tearing down between them, and stops
-# at the first size that fails: this finds the ceiling of a box without
-# guessing at it.
-#
-# Requires: the dev stack (make dev), curl, and lk (livekit-cli), fetched
-# into go/bin by make tools. Everything else is bash and coreutils.
-#
-# Usage: ROOMS=100 DURATION=60s scripts/loadtest-media.sh
-#        RAMP="10 25 50" scripts/loadtest-media.sh
-#
-# Knobs (environment):
-#   ROOMS             concurrent rooms                                (100)
-#   RAMP              sizes to run in turn instead of ROOMS, e.g. "10 25 50"
-#   DURATION          time every room is held once all are up         (60s)
-#   PUBLISHERS        video publishers per room                       (1)
-#   SUBSCRIBERS       subscribers per room, each receives all tracks  (1)
-#   VIDEO_RESOLUTION  lk resolution: low, medium, high                (low)
-#   SIMULCAST         1 to publish simulcast layers                   (0)
-#   LAYOUT            lk subscriber layout                            (speaker)
-#   ROOMS_PER_SECOND  lk processes launched per second                (2)
-#   LOSS_MAX_PCT      overall packet loss above which a size fails    (5)
-#   MEM_MIN_MB        MemAvailable required to start a size           (3072)
-#   MEM_FLOOR_MB      MemAvailable under which the run is aborted     (1500)
-#   DAFTER_URL        control plane                                   (http://127.0.0.1:8080)
-#   LIVEKIT_URL       SFU signalling URL for the generator            (ws://127.0.0.1:7880)
-#   LIVEKIT_API_KEY, LIVEKIT_API_SECRET                               (devkey / secret)
-#   PROM_URL          Prometheus, for the live progress line          (http://127.0.0.1:9090)
-#   TENANT, LANGUAGE, CHANNEL   session request fields                (t_9c21a4be, en-IN, webrtc)
-#   OUT_DIR           per-room logs and the summaries                 (./.loadtest-media/<timestamp>)
-#
-# Exit status: 0 when every size held cleanly, 1 when a size failed,
-# 2 when the memory floor aborted the run.
-
 ROOMS=${ROOMS:-100}
 RAMP=${RAMP:-}
 DURATION=${DURATION:-60s}
@@ -80,7 +26,6 @@ OUT_DIR=${OUT_DIR:-.loadtest-media/$(date +%Y%m%d-%H%M%S)}
 die() { printf 'loadtest-media: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# Seconds from a Go-style duration: 60s, 2m, 1h30m, or a bare number.
 duration_seconds() {
   local s=$1 total=0 n unit
   [[ $s =~ ^[0-9]+$ ]] && { echo "$s"; return; }
@@ -96,11 +41,8 @@ duration_seconds() {
   echo "$total"
 }
 
-# JSON field of a compact single-line object; the control plane's responses
-# have no nested strings around the fields read here.
 json_field() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" | head -n1; }
 
-# Room claim of a JWT, from its payload, without verifying the signature.
 jwt_room() {
   local payload=${1#*.}; payload=${payload%%.*}
   payload=$(printf '%s' "$payload" | tr '_-' '/+')
@@ -115,7 +57,6 @@ prom() {
 
 mem_available_mb() { awk '/^MemAvailable:/ {printf "%d", $2/1024}' /proc/meminfo; }
 
-# CPU ticks (user+system) consumed so far by the given pids, from /proc.
 cpu_ticks() {
   local pid t=0 f
   for pid in "$@"; do
@@ -125,19 +66,11 @@ cpu_ticks() {
   done
   echo "$t"
 }
-# Busy and total ticks of the whole box, from /proc/stat.
 host_ticks() { awk '/^cpu / {print $2+$3+$4+$6+$7+$8, $2+$3+$4+$5+$6+$7+$8}' /proc/stat; }
 CLK_TCK=$(getconf CLK_TCK 2>/dev/null || echo 100)
 
 fmt_bps() { awk -v b="$1" 'BEGIN { if (b>=1000000) printf "%.2f Mbps", b/1000000; else printf "%.1f kbps", b/1000 }'; }
 
-# ---------------------------------------------------------------------------
-# Preflight
-# ---------------------------------------------------------------------------
-
-# The release binary from scripts/install-lk.sh (make tools) is preferred: a
-# go-installed lk embeds Git LFS pointers instead of its video clips and its
-# publishers send nothing.
 LK=${LK_BIN:-}
 if [ -z "$LK" ]; then
   for candidate in "$(dirname "$0")/../go/bin/lk" lk "$HOME/go/bin/lk"; do
@@ -180,11 +113,6 @@ echo "control:      $DAFTER_URL"
 echo "sfu:          $LIVEKIT_URL ($LK)"
 echo "logs:         $OUT_DIR"
 
-# ---------------------------------------------------------------------------
-# One size: sessions through the control plane, media into every room,
-# then a summary from what lk reported per room.
-# ---------------------------------------------------------------------------
-
 pids=()
 kill_generators() {
   if [ ${#pids[@]} -gt 0 ]; then
@@ -202,7 +130,6 @@ abort_memory() {
   exit 2
 }
 
-# Sets size_ok (1/0) and size_reason; writes $run_dir/summary.txt.
 run_size() {
   local rooms=$1
   run_dir=$OUT_DIR/$rooms
@@ -222,7 +149,6 @@ run_size() {
     return
   fi
 
-  # Phase 1: sessions and tokens through the control plane.
   local create_body create_failures=0 join_failures=0 tokens=0 bad_tokens=0 t0 t1
   create_body=$(printf '{"tenantId":"%s","language":"%s","channel":"%s","overrides":{"agent":{"enabled":false}}}' "$TENANT" "$LANGUAGE" "$CHANNEL")
   t0=$(date +%s.%N)
@@ -264,15 +190,11 @@ run_size() {
     return
   fi
 
-  # Phase 2: media into every room.
   local lk_args=(load-test --url "$LIVEKIT_URL" --api-key "$LIVEKIT_API_KEY" --api-secret "$LIVEKIT_API_SECRET"
     --video-publishers "$PUBLISHERS" --subscribers "$SUBSCRIBERS"
     --video-resolution "$VIDEO_RESOLUTION" --layout "$LAYOUT" --num-per-second 10)
   [ "$SIMULCAST" = 1 ] || lk_args+=(--no-simulcast)
 
-  # Rooms launch ROOMS_PER_SECOND per second; each one's hold is stretched so
-  # that all of them end together, which makes the fully concurrent window
-  # exactly DURATION.
   local ramp_s end_at n hold
   ramp_s=$(( (rooms_created + ROOMS_PER_SECOND - 1) / ROOMS_PER_SECOND ))
   end_at=$(( $(date +%s) + ramp_s + duration_s ))
@@ -292,9 +214,6 @@ run_size() {
     fi
   done <"$rooms_tsv"
 
-  # Progress: generator processes alive, SFU gauges from Prometheus, CPU of
-  # the lk processes and of the box from /proc, the livekit container from
-  # docker stats. Memory is checked every 2s; the line prints every 10s.
   local peak_rooms=0 peak_participants=0 peak_subscribed=0 peak_sfu_cpu=0
   local peak_gen_rss=0 peak_gen_cpu=0 peak_host_cpu=0 min_mem=999999 docker_stats= tick=0
   local started alive pid elapsed rooms_now participants_now subscribed_now sfu_cpu
@@ -330,8 +249,6 @@ run_size() {
       peak_gen_rss=$(( gen_rss > peak_gen_rss ? gen_rss : peak_gen_rss ))
       peak_gen_cpu=$(( gen_cpu > peak_gen_cpu ? gen_cpu : peak_gen_cpu ))
       peak_host_cpu=$(( host_cpu > peak_host_cpu ? host_cpu : peak_host_cpu ))
-      # One docker stats sample in the middle of the fully concurrent window,
-      # which this loop enters once every room has been launched.
       if [ -z "$docker_stats" ] && [ "$elapsed" -ge $((duration_s / 2)) ] && have docker; then
         docker_stats=$(docker stats --no-stream --format '{{.Name}} cpu={{.CPUPerc}} mem={{.MemUsage}} net={{.NetIO}}' 2>/dev/null \
           | grep -E 'livekit|control' || true)
@@ -342,10 +259,6 @@ run_size() {
   done
   pids=()
 
-  # Summary. lk prints two lipgloss tables per room: "Track loading" (one row
-  # per subscribed track: tester, track, kind, packets, bitrate, loss) and
-  # "Subscriber summaries" (one row per subscriber plus a Total row). Borders
-  # and ANSI colour are stripped, then the rows are parsed on the "|" columns.
   parse_log() {
     sed -e 's/\x1b\[[0-9;]*m//g' -e 's/│/|/g' -e 's/[┌┐└┘├┤┬┴┼─]//g' "$1"
   }
@@ -368,7 +281,6 @@ run_size() {
     got=${total% *}; got=${got%%/*}; want=${total% *}; want=${want##*/}
     tracks_subscribed=$((tracks_subscribed + got)); tracks_expected=$((tracks_expected + want))
     if [ "$got" -eq "$want" ] && [ "$cf" -eq 0 ]; then rooms_ok=$((rooms_ok + 1)); else rooms_partial=$((rooms_partial + 1)); fi
-    # Per-track rows: packets, bitrate (normalised to bps), dropped.
     parse_log "$log" | awk -F'|' -v room="$session" '
       NF >= 7 && $4 ~ /video|audio/ {
         pk=$5; gsub(/ /,"",pk); br=$6; gsub(/ /,"",br); lost=$7; sub(/ *\(.*/,"",lost); gsub(/ /,"",lost)
@@ -423,8 +335,6 @@ run_size() {
   } | tee "$run_dir/summary.txt"
 }
 
-# Between sizes: close this size's rooms on the SFU so the next size starts
-# from an empty server and the SFU gauges in Grafana show one size at a time.
 teardown_size() {
   local rooms_tsv=$run_dir/rooms.tsv waited=0 p
   [ -s "$rooms_tsv" ] || return 0
@@ -436,10 +346,6 @@ teardown_size() {
     sleep 2; waited=$((waited + 2))
   done
 }
-
-# ---------------------------------------------------------------------------
-# Run every size in turn; stop at the first that does not hold.
-# ---------------------------------------------------------------------------
 
 ceiling=0 failed_size= results=()
 for size in "${sizes[@]}"; do
