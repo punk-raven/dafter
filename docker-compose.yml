@@ -118,8 +118,6 @@ services:
 
   sip:
     image: livekit/sip:v1.17.0@sha256:d3c6441eb0918a81ab9e48ba7df6f02c1eebbeace42c963b2c6a6e5418675671
-    environment:
-      SIP_CONFIG_FILE: /etc/sip.yaml
     network_mode: host
     depends_on:
       redis:
@@ -127,7 +125,7 @@ services:
       livekit:
         condition: service_started
     volumes:
-      - ./deploy/sip.yaml:/etc/sip.yaml:ro
+      - ./deploy/sip.yaml:/sip/config.yaml:ro
     restart: unless-stopped
     logging: *logging
 
@@ -159,6 +157,7 @@ services:
       args:
         PACKAGE: dafter-scribe
     entrypoint: ["dafter-scribe"]
+    command: ["start"]
     network_mode: host
     environment:
       LIVEKIT_URL: ws://127.0.0.1:7880
