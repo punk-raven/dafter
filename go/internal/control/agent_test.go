@@ -3,6 +3,7 @@ package control_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -30,16 +31,21 @@ func TestAnAgentSessionHandsTheStoredDocumentToItsPool(t *testing.T) {
 	}
 }
 
-const semanticOverride = `{"turn": {"strategy": "semantic", "localVadEnabled": true}}`
+const (
+	semanticOverride  = `{"turn": {"strategy": "semantic", "localVadEnabled": true}}`
+	recordedPhoneCall = `{"recording": {"enabled": true, "layout": "room_composite", "startAt": "session_create", "consentArtifactId": "consent_call"}}`
+)
 
 var agentJobs = []struct {
 	fixture   string
 	language  string
+	channel   config.Channel
 	overrides string
 }{
-	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", ""},
-	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", semanticOverride},
-	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", ""},
+	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", config.ChannelWebRTC, ""},
+	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", config.ChannelWebRTC, semanticOverride},
+	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", config.ChannelWebRTC, ""},
+	{"../../../testdata/agent/hindi-telephony-job.json", "hi", config.ChannelTelephony, recordedPhoneCall},
 }
 
 func embeddedCatalog(t *testing.T) *config.Catalog {
@@ -60,7 +66,7 @@ func TestTheAgentJobsArePinnedForTheWorker(t *testing.T) {
 	catalog := embeddedCatalog(t)
 	for _, job := range agentJobs {
 		resolved, err := catalog.Resolve(config.Request{
-			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: job.language, Channel: config.ChannelWebRTC,
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: job.language, Channel: job.channel,
 			Overrides: json.RawMessage(job.overrides),
 		})
 		if err != nil {
@@ -96,6 +102,44 @@ func TestASessionOverrideSelectsTheTurnDetectorForHindi(t *testing.T) {
 		if turn.Strategy != config.TurnSemantic || !turn.LocalVADDecidesTurn() {
 			t.Errorf("%s: the override resolved to %s with a local VAD deciding it %v; an A/B cannot select the turn detector", channel, turn.Strategy, turn.LocalVADDecidesTurn())
 		}
+	}
+}
+
+func TestAPhoneCallAnswersEveryTurnGreetsAndHearsTheNarrowbandLine(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for _, tc := range []struct {
+		overrides string
+		mode      config.AddressingMode
+		greets    bool
+	}{
+		{"", config.AddressingAlways, true},
+		{`{"agent":{"greets":false,"addressing":{"mode":"transcript"}}}`, config.AddressingTranscript, false},
+	} {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelTelephony,
+			Overrides: json.RawMessage(tc.overrides),
+		})
+		if err != nil {
+			t.Fatalf("overrides %q: %v", tc.overrides, err)
+		}
+		agent := resolved.Config.Agent
+		if agent.Addressing.Mode != tc.mode || agent.Greets == nil || *agent.Greets != tc.greets {
+			t.Errorf("overrides %q resolved addressing %s greeting %v; the session chooses, and a caller hears a greeting by default", tc.overrides, agent.Addressing.Mode, agent.Greets)
+		}
+		stt, tts := agent.Pipeline.STT.Options["sampleRate"], agent.Pipeline.TTS.Options["sampleRate"]
+		if stt != float64(8000) || tts != float64(8000) {
+			t.Errorf("the phone line resolved STT at %v and TTS at %v Hz; it carries 8 kHz audio", stt, tts)
+		}
+	}
+
+	_, err := catalog.Resolve(config.Request{
+		SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelTelephony,
+		Overrides: json.RawMessage(`{"agent":{"pipeline":{"tts":{"options":{"sampleRate":24000}}}}}`),
+	})
+	var de *errs.Error
+	if !errors.As(err, &de) || !strings.Contains(strings.Join(de.Details, "\n"), "/agent/pipeline/tts/options/sampleRate") {
+		t.Errorf("a session override widened the phone line's TTS rate: %v", err)
 	}
 }
 

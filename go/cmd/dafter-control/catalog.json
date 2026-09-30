@@ -238,6 +238,10 @@
 
     "telephony": {
       "tuning": {
+        "agent": {
+          "greets": true,
+          "addressing": { "mode": "always" }
+        },
         "turn": {
           "silenceMs": 900,
           "endpointingDelayMs": 200,
@@ -245,6 +249,12 @@
         }
       },
       "overlay": {
+        "agent": {
+          "pipeline": {
+            "stt": { "options": { "sampleRate": 8000 } },
+            "tts": { "options": { "sampleRate": 8000 } }
+          }
+        },
         "media": {
           "video": { "enabled": false },
           "egress": { "audioBitrate": 64 }
