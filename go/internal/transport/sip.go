@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -17,6 +18,8 @@ const (
 	roleAttribute           = "dafter.role"
 )
 
+var headerPattern = regexp.MustCompile(`^X-[A-Za-z0-9-]{1,64}$`)
+
 var sipTransportNames = map[string]string{
 	"":    "SIP_TRANSPORT_AUTO",
 	"udp": "SIP_TRANSPORT_UDP",
@@ -28,6 +31,8 @@ type PhoneCall struct {
 	Room            string
 	Identity        string
 	To              string
+	SIPUser         string
+	Headers         map[string]string
 	Trunk           Trunk
 	RingingTimeout  time.Duration
 	MaxCallDuration time.Duration
@@ -62,6 +67,7 @@ type createSIPParticipantRequest struct {
 	ParticipantName       string            `json:"participantName"`
 	ParticipantAttributes map[string]string `json:"participantAttributes"`
 	HidePhoneNumber       bool              `json:"hidePhoneNumber"`
+	Headers               map[string]string `json:"headers,omitempty"`
 	RingingTimeout        string            `json:"ringingTimeout"`
 	MaxCallDuration       string            `json:"maxCallDuration"`
 	WaitUntilAnswered     bool              `json:"waitUntilAnswered"`
@@ -82,8 +88,8 @@ func (l *LiveKit) PlaceCall(ctx context.Context, c PhoneCall) (CallInfo, error) 
 	if c.Room == "" || c.Identity == "" {
 		return CallInfo{}, errs.Errorf(errs.CodeInvalidConfig, "a phone call joins a room under an identity, and this one names none")
 	}
-	if !PhoneNumber.MatchString(c.To) {
-		return CallInfo{}, errs.Errorf(errs.CodeInvalidConfig, "a phone call goes to an E.164 number")
+	if err := c.destination(); err != nil {
+		return CallInfo{}, err
 	}
 	if c.Trunk.Address == "" || len(c.Trunk.Numbers) == 0 {
 		return CallInfo{}, errs.Errorf(errs.CodeInvalidConfig, "a phone call goes out on a trunk with an address and a number to call from")
@@ -103,13 +109,14 @@ func (l *LiveKit) PlaceCall(ctx context.Context, c PhoneCall) (CallInfo, error) 
 			AuthUsername:       c.Trunk.AuthUsername,
 			AuthPassword:       c.Trunk.AuthPassword,
 		},
-		SIPCallTo:             c.To,
+		SIPCallTo:             c.To + c.SIPUser,
 		SIPNumber:             c.Trunk.Numbers[0],
 		RoomName:              c.Room,
 		ParticipantIdentity:   c.Identity,
 		ParticipantName:       phoneParticipantName,
 		ParticipantAttributes: map[string]string{roleAttribute: "participant"},
 		HidePhoneNumber:       true,
+		Headers:               c.Headers,
 		RingingTimeout:        seconds(c.RingingTimeout),
 		MaxCallDuration:       seconds(c.MaxCallDuration),
 		WaitUntilAnswered:     false,
@@ -135,6 +142,23 @@ func (l *LiveKit) PlaceCall(ctx context.Context, c PhoneCall) (CallInfo, error) 
 		return CallInfo{}, errs.Errorf(errs.CodeInternal, "the media server answered %s for another participant than the one the call was placed as", methodCreateParticipant)
 	}
 	return info, nil
+}
+
+func (c PhoneCall) destination() error {
+	switch {
+	case (c.To == "") == (c.SIPUser == ""):
+		return errs.Errorf(errs.CodeInvalidConfig, "a phone call goes to a number or to a SIP user at the trunk's host, one of the two")
+	case c.To != "" && !PhoneNumber.MatchString(c.To):
+		return errs.Errorf(errs.CodeInvalidConfig, "a phone call goes to an E.164 number")
+	case c.SIPUser != "" && !sipUserPattern.MatchString(c.SIPUser):
+		return errs.Errorf(errs.CodeInvalidConfig, "a SIP user is letters, digits, dots, dashes and underscores")
+	}
+	for name := range c.Headers {
+		if !headerPattern.MatchString(name) {
+			return errs.Errorf(errs.CodeInvalidConfig, "a phone call carries only X- headers")
+		}
+	}
+	return nil
 }
 
 func seconds(d time.Duration) string {

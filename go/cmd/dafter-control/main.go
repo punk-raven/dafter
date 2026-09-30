@@ -91,11 +91,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	trunks, err := transport.LoadTrunks(raw, os.Getenv)
+	trunks, skipped, err := transport.LoadTrunks(raw, os.Getenv)
 	if err != nil {
 		return fmt.Errorf("SIP trunk table: %w", err)
 	}
-	slog.Info("SIP trunks loaded", "trunks", len(trunks))
+	slog.Info("SIP trunks loaded", "trunks", len(trunks), "not configured here", skipped)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

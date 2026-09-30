@@ -15,6 +15,15 @@ are strings in seconds.
   here are made up; real ones come from the environment through the table's
   `secret://` references.
 
+- `create-sip-participant-bridge.json`: the dial-back of an inbound call. The
+  carrier holds the caller in a conference, and the call goes to its
+  application's public SIP address (`sipCallTo` is the application id, the
+  inline trunk's host the carrier's application domain) carrying the per-call
+  bridge token as the `X-VH-Bridge` header, which the carrier passes to the
+  application's answer URL. No credentials: the application address takes the
+  call, the token is what admits it to the right conference. The caller's own
+  number never reaches the media server at all.
+
 What keeps the dialed number out of the room: `participantIdentity` is the
 opaque `p_` id the control plane minted, `participantName` is the constant
 `Phone`, and `hidePhoneNumber` stops the SIP service from adding

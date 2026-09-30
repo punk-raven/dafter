@@ -119,3 +119,46 @@ func TestACallAnsweredForSomeoneElseIsNotTakenForOurs(t *testing.T) {
 		t.Errorf("want %s, got %v", errs.CodeInternal, err)
 	}
 }
+
+func TestAHeldCallerIsReachedThroughTheCarriersApplicationWithItsBridgeToken(t *testing.T) {
+	t.Parallel()
+	srv, calls := egressServer(t, placedReply, http.StatusOK)
+	bridge := transport.PhoneCall{
+		Room: sessionID, Identity: phoneIdentity, SIPUser: "12345678901234567",
+		Headers:        map[string]string{"X-VH-Bridge": "0f1e2d3c4b5a69788796a5b4c3d2e1f0"},
+		Trunk:          transport.Trunk{Provider: "vobiz", Address: "app.vobiz.ai", Transport: "udp", Numbers: []string{"+12025550100"}},
+		RingingTimeout: 30 * time.Second, MaxCallDuration: 30 * time.Minute,
+	}
+	if _, err := recorder(t, srv).PlaceCall(t.Context(), bridge); err != nil {
+		t.Fatalf("place call: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join("testdata", "sip", "create-sip-participant-bridge.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := compact(t, (*calls)[0].body), compact(t, raw); got != want {
+		t.Errorf("request differs from the pinned fixture\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestACallNamesExactlyOneDestinationAndOnlyXHeaders(t *testing.T) {
+	t.Parallel()
+	srv, calls := egressServer(t, placedReply, http.StatusOK)
+	lk := recorder(t, srv)
+	for name, change := range map[string]func(*transport.PhoneCall){
+		"a number and a user": func(c *transport.PhoneCall) { c.SIPUser = "12345678901234567" },
+		"neither":             func(c *transport.PhoneCall) { c.To = "" },
+		"a user with a host":  func(c *transport.PhoneCall) { c.To, c.SIPUser = "", "app@evil.example" },
+		"a routing header":    func(c *transport.PhoneCall) { c.Headers = map[string]string{"Route": "sip:evil.example"} },
+	} {
+		c := phoneCall()
+		change(&c)
+		var de *errs.Error
+		if _, err := lk.PlaceCall(t.Context(), c); !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+			t.Errorf("%s was not refused: %v", name, err)
+		}
+	}
+	if len(*calls) != 0 {
+		t.Errorf("%d refused calls reached the server", len(*calls))
+	}
+}

@@ -100,6 +100,9 @@
     "support": {
       "agent": { "personaRef": "persona://support/v3" }
     },
+    "telephony-vobiz": {
+      "telephony": { "trunk": "vobiz" }
+    },
     "scribe-gemini": {
       "scribe": {
         "llm": {
