@@ -81,6 +81,7 @@
     "recording": { "$ref": "#/$defs/Recording" },
     "transcription": { "$ref": "#/$defs/Transcription" },
     "scribe": { "$ref": "#/$defs/Scribe" },
+    "telephony": { "$ref": "https://schemas.dafter.dev/config/v1/telephony.schema.json#/$defs/Telephony" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
   "$defs": {

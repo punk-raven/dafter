@@ -137,6 +137,11 @@ var targets = []target{
 		Package: "config", Type: "TranscriptionMode", Prefix: "Transcription",
 		Out: "internal/config/transcription_gen.go", AllName: "AllTranscriptionModes",
 	},
+	{
+		Schema: "config/v1/telephony.schema.json", Pointer: []string{"$defs", "Telephony", "properties", "recordingNotice", "enum"},
+		Package: "config", Type: "RecordingNotice", Prefix: "Notice",
+		Out: "internal/config/notice_gen.go", AllName: "AllRecordingNotices",
+	},
 }
 
 var initialisms = map[string]string{

@@ -17,6 +17,7 @@ from dafter_core import (
     KeyModel,
     NoiseCancellation,
     PrivacyMode,
+    RecordingNotice,
     RecordingStart,
     Role,
     SpeakerKind,
@@ -61,6 +62,11 @@ CASES = [
     (EgressLayout, CFG, ("$defs", "Recording", "properties", "layout", "enum")),
     (RecordingStart, CFG, ("$defs", "Recording", "properties", "startAt", "enum")),
     (TranscriptionMode, CFG, ("$defs", "Transcription", "properties", "mode", "enum")),
+    (
+        RecordingNotice,
+        schemas.TELEPHONY,
+        ("$defs", "Telephony", "properties", "recordingNotice", "enum"),
+    ),
 ]
 
 

@@ -15,6 +15,7 @@ from .errors import DafterError
 _FILES = (
     schemas.IDS,
     schemas.RESOLVED_SESSION_CONFIG,
+    schemas.TELEPHONY,
     schemas.EVENT_ENVELOPE,
     schemas.SCRIBE_EVENTS,
     schemas.ERROR,
