@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/captions.css">
 <link rel="stylesheet" href="/scribe.css">
 <link rel="stylesheet" href="/phone.css">
+<link rel="stylesheet" href="/guests.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
@@ -178,6 +179,11 @@
           <option value="" selected>follow the catalog (off)</option>
           <option value="on">on - live notes, scores and minutes</option>
         </select>
+        <label>Phone guests</label>
+        <select id="phone-guests">
+          <option value="" selected>off</option>
+          <option value="dial_out">dial out - call phones into the meeting</option>
+        </select>
       </fieldset>
       <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
     </div>
@@ -305,6 +311,6 @@
 </div>
 
 <script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script>
+<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script>
 </body>
 </html>

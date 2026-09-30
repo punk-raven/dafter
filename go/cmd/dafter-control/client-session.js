@@ -36,6 +36,11 @@ function sessionRequest() {
   const transcription = transcriptionOverride();
   if (transcription) applyTranscriptionOverride(body, transcription);
   if (scribeOverride()) applyScribeOverride(body);
+  const phoneGuests = document.getElementById('phone-guests').value;
+  if (phoneGuests && body.channel !== 'telephony') {
+    body.overrides = body.overrides || {};
+    body.overrides.telephony = { phoneGuests };
+  }
   return body;
 }
 
@@ -138,6 +143,7 @@ async function joinRoom() {
     watchCaptions(room, data);
     watchScribe(data);
     watchPhone(room, data);
+    watchGuests(room, data);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
@@ -270,6 +276,7 @@ function cleanup() {
   stopCaptions();
   stopScribe();
   stopPhone();
+  stopGuests();
   stopStats();
   syntheticVideo = false;
   if (syntheticIntervalId != null) {

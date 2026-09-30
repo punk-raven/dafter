@@ -35,6 +35,7 @@ var testClientHTML []byte
 //go:embed client.js client-stats.js client-session.js client-media.js client-captions.js captions.css
 //go:embed client-scribe.js scribe.css
 //go:embed client-phone.js phone.css
+//go:embed client-guests.js guests.css
 var clientAssets embed.FS
 
 var clientAssetPaths = map[string]string{
@@ -55,6 +56,8 @@ var clientAssetPaths = map[string]string{
 	"/scribe.css":          "scribe.css",
 	"/client-phone.js":     "client-phone.js",
 	"/phone.css":           "phone.css",
+	"/client-guests.js":    "client-guests.js",
+	"/guests.css":          "guests.css",
 }
 
 func main() {
