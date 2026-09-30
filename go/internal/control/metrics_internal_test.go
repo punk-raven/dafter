@@ -2,7 +2,7 @@ package control
 
 import "testing"
 
-func TestCarrierPathsCarryNoTrunkOrTokenIntoALabel(t *testing.T) {
+func TestCarrierAndCallPathsCarryNoTrunkTokenOrParticipantIntoALabel(t *testing.T) {
 	t.Parallel()
 	for path, want := range map[string]string{
 		"/telephony/vobiz/answer":                                "/telephony/{trunk}/answer",
@@ -11,6 +11,7 @@ func TestCarrierPathsCarryNoTrunkOrTokenIntoALabel(t *testing.T) {
 		"/telephony/answer":                                      "/telephony",
 		"/telephony/vobiz/../../etc":                             "/telephony",
 		"/sessions/s_7f3a9c21/call/start":                        "/sessions/{id}/call/start",
+		"/sessions/s_7f3a9c21/call/p_4b81e0d7/stop":              "/sessions/{id}/call/{participant}/stop",
 	} {
 		if got := normalizePath(path); got != want {
 			t.Errorf("%s labelled %s, want %s", path, got, want)

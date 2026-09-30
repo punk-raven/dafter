@@ -145,7 +145,30 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 	if len(problems) > 0 {
 		return nil, detailed(errs.CodeInvalidConfig, problems, "%d session override(s) would be dropped by an overlay")
 	}
+	if problems = dropIdleTelephony(doc, overrides, req.Channel); len(problems) > 0 {
+		return nil, detailed(errs.CodeInvalidConfig, problems, "%d session override(s) tune phone calls in a session that takes none")
+	}
 	return doc, nil
+}
+
+func dropIdleTelephony(doc, overrides map[string]any, channel Channel) []string {
+	if channel == ChannelTelephony {
+		return nil
+	}
+	telephony, _ := doc["telephony"].(map[string]any)
+	if guests, _ := telephony["phoneGuests"].(string); guests != "" && guests != string(PhoneGuestsOff) {
+		return nil
+	}
+	delete(doc, "telephony")
+	stated, _ := overrides["telephony"].(map[string]any)
+	var problems []string
+	for _, k := range slices.Sorted(maps.Keys(stated)) {
+		if k != "phoneGuests" {
+			problems = append(problems, located("/telephony/"+pointerEscaper.Replace(k),
+				"tunes phone calls, but this session takes none, so it applies only with phoneGuests dial_out"))
+		}
+	}
+	return problems
 }
 
 func decode(s source) (map[string]any, error) {

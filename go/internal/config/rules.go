@@ -74,6 +74,39 @@ var crossFieldRules = []crossFieldRule{
 	},
 	{
 		broken: func(c *ResolvedSessionConfig) bool {
+			return c.phoneGuests() && c.EncryptionMode() == EncryptionE2EE
+		},
+		code:    errs.CodePrivacyModeForbids,
+		pointer: "/telephony/phoneGuests",
+		because: "a phone guest cannot join an end-to-end encrypted meeting, because the media server's SIP bridge decodes every frame between the phone network and the room, so a session that takes phone calls needs privacy mode open",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.phoneGuests() && c.TrunkName() == ""
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/telephony/phoneGuests",
+		because: "phone guests are called in on the tenant's SIP trunk, and this tenant has none configured",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Channel == ChannelTelephony && c.Telephony != nil &&
+				c.Telephony.PhoneGuests != "" && c.Telephony.PhoneGuests != PhoneGuestsOff
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/telephony/phoneGuests",
+		because: "on the telephony channel the session is the phone call itself, so it takes no phone guests and this must be off",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.phoneGuests() && c.Recording.Enabled && !c.Agent.Enabled
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/enabled",
+		because: "a phone guest sees no recording indicator and only the agent tells them the meeting is recorded, so a recorded session that takes phone calls needs the agent",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
 			v := c.video()
 			return v != nil && v.ScalabilityMode != "" && !v.Codec.Layered()
 		},

@@ -16,6 +16,7 @@ from dafter_core import (
     EventType,
     KeyModel,
     NoiseCancellation,
+    PhoneGuests,
     PrivacyMode,
     RecordingNotice,
     RecordingStart,
@@ -66,6 +67,11 @@ CASES = [
         RecordingNotice,
         schemas.TELEPHONY,
         ("$defs", "Telephony", "properties", "recordingNotice", "enum"),
+    ),
+    (
+        PhoneGuests,
+        schemas.TELEPHONY,
+        ("$defs", "Telephony", "properties", "phoneGuests", "enum"),
     ),
 ]
 

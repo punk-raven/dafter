@@ -9,6 +9,7 @@ from .enums import (
     EgressLayout,
     EncryptionMode,
     ErrorCode,
+    PhoneGuests,
     PrivacyMode,
     RecordingStart,
     TurnStrategy,
@@ -20,6 +21,10 @@ if TYPE_CHECKING:
 
 def required_encryption(mode: PrivacyMode) -> EncryptionMode:
     return EncryptionMode.TRANSPORT if mode is PrivacyMode.OPEN else EncryptionMode.E2EE
+
+
+def phone_guests(c: ResolvedSessionConfig) -> bool:
+    return c.channel is not Channel.TELEPHONY and c.telephony.phone_guests is not PhoneGuests.OFF
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +109,45 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         because=(
             "a person on a phone sees no recording indicator and only the agent tells them the "
             "call is recorded, so a recorded telephony session needs the agent"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: phone_guests(c) and c.media.encryption.stated_mode is EncryptionMode.E2EE,
+        code=ErrorCode.PRIVACY_MODE_FORBIDS,
+        pointer="/telephony/phoneGuests",
+        because=(
+            "a phone guest cannot join an end-to-end encrypted meeting, because the media "
+            "server's SIP bridge decodes every frame between the phone network and the room, "
+            "so a session that takes phone calls needs privacy mode open"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: phone_guests(c) and not c.telephony.trunk,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/telephony/phoneGuests",
+        because=(
+            "phone guests are called in on the tenant's SIP trunk, and this tenant has none "
+            "configured"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.channel is Channel.TELEPHONY and c.telephony.phone_guests is not PhoneGuests.OFF
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/telephony/phoneGuests",
+        because=(
+            "on the telephony channel the session is the phone call itself, so it takes no "
+            "phone guests and this must be off"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: phone_guests(c) and c.recording.enabled and not c.agent.enabled,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/agent/enabled",
+        because=(
+            "a phone guest sees no recording indicator and only the agent tells them the "
+            "meeting is recorded, so a recorded session that takes phone calls needs the agent"
         ),
     ),
     CrossFieldRule(

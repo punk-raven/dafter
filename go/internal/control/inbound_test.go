@@ -44,7 +44,7 @@ func serveInbound(t *testing.T) (*harness, *lockedBuffer) {
 	trunk := carrierTrunk
 	trunk.Inbound = &transport.Inbound{
 		PublicURL: publicURL, SigningKey: signingKey, BridgeHost: "sip.vobiz.ai", BridgeUser: bridgeApp,
-		Session: transport.InboundSession{TenantID: tenantID, Language: "hi", Profile: "phone"},
+		Session: transport.InboundSession{TenantID: tenantID, Language: "hi"},
 	}
 	h.svc.Trunks = transport.Trunks{"carrier-out": trunk, "outbound-only": carrierTrunk}
 	return h, logs
@@ -249,7 +249,7 @@ func TestAnInboundSessionMustNameItsOwnTrunk(t *testing.T) {
 	h, _ := serveInbound(t)
 	trunk := h.svc.Trunks["carrier-out"]
 	in := *trunk.Inbound
-	in.Session.Profile = "support"
+	in.Session.TenantID = tenantWithoutPhone
 	trunk.Inbound = &in
 	h.svc.Trunks["carrier-out"] = trunk
 	if status, body := h.ring(t, nil); status != http.StatusOK || !strings.Contains(body, "<Hangup>") {

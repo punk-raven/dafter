@@ -45,6 +45,7 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
 	mux.HandleFunc("POST /sessions/{sessionID}/call/start", s.startCall)
+	mux.HandleFunc("POST /sessions/{sessionID}/call/{participantID}/stop", s.stopCall)
 	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
 	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
 	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)

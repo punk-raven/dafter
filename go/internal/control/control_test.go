@@ -50,6 +50,8 @@ type stubTransport struct {
 
 	calls   []transport.PhoneCall
 	callErr error
+	people  map[string]string
+	hungUp  []string
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {
@@ -160,7 +162,7 @@ func serve(t *testing.T) *harness {
 	tport := &stubTransport{}
 	svc := &control.Service{
 		Catalog: catalog, Store: store, Transport: tport, TokenTTL: 15 * time.Minute,
-		WorkerSecret: workerSecret,
+		WorkerSecret: workerSecret, Trunks: transport.Trunks{"vobiz": carrierTrunk},
 	}
 	server := httptest.NewServer(svc.MetricsHandler())
 	t.Cleanup(server.Close)

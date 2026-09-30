@@ -11,7 +11,7 @@
       "signingKeyRef": "secret://operator/vobiz/sip-auth-token",
       "bridgeHost": "sip.vobiz.ai",
       "bridgeUserRef": "secret://operator/vobiz/sip-bridge-app",
-      "session": { "tenantId": "t_9c21a4be", "language": "hi", "profile": "telephony-vobiz" }
+      "session": { "tenantId": "t_9c21a4be", "language": "hi" }
     }
   }
 }

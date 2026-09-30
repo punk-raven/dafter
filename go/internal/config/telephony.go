@@ -9,6 +9,7 @@ const (
 
 type Telephony struct {
 	Trunk                  string          `json:"trunk,omitempty"`
+	PhoneGuests            PhoneGuests     `json:"phoneGuests,omitempty"`
 	RingingTimeoutSeconds  int             `json:"ringingTimeoutSeconds,omitempty"`
 	MaxCallDurationSeconds int             `json:"maxCallDurationSeconds,omitempty"`
 	RecordingNotice        RecordingNotice `json:"recordingNotice,omitempty"`
@@ -19,6 +20,15 @@ func (c *ResolvedSessionConfig) TrunkName() string {
 		return ""
 	}
 	return c.Telephony.Trunk
+}
+
+func (c *ResolvedSessionConfig) TakesPhoneCalls() bool {
+	return c.TrunkName() != "" && (c.Channel == ChannelTelephony || c.phoneGuests())
+}
+
+func (c *ResolvedSessionConfig) phoneGuests() bool {
+	return c.Channel != ChannelTelephony && c.Telephony != nil &&
+		c.Telephony.PhoneGuests != "" && c.Telephony.PhoneGuests != PhoneGuestsOff
 }
 
 func (c *ResolvedSessionConfig) RingingTimeout() time.Duration {

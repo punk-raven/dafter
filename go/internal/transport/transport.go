@@ -92,4 +92,5 @@ type Transport interface {
 	TrackOwner(ctx context.Context, room, trackID string) (TrackPublisher, error)
 	RecordingFile(ctx context.Context, egressID string, ttl time.Duration) (RecordingFile, error)
 	PlaceCall(context.Context, PhoneCall) (CallInfo, error)
+	HangUp(ctx context.Context, room, identity string) error
 }

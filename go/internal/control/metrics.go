@@ -59,7 +59,7 @@ var (
 
 	phoneCallsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_phone_calls_total",
-		Help: "Outbound phone calls by outcome: placed when the media server took the call, failed when it refused it.",
+		Help: "Outbound phone calls by outcome: placed when the media server took the call, failed when it refused it, hung_up when the control plane ended it.",
 	}, []string{"outcome"})
 
 	inboundCallsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -97,6 +97,10 @@ func incCall(ok bool) {
 	phoneCallsTotal.WithLabelValues(outcome).Inc()
 }
 
+func incHangUp() {
+	phoneCallsTotal.WithLabelValues("hung_up").Inc()
+}
+
 func incInbound(outcome string) {
 	inboundCallsTotal.WithLabelValues(outcome).Inc()
 }
@@ -131,6 +135,7 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
 	mux.HandleFunc("POST /sessions/{sessionID}/call/start", s.startCall)
+	mux.HandleFunc("POST /sessions/{sessionID}/call/{participantID}/stop", s.stopCall)
 	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
 	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
 	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)
@@ -165,6 +170,9 @@ func normalizePath(p string) string {
 	}
 	if !strings.HasPrefix(p, "/sessions/") {
 		return p
+	}
+	if strings.Contains(p, "/call/") && strings.HasSuffix(p, "/stop") {
+		return "/sessions/{id}/call/{participant}/stop"
 	}
 	if strings.Contains(p, "/transcripts/") {
 		return "/sessions/{id}/transcripts/{version}"
