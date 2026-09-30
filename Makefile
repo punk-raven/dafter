@@ -103,6 +103,7 @@ dev: setup ## Build and start the full dev stack
 	@echo "  Jaeger UI     http://127.0.0.1:16686"
 	@echo "  Prometheus    http://127.0.0.1:9090"
 	@echo "  Grafana       http://127.0.0.1:3000  (admin/admin)"
+	@echo "  SIP           udp/tcp 5060, RTP udp 10000-10100"
 	@echo ""
 
 .PHONY: loadtest
