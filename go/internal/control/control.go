@@ -26,6 +26,7 @@ type Service struct {
 	TURN      *turn.Fetcher
 	TokenTTL  time.Duration
 	Log       *slog.Logger
+	Trunks    transport.Trunks
 
 	WorkerSecret string
 }
@@ -41,6 +42,7 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("POST /sessions/{sessionID}/call/start", s.startCall)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -127,6 +129,12 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.fail(w, err)
 		return
+	}
+	if name := resolved.Config.TrunkName(); name != "" {
+		if _, err := s.knownTrunk(name); err != nil {
+			s.fail(w, err)
+			return
+		}
 	}
 
 	sess := state.Session{

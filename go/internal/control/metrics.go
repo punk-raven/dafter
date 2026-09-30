@@ -56,6 +56,11 @@ var (
 		Help: "Scribe dispatches by outcome. A failed one leaves the call without notes and never fails it.",
 	}, []string{"outcome"})
 
+	phoneCallsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dafter_phone_calls_total",
+		Help: "Outbound phone calls by outcome: placed when the media server took the call, failed when it refused it.",
+	}, []string{"outcome"})
+
 	errorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_errors_total",
 		Help: "Total errors by code.",
@@ -76,6 +81,14 @@ func incScribeDispatch(ok bool) {
 		outcome = "dispatched"
 	}
 	scribeDispatchesTotal.WithLabelValues(outcome).Inc()
+}
+
+func incCall(ok bool) {
+	outcome := "failed"
+	if ok {
+		outcome = "placed"
+	}
+	phoneCallsTotal.WithLabelValues(outcome).Inc()
 }
 
 func incRecall(n int) {
@@ -107,6 +120,7 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("POST /sessions/{sessionID}/call/start", s.startCall)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -136,7 +150,7 @@ func normalizePath(p string) string {
 	if strings.Contains(p, "/transcripts/") {
 		return "/sessions/{id}/transcripts/{version}"
 	}
-	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/scribe/key", "/scribe/refusal", "/transcription/sources", "/transcripts", "/minutes"} {
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/call/start", "/scribe/key", "/scribe/refusal", "/transcription/sources", "/transcripts", "/minutes"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
 		}
