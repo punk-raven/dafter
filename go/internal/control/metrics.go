@@ -2,6 +2,7 @@ package control
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,11 @@ var (
 		Help: "Outbound phone calls by outcome: placed when the media server took the call, failed when it refused it.",
 	}, []string{"outcome"})
 
+	inboundCallsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dafter_inbound_calls_total",
+		Help: "Carrier webhooks for inbound calls by outcome: held, dialed, bridged, failed, hung_up or refused.",
+	}, []string{"outcome"})
+
 	errorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_errors_total",
 		Help: "Total errors by code.",
@@ -89,6 +95,10 @@ func incCall(ok bool) {
 		outcome = "placed"
 	}
 	phoneCallsTotal.WithLabelValues(outcome).Inc()
+}
+
+func incInbound(outcome string) {
+	inboundCallsTotal.WithLabelValues(outcome).Inc()
 }
 
 func incRecall(n int) {
@@ -121,6 +131,9 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
 	mux.HandleFunc("POST /sessions/{sessionID}/call/start", s.startCall)
+	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
+	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
+	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -143,6 +156,12 @@ func (s *Service) MetricsHandler() http.Handler {
 func normalizePath(p string) string {
 	if p == "/sessions" {
 		return "/sessions"
+	}
+	if strings.HasPrefix(p, "/telephony/") {
+		if parts := strings.Split(p, "/"); len(parts) > 3 && slices.Contains([]string{"answer", "held", "bridge"}, parts[3]) {
+			return "/telephony/{trunk}/" + parts[3]
+		}
+		return "/telephony"
 	}
 	if !strings.HasPrefix(p, "/sessions/") {
 		return p
