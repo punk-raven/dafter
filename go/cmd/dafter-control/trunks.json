@@ -2,7 +2,7 @@
   "vobiz": {
     "provider": "vobiz",
     "addressRef": "secret://operator/vobiz/sip-domain",
-    "transport": "udp",
+    "transport": "tcp",
     "numbersRef": "secret://operator/vobiz/sip-numbers",
     "authUsernameRef": "secret://operator/vobiz/sip-username",
     "authPasswordRef": "secret://operator/vobiz/sip-password",

@@ -142,7 +142,7 @@ func TestTheShippedVobizTrunkReadsEverythingPerAccountFromTheEnvironment(t *test
 	}
 	v := trunks["vobiz"]
 	if v.Address != "aabbccdd.sip.vobiz.ai" || !slices.Equal(v.Numbers, []string{"+12025550100", "+12025550101"}) ||
-		v.AuthUsername != "dafter" || v.AuthPassword != "not-a-real-password" || v.Transport != "udp" {
+		v.AuthUsername != "dafter" || v.AuthPassword != "not-a-real-password" || v.Transport != "tcp" {
 		t.Errorf("vobiz = %+v", v)
 	}
 	in := v.Inbound
