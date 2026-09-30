@@ -147,7 +147,7 @@ func TestTheShippedVobizTrunkReadsEverythingPerAccountFromTheEnvironment(t *test
 	}
 	in := v.Inbound
 	if in == nil || in.PublicURL != "https://calls.example.com" || in.SigningKey != "not-a-real-token" ||
-		in.BridgeHost != "app.vobiz.ai" || in.BridgeUser != "12345678901234567" || in.Session.Profile != "telephony-vobiz" {
+		in.BridgeHost != "sip.vobiz.ai" || in.BridgeUser != "12345678901234567" || in.Session.Profile != "telephony-vobiz" {
 		t.Errorf("vobiz inbound = %+v", in)
 	}
 }
