@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/agent.css">
 <link rel="stylesheet" href="/captions.css">
 <link rel="stylesheet" href="/scribe.css">
+<link rel="stylesheet" href="/phone.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
@@ -189,6 +190,20 @@
       <button id="btn-copy-link" class="btn-copy" onclick="copyJoinLink()">Copy join link</button>
     </div>
 
+    <hr id="phone-divider" class="divider">
+
+    <div id="panel-phone">
+      <fieldset>
+        <legend>Phone call</legend>
+        <label for="phone-to">Number to call (E.164)</label>
+        <input id="phone-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX">
+        <button id="btn-call" class="btn-call" onclick="placePhoneCall()">Call</button>
+        <div class="phone-status"><span id="phone-state" class="phone-pill phone-pill-idle">no call</span><span id="phone-detail" class="phone-detail"></span></div>
+        <div id="phone-problem" class="phone-problem"></div>
+        <div id="phone-hint" class="phone-hint"></div>
+      </fieldset>
+    </div>
+
     <hr class="divider">
 
     <div id="panel-join">
@@ -290,6 +305,6 @@
 </div>
 
 <script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script>
+<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script>
 </body>
 </html>
