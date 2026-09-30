@@ -47,6 +47,9 @@ type stubTransport struct {
 	owners    map[string]transport.TrackPublisher
 	files     map[string]transport.RecordingFile
 	forgotten map[string]bool
+
+	calls   []transport.PhoneCall
+	callErr error
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {

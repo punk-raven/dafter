@@ -1,0 +1,19 @@
+{
+  "trunk": {
+    "hostname": "sip.carrier.example",
+    "destinationCountry": "US",
+    "transport": "SIP_TRANSPORT_UDP",
+    "authUsername": "dafter-user",
+    "authPassword": "dafter-password"
+  },
+  "sipCallTo": "+12025550143",
+  "sipNumber": "+12025550100",
+  "roomName": "s_7f3a9c21",
+  "participantIdentity": "p_4b81e0d7",
+  "participantName": "Phone",
+  "participantAttributes": { "dafter.role": "participant" },
+  "hidePhoneNumber": true,
+  "ringingTimeout": "30s",
+  "maxCallDuration": "1800s",
+  "waitUntilAnswered": false
+}

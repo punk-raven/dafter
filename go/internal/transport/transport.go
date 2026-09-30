@@ -91,4 +91,5 @@ type Transport interface {
 	RecallAgents(ctx context.Context, room, pool string) ([]DispatchInfo, error)
 	TrackOwner(ctx context.Context, room, trackID string) (TrackPublisher, error)
 	RecordingFile(ctx context.Context, egressID string, ttl time.Duration) (RecordingFile, error)
+	PlaceCall(context.Context, PhoneCall) (CallInfo, error)
 }
