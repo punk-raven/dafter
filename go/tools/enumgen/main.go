@@ -138,6 +138,11 @@ var targets = []target{
 		Out: "internal/config/transcription_gen.go", AllName: "AllTranscriptionModes",
 	},
 	{
+		Schema: "config/v1/telephony.schema.json", Pointer: []string{"$defs", "Telephony", "properties", "recordingNotice", "enum"},
+		Package: "config", Type: "RecordingNotice", Prefix: "Notice",
+		Out: "internal/config/notice_gen.go", AllName: "AllRecordingNotices",
+	},
+	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Speech", "properties", "normalization", "enum"},
 		Package: "config", Type: "SpeechNormalization", Prefix: "Normalization",
 		Out: "internal/config/normalization_gen.go", AllName: "AllSpeechNormalizations",

@@ -88,6 +88,18 @@ linters:
             - pkg: github.com/punk-raven/dafter/go/internal/control
               desc: control depends on transport, never the other way round
 
+        carrier-depends-on-core-only:
+          files:
+            - "**/internal/carrier/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: a carrier dialect parses and answers webhooks; what a call does with the store is control's
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: a carrier dialect and the media server seam are siblings under control
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: control depends on the carrier dialect, never the other way round
+
         turn-depends-on-nothing:
           files:
             - "**/internal/turn/**"

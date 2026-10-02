@@ -93,6 +93,29 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         ),
     ),
     CrossFieldRule(
+        broken=lambda c: (
+            c.channel is Channel.TELEPHONY and c.media.encryption.stated_mode is EncryptionMode.E2EE
+        ),
+        code=ErrorCode.PRIVACY_MODE_FORBIDS,
+        pointer="/channel",
+        because=(
+            "a phone call cannot be end-to-end encrypted, because the media server's SIP bridge "
+            "decodes every frame between the phone network and the room, so telephony needs "
+            "privacy mode open"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.channel is Channel.TELEPHONY and c.recording.enabled and not c.agent.enabled
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/agent/enabled",
+        because=(
+            "a person on a phone sees no recording indicator and only the agent tells them the "
+            "call is recorded, so a recorded telephony session needs the agent"
+        ),
+    ),
+    CrossFieldRule(
         broken=lambda c: bool(c.media.video.scalability_mode) and not c.media.video.layered,
         code=ErrorCode.INVALID_CONFIG,
         pointer="/media/video/scalabilityMode",

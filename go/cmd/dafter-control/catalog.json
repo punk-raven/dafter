@@ -149,6 +149,9 @@
     "support": {
       "agent": { "personaRef": "persona://support/v3" }
     },
+    "telephony-vobiz": {
+      "telephony": { "trunk": "vobiz" }
+    },
     "scribe-gemini": {
       "scribe": {
         "llm": {
@@ -191,12 +194,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -239,12 +237,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -287,12 +280,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -335,12 +323,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -383,12 +366,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -443,6 +421,10 @@
 
     "telephony": {
       "tuning": {
+        "agent": {
+          "greets": true,
+          "addressing": { "mode": "always" }
+        },
         "turn": {
           "silenceMs": 900,
           "endpointingDelayMs": 200,
@@ -450,6 +432,12 @@
         }
       },
       "overlay": {
+        "agent": {
+          "pipeline": {
+            "stt": { "options": { "sampleRate": 8000 } },
+            "tts": { "options": { "sampleRate": 8000 } }
+          }
+        },
         "media": {
           "video": { "enabled": false },
           "egress": { "audioBitrate": 64 }

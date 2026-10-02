@@ -87,6 +87,13 @@ services:
       DAFTER_TURN_TOKEN_ID: ${DAFTER_TURN_TOKEN_ID:-}
       DAFTER_TURN_API_TOKEN: ${DAFTER_TURN_API_TOKEN:-}
       DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
+      VOBIZ_SIP_DOMAIN: ${VOBIZ_SIP_DOMAIN:-}
+      VOBIZ_SIP_NUMBERS: ${VOBIZ_SIP_NUMBERS:-}
+      VOBIZ_SIP_USERNAME: ${VOBIZ_SIP_USERNAME:-}
+      VOBIZ_SIP_PASSWORD: ${VOBIZ_SIP_PASSWORD:-}
+      VOBIZ_SIP_WEBHOOK_URL: ${VOBIZ_SIP_WEBHOOK_URL:-}
+      VOBIZ_SIP_AUTH_TOKEN: ${VOBIZ_SIP_AUTH_TOKEN:-}
+      VOBIZ_SIP_BRIDGE_APP: ${VOBIZ_SIP_BRIDGE_APP:-}
     depends_on:
       livekit:
         condition: service_started
@@ -107,6 +114,19 @@ services:
       - ./deploy/egress.yaml:/etc/egress.yaml:ro
     cap_add:
       - SYS_ADMIN
+    logging: *logging
+
+  sip:
+    image: livekit/sip:v1.17.0@sha256:d3c6441eb0918a81ab9e48ba7df6f02c1eebbeace42c963b2c6a6e5418675671
+    network_mode: host
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    volumes:
+      - ./deploy/sip.yaml:/sip/config.yaml:ro
+    restart: unless-stopped
     logging: *logging
 
   agent:
@@ -140,6 +160,7 @@ services:
       args:
         PACKAGE: dafter-scribe
     entrypoint: ["dafter-scribe"]
+    command: ["start"]
     network_mode: host
     environment:
       LIVEKIT_URL: ws://127.0.0.1:7880

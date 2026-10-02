@@ -14,8 +14,10 @@ from dafter_core.config import (
 from dafter_core.enums import (
     AddressingMode,
     AgentMode,
+    Channel,
     EncryptionMode,
     ErrorCode,
+    RecordingNotice,
     Stage,
     TurnStrategy,
 )
@@ -24,7 +26,7 @@ from dafter_core.hashing import hash_document
 from dafter_providers import Vendor, vendor_for
 from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
 
-from .personas import Persona, base_language, called_by_name, persona_for
+from .personas import Persona, base_language, called_by_name, persona_for, recording_notice
 
 TurnDetection = Literal["stt", "semantic", "manual"]
 TURN_DETECTOR_LANGUAGES = frozenset(LOCAL_LANGUAGES)
@@ -42,6 +44,7 @@ class Plan:
     turn_handling: dict[str, Any]
     persona: Persona
     stt_prompt: str | None = None
+    disclosure: str | None = None
     personas: dict[str, Persona] = field(default_factory=dict)
 
     @property
@@ -61,6 +64,10 @@ class Plan:
     @property
     def opening(self) -> str | None:
         return self.persona.greeting if self.config.agent.greets else None
+
+    @property
+    def on_a_phone(self) -> bool:
+        return self.config.channel is Channel.TELEPHONY
 
 
 def load(metadata: str | bytes) -> ResolvedSessionConfig:
@@ -242,6 +249,13 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     }
 
 
+def disclosure(cfg: ResolvedSessionConfig) -> str | None:
+    if cfg.channel is not Channel.TELEPHONY:
+        return None
+    always = cfg.telephony.recording_notice is RecordingNotice.ALWAYS
+    return recording_notice(cfg.language, cfg.recording.enabled, always)
+
+
 def voiced(agent: Agent, language: str) -> Persona:
     persona = persona_for(agent.persona_ref, language, agent.name, agent.addressing.aliases)
     return called_by_name(persona) if agent.addressing.waits_to_be_called else persona
@@ -314,5 +328,6 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         turn_handling=turn_handling(cfg.turn, detection),
         persona=persona,
         stt_prompt=prompt,
+        disclosure=disclosure(cfg),
         personas=personas,
     )

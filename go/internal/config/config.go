@@ -29,6 +29,7 @@ type ResolvedSessionConfig struct {
 
 	Transcription *Transcription `json:"transcription,omitempty"`
 	Scribe        *Scribe        `json:"scribe,omitempty"`
+	Telephony     *Telephony     `json:"telephony,omitempty"`
 
 	Budgets Budgets `json:"budgets"`
 }

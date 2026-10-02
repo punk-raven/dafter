@@ -55,6 +55,7 @@ from .scribing import Scribing
 from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
 from .switching import Switching
+from .telephony import ANSWER_GRACE_SECONDS, answered
 from .timing import Turns, TurnTiming
 from .toolbox import Answering, follow, linked, registry_for
 from .transcribing import Transcribing
@@ -404,6 +405,19 @@ async def entrypoint(ctx: JobContext) -> None:
         called.listen()
     elif transcribing is not None:
         transcribing.listen()
+    await speak_first(p, session, ctx.room)
+
+
+async def speak_first(p: Plan, session: AgentSession[Any], room: rtc.Room) -> None:
+    if p.on_a_phone:
+        within = p.config.telephony.ringing_timeout_seconds + ANSWER_GRACE_SECONDS
+        caller = await answered(room, within)
+        if caller is None:
+            log.info("nobody picked up", extra={"session": p.config.session_id})
+            return
+        log.info("phone answered", extra={"session": p.config.session_id, "participant": caller})
+    if p.disclosure is not None:
+        session.say(p.disclosure, allow_interruptions=False)
     if p.opening is not None:
         session.say(p.opening, allow_interruptions=True)
 
@@ -467,4 +481,5 @@ __all__ = [
     "prewarm",
     "redact_framework_logs",
     "server",
+    "speak_first",
 ]

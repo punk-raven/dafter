@@ -1,0 +1,17 @@
+{
+  "vobiz": {
+    "provider": "vobiz",
+    "addressRef": "secret://operator/vobiz/sip-domain",
+    "transport": "tcp",
+    "numbersRef": "secret://operator/vobiz/sip-numbers",
+    "authUsernameRef": "secret://operator/vobiz/sip-username",
+    "authPasswordRef": "secret://operator/vobiz/sip-password",
+    "inbound": {
+      "publicUrlRef": "secret://operator/vobiz/sip-webhook-url",
+      "signingKeyRef": "secret://operator/vobiz/sip-auth-token",
+      "bridgeHost": "app.vobiz.ai",
+      "bridgeUserRef": "secret://operator/vobiz/sip-bridge-app",
+      "session": { "tenantId": "t_9c21a4be", "language": "hi", "profile": "telephony-vobiz" }
+    }
+  }
+}

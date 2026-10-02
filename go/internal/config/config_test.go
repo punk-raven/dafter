@@ -390,6 +390,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 	const (
 		ids = "common/v1/ids.schema.json"
 		cfg = "config/v1/resolved-session-config.schema.json"
+		tel = "config/v1/telephony.schema.json"
 	)
 	cases := []struct {
 		name    string
@@ -413,6 +414,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"EgressLayout", cfg, []string{"$defs", "Recording", "properties", "layout", "enum"}, schema.Names(config.AllEgressLayouts)},
 		{"RecordingStart", cfg, []string{"$defs", "Recording", "properties", "startAt", "enum"}, schema.Names(config.AllRecordingStarts)},
 		{"TranscriptionMode", cfg, []string{"$defs", "Transcription", "properties", "mode", "enum"}, schema.Names(config.AllTranscriptionModes)},
+		{"RecordingNotice", tel, []string{"$defs", "Telephony", "properties", "recordingNotice", "enum"}, schema.Names(config.AllRecordingNotices)},
 		{"SpeechNormalization", cfg, []string{"$defs", "Speech", "properties", "normalization", "enum"}, schema.Names(config.AllSpeechNormalizations)},
 		{"Situation", cfg, []string{"$defs", "Situation", "enum"}, schema.Names(config.AllSituations)},
 	}
