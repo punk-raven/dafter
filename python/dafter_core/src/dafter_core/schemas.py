@@ -14,6 +14,7 @@ ERROR = "errors/v1/error.schema.json"
 IDS = "common/v1/ids.schema.json"
 LANGUAGE_SWITCHING = "config/v1/language-switching.schema.json"
 BACKCHANNEL = "config/v1/backchannel.schema.json"
+SCRIBE_CONFIG = "config/v1/scribe.schema.json"
 
 
 def load(relative: str) -> dict[str, Any]:

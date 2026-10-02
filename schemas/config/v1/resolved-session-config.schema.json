@@ -87,7 +87,7 @@
     "media": { "$ref": "#/$defs/Media" },
     "recording": { "$ref": "#/$defs/Recording" },
     "transcription": { "$ref": "#/$defs/Transcription" },
-    "scribe": { "$ref": "#/$defs/Scribe" },
+    "scribe": { "$ref": "https://schemas.dafter.dev/config/v1/scribe.schema.json" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
   "$defs": {
@@ -459,48 +459,6 @@
         "batch": {
           "$ref": "#/$defs/ProviderRef",
           "description": "The provider and pinned model of the after-call pass. It is the batch class of STT, tuned for accuracy rather than first-partial latency, so it is named separately from agent.pipeline.stt. The after-call pass needs one, which is a cross-field rule."
-        }
-      }
-    },
-    "Scribe": {
-      "type": "object",
-      "unevaluatedProperties": false,
-      "description": "A second agent in the session that never speaks. It joins hidden and publishes no track, reads the live captions the agent worker already publishes rather than transcribing again, and keeps rolling notes: a short summary, decisions, action items with an owner, open questions, and the names and numbers mentioned. The voice agent reads those notes as the call's context and answers summarize_call from them. It scores each agent turn with the stage 4 judge, and when the call ends it writes the minutes, starts the transcript after the call and logs the session's cost. It is off the conversation's path: when it is slow or fails, only the notes are late. A session without this block has no scribe. It sends what everyone said to its own LLM provider and keeps the minutes, so it is gated like transcription: it needs its own consent artifact, a sealed session refuses it, and it needs transcription live or both, since it reads those captions. All three are cross-field rules.",
-      "required": ["enabled"],
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "pool": {
-          "type": "string",
-          "description": "The worker pool the scribe is dispatched to, beside the agent's own pool and never the same one: one room holds one agent per pool, and the scribe runs a different program.",
-          "pattern": "^[a-z][a-z0-9-]{1,62}$",
-          "default": "dafter-scribe"
-        },
-        "consentArtifactId": {
-          "type": "string",
-          "minLength": 1,
-          "description": "The scribe cannot run without a valid artifact, the same gate recording and transcription have. A separate field from transcription.consentArtifactId because consent to captions is not consent to an LLM reading the whole call and to minutes being kept."
-        },
-        "llm": {
-          "$ref": "#/$defs/ProviderRef",
-          "description": "Writes the notes and the minutes. Not latency bound, so a slower or free model fits here that could never answer a turn. A scribe needs one, which is a cross-field rule."
-        },
-        "judge": {
-          "$ref": "#/$defs/ProviderRef",
-          "description": "Grades each agent turn on the stage 4 criteria (correct, right language, speakable). Absent: turns are not scored."
-        },
-        "summaryIntervalMs": {
-          "type": "integer",
-          "description": "How often the rolling notes are rewritten while people are talking. Also the longest one rewrite may take, so rewrites never pile up.",
-          "minimum": 10000,
-          "maximum": 600000,
-          "default": 60000
-        },
-        "afterCallTimeoutSeconds": {
-          "type": "integer",
-          "description": "How long the scribe keeps working once the call has ended: the minutes, waiting for the track recordings to finish, and the transcript after the call. Work still running at the deadline is abandoned and logged; the call itself is already over.",
-          "minimum": 60,
-          "maximum": 3600,
-          "default": 900
         }
       }
     },
