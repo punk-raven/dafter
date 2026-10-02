@@ -194,12 +194,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -242,12 +237,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -290,12 +280,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -338,12 +323,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
@@ -386,12 +366,7 @@
       },
       "overlay": {
         "transcription": {
-          "batch": {
-            "provider": "sarvam",
-            "model": "saaras:v3",
-            "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
-          }
+          "batch": { "provider": "sarvam", "model": "saaras:v3", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key" }
         },
         "agent": {
           "pipeline": {
