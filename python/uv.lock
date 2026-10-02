@@ -11,6 +11,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "dafter-batch",
     "dafter-core",
     "dafter-evals",
     "dafter-providers",
@@ -570,6 +571,23 @@ wheels = [
 ]
 
 [[package]]
+name = "dafter-batch"
+version = "0.0.0"
+source = { editable = "dafter_batch" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "dafter-core" },
+    { name = "dafter-providers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
+    { name = "dafter-core", editable = "dafter_core" },
+    { name = "dafter-providers", editable = "dafter_providers" },
+]
+
+[[package]]
 name = "dafter-core"
 version = "0.0.0"
 source = { editable = "dafter_core" }
@@ -615,6 +633,7 @@ name = "dafter-providers"
 version = "0.0.0"
 source = { editable = "dafter_providers" }
 dependencies = [
+    { name = "aiohttp" },
     { name = "dafter-core" },
     { name = "livekit-agents" },
     { name = "livekit-plugins-openai" },
@@ -623,6 +642,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
     { name = "dafter-core", editable = "dafter_core" },
     { name = "livekit-agents", specifier = "==1.8.3" },
     { name = "livekit-plugins-openai", specifier = "==1.8.3" },
@@ -661,6 +681,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "dafter-batch" },
     { name = "dafter-core" },
     { name = "dafter-evals" },
     { name = "dafter-providers" },
@@ -675,6 +696,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "dafter-batch", editable = "dafter_batch" },
     { name = "dafter-core", editable = "dafter_core" },
     { name = "dafter-evals", editable = "dafter_evals" },
     { name = "dafter-providers", editable = "dafter_providers" },

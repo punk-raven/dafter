@@ -80,6 +80,7 @@
     "turn": { "$ref": "#/$defs/Turn" },
     "media": { "$ref": "#/$defs/Media" },
     "recording": { "$ref": "#/$defs/Recording" },
+    "transcription": { "$ref": "#/$defs/Transcription" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
   "$defs": {
@@ -451,6 +452,29 @@
         "consentArtifactId": {
           "type": "string",
           "description": "Recording and storage cannot proceed without a valid artifact. Consent is a gate in the control plane, not a flag a consumer can forget to check."
+        }
+      }
+    },
+    "Transcription": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Whether the people in the call are transcribed, and how. A session without this block is not transcribed, which is what every session did before the block existed. Transcribing a person sends their speech to a provider and keeps what they said, so it is gated like recording: it needs a consent artifact, and a sealed session never sends audio to a transcription provider. Both are cross-field rules.",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "off: nobody is transcribed beyond what the agent itself needs to hear. live: every participant's speech, the agent's included, is published as captions while it is spoken; the agent worker transcribes each human separately with the session's STT provider, so it needs the agent on. after_call: once the call is over, each participant's own recorded audio track is transcribed by the batch provider, so every line is attributed to its speaker; it needs recording on with the track layout. both: live captions during the call and the transcript after it. Captions are the realtime pass and never the record: only the after-call pass produces a transcript version.",
+          "enum": ["off", "live", "after_call", "both"],
+          "default": "off"
+        },
+        "consentArtifactId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Transcription cannot proceed without a valid artifact, the same gate recording has. A separate field from recording.consentArtifactId because a session can be transcribed without being recorded, and consent to one is not consent to the other."
+        },
+        "batch": {
+          "$ref": "#/$defs/ProviderRef",
+          "description": "The provider and pinned model of the after-call pass. It is the batch class of STT, tuned for accuracy rather than first-partial latency, so it is named separately from agent.pipeline.stt. The after-call pass needs one, which is a cross-field rule."
         }
       }
     },

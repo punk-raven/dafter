@@ -1,0 +1,9 @@
+{
+  "job_id": "20260924_9f8b7c6d-5e4a-3b2c-1d0e-000000000001",
+  "job_state": "Accepted",
+  "upload_urls": {
+    "EG_Kx9r2QmT4bZa.ogg": { "file_url": "{storage}/upload/EG_Kx9r2QmT4bZa.ogg?sv=2024-01-01&sig=x", "file_metadata": {} },
+    "EG_Lw3s8PnV6cYb.ogg": { "file_url": "{storage}/upload/EG_Lw3s8PnV6cYb.ogg?sv=2024-01-01&sig=y", "file_metadata": {} }
+  },
+  "storage_container_type": "Azure_V1"
+}

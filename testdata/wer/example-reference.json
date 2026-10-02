@@ -1,0 +1,7 @@
+{
+  "clip": "example-hi-meeting",
+  "language": "hi",
+  "audio": "testdata/wer/audio/example-hi-meeting.ogg",
+  "speakers": 1,
+  "reference": "हाँ, मुझे कल की मीटिंग का टाइम बताओ। और ज़रा एजेंडा भी भेज देना, दस बजे से पहले।"
+}

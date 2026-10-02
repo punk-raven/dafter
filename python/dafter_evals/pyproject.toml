@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 dafter-evals = "dafter_evals.__main__:main"
+dafter-wer = "dafter_evals.score:main"
 dafter-screen = "dafter_evals.screen.__main__:main"
 
 [build-system]

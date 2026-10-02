@@ -1,0 +1,9 @@
+{
+  "job_id": "20260924_9f8b7c6d-5e4a-3b2c-1d0e-000000000001",
+  "job_state": "Completed",
+  "download_urls": {
+    "0.json": { "file_url": "{storage}/download/0.json?sv=2024-01-01&sig=z", "file_metadata": {} },
+    "1.json": { "file_url": "{storage}/download/1.json?sv=2024-01-01&sig=w", "file_metadata": {} }
+  },
+  "storage_container_type": "Azure_V1"
+}

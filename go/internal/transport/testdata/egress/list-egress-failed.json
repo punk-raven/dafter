@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "egress_id": "EG_abc123",
+      "room_name": "s_7f3a9c21",
+      "status": "EGRESS_FAILED",
+      "started_at": "1758535200000000000",
+      "ended_at": "1758535650000000000",
+      "track": {"room_name": "s_7f3a9c21", "track_id": "TR_AMabc123"},
+      "file_results": []
+    }
+  ],
+  "next_page_token": null
+}

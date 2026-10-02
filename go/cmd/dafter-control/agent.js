@@ -43,10 +43,6 @@ function agentPanel() {
     </div>
     <div id="agent-reason" class="agent-reason"></div>
     <div class="agent-body">
-      <div class="agent-col agent-transcript">
-        <div class="agent-col-head"><span>Live transcript</span><span class="agent-hint">interim in italics</span></div>
-        <div id="agent-lines" class="agent-lines"><div class="agent-empty">speech shows here as it is recognised</div></div>
-      </div>
       <div class="agent-col agent-latency">
         <div class="agent-col-head"><span>Turn latency <span class="agent-hint">ms</span></span><span id="agent-cost" class="agent-cost">cost -</span><span id="agent-p50" class="agent-p50" title="median of the heard column">p50 -</span></div>
         <div class="agent-turns-body">
@@ -71,6 +67,13 @@ function agentPanel() {
   stage.className = 'agent-stage';
   grid.parentNode.insertBefore(stage, grid);
   stage.append(grid, panel);
+  const transcript = document.createElement('section');
+  transcript.id = 'agent-transcript';
+  transcript.className = 'agent-col agent-transcript';
+  transcript.innerHTML = `
+    <div class="agent-col-head"><span>Live transcript</span><span class="agent-hint">interim in italics</span></div>
+    <div id="agent-lines" class="agent-lines"><div class="agent-empty">speech shows here as it is recognised</div></div>`;
+  document.getElementById('transcripts').append(transcript);
   document.getElementById('agent-toggle').addEventListener('click', toggleAgent);
   document.getElementById('agent-wake').addEventListener('click', wakeAgent);
   return panel;
@@ -148,6 +151,10 @@ function onAgentEvent(payload) {
     return;
   }
   if (!event.payload) return;
+  if (event.type === 'transcript.partial' || event.type === 'transcript.final') {
+    onCaption(event);
+    return;
+  }
   if (event.type === 'agent.turn_metrics') {
     onTurnMetrics(event.payload);
     return;
@@ -175,6 +182,7 @@ function watchAgent(room, data) {
   agentView.state = null;
   resetAgentAddressing();
   agentPanel().style.display = '';
+  document.getElementById('agent-transcript').style.display = '';
   resetAgentTurns();
   watchTranscripts(room);
 
@@ -225,4 +233,6 @@ function stopAgent() {
   resetAgentAddressing();
   const panel = document.getElementById('agent-panel');
   if (panel) panel.style.display = 'none';
+  const transcript = document.getElementById('agent-transcript');
+  if (transcript) transcript.style.display = 'none';
 }

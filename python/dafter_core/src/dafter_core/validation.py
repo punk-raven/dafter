@@ -12,7 +12,13 @@ from . import schemas
 from .enums import ErrorCode
 from .errors import DafterError
 
-_FILES = (schemas.IDS, schemas.RESOLVED_SESSION_CONFIG, schemas.EVENT_ENVELOPE, schemas.ERROR)
+_FILES = (
+    schemas.IDS,
+    schemas.RESOLVED_SESSION_CONFIG,
+    schemas.EVENT_ENVELOPE,
+    schemas.TRANSCRIPT_EVENTS,
+    schemas.ERROR,
+)
 
 
 @cache
