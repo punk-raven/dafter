@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -27,6 +27,17 @@ var embeddedCatalog []byte
 
 //go:embed testclient.html
 var testClientHTML []byte
+
+//go:embed agent.js agent-call.js agent-turns.js agent-refusal.js agent.css
+var clientAssets embed.FS
+
+var clientAssetPaths = map[string]string{
+	"/agent.js":         "agent.js",
+	"/agent-call.js":    "agent-call.js",
+	"/agent-turns.js":   "agent-turns.js",
+	"/agent-refusal.js": "agent-refusal.js",
+	"/agent.css":        "agent.css",
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -82,7 +93,13 @@ func run() error {
 		slog.Info("cloudflare TURN credentials enabled")
 	}
 
-	svc := &control.Service{Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl}
+	svc := &control.Service{
+		Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl,
+		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"),
+	}
+	if svc.WorkerSecret == "" {
+		slog.Info("worker calls disabled: DAFTER_WORKER_SECRET is not set, so no agent can join an end-to-end session")
+	}
 	handler := svc.MetricsHandler()
 	metricsHandler := promhttp.Handler()
 	server := &http.Server{
@@ -93,6 +110,10 @@ func run() error {
 				if _, err := w.Write(testClientHTML); err != nil {
 					slog.Error("write test client", "error", err)
 				}
+				return
+			}
+			if name, ok := clientAssetPaths[r.URL.Path]; ok && r.Method == http.MethodGet {
+				http.ServeFileFS(w, r, clientAssets, name)
 				return
 			}
 			if r.Method == http.MethodGet && r.URL.Path == "/metrics" {

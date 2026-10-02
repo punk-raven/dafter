@@ -69,23 +69,24 @@
         "pipeline": {
           "stt": {
             "provider": "sarvam",
-            "model": "saaras",
+            "model": "saaras:v3-realtime",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "chunkMs": 500, "encoding": "pcm_s16le" }
+            "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000 }
           },
           "llm": {
             "provider": "sarvam",
             "model": "sarvam-105b",
             "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+            "options": { "thinking": false, "temperature": 0.4, "maxTokens": 200 }
           },
           "tts": {
             "provider": "sarvam",
-            "model": "bulbul",
+            "model": "bulbul:v3",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "prewarm": true }
+            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh" }
           }
         }
       }
@@ -109,14 +110,15 @@
             "provider": "sarvam",
             "model": "sarvam-105b",
             "region": "ap-south-1",
-            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+            "options": { "thinking": false, "temperature": 0.4, "maxTokens": 200 }
           },
           "tts": {
             "provider": "sarvam",
-            "model": "bulbul",
+            "model": "bulbul:v3",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "prewarm": true }
+            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh" }
           }
         }
       }

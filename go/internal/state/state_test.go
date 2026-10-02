@@ -137,13 +137,42 @@ func TestOpeningAnOlderStoreAddsTheKeyColumn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read a session stored before the column existed: %v", err)
 	}
-	if got.EncryptionKey != "" {
-		t.Errorf("an older session reads back with key %q", got.EncryptionKey)
+	if got.EncryptionKey != "" || got.AgentRefusal != nil {
+		t.Errorf("an older session reads back with key %q and refusal %s", got.EncryptionKey, got.AgentRefusal)
+	}
+	if err := s.SetAgentRefusal(t.Context(), "s_7f3a9c21", json.RawMessage(`{"code":"internal"}`)); err != nil {
+		t.Errorf("record a refusal in a migrated store: %v", err)
 	}
 	keyed := session(t)
 	keyed.SessionID, keyed.EncryptionKey = "s_00000002", "k"
 	if err := s.CreateSession(t.Context(), keyed); err != nil {
 		t.Fatalf("store a keyed session in a migrated store: %v", err)
+	}
+}
+
+func TestTheLatestAgentRefusalIsKeptUntilCleared(t *testing.T) {
+	t.Parallel()
+	s, sess := store(t), session(t)
+	if err := s.CreateSession(t.Context(), sess); err != nil {
+		t.Fatal(err)
+	}
+	for _, refusal := range []string{`{"code":"internal"}`, `{"code":"unsupported_capability"}`} {
+		if err := s.SetAgentRefusal(t.Context(), sess.SessionID, json.RawMessage(refusal)); err != nil {
+			t.Fatalf("record refusal: %v", err)
+		}
+	}
+	got, err := s.Session(t.Context(), sess.SessionID)
+	if err != nil || string(got.AgentRefusal) != `{"code":"unsupported_capability"}` {
+		t.Errorf("refusal read back as %s (%v), want the latest one", got.AgentRefusal, err)
+	}
+	if err := s.SetAgentRefusal(t.Context(), sess.SessionID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Session(t.Context(), sess.SessionID); err != nil || got.AgentRefusal != nil {
+		t.Errorf("a cleared refusal read back as %s (%v)", got.AgentRefusal, err)
+	}
+	if err := s.SetAgentRefusal(t.Context(), "s_00000000", nil); !errors.Is(err, state.ErrNotFound) {
+		t.Errorf("a refusal for an unknown session: want %v, got %v", state.ErrNotFound, err)
 	}
 }
 

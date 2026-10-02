@@ -120,12 +120,9 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 	}
 
 	var wg sync.WaitGroup
-	// One context, not a shared time.After: a timer channel delivers to a
-	// single receiver, so every other goroutine waiting on it would run on.
 	runCtx, runCancel := context.WithTimeout(ctx, cfg.duration)
 	defer runCancel()
 
-	// Reporter goroutine
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -161,16 +158,16 @@ func runLoad(ctx context.Context, cfg *loadConfig) *stats {
 		}
 	}()
 
-	// Ramp users
 	rampInterval := cfg.ramp / time.Duration(cfg.users)
 	if rampInterval < time.Millisecond {
 		rampInterval = time.Millisecond
 	}
 
-	createBody, _ := json.Marshal(map[string]string{
-		"tenantId": cfg.tenant,
-		"language": cfg.language,
-		"channel":  cfg.channel,
+	createBody, _ := json.Marshal(map[string]any{
+		"tenantId":  cfg.tenant,
+		"language":  cfg.language,
+		"channel":   cfg.channel,
+		"overrides": map[string]any{"agent": map[string]bool{"enabled": false}},
 	})
 	joinBody := []byte(`{"role":"participant"}`)
 
@@ -225,7 +222,7 @@ func doCreate(ctx context.Context, client *http.Client, target string, body []by
 	resp, err := client.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		if ctx.Err() == nil { // cut off by the end of the run is not a failure
+		if ctx.Err() == nil {
 			st.record(requestResult{op: "create", duration: elapsed, err: err})
 		}
 		return ""
@@ -266,7 +263,7 @@ func doJoin(ctx context.Context, client *http.Client, target, sessionID string, 
 	resp, err := client.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		if ctx.Err() == nil { // cut off by the end of the run is not a failure
+		if ctx.Err() == nil {
 			st.record(requestResult{op: "join", duration: elapsed, err: err})
 		}
 		return

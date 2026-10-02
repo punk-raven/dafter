@@ -46,11 +46,28 @@ var (
 		Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 	})
 
+	agentDispatchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dafter_agent_dispatches_total",
+		Help: "Agent dispatches by outcome.",
+	}, []string{"outcome"})
+
 	errorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_errors_total",
 		Help: "Total errors by code.",
 	}, []string{"code"})
 )
+
+func incDispatch(ok bool) {
+	outcome := "failed"
+	if ok {
+		outcome = "dispatched"
+	}
+	agentDispatchesTotal.WithLabelValues(outcome).Inc()
+}
+
+func incRecall(n int) {
+	agentDispatchesTotal.WithLabelValues("recalled").Add(float64(n))
+}
 
 func incError(code errs.ErrorCode) {
 	errorsTotal.WithLabelValues(string(code)).Inc()
@@ -73,6 +90,10 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/join", s.metricsJoinSession)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/start", s.startRecording)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/start", s.inviteAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()
@@ -91,7 +112,7 @@ func normalizePath(p string) string {
 	if !strings.HasPrefix(p, "/sessions/") {
 		return p
 	}
-	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop"} {
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
 		}

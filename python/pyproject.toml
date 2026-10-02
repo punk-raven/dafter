@@ -9,13 +9,19 @@ package = false
 
 [tool.uv.sources]
 dafter-core = { workspace = true }
+dafter-providers = { workspace = true }
+dafter-runtime = { workspace = true }
+dafter-evals = { workspace = true }
 
 [tool.uv.workspace]
-members = ["dafter_core"]
+members = ["dafter_core", "dafter_providers", "dafter_runtime", "dafter_evals"]
 
 [dependency-groups]
 dev = [
     "dafter-core",
+    "dafter-providers",
+    "dafter-runtime",
+    "dafter-evals",
     "pytest>=8",
     "ruff>=0.9",
     "mypy>=1.11",
@@ -30,15 +36,36 @@ extend-exclude = ["**/enums.py", "**/_schemas/**"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "RUF"]
 
+[tool.ruff.lint.isort]
+known-third-party = ["dafter_core", "dafter_providers", "dafter_runtime", "dafter_evals"]
+
 [tool.pytest.ini_options]
-testpaths = ["dafter_core/tests"]
-pythonpath = ["dafter_core/src"]
+testpaths = [
+    "dafter_core/tests",
+    "dafter_providers/tests",
+    "dafter_runtime/tests",
+    "dafter_evals/tests",
+]
+pythonpath = [
+    "dafter_core/src",
+    "dafter_providers/src",
+    "dafter_runtime/src",
+    "dafter_evals/src",
+]
 
 [tool.mypy]
-python_version = "3.11"
 strict = true
-files = ["dafter_core/src", "dafter_core/tests"]
-mypy_path = "dafter_core/src"
+files = [
+    "dafter_core/src",
+    "dafter_core/tests",
+    "dafter_providers/src",
+    "dafter_providers/tests",
+    "dafter_runtime/src",
+    "dafter_runtime/tests",
+    "dafter_evals/src",
+    "dafter_evals/tests",
+]
+mypy_path = "dafter_core/src:dafter_providers/src:dafter_runtime/src:dafter_evals/src"
 
 [[tool.mypy.overrides]]
 module = "referencing.*"

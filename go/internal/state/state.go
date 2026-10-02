@@ -21,6 +21,7 @@ type Session struct {
 	CreatedAt  time.Time
 
 	EncryptionKey string
+	AgentRefusal  json.RawMessage
 }
 
 type Egress struct {
@@ -38,6 +39,7 @@ var ErrNotFound = errors.New("state: no such session")
 type SessionStore interface {
 	CreateSession(ctx context.Context, sess Session) error
 	Session(ctx context.Context, sessionID string) (Session, error)
+	SetAgentRefusal(ctx context.Context, sessionID string, refusal json.RawMessage) error
 	AddEgress(ctx context.Context, e Egress) error
 	StopEgress(ctx context.Context, egressID string, at time.Time) error
 	Egresses(ctx context.Context, sessionID string) ([]Egress, error)
@@ -56,7 +58,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 	config_hash    TEXT NOT NULL,
 	config         TEXT NOT NULL,
 	created_at     INTEGER NOT NULL,
-	encryption_key TEXT NOT NULL DEFAULT ''
+	encryption_key TEXT NOT NULL DEFAULT '',
+	agent_refusal  TEXT NOT NULL DEFAULT ''
 ) STRICT;
 CREATE TABLE IF NOT EXISTS egresses (
 	egress_id   TEXT PRIMARY KEY,
@@ -70,6 +73,7 @@ CREATE INDEX IF NOT EXISTS egresses_by_session ON egresses(session_id, started_a
 
 var addedColumns = []struct{ name, definition string }{
 	{"encryption_key", "TEXT NOT NULL DEFAULT ''"},
+	{"agent_refusal", "TEXT NOT NULL DEFAULT ''"},
 }
 
 func Open(ctx context.Context, path string) (*Store, error) {
@@ -137,14 +141,14 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 
 func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT session_id, tenant_id, room, config_hash, config, created_at, encryption_key
+		`SELECT session_id, tenant_id, room, config_hash, config, created_at, encryption_key, agent_refusal
 		 FROM sessions WHERE session_id = ?`, sessionID)
 
 	var sess Session
-	var config string
+	var config, refusal string
 	var createdAt int64
 	switch err := row.Scan(&sess.SessionID, &sess.TenantID, &sess.Room,
-		&sess.ConfigHash, &config, &createdAt, &sess.EncryptionKey); {
+		&sess.ConfigHash, &config, &createdAt, &sess.EncryptionKey, &refusal); {
 	case errors.Is(err, sql.ErrNoRows):
 		return Session{}, ErrNotFound
 	case err != nil:
@@ -152,8 +156,23 @@ func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) 
 	}
 
 	sess.Config = json.RawMessage(config)
+	if refusal != "" {
+		sess.AgentRefusal = json.RawMessage(refusal)
+	}
 	sess.CreatedAt = time.UnixMicro(createdAt).UTC()
 	return sess, nil
+}
+
+func (s *Store) SetAgentRefusal(ctx context.Context, sessionID string, refusal json.RawMessage) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE sessions SET agent_refusal = ? WHERE session_id = ?`, string(refusal), sessionID)
+	if err != nil {
+		return errs.Wrap(errs.CodeInternal, err, "store agent refusal")
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) AddEgress(ctx context.Context, e Egress) error {

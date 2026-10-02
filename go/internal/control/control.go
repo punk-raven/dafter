@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -19,12 +20,13 @@ import (
 )
 
 type Service struct {
-	Catalog   *config.Catalog
-	Store     state.SessionStore
-	Transport transport.Transport
-	TURN      *turn.Fetcher
-	TokenTTL  time.Duration
-	Log       *slog.Logger
+	Catalog      *config.Catalog
+	Store        state.SessionStore
+	Transport    transport.Transport
+	TURN         *turn.Fetcher
+	TokenTTL     time.Duration
+	Log          *slog.Logger
+	WorkerSecret string
 }
 
 func (s *Service) Handler() http.Handler {
@@ -34,6 +36,10 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/join", s.joinSession)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/start", s.startRecording)
 	mux.HandleFunc("POST /sessions/{sessionID}/recording/stop", s.stopRecording)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/start", s.inviteAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
+	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
 	return mux
 }
 
@@ -57,7 +63,8 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	EncryptionKey string `json:"encryptionKey,omitempty"`
+	EncryptionKey   string `json:"encryptionKey,omitempty"`
+	AgentDispatchID string `json:"agentDispatchId,omitempty"`
 }
 
 func mintEncryptionKey() (string, error) {
@@ -139,6 +146,12 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	dispatchID, err := s.dispatchAgent(r.Context(), sess, resolved.Config)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sessionID,
 		Identity: participantID,
@@ -161,17 +174,36 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.write(w, http.StatusCreated, createSessionResponse{
-		SessionID:     sessionID,
-		ParticipantID: participantID,
-		Room:          sessionID,
-		ConfigHash:    resolved.Hash,
-		Config:        resolved.Document,
-		Token:         token.JWT,
-		URL:           token.URL,
-		ExpiresAt:     token.ExpiresAt,
-		ICEServers:    iceServers,
-		EncryptionKey: keyFor(resolved.Config, sess, req.Role),
+		SessionID:       sessionID,
+		ParticipantID:   participantID,
+		Room:            sessionID,
+		ConfigHash:      resolved.Hash,
+		Config:          resolved.Document,
+		Token:           token.JWT,
+		URL:             token.URL,
+		ExpiresAt:       token.ExpiresAt,
+		ICEServers:      iceServers,
+		EncryptionKey:   keyFor(resolved.Config, sess, req.Role),
+		AgentDispatchID: dispatchID,
 	})
+}
+
+func (s *Service) dispatchAgent(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig) (string, error) {
+	if !cfg.Agent.Enabled {
+		return "", nil
+	}
+	info, err := s.Transport.DispatchAgent(ctx, transport.AgentDispatch{
+		Room:     sess.Room,
+		Pool:     cfg.Agent.Pool,
+		Metadata: sess.Config,
+	})
+	if err != nil {
+		incDispatch(false)
+		return "", err
+	}
+	incDispatch(true)
+	s.log().Info("agent dispatched", "session", sess.SessionID, "pool", cfg.Agent.Pool, "dispatch", info.DispatchID)
+	return info.DispatchID, nil
 }
 
 type joinSessionRequest struct {

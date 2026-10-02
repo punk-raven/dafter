@@ -71,6 +71,7 @@ services:
       DAFTER_EGRESS_S3_FORCE_PATH_STYLE: "true"
       DAFTER_TURN_TOKEN_ID: ${DAFTER_TURN_TOKEN_ID:-}
       DAFTER_TURN_API_TOKEN: ${DAFTER_TURN_API_TOKEN:-}
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
     depends_on:
       livekit:
         condition: service_started
@@ -90,6 +91,26 @@ services:
       - ./deploy/egress.yaml:/etc/egress.yaml:ro
     cap_add:
       - SYS_ADMIN
+
+  agent:
+    build:
+      context: ./python
+    network_mode: host
+    environment:
+      LIVEKIT_URL: ws://127.0.0.1:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+      LIVEKIT_AGENT_NAME: dafter-py
+      DAFTER_CONTROL_URL: http://127.0.0.1:8080
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
+    depends_on:
+      livekit:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    restart: unless-stopped
 
   jaeger:
     image: jaegertracing/all-in-one:latest

@@ -32,11 +32,43 @@ type stubTransport struct {
 	grant transport.Grant
 	err   error
 
-	mu        sync.Mutex
-	started   []transport.EgressRequest
-	stopped   []string
-	egressErr error
-	nextID    int
+	mu          sync.Mutex
+	started     []transport.EgressRequest
+	stopped     []string
+	egressErr   error
+	nextID      int
+	dispatched  []transport.AgentDispatch
+	dispatchErr error
+	recalled    []string
+	live        []string
+	recallErr   error
+}
+
+func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.recallErr != nil {
+		return nil, s.recallErr
+	}
+	var out []transport.DispatchInfo
+	for _, id := range s.live {
+		out = append(out, transport.DispatchInfo{DispatchID: id, Room: room, Pool: pool})
+		s.recalled = append(s.recalled, id)
+	}
+	s.live = nil
+	return out, nil
+}
+
+func (s *stubTransport) DispatchAgent(_ context.Context, d transport.AgentDispatch) (transport.DispatchInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dispatchErr != nil {
+		return transport.DispatchInfo{}, s.dispatchErr
+	}
+	s.dispatched = append(s.dispatched, d)
+	id := fmt.Sprintf("AD_stub%d", len(s.dispatched))
+	s.live = append(s.live, id)
+	return transport.DispatchInfo{DispatchID: id, Room: d.Room, Pool: d.Pool}, nil
 }
 
 func (s *stubTransport) MintToken(g transport.Grant) (transport.Token, error) {
@@ -86,7 +118,10 @@ type harness struct {
 	server    *httptest.Server
 	store     *state.Store
 	transport *stubTransport
+	svc       *control.Service
 }
+
+const workerSecret = "worker-secret-for-tests"
 
 func serve(t *testing.T) *harness {
 	t.Helper()
@@ -111,23 +146,25 @@ func serve(t *testing.T) *harness {
 	tport := &stubTransport{}
 	svc := &control.Service{
 		Catalog: catalog, Store: store, Transport: tport, TokenTTL: 15 * time.Minute,
+		WorkerSecret: workerSecret,
 	}
 	server := httptest.NewServer(svc.MetricsHandler())
 	t.Cleanup(server.Close)
-	return &harness{server: server, store: store, transport: tport}
+	return &harness{server: server, store: store, transport: tport, svc: svc}
 }
 
 type sessionResponse struct {
-	SessionID     string           `json:"sessionId"`
-	ParticipantID string           `json:"participantId"`
-	Room          string           `json:"room"`
-	ConfigHash    string           `json:"configHash"`
-	Config        json.RawMessage  `json:"config"`
-	Token         string           `json:"token"`
-	URL           string           `json:"url"`
-	ExpiresAt     time.Time        `json:"expiresAt"`
-	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
-	EncryptionKey string           `json:"encryptionKey,omitempty"`
+	SessionID       string           `json:"sessionId"`
+	ParticipantID   string           `json:"participantId"`
+	Room            string           `json:"room"`
+	ConfigHash      string           `json:"configHash"`
+	Config          json.RawMessage  `json:"config"`
+	Token           string           `json:"token"`
+	URL             string           `json:"url"`
+	ExpiresAt       time.Time        `json:"expiresAt"`
+	ICEServers      []turn.ICEServer `json:"iceServers,omitempty"`
+	EncryptionKey   string           `json:"encryptionKey,omitempty"`
+	AgentDispatchID string           `json:"agentDispatchId,omitempty"`
 }
 
 func (h *harness) post(t *testing.T, body string) (int, []byte) {
@@ -696,11 +733,12 @@ type recordingResponse struct {
 }
 
 type sessionView struct {
-	SessionID  string          `json:"sessionId"`
-	Room       string          `json:"room"`
-	ConfigHash string          `json:"configHash"`
-	Config     json.RawMessage `json:"config"`
-	Recordings []recordingView `json:"recordings"`
+	SessionID    string          `json:"sessionId"`
+	Room         string          `json:"room"`
+	ConfigHash   string          `json:"configHash"`
+	Config       json.RawMessage `json:"config"`
+	Recordings   []recordingView `json:"recordings"`
+	AgentRefusal json.RawMessage `json:"agentRefusal"`
 }
 
 func recordingRequest(layout, startAt string) string {
@@ -967,5 +1005,322 @@ func TestReadingAnUnknownSessionFails(t *testing.T) {
 		if status, _ := h.call(t, http.MethodGet, "/sessions/"+id, ""); status != http.StatusBadRequest {
 			t.Errorf("GET /sessions/%s returned %d", id, status)
 		}
+	}
+}
+
+func TestAnAgentSessionHandsTheStoredDocumentToItsPool(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("hi", "webrtc"))
+
+	if len(h.transport.dispatched) != 1 || got.AgentDispatchID != "AD_stub1" {
+		t.Fatalf("dispatches %+v, response id %q; one agent session is one dispatch", h.transport.dispatched, got.AgentDispatchID)
+	}
+	d := h.transport.dispatched[0]
+	stored, err := h.store.Session(t.Context(), got.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Room != got.Room || d.Pool != "dafter-py" || !bytes.Equal(d.Metadata, stored.Config) {
+		t.Errorf("dispatched room %q pool %q; the worker must receive exactly the stored, hashed document", d.Room, d.Pool)
+	}
+}
+
+const agentJobFixture = "../../../testdata/agent/hindi-webrtc-job.json"
+
+func TestTheHindiAgentJobIsPinnedForTheWorker(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := config.LoadCatalog(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := catalog.Resolve(config.Request{
+		SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelWebRTC,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.Getenv("DAFTER_UPDATE_FIXTURES") == "1" {
+		if err := os.WriteFile(agentJobFixture, append(resolved.Document, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(agentJobFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(bytes.TrimSpace(want), resolved.Document) {
+		t.Errorf("the Hindi agent job changed; the worker's tests read %s, so rerun with DAFTER_UPDATE_FIXTURES=1 and check both halves\n got: %s", agentJobFixture, resolved.Document)
+	}
+}
+
+func TestNoAgentMeansNoDispatch(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, `{"tenantId":"`+tenantID+`","language":"hi","channel":"webrtc","overrides":{"agent":{"enabled":false}}}`)
+	if len(h.transport.dispatched) != 0 || got.AgentDispatchID != "" {
+		t.Errorf("a session without an agent dispatched one: %+v", h.transport.dispatched)
+	}
+}
+
+func TestAFailedDispatchMintsNoToken(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	h.transport.dispatchErr = errs.Errorf(errs.CodeProviderUnavailable, "media server unreachable")
+	status, raw := h.post(t, request("hi", "webrtc"))
+	if status != http.StatusServiceUnavailable {
+		t.Errorf("status %d: %s", status, raw)
+	}
+	if h.transport.grant.Identity != "" {
+		t.Error("a token was minted for a session whose agent never got the job")
+	}
+}
+
+type agentReply struct {
+	SessionID       string   `json:"sessionId"`
+	AgentDispatchID string   `json:"agentDispatchId"`
+	Recalled        []string `json:"recalled"`
+	Code            string   `json:"code"`
+	Details         []string `json:"details"`
+}
+
+func (h *harness) agent(t *testing.T, sessionID, action, body string) (int, agentReply) {
+	t.Helper()
+	status, raw := h.call(t, http.MethodPost, "/sessions/"+sessionID+"/agent/"+action, body)
+	var out agentReply
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode agent %s reply: %v: %s", action, err, raw)
+	}
+	return status, out
+}
+
+func TestInvitingTheAgentMidCallReplacesItWithOneDispatchOfTheStoredDocument(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("hi", "webrtc"))
+	stored, err := h.store.Session(t.Context(), got.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	status, reply := h.agent(t, got.SessionID, "start", "")
+	if status != http.StatusCreated || reply.AgentDispatchID != "AD_stub2" {
+		t.Fatalf("invite returned %d %+v", status, reply)
+	}
+	if len(reply.Recalled) != 1 || reply.Recalled[0] != got.AgentDispatchID {
+		t.Errorf("recalled %v, want the dispatch made at create so one agent is in the room", reply.Recalled)
+	}
+	if len(h.transport.dispatched) != 2 {
+		t.Fatalf("dispatches %+v", h.transport.dispatched)
+	}
+	d := h.transport.dispatched[1]
+	if d.Room != got.Room || d.Pool != "dafter-py" || !bytes.Equal(d.Metadata, stored.Config) {
+		t.Errorf("invited room %q pool %q; the worker must receive exactly the stored, hashed document", d.Room, d.Pool)
+	}
+}
+
+func TestRemovingTheAgentRecallsEveryDispatchAndIsIdempotent(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("hi", "webrtc"))
+
+	status, reply := h.agent(t, got.SessionID, "stop", "")
+	if status != http.StatusOK || len(reply.Recalled) != 1 || reply.Recalled[0] != got.AgentDispatchID {
+		t.Fatalf("remove returned %d %+v", status, reply)
+	}
+	status, reply = h.agent(t, got.SessionID, "stop", "")
+	if status != http.StatusOK || len(reply.Recalled) != 0 {
+		t.Errorf("a second remove returned %d %+v", status, reply)
+	}
+	if len(h.transport.dispatched) != 1 {
+		t.Errorf("a remove dispatched: %+v", h.transport.dispatched)
+	}
+}
+
+func TestTheStoredConfigDecidesWhetherAnAgentMayBeInvited(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	off := h.create(t, `{"tenantId":"`+tenantID+`","language":"hi","channel":"webrtc","overrides":{"agent":{"enabled":false}}}`)
+	sealed := h.create(t, sealedRequest("hi"))
+
+	cases := []struct {
+		name, session, body, code, pointer string
+	}{
+		{"agent off", off.SessionID, "", string(errs.CodeInvalidConfig), "/agent/enabled"},
+		{"sealed", sealed.SessionID, "", string(errs.CodePrivacyModeForbids), "/privacyMode"},
+		{"request asks for its own pool", off.SessionID, `{"pool":"other"}`, string(errs.CodeInvalidConfig), ""},
+	}
+	for _, c := range cases {
+		status, reply := h.agent(t, c.session, "start", c.body)
+		if status != http.StatusBadRequest || reply.Code != c.code {
+			t.Errorf("%s: invite returned %d %+v", c.name, status, reply)
+		}
+		if c.pointer != "" && (len(reply.Details) != 1 || !strings.Contains(reply.Details[0], c.pointer)) {
+			t.Errorf("%s: details %v do not locate %s", c.name, reply.Details, c.pointer)
+		}
+	}
+	if status, reply := h.agent(t, sealed.SessionID, "stop", ""); status != http.StatusBadRequest || reply.Code != string(errs.CodePrivacyModeForbids) {
+		t.Errorf("remove on a sealed session returned %d %+v", status, reply)
+	}
+	if len(h.transport.dispatched) != 0 || len(h.transport.recalled) != 0 {
+		t.Errorf("a refused request reached the media server: dispatched %+v recalled %v", h.transport.dispatched, h.transport.recalled)
+	}
+	if status, _ := h.call(t, http.MethodPost, "/sessions/s_00000000/agent/start", ""); status != http.StatusBadRequest {
+		t.Errorf("inviting into an unknown session returned %d", status)
+	}
+}
+
+func TestAFailedRecallDispatchesNoSecondAgent(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("hi", "webrtc"))
+	h.transport.recallErr = errs.Errorf(errs.CodeProviderUnavailable, "media server unreachable")
+	if status, reply := h.agent(t, got.SessionID, "start", ""); status != http.StatusServiceUnavailable {
+		t.Errorf("invite returned %d %+v", status, reply)
+	}
+	if len(h.transport.dispatched) != 1 {
+		t.Errorf("an invite whose recall failed dispatched anyway: %+v", h.transport.dispatched)
+	}
+}
+
+func (h *harness) worker(t *testing.T, credential, sessionID, action, body string) (int, []byte) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		h.server.URL+"/sessions/"+sessionID+"/agent/"+action, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if credential != "" {
+		req.Header.Set("Authorization", "Bearer "+credential)
+	}
+	resp, err := h.server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("POST agent/%s: %v", action, err)
+	}
+	defer closeBody(t, resp)
+	raw, err := readAll(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, raw
+}
+
+func keyRequest(hash string) string {
+	return `{"configHash":"` + hash + `"}`
+}
+
+func TestTheWorkerFetchesATrustedAgentSessionKeyOverItsOwnCredential(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	created := h.create(t, trustedAgentRequest("hi"))
+	status, raw := h.worker(t, workerSecret, created.SessionID, "key", keyRequest(created.ConfigHash))
+	if status != http.StatusOK {
+		t.Fatalf("agent key returned %d: %s", status, raw)
+	}
+	var got struct {
+		SessionID     string `json:"sessionId"`
+		EncryptionKey string `json:"encryptionKey"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.SessionID != created.SessionID || got.EncryptionKey != created.EncryptionKey {
+		t.Errorf("the worker got %+v, want the one key the humans hold; two keys make one session two calls", got)
+	}
+	for _, d := range h.transport.dispatched {
+		if bytes.Contains(d.Metadata, []byte(created.EncryptionKey)) {
+			t.Error("the key rode the dispatch, which the media server reads")
+		}
+	}
+}
+
+func TestTheSessionKeyIsWithheldUnlessTheWorkerAndTheModeAllowIt(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	trusted := h.create(t, trustedAgentRequest("hi"))
+	sealed := h.create(t, sealedRequest("hi"))
+	open := h.create(t, request("hi", "webrtc"))
+
+	cases := []struct {
+		name, credential, session, body string
+		status                          int
+		code                            errs.ErrorCode
+		pointer                         string
+	}{
+		{"no credential", "", trusted.SessionID, keyRequest(trusted.ConfigHash), http.StatusUnauthorized, errs.CodeAuthenticationFailed, ""},
+		{"a client token", trusted.Token, trusted.SessionID, keyRequest(trusted.ConfigHash), http.StatusUnauthorized, errs.CodeAuthenticationFailed, ""},
+		{"another document", workerSecret, trusted.SessionID, keyRequest(open.ConfigHash), http.StatusBadRequest, errs.CodeInvalidConfig, "/configHash"},
+		{"a field the call does not take", workerSecret, trusted.SessionID, `{"configHash":"` + trusted.ConfigHash + `","role":"participant"}`, http.StatusBadRequest, errs.CodeInvalidConfig, ""},
+		{"sealed", workerSecret, sealed.SessionID, keyRequest(sealed.ConfigHash), http.StatusBadRequest, errs.CodeInvalidConfig, "/agent/enabled"},
+		{"open", workerSecret, open.SessionID, keyRequest(open.ConfigHash), http.StatusBadRequest, errs.CodePrivacyModeForbids, "/privacyMode"},
+	}
+	for _, c := range cases {
+		status, raw := h.worker(t, c.credential, c.session, "key", c.body)
+		var de errs.Error
+		if err := json.Unmarshal(raw, &de); err != nil {
+			t.Fatalf("%s: %v: %s", c.name, err, raw)
+		}
+		if status != c.status || de.Code != c.code {
+			t.Errorf("%s: returned %d %s, want %d %s", c.name, status, de.Code, c.status, c.code)
+		}
+		if c.pointer != "" && (len(de.Details) != 1 || !strings.Contains(de.Details[0], c.pointer)) {
+			t.Errorf("%s: details %v do not locate %s", c.name, de.Details, c.pointer)
+		}
+		for _, key := range []string{trusted.EncryptionKey, sealed.EncryptionKey} {
+			if bytes.Contains(raw, []byte(key)) {
+				t.Errorf("%s: a refused call carried a session key", c.name)
+			}
+		}
+	}
+
+	h.svc.WorkerSecret = ""
+	if status, _ := h.worker(t, "", trusted.SessionID, "key", keyRequest(trusted.ConfigHash)); status != http.StatusUnauthorized {
+		t.Errorf("with no worker credential configured an empty one was accepted: %d", status)
+	}
+}
+
+func TestAWorkerRefusalIsReadBackUntilTheNextInvite(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	got := h.create(t, request("hi", "webrtc"))
+	refusal := `{"code":"unsupported_capability","message":"this worker cannot run the session's turn strategy","retryable":false,"details":["at '/turn/strategy': semantic"]}`
+
+	for name, body := range map[string]string{
+		"a field the error schema does not have": `{"code":"internal","message":"m","retryable":false,"transcript":"x"}`,
+		"a code outside the taxonomy":            `{"code":"worker_sad","message":"m","retryable":false}`,
+		"not json":                               `refused`,
+	} {
+		if status, raw := h.worker(t, workerSecret, got.SessionID, "refusal", body); status != http.StatusBadRequest {
+			t.Errorf("%s: returned %d %s", name, status, raw)
+		}
+	}
+	if status, _ := h.worker(t, "", got.SessionID, "refusal", refusal); status != http.StatusUnauthorized {
+		t.Errorf("an unauthenticated refusal returned %d", status)
+	}
+	if h.read(t, got.SessionID).AgentRefusal != nil {
+		t.Fatal("a rejected report was stored")
+	}
+
+	if status, raw := h.worker(t, workerSecret, got.SessionID, "refusal", refusal); status != http.StatusNoContent {
+		t.Fatalf("refusal returned %d %s", status, raw)
+	}
+	var stored errs.Error
+	if err := json.Unmarshal(h.read(t, got.SessionID).AgentRefusal, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Code != errs.CodeUnsupportedCapability || len(stored.Details) != 1 || !strings.Contains(stored.Details[0], "/turn/strategy") {
+		t.Errorf("the session reads back refusal %+v", stored)
+	}
+
+	if status, reply := h.agent(t, got.SessionID, "start", ""); status != http.StatusCreated {
+		t.Fatalf("invite returned %d %+v", status, reply)
+	}
+	if raw := h.read(t, got.SessionID).AgentRefusal; raw != nil {
+		t.Errorf("a fresh invite still shows the last refusal %s", raw)
 	}
 }
