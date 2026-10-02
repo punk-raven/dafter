@@ -22,7 +22,7 @@ class Vendor:
     languages: frozenset[str]
     native_endpointing: bool
     vad: Callable[[ProviderRef], lk_vad.VAD] | None
-    stt: Callable[[ProviderRef, str, Turn], lk_stt.STT[Any]] | None
+    stt: Callable[[ProviderRef, str, Turn, str | None], lk_stt.STT[Any]] | None
     llm: Callable[[ProviderRef], lk_llm.LLM[Any]] | None
     tts: Callable[[ProviderRef, str], lk_tts.TTS[Any]] | None
     wants_prewarm: Callable[[ProviderRef], bool]

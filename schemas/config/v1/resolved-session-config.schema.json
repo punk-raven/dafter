@@ -53,7 +53,7 @@
         },
         "name": {
           "type": "string",
-          "description": "What the agent is called: the name a person sees on its tile and in captions, and hears it introduce itself by in every language. The agent's persona and greeting read it, so it is stated once. Without one the agent introduces itself by no name.",
+          "description": "What the agent is called: the name a person sees on its tile and in captions, hears it introduce itself by in every language, and says to call it. The persona, the greeting and the name matcher all read it, so it is stated once, in the script the session's language is usually transcribed in; its other spellings are addressing.aliases. Without one the agent introduces itself by no name, and a mode that waits to be called needs one, which is a cross-field rule.",
           "minLength": 1,
           "maxLength": 32
         },
@@ -72,7 +72,8 @@
           "type": "string",
           "description": "Reference to a prompt/persona document. Never inline prose."
         },
-        "pipeline": { "$ref": "#/$defs/Pipeline" }
+        "pipeline": { "$ref": "#/$defs/Pipeline" },
+        "addressing": { "$ref": "#/$defs/Addressing" }
       }
     },
     "turn": { "$ref": "#/$defs/Turn" },
@@ -92,6 +93,41 @@
         "region": { "type": "string" },
         "credentialRef": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/SecretRef" },
         "options": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "Addressing": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "When the agent speaks. A session without this block behaves as mode always, the agent answering every turn of the one participant it is linked to, which is what every session did before the block existed.",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "always: the agent is linked to one participant and answers every turn of theirs. transcript: every human in the call is transcribed separately by the session's STT provider, the agent stays dormant and silent until one of them says its name, answers that person, and goes dormant again after the follow-up window; this sends every human's speech to the STT provider, not only the speech meant for the agent. on_device: the name is spotted locally before any audio leaves the worker; declared so a document can ask for it, and refused by the worker as an unsupported capability until a spotter is built.",
+          "enum": ["always", "transcript", "on_device"],
+          "default": "always"
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Other spellings of the agent's name (`agent.name`), one per script or common transcription, for example the Devanagari, Kannada and Telugu spellings of a Latin name. Every alias counts as the name in every language, because people in one call mix languages and a recognizer does not always transcribe a name in the session language's script.",
+          "items": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "nearMisses": {
+          "type": "array",
+          "description": "Words one letter away from the name that must never wake the agent: other people's names and ordinary words that a recognizer or a tolerant matcher would otherwise take for it. A near miss that is also the name or an alias contradicts itself, which is a cross-field rule.",
+          "items": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "followUpWindowMs": {
+          "type": "integer",
+          "description": "How long the agent stays awake for the person who called it after it has finished speaking, so a follow-up question needs no name. Counted from the end of the agent's reply, not from the wake.",
+          "minimum": 1000,
+          "maximum": 120000,
+          "default": 20000
+        }
       }
     },
     "Pipeline": {

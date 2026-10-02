@@ -27,6 +27,10 @@ async function createSession() {
     }
     const agent = agentOverride();
     if (agent && !overrides.agent) overrides.agent = agent;
+    const addressing = addressingOverride();
+    if (addressing && !(overrides.agent && overrides.agent.enabled === false)) {
+      overrides.agent = Object.assign(overrides.agent || {}, { addressing });
+    }
     if (Object.keys(overrides).length) body.overrides = overrides;
 
     const layout = document.getElementById('recording-layout').value;

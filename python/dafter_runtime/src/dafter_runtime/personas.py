@@ -84,6 +84,20 @@ SCRIPTS: dict[tuple[str, str], Script] = {
 }
 
 
+def called_by_name(persona: Persona) -> Persona:
+    return Persona(
+        instructions=(
+            f"{persona.instructions}\n\nYou are in a call with several people and you speak "
+            "only when one of them calls you by your name. Each message starts with who "
+            "spoke in square brackets: lines marked 'to you' are the person talking to "
+            "you, who is the one you answer; lines marked 'not to you' are what others said "
+            "in the call just before, which you may use as context but never answer or quote. "
+            "Call go_quiet when the person talking to you is done or asks you to be quiet."
+        ),
+        greeting=persona.greeting,
+    )
+
+
 def base_language(tag: str) -> str:
     return tag.split("-", 1)[0].lower()
 

@@ -43,6 +43,11 @@ var targets = []target{
 		Out: "internal/events/states_gen.go", AllName: "AllAgentStates",
 	},
 	{
+		Schema: "events/v1/envelope.schema.json", Pointer: []string{"$defs", "WakeSource", "enum"},
+		Package: "events", Type: "WakeSource", Prefix: "Wake",
+		Out: "internal/events/wake_gen.go", AllName: "AllWakeSources",
+	},
+	{
 		Schema: "events/v1/envelope.schema.json", Pointer: []string{"$defs", "UsageUnit", "enum"},
 		Package: "events", Type: "UsageUnit", Prefix: "Unit",
 		Out: "internal/events/units_gen.go", AllName: "AllUsageUnits",
@@ -66,6 +71,11 @@ var targets = []target{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"properties", "agent", "properties", "mode", "enum"},
 		Package: "config", Type: "AgentMode", Prefix: "Mode",
 		Out: "internal/config/modes_gen.go", AllName: "AllAgentModes",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Addressing", "properties", "mode", "enum"},
+		Package: "config", Type: "AddressingMode", Prefix: "Addressing",
+		Out: "internal/config/addressing_gen.go", AllName: "AllAddressingModes",
 	},
 	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Turn", "properties", "strategy", "enum"},

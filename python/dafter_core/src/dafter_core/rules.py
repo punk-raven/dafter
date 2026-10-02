@@ -41,6 +41,21 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         ),
     ),
     CrossFieldRule(
+        broken=lambda c: c.agent.addressing.waits_to_be_called and not c.agent.name,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/agent/name",
+        because="an agent that stays quiet until it is called by name needs a name to be called by",
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.agent.near_miss_is_its_name,
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/agent/addressing/nearMisses",
+        because=(
+            "a near miss is a word that must never wake the agent, so one that is also its "
+            "name or an alias contradicts itself"
+        ),
+    ),
+    CrossFieldRule(
         broken=lambda c: c.recording.enabled and not c.recording.consent_artifact_id,
         code=ErrorCode.CONSENT_REQUIRED,
         pointer="/recording/consentArtifactId",
