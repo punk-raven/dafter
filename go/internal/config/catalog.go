@@ -23,5 +23,8 @@ func LoadCatalog(raw []byte) (*Catalog, error) {
 				"the catalog carries a channel overlay that no session could ever select")
 		}
 	}
+	if err := c.checkLLMRoutes(); err != nil {
+		return nil, err
+	}
 	return &c, nil
 }

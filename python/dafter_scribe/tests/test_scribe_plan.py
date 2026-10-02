@@ -60,8 +60,8 @@ def test_an_unregistered_scribe_llm_is_located_at_the_scribe() -> None:
 
 
 def test_an_llm_that_does_not_declare_the_language_is_refused() -> None:
-    compat = {"provider": "openai_compat", "model": "m", "options": {"endpoint": "google"}}
-    err = refused("/language", language="en-IN", scribe={"llm": compat})
+    compat = {"provider": "google", "model": "m"}
+    err = refused("/language", language="ta-IN", scribe={"llm": compat})
     assert err.code is ErrorCode.UNSUPPORTED_CAPABILITY
 
 

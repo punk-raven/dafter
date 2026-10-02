@@ -142,6 +142,16 @@ var targets = []target{
 		Package: "config", Type: "RecordingNotice", Prefix: "Notice",
 		Out: "internal/config/notice_gen.go", AllName: "AllRecordingNotices",
 	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Speech", "properties", "normalization", "enum"},
+		Package: "config", Type: "SpeechNormalization", Prefix: "Normalization",
+		Out: "internal/config/normalization_gen.go", AllName: "AllSpeechNormalizations",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Situation", "enum"},
+		Package: "config", Type: "Situation", Prefix: "Situation",
+		Out: "internal/config/situations_gen.go", AllName: "AllSituations",
+	},
 }
 
 var initialisms = map[string]string{

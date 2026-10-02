@@ -28,8 +28,9 @@ class Vendor:
     name: str
     languages: frozenset[str]
     native_endpointing: bool
+    detects_language: bool
     vad: Callable[[ProviderRef], lk_vad.VAD] | None
-    stt: Callable[[ProviderRef, str, Turn, str | None], lk_stt.STT[Any]] | None
+    stt: Callable[[ProviderRef, str | None, Turn, str | None], lk_stt.STT[Any]] | None
     llm: BuildLLM | None
     tts: Callable[[ProviderRef, str], lk_tts.TTS[Any]] | None
     batch: Callable[[ProviderRef], BatchTranscriber] | None
@@ -43,6 +44,7 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             name=sarvam.NAME,
             languages=frozenset(sarvam.LANGUAGES),
             native_endpointing=True,
+            detects_language=True,
             vad=None,
             stt=sarvam.build_stt,
             llm=sarvam.build_llm,
@@ -55,6 +57,7 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             name=silero.NAME,
             languages=frozenset(),
             native_endpointing=False,
+            detects_language=False,
             vad=silero.build_vad,
             stt=None,
             llm=None,
@@ -63,18 +66,22 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             wants_prewarm=lambda _: False,
             classify=silero.classify,
         ),
-        openai_compat.NAME: Vendor(
-            name=openai_compat.NAME,
-            languages=openai_compat.LANGUAGES,
-            native_endpointing=False,
-            vad=None,
-            stt=None,
-            llm=openai_compat.build_llm,
-            tts=None,
-            batch=None,
-            wants_prewarm=openai_compat.wants_prewarm,
-            classify=openai_compat.classify,
-        ),
+        **{
+            name: Vendor(
+                name=name,
+                languages=openai_compat.LANGUAGES,
+                native_endpointing=False,
+                detects_language=False,
+                vad=None,
+                stt=None,
+                llm=openai_compat.builder(endpoint),
+                tts=None,
+                batch=None,
+                wants_prewarm=openai_compat.wants_prewarm,
+                classify=openai_compat.classifier(endpoint),
+            )
+            for name, endpoint in openai_compat.ENDPOINTS.items()
+        },
     }
 )
 

@@ -25,6 +25,8 @@ from .enums import (
 )
 from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
+from .speech import Backchannel, Speech
+from .switching import LanguageSwitching
 from .telephony import Telephony
 from .validation import validate_document
 
@@ -81,6 +83,7 @@ class Interruption:
     min_words: int = 0
     false_interruption_timeout_ms: int = 0
     resume_false_interruption: bool = True
+    backchannel: Backchannel = field(default_factory=Backchannel)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Interruption:
@@ -91,6 +94,7 @@ class Interruption:
             min_words=d.get("minWords", 0),
             false_interruption_timeout_ms=d.get("falseInterruptionTimeoutMs", 0),
             resume_false_interruption=d.get("resumeFalseInterruption", True),
+            backchannel=Backchannel.from_dict(d.get("backchannel") or {}),
         )
 
 
@@ -162,6 +166,8 @@ class Agent:
     persona_ref: str | None = None
     pipeline: Pipeline | None = None
     addressing: Addressing = field(default_factory=Addressing)
+    speech: Speech = field(default_factory=Speech)
+    language_switching: LanguageSwitching = field(default_factory=LanguageSwitching)
 
     @property
     def near_miss_is_its_name(self) -> bool:
@@ -179,6 +185,8 @@ class Agent:
             persona_ref=d.get("personaRef"),
             pipeline=Pipeline.from_dict(d["pipeline"]) if d.get("pipeline") else None,
             addressing=Addressing.from_dict(d.get("addressing") or {}),
+            speech=Speech.from_dict(d.get("speech") or {}),
+            language_switching=LanguageSwitching.from_dict(d.get("languageSwitching") or {}),
         )
 
 
@@ -443,6 +451,7 @@ class ResolvedSessionConfig:
     telephony: Telephony = field(default_factory=Telephony)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
+    llm: str | None = None
 
     def validate_cross_field_rules(self) -> None:
         broken = [rule for rule in CROSS_FIELD_RULES if rule.broken(self)]
@@ -477,6 +486,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         telephony=Telephony.from_dict(doc.get("telephony") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
+        llm=doc.get("llm"),
     )
     cfg.validate_cross_field_rules()
     return cfg

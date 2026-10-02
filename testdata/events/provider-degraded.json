@@ -1,0 +1,22 @@
+{
+  "eventId": "e_4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e",
+  "type": "provider.degraded",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 5,
+  "occurredAt": "2026-09-24T10:00:02.114Z",
+  "payload": {
+    "error": {
+      "code": "rate_limited",
+      "message": "openrouter llm failed (APIStatusError)",
+      "retryable": true,
+      "stage": "llm",
+      "provider": {
+        "name": "openrouter",
+        "nativeCode": "429"
+      }
+    },
+    "recoverable": true
+  }
+}

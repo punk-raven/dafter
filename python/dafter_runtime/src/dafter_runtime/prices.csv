@@ -5,3 +5,9 @@ sarvam,sarvam-105b,output_token,73.20,1000000,https://www.sarvam.ai/api-pricing,
 sarvam,sarvam-105b-conversations,input_token,29.28,1000000,https://www.sarvam.ai/api-pricing,2026-09-27
 sarvam,sarvam-105b-conversations,output_token,73.20,1000000,https://www.sarvam.ai/api-pricing,2026-09-27
 sarvam,bulbul:v3,character,3.00,1000,https://www.sarvam.ai/api-pricing,2026-09-27
+openrouter,nvidia/nemotron-3-super-120b-a12b:free,input_token,0,1000000,https://openrouter.ai/api/v1/models,2026-09-29
+openrouter,nvidia/nemotron-3-super-120b-a12b:free,output_token,0,1000000,https://openrouter.ai/api/v1/models,2026-09-29
+openrouter,inclusionai/ling-3.0-flash-sante:free,input_token,0,1000000,https://openrouter.ai/api/v1/models,2026-09-29
+openrouter,inclusionai/ling-3.0-flash-sante:free,output_token,0,1000000,https://openrouter.ai/api/v1/models,2026-09-29
+openrouter,liquid/lfm-2.5-2.6b:free,input_token,0,1000000,https://openrouter.ai/api/v1/models,2026-09-29
+openrouter,liquid/lfm-2.5-2.6b:free,output_token,0,1000000,https://openrouter.ai/api/v1/models,2026-09-29

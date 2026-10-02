@@ -177,7 +177,7 @@ def test_a_session_with_a_scribe_offers_its_tools_and_one_without_does_not() -> 
         async def run(p: Plan = p, stub: StubLLM = stub, scribe: bool = scribe) -> None:
             async with AgentSession[None](llm=stub) as session:
                 s = scribing(p)[0] if scribe else None
-                registry = registry_for(p, session, Roster(), lambda: None, None, s)
+                registry = registry_for(p, session, Roster(), lambda: None, None, scribing=s)
                 await session.start(Answering(p.persona.instructions, registry, lambda: None))
                 await session.run(user_input="नमस्ते")
 
@@ -197,7 +197,7 @@ def test_a_text_turn_takes_a_note_and_summarizes_through_the_registry() -> None:
 
     async def run() -> None:
         async with AgentSession[None](llm=stub) as session:
-            registry = registry_for(p, session, Roster(), lambda: ASHA, None, s)
+            registry = registry_for(p, session, Roster(), lambda: ASHA, None, scribing=s)
             await session.start(Answering(p.persona.instructions, registry, lambda: ASHA))
             await session.run(user_input="नोट कर लो: बजट आशा देखेगी")
             await session.run(user_input="अभी तक क्या बात हुई?")
@@ -219,7 +219,7 @@ def test_new_notes_brief_the_agent_before_its_next_turn() -> None:
 
     async def run() -> None:
         async with AgentSession[None](llm=stub) as session:
-            registry = registry_for(p, session, Roster(), lambda: ASHA, None, s)
+            registry = registry_for(p, session, Roster(), lambda: ASHA, None, scribing=s)
             agent = Answering(p.persona.instructions, registry, lambda: ASHA)
             s.briefed = lambda: agent.brief(s.context())
             await session.start(agent)

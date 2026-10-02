@@ -75,6 +75,20 @@ What frame encryption in that session covers and what it does not:
 | The browser's own data packets, since it passes the key provider as `RoomOptions.encryption` | Packet sizes and timing, and the per-packet audio level header the media server uses for active speaker detection, so who speaks when is visible |
 | | The key on the worker-to-control call travels over plain HTTP in the dev stack; outside it that call needs TLS. The worker credential is one static secret for the whole pool, and the `configHash` it sends is in the job metadata the media server sees, so the credential is the only gate |
 
+**Recorded, offline accuracy per language (2026-09-28, `dafter-asr`).** Sarvam `saaras:v3-realtime` as each language's job vector builds it, on the pinned 20-clip samples in `testdata/asr/` (Kathbath read speech for hi, kn, mr, te, 20 speakers each; Svarah Indian-accented English for en-IN, 20 first languages and districts), streamed in real time. Word error rate after `dafter-wer`'s normalisation. Latin words are the Latin-script words codemix wrote; Kathbath writes English loanwords in the Indic script, so each one was charged as an error, and the codemix rate less them is a floor (an inference: it assumes every Latin word was heard right).
+
+| Language | transcribe | codemix (Latin words, floor) | codemix, language identified | identified right | last final after the audio, p50 |
+|---|---|---|---|---|---|
+| hi | 10.2% | 18.0% (22, 9.0%) | 18.0% | 20 of 20 clips | 364ms |
+| kn-IN | 18.8% | 25.2% (16, 17.9%) | 25.2% | 20 of 20 | 474ms |
+| mr-IN | 16.0% | 21.8% (14, 15.6%) | 21.8% | 19 of 20 | 380ms |
+| te-IN | 20.3% | 28.2% (19, 18.8%) | 30.2% | 19 of 20 | 327ms |
+| en-IN (Svarah) | 6.9% | not run | not run | - | 646ms (transcribe) |
+
+For scale only (different sample, whole test set): IndicWhisper on Kathbath scores hi 10.3, kn 19.3, mr 19.9, te 25.0 (Vistaar README). Identifying the language cost nothing measurable in hi, kn and mr; in Telugu one clip's last two finals came back as English ("Children understanding was created"), with language confidence 0.3 and 0.5, which `languageSwitching.minConfidence` (0.8) would not switch on. The Marathi miss was one short final tagged en-IN at 0.85, which it would, while correct Marathi finals went as low as 0.41. Switching therefore stays off by default until the live set says otherwise. Both identified runs were repeated with the same outcome. Spend: about Rs 22 of Sarvam STT.
+
+en-IN runs `transcribe`, the mode its route names, so it has no codemix or identified run, and it is a different dataset, so it compares with the others loosely. Half its 17 errors in 246 words are how a word is written, not what was heard: `18+` against `18 plus`, `pincode` against `pin code`, `MPIN` against `M PIN`, a district the reference spells as spoken, and a reference cut off mid-name. The rest are short words and two content words from North-East speakers (`daytime` as `their time`, `disease` as `digest`). An eleven-digit phone number came back right and a six-digit PIN code came back with two digits swapped, so an agent still reads numbers back. Spend: Rs 1.28.
+
 ## Infrastructure (parallel track)
 
 | Piece | What | How |

@@ -3,6 +3,7 @@ function sessionRequest() {
     tenantId: document.getElementById('tenant').value,
     language: document.getElementById('language').value,
     channel: document.getElementById('channel').value,
+    llm: chosenLlm(),
   };
   const profile = document.getElementById('profile').value.trim();
   if (profile) body.profile = profile;
@@ -26,6 +27,7 @@ function sessionRequest() {
   if (addressing && !(overrides.agent && overrides.agent.enabled === false)) {
     overrides.agent = Object.assign(overrides.agent || {}, { addressing });
   }
+  speechOverrides(overrides);
   if (Object.keys(overrides).length) body.overrides = overrides;
 
   const layout = document.getElementById('recording-layout').value;
@@ -70,21 +72,24 @@ async function createSession() {
     if (!resp.ok) {
       log(`Create failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
-      return;
+      return null;
     }
 
     showCreatedSession(data);
+    btn.disabled = false;
+    return data.room;
   } catch (err) {
     log(`Error: ${err.message}`, 'error');
   }
   btn.disabled = false;
+  return null;
 }
 
 async function joinRoom() {
   const roomId = document.getElementById('room-id').value.trim();
   if (!roomId) {
     log('Enter a Room ID or create a session first', 'error');
-    return;
+    return false;
   }
 
   const btn = document.getElementById('btn-join');
@@ -103,11 +108,12 @@ async function joinRoom() {
     if (!resp.ok) {
       log(`Join failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
-      return;
+      return false;
     }
 
     log(`Joined session: ${data.sessionId} | Participant: ${data.participantId}`, 'success');
     localParticipantId = data.participantId;
+    lastRoomId = roomId;
 
     const icePolicy = document.getElementById('ice-policy').value;
     const hasICEServers = data.iceServers && data.iceServers.length > 0;
@@ -244,16 +250,17 @@ async function joinRoom() {
     document.getElementById('panel-create').style.display = 'none';
     document.getElementById('panel-join').style.display = 'none';
     document.getElementById('session-created-info').style.display = 'none';
-    document.getElementById('btn-leave').style.display = 'block';
+    setInCall(true);
     showRecordingPanel(data);
 
     startStats(data);
     monitorICE();
-
+    return true;
   } catch (err) {
     log(`Error: ${err.message}`, 'error');
     btn.disabled = false;
     setBadge('disconnected');
+    return false;
   }
 }
 
@@ -296,7 +303,7 @@ function cleanup() {
   document.getElementById('panel-join').style.display = 'block';
   document.getElementById('btn-create').disabled = false;
   document.getElementById('btn-join').disabled = false;
-  document.getElementById('btn-leave').style.display = 'none';
+  setInCall(false);
   document.getElementById('ice-info').style.display = 'none';
   document.getElementById('panel-recording').style.display = 'none';
 }

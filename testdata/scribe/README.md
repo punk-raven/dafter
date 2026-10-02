@@ -19,8 +19,8 @@ hands both pools for a Hindi WebRTC session with live transcription and the
 scribe on, byte for byte as the embedded catalog resolves it:
 `hindi-scribe-job.json` with no profile (Sarvam writes and judges),
 `hindi-scribe-gemini-job.json` with profile `scribe-gemini` and
-`hindi-scribe-nvidia-job.json` with profile `scribe-nvidia` (openai_compat on
-the `google` and `nvidia` endpoints). `go/internal/control/scribe_test.go`
+`hindi-scribe-nvidia-job.json` with profile `scribe-nvidia` (the `google` and
+`nvidia` endpoint vendors). `go/internal/control/scribe_test.go`
 resolves them and fails if the bytes differ (rerun with
 `DAFTER_UPDATE_FIXTURES=1` when the catalog changes on purpose);
 `python/dafter_scribe/tests/test_scribe_models.py` plans and builds each

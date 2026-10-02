@@ -137,3 +137,22 @@ def test_the_reply_budget_is_judged_on_the_gap_the_caller_hears() -> None:
     assert summary["worker"]["layers"]["endOfTurnDelayMs"]["p50"] == 0
     assert (summary["caller"]["clock"], summary["worker"]["clock"]) == ("caller", "worker")
     assert set(summary["clocks"]) == {"caller", "worker"}
+
+
+def test_the_endpoint_and_the_gap_to_the_reply_are_layers_and_filler_turns_are_counted() -> None:
+    turns = [
+        metrics(0, 900, endpointMs=700, replyGapMs=1600, filler=True),
+        metrics(1, 800, endpointMs=650, replyGapMs=1450),
+    ]
+    by_worker = worker(turns)
+    assert by_worker["layers"]["endpointMs"] == {"n": 2, "p50": 675, "p95": 698}
+    assert by_worker["layers"]["replyGapMs"] == {"n": 2, "p50": 1525, "p95": 1592}
+    assert by_worker["fillerTurns"] == 1
+
+
+def test_a_report_from_before_the_endpoint_layer_still_compares() -> None:
+    before = report([2000, 2100, 2250], [barge_in(1250)])
+    for layer in ("endpointMs", "replyGapMs"):
+        del before["worker"]["layers"][layer]
+    diff = compare(before, report([700, 750, 900], [barge_in(260)]))
+    assert diff["deltaMs"]["worker"]["endpointMs"] == {"p50": None, "p95": None}

@@ -209,7 +209,7 @@ func TestAProfileSwitchesTheScribesLLMWithoutCarryingSarvamFields(t *testing.T) 
 			t.Fatalf("%s: %v", profile, err)
 		}
 		for name, ref := range map[string]*config.ProviderRef{"llm": resolved.Config.Scribe.LLM, "judge": resolved.Config.Scribe.Judge} {
-			if ref.Provider != "openai_compat" || ref.Region != "" || ref.Options["endpoint"] != endpoint {
+			if _, named := ref.Options["endpoint"]; named || ref.Provider != endpoint || ref.Region != "" {
 				t.Errorf("%s %s resolved to %+v", profile, name, ref)
 			}
 			if _, leaked := ref.Options["thinking"]; leaked {

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -7,6 +9,8 @@ from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
+from dafter_core.enums import EventType
+from dafter_core.events import parse_event
 from dafter_providers.sarvam.realtime import FinalFirstSTT
 from dafter_runtime.events import SessionEvents
 from dafter_runtime.metrics import WorkerMetrics
@@ -45,8 +49,13 @@ def logged_stage(source: object, error: Any) -> tuple[str, str | None]:
     capture = Capture()
     logger = logging.getLogger("dafter.runtime")
     logger.addHandler(capture)
-    try:
+
+    async def fail() -> None:
         session.handlers["error"](ErrorEvent(error=error, source=source))
+        await events.drain()
+
+    try:
+        asyncio.run(fail())
     finally:
         logger.removeHandler(capture)
     [record] = [r for r in records if r.getMessage() == "pipeline stage failed"]
@@ -73,3 +82,35 @@ def test_each_stage_is_told_by_what_failed_not_where_it_is_defined(kind: type, s
 
 def test_anything_else_is_the_control_stage() -> None:
     assert logged_stage(object(), timeout())[0] == "control"
+
+
+def test_a_failed_llm_request_is_published_so_the_page_can_say_why() -> None:
+    p = plan(load(JOB.read_bytes().strip()), "dafter-py")
+    sent: list[bytes] = []
+
+    async def publish(body: bytes) -> None:
+        sent.append(body)
+
+    events = SessionEvents(p.config, publish, clock=lambda: datetime(2026, 9, 28, tzinfo=UTC))
+    session = Session(None)
+    watch(
+        cast(AgentSession[Any], session),
+        p,
+        events,
+        trace.NoOpTracer(),
+        WorkerMetrics(CollectorRegistry()),
+    )
+    limited = APIStatusError("free-models-per-day", status_code=429, body={"error": {}})
+    error = llm.LLMError(timestamp=0.0, label="sarvam", error=limited, recoverable=True)
+
+    async def run() -> None:
+        session.handlers["error"](ErrorEvent(error=error, source=Mock(spec=llm.LLM)))
+        await events.drain()
+
+    asyncio.run(run())
+    [event] = [parse_event(body) for body in sent]
+    assert event.type is EventType.PROVIDER_DEGRADED
+    assert event.payload["recoverable"] is True
+    assert event.payload["error"]["stage"] == "llm"
+    assert event.payload["error"]["provider"]["nativeCode"] == "429"
+    assert "free-models-per-day" not in json.dumps(event.payload)

@@ -56,6 +56,12 @@ def test_parses_a_minimal_document() -> None:
     assert c.turn.local_vad_enabled is True
 
 
+def test_the_llm_route_is_read_and_unstated_means_the_languages_own() -> None:
+    assert parse(doc(llm="groq/qwen/qwen3.8-27b")).llm == "groq/qwen/qwen3.8-27b"
+    assert parse(doc()).llm is None
+    assert refuse(doc(llm="qwen3.8")).code is ErrorCode.INVALID_CONFIG
+
+
 def test_the_agent_name_and_greeting_are_read_and_unstated_means_unnamed_and_silent() -> None:
     c = parse(doc(agent={"enabled": True, "pool": "dafter-py", "name": "Nivya", "greets": True}))
     assert (c.agent.name, c.agent.greets) == ("Nivya", True)

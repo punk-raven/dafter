@@ -1,0 +1,22 @@
+{
+  "kathbath": {
+    "name": "Kathbath, as packaged in the Vistaar benchmark",
+    "archive": "https://indicwhisper.objectstore.e2enetworks.net/vistaar_benchmarks/kathbath.zip",
+    "bytes": 3457654951,
+    "etag": "\"bab49044464c3d44b500ec4258894da7-207\"",
+    "lastModified": "Thu, 01 May 2025 16:19:37 GMT",
+    "license": "CC-BY-4.0",
+    "homepage": "https://github.com/AI4Bharat/vistaar",
+    "paper": "https://arxiv.org/abs/2208.11761",
+    "languages": { "hi": "hindi", "kn-IN": "kannada", "mr-IN": "marathi", "te-IN": "telugu" }
+  },
+  "svarah": {
+    "name": "Svarah, Indian-accented English",
+    "dataset": "ai4bharat/Svarah",
+    "revision": "ebbf7777fe771490696a3f7b007097606fa8c924",
+    "license": "CC-BY-4.0",
+    "homepage": "https://huggingface.co/datasets/ai4bharat/Svarah",
+    "paper": "https://arxiv.org/abs/2305.15760",
+    "languages": { "en-IN": "test" }
+  }
+}

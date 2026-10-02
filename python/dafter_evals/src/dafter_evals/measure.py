@@ -20,6 +20,7 @@ CLOCKS = {
 }
 CALLER_SPANS = ("gap_ms", "end_of_turn_ms", "reply_ms")
 LAYERS = (
+    "endpointMs",
     "endOfTurnDelayMs",
     "transcriptionDelayMs",
     "llmNodeTtftMs",
@@ -27,7 +28,9 @@ LAYERS = (
     "ttsNodeTtfbMs",
     "playbackLatencyMs",
     "e2eLatencyMs",
+    "replyGapMs",
 )
+UNMEASURED: dict[str, int | None] = {"p50": None, "p95": None}
 AGENT_SPEAKING = "speaking"
 
 
@@ -61,7 +64,8 @@ def worker(turn_metrics: list[dict[str, Any]]) -> dict[str, Any]:
         layer: spread([m[layer] for m in turn_metrics if isinstance(m.get(layer), int)])
         for layer in LAYERS
     }
-    return {"clock": WORKER, "layers": layers}
+    filled = sum(1 for m in turn_metrics if m.get("filler") is True)
+    return {"clock": WORKER, "layers": layers, "fillerTurns": filled}
 
 
 def state_stop(states: list[tuple[float, str]], onset: float, until: float) -> int | None:
@@ -113,7 +117,9 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]
     was_layers, now_layers = baseline[WORKER]["layers"], current[WORKER]["layers"]
     rows: dict[str, Any] = {
         CALLER: {s: _deltas(was_caller[s], now_caller[s]) for s in CALLER_SPANS},
-        WORKER: {layer: _deltas(was_layers[layer], now_layers[layer]) for layer in LAYERS},
+        WORKER: {
+            layer: _deltas(was_layers.get(layer, UNMEASURED), now_layers[layer]) for layer in LAYERS
+        },
     }
     was_stop = baseline["barge_in"]["state_stop_p50_ms"]
     now_stop = current["barge_in"]["state_stop_p50_ms"]

@@ -79,6 +79,12 @@ def test_the_session_catches_barge_in_on_the_local_vad_and_ends_turns_on_the_rec
         assert session.options.endpointing["mode"] == "fixed"
         assert session.options.preemptive_generation["enabled"] is True
         assert session.options.preemptive_generation["preemptive_tts"] is True
+        transforms = session.options.tts_text_transforms
+        assert transforms is not None and list(transforms[:2]) == [
+            "filter_markdown",
+            "filter_emoji",
+        ]
+        assert callable(transforms[2])
 
     check_session(offline_plan(), check)
 

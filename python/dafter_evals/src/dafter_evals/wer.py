@@ -5,17 +5,16 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-NUKTA = "\u093c"
-CHANDRABINDU = "\u0901"
-ANUSVARA = "\u0902"
+NUKTAS = dict.fromkeys(map(ord, "\u093c\u0cbc\u0c3c"))
+ANUSVARA_FOR_CHANDRABINDU = {0x0901: "\u0902", 0x0C81: "\u0c82", 0x0C01: "\u0c02"}
 JOINERS = dict.fromkeys(map(ord, "\u200c\u200d\ufeff"))
-DEVANAGARI_DIGITS = {0x0966 + i: str(i) for i in range(10)}
+INDIC_DIGITS = {zero + i: str(i) for zero in (0x0966, 0x0CE6, 0x0C66) for i in range(10)}
 
 
 def normalise(text: str) -> str:
     text = unicodedata.normalize("NFD", text)
-    text = text.replace(NUKTA, "").replace(CHANDRABINDU, ANUSVARA)
-    text = unicodedata.normalize("NFC", text).translate(JOINERS).translate(DEVANAGARI_DIGITS)
+    text = text.translate(NUKTAS).translate(ANUSVARA_FOR_CHANDRABINDU)
+    text = unicodedata.normalize("NFC", text).translate(JOINERS).translate(INDIC_DIGITS)
     text = "".join(" " if unicodedata.category(c)[0] in "PS" else c for c in text.casefold())
     return " ".join(text.split())
 

@@ -73,6 +73,7 @@ class Meter:
 class Events:
     states: list[tuple[float, str]] = field(default_factory=list)
     turn_metrics: list[dict[str, Any]] = field(default_factory=list)
+    usage: dict[str, Any] | None = None
     errors: int = 0
 
     def receive(self, body: bytes, at: float) -> None:
@@ -85,6 +86,8 @@ class Events:
             self.states.append((at, str(event.payload["state"])))
         elif event.type is EventType.AGENT_TURN_METRICS:
             self.turn_metrics.append(dict(event.payload))
+        elif event.type is EventType.SESSION_USAGE:
+            self.usage = dict(event.payload)
 
     def state_after(self, t: float) -> tuple[float, str] | None:
         return next(((st, s) for st, s in self.states if st > t), None)

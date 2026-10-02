@@ -17,6 +17,7 @@ type Catalog struct {
 	Profiles  map[string]json.RawMessage `json:"profiles"`
 	Languages map[string]Axis            `json:"languages"`
 	Channels  map[Channel]Axis           `json:"channels"`
+	LLMs      map[string]json.RawMessage `json:"llms"`
 }
 
 type Axis struct {
@@ -30,6 +31,7 @@ type Request struct {
 	Profile   string
 	Language  string
 	Channel   Channel
+	LLM       string
 	Overrides json.RawMessage
 }
 
@@ -53,6 +55,9 @@ func (c *Catalog) Resolve(req Request) (*Resolution, error) {
 	doc["tenantId"] = req.TenantID
 	doc["language"] = req.Language
 	doc["channel"] = string(req.Channel)
+	if req.LLM != "" {
+		doc["llm"] = req.LLM
+	}
 	stampEncryption(doc)
 
 	raw, err := json.Marshal(doc)
@@ -71,28 +76,30 @@ func (c *Catalog) Resolve(req Request) (*Resolution, error) {
 }
 
 type source struct {
-	name string
-	raw  json.RawMessage
+	name     string
+	raw      json.RawMessage
+	replaces string
 }
 
 func (c *Catalog) compose(req Request) (map[string]any, error) {
-	sources := []source{{"defaults", c.Defaults}}
+	sources := []source{{name: "defaults", raw: c.Defaults}}
 	var problems []string
 
 	if raw, ok := c.Tenants[req.TenantID]; ok {
-		sources = append(sources, source{"tenant", raw})
+		sources = append(sources, source{name: "tenant", raw: raw})
 	} else {
 		problems = append(problems, located("/tenantId", "no tenant configuration is registered"))
 	}
 	if req.Profile != "" {
 		if raw, ok := c.Profiles[req.Profile]; ok {
-			sources = append(sources, source{"profile", raw})
+			sources = append(sources, source{name: "profile", raw: raw})
 		} else {
 			problems = append(problems, located("/profile", "no profile of that name is registered"))
 		}
 	}
 	if len(req.Overrides) > 0 {
 		problems = append(problems, reservedProblems(req.Overrides)...)
+		problems = append(problems, routeProblems(req.Overrides)...)
 	}
 	if len(problems) > 0 {
 		return nil, detailed(errs.CodeInvalidConfig, problems, "%d layer(s) could not be resolved")
@@ -108,15 +115,20 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 		problems = append(problems, located("/channel",
 			"no channel overlay is configured, so turn constants cannot be resolved for this channel"))
 	}
+	overlays := []source{
+		{name: req.Language + " language overlay", raw: language.Overlay},
+		{name: string(req.Channel) + " channel overlay", raw: channel.Overlay},
+	}
+	if req.LLM != "" {
+		route, unknown := c.llmRoute(req.LLM)
+		problems = append(problems, unknown...)
+		overlays = append(overlays, route)
+	}
 	if len(problems) > 0 {
 		return nil, detailed(errs.CodeUnsupportedCapability, problems, "%d composition axis/axes could not be resolved")
 	}
 
-	sources = append(sources, source{"language tuning", language.Tuning}, source{"channel tuning", channel.Tuning})
-	overlays := []source{
-		{req.Language + " language overlay", language.Overlay},
-		{string(req.Channel) + " channel overlay", channel.Overlay},
-	}
+	sources = append(sources, source{name: "language tuning", raw: language.Tuning}, source{name: "channel tuning", raw: channel.Tuning})
 	doc := map[string]any{}
 	for _, s := range sources {
 		m, err := decode(s)
@@ -125,17 +137,17 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 		}
 		doc = merge(doc, m)
 	}
-	overrides, err := decode(source{"overrides", req.Overrides})
+	overrides, err := decode(source{name: "overrides", raw: req.Overrides})
 	if err != nil {
 		return nil, err
 	}
 	doc = merge(doc, overrides)
 	pins := make([]map[string]any, len(overlays))
 	for i, s := range overlays {
-		if pins[i], err = decode(s); err != nil {
+		if pins[i], err = s.pin(); err != nil {
 			return nil, err
 		}
-		doc = merge(doc, pins[i])
+		doc = merge(cut(doc, s.replaces), pins[i])
 	}
 
 	for _, pointer := range dropped(overrides, doc, "") {
@@ -184,6 +196,9 @@ var (
 func pinnedBy(overlays []source, pins []map[string]any, pointer string) string {
 	tokens := strings.Split(strings.TrimPrefix(pointer, "/"), "/")
 	for i := len(pins) - 1; i > 0; i-- {
+		if overlays[i].pins(pointer) {
+			return overlays[i].name
+		}
 		var node any = pins[i]
 		for _, token := range tokens {
 			m, _ := node.(map[string]any)
