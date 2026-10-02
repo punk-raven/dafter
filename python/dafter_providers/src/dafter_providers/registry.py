@@ -13,7 +13,7 @@ from livekit.agents import stt as lk_stt
 from livekit.agents import tts as lk_tts
 from livekit.agents import vad as lk_vad
 
-from . import sarvam, silero
+from . import openai_compat, sarvam, silero
 from .batch import BatchTranscriber
 
 
@@ -44,6 +44,18 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             batch=sarvam.build_batch,
             wants_prewarm=sarvam.wants_prewarm,
             classify=sarvam.classify,
+        ),
+        openai_compat.NAME: Vendor(
+            name=openai_compat.NAME,
+            languages=openai_compat.LANGUAGES,
+            native_endpointing=False,
+            vad=None,
+            stt=None,
+            llm=openai_compat.build_llm,
+            tts=None,
+            batch=None,
+            wants_prewarm=openai_compat.wants_prewarm,
+            classify=openai_compat.classify,
         ),
         silero.NAME: Vendor(
             name=silero.NAME,

@@ -39,13 +39,16 @@ from opentelemetry import trace
 
 from . import telemetry
 from .answering import Roster
+from .backchannel import Acknowledgements
 from .called import Called
 from .captions import Captions, source_of
 from .control import ControlPlane, encryption
 from .cost import OutputTokens, load_prices, priced, usage_payload
+from .delivery import Delivery
 from .events import TOPIC, SessionEvents
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
+from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
 from .timing import Turns, TurnTiming
 from .toolbox import Answering, follow, linked, registry_for
@@ -149,6 +152,7 @@ def watch(
     tracer: trace.Tracer,
     metrics: WorkerMetrics = WORKER,
     usage: Callable[[], AgentSessionUsage] | None = None,
+    filled: Callable[[], bool] = lambda: False,
 ) -> None:
     turns = Turns(getattr(session.stt, "take_endpoint", None))
     generated = OutputTokens()
@@ -172,7 +176,7 @@ def watch(
     def item_added(ev: ConversationItemAddedEvent) -> None:
         if not isinstance(ev.item, ChatMessage):
             return
-        timing = turns.add(ev.item)
+        timing = turns.add(ev.item, filled())
         if timing is None:
             return
         report(timing)
@@ -239,6 +243,7 @@ def watch(
 
 
 def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
+    spoken = SpeechPlan(p.config.agent.speech, p.config.language).transforms()
     if p.called_by_name:
         return AgentSession(
             stt=NOT_GIVEN,
@@ -247,6 +252,8 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
             vad=None,
             turn_handling=p.voice_turn_handling,  # type: ignore[arg-type]
             user_away_timeout=None,
+            tts_text_transforms=spoken,
+            expressive=p.config.agent.speech.expressive,
         )
     return AgentSession(
         stt=stages.stt,
@@ -255,6 +262,8 @@ def new_session(p: Plan, stages: Stages) -> AgentSession[Any]:
         vad=stages.vad,
         turn_handling=hearing(p, stages),  # type: ignore[arg-type]
         user_away_timeout=None,
+        tts_text_transforms=spoken,
+        expressive=p.config.agent.speech.expressive,
     )
 
 
@@ -289,30 +298,39 @@ async def entrypoint(ctx: JobContext) -> None:
         if captions is not None and called is None
         else None
     )
+    delivery = Delivery(p.config.agent.speech, p.config.language)
     caller: Callable[[], str | None]
     if called is not None:
         caller = called.addressee
-        registry = registry_for(p, session, called.roster, caller, called.gate.sleep)
+        registry = registry_for(p, session, called.roster, caller, called.gate.sleep, delivery)
         called.voice.before_answer = registry.heard
         called.voice.announce = events.addressed
     else:
         roster = Roster()
         follow(ctx.room, roster)
         caller = linked(session)
-        registry = registry_for(p, session, roster, caller, None)
+        registry = registry_for(p, session, roster, caller, None, delivery)
     watch(
         session,
         p,
         events,
         telemetry.tracer(provider),
         usage=spent(session, called, transcribing),
+        filled=lambda: delivery.filler.took(session.current_speech),
     )
     await session.start(
-        agent=Answering(p.persona.instructions, registry, caller),
+        agent=Answering(
+            p.persona.instructions,
+            registry,
+            caller,
+            Acknowledgements.of(p.config.turn.interruption.backchannel),
+            delivery,
+        ),
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate, captions),
         record=False,
     )
+    delivery.filler.start(session, stages.tts)
     if called is not None:
         called.listen()
     elif transcribing is not None:

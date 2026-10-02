@@ -173,6 +173,8 @@ def test_a_listener_session_feeds_its_user_state_and_transcripts() -> None:
 class Responder:
     def __init__(self) -> None:
         self.stops = 0
+        self.pauses = 0
+        self.resumes = 0
 
     def answer(self, speaker: str, text: str, overheard: list[Said], timing: Timing | None) -> None:
         return None
@@ -186,6 +188,13 @@ class Responder:
     def barge_in(self) -> None:
         self.stops += 1
 
+    def pause(self) -> bool:
+        self.pauses += 1
+        return True
+
+    def resume(self) -> None:
+        self.resumes += 1
+
 
 class Loop:
     def __init__(self, scheduler: Scheduler) -> None:
@@ -195,7 +204,9 @@ class Loop:
         return self.scheduler(delay, callback)
 
 
-def test_a_called_session_barges_in_on_stage_1s_minimum_for_whoever_woke_it() -> None:
+def test_a_called_session_pauses_on_stage_1s_minimum_and_stops_on_words_of_whoever_woke_it() -> (
+    None
+):
     doc = json.loads(JOB.read_bytes())
     doc["agent"]["addressing"]["mode"] = "transcript"
     sealed, _ = seal(json.dumps(doc))
@@ -218,6 +229,10 @@ def test_a_called_session_barges_in_on_stage_1s_minimum_for_whoever_woke_it() ->
     assert all(MIN_S - 0.05 < t.delay <= MIN_S for t in held)
     for timer in held:
         timer.callback()
+    assert (responder.pauses, responder.stops) == (1, 0)
+    barge_in.transcribed(ASHA, "रुको", final=False)
+    assert responder.stops == 0
+    barge_in.transcribed(RAVI, "रुको", final=False)
     assert responder.stops == 1
 
 

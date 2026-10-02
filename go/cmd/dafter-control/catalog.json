@@ -25,6 +25,40 @@
           "నవ్య", "దివ్య", "కావ్య", "భవ్య", "నిత్య"
         ],
         "followUpWindowMs": 20000
+      },
+      "speech": {
+        "normalization": "platform",
+        "fillers": {
+          "enabled": true,
+          "afterMs": 1000,
+          "phrases": {
+            "hi": ["जी, एक पल।", "अच्छा, ज़रा देखती हूँ।", "हम्म, बस एक सेकंड।"],
+            "en": ["One moment.", "Let me check.", "Just a second."],
+            "kn": ["ಒಂದು ನಿಮಿಷ.", "ಸ್ವಲ್ಪ ನೋಡುತ್ತೇನೆ."],
+            "mr": ["एक क्षण हं.", "थांबा, बघते."],
+            "te": ["ఒక్క నిమిషం.", "చూస్తాను, ఒక్క క్షణం."]
+          }
+        },
+        "situations": {
+          "enabled": true,
+          "cues": {
+            "greeting": {
+              "hi": ["नमस्ते", "नमस्कार", "प्रणाम", "हेलो", "हैलो", "namaste", "hello"],
+              "en": ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"],
+              "kn": ["ನಮಸ್ಕಾರ", "ನಮಸ್ತೆ"],
+              "mr": ["नमस्कार", "नमस्ते"],
+              "te": ["నమస్కారం", "నమస్తే"]
+            },
+            "concern": {
+              "hi": ["समस्या", "दिक्कत", "परेशानी", "शिकायत", "खराब", "गड़बड़", "नहीं चल रहा", "नहीं हो रहा", "गलत", "नाराज़", "problem", "complaint"],
+              "en": ["problem", "issue", "complaint", "not working", "broken", "wrong", "upset", "angry", "refund"],
+              "kn": ["ಸಮಸ್ಯೆ", "ತೊಂದರೆ", "ದೂರು", "ಕೆಲಸ ಮಾಡುತ್ತಿಲ್ಲ"],
+              "mr": ["समस्या", "अडचण", "तक्रार", "त्रास", "चालत नाही"],
+              "te": ["సమస్య", "ఇబ్బంది", "ఫిర్యాదు", "పని చేయడం లేదు"]
+            }
+          }
+        },
+        "expressive": false
       }
     },
     "turn": {
@@ -40,7 +74,19 @@
         "minWords": 0,
         "minDurationMs": 250,
         "falseInterruptionTimeoutMs": 2000,
-        "resumeFalseInterruption": true
+        "resumeFalseInterruption": true,
+        "backchannel": {
+          "enabled": true,
+          "maxWords": 3,
+          "answerWithinMs": 1500,
+          "words": {
+            "hi": ["हाँ", "हां", "हाँजी", "हांजी", "जी", "हम्म", "हम", "हूँ", "हूं", "अच्छा", "ठीक है", "सही", "सही है", "बिल्कुल", "ओके", "haan", "haanji", "ji", "hmm", "achha", "accha", "theek hai", "ok"],
+            "en": ["ok", "okay", "hmm", "hm", "mm", "mhm", "uh huh", "yeah", "yes", "yep", "right", "sure", "alright", "got it", "i see"],
+            "kn": ["ಹೌದು", "ಹೂಂ", "ಹೂ", "ಹಾಂ", "ಸರಿ", "ಓಕೆ", "ಆಯ್ತು"],
+            "mr": ["हो", "हं", "हम्म", "बरं", "ठीक आहे", "ओके", "अच्छा"],
+            "te": ["అవును", "ఊ", "ఊం", "హా", "సరే", "ఓకే", "అలాగే"]
+          }
+        }
       }
     },
     "media": {
@@ -119,7 +165,11 @@
               "model": "bulbul:v3",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30 }
+              "options": {
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
+                "pace": 1.0, "temperature": 0.6,
+                "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
+              }
             }
           }
         }
@@ -160,7 +210,11 @@
               "model": "bulbul:v3",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30 }
+              "options": {
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
+                "pace": 1.0, "temperature": 0.6,
+                "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
+              }
             }
           }
         }

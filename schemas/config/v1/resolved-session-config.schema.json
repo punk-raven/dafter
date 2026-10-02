@@ -73,7 +73,8 @@
           "description": "Reference to a prompt/persona document. Never inline prose."
         },
         "pipeline": { "$ref": "#/$defs/Pipeline" },
-        "addressing": { "$ref": "#/$defs/Addressing" }
+        "addressing": { "$ref": "#/$defs/Addressing" },
+        "speech": { "$ref": "#/$defs/Speech" }
       }
     },
     "turn": { "$ref": "#/$defs/Turn" },
@@ -194,7 +195,105 @@
             "minDurationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
             "minWords": { "type": "integer", "minimum": 0, "maximum": 20 },
             "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
-            "resumeFalseInterruption": { "type": "boolean", "default": true }
+            "resumeFalseInterruption": { "type": "boolean", "default": true },
+            "backchannel": { "$ref": "#/$defs/Backchannel" }
+          }
+        }
+      }
+    },
+    "Backchannel": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Short acknowledgements (haan, hmm, achha, ok) said while the agent holds the floor are the caller listening, not taking the turn. A local VAD still stops the agent's audio as soon as anyone talks over it, so real barge-in stays fast; an utterance made only of phrases on this list is then dropped before it becomes a turn or reaches chat history, and the agent's paused reply resumes after interruption.falseInterruptionTimeoutMs. Said over the end of a question it is the caller's answer instead (answerWithinMs). The words of every language are used together, because people in one call mix languages and a recognizer does not always transcribe in the session language's script.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "maxWords": {
+          "type": "integer",
+          "description": "The longest utterance still heard as an acknowledgement. Anything longer is a turn, whatever its words.",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 3
+        },
+        "answerWithinMs": {
+          "type": "integer",
+          "description": "An acknowledgement said over a reply that ends in a question answers it and becomes the caller's turn, when that reply then plays to its end within this long of the caller falling silent and the caller says nothing more. Said earlier, over the rest of the reply, it was the caller listening and is dropped; said over a statement, it is always dropped.",
+          "minimum": 100,
+          "maximum": 5000,
+          "default": 1500
+        },
+        "words": { "$ref": "#/$defs/PhrasesByLanguage" }
+      }
+    },
+    "PhrasesByLanguage": {
+      "type": "object",
+      "description": "Words or short phrases keyed by base language (hi, en, kn, mr, te), so a language overlay restates its own list without repeating the others.",
+      "propertyNames": { "pattern": "^[a-z]{2,3}$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "maxItems": 64,
+        "uniqueItems": true
+      }
+    },
+    "Speech": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How the agent's reply is spoken: the text handed to TTS, what fills a slow reply, and the voice chosen for the moment. The LLM decides what to say; this block decides how it is said.",
+      "properties": {
+        "normalization": {
+          "type": "string",
+          "description": "Who turns digits and symbols into words before they are spoken. platform: the worker's deterministic speech planner, per language (Hindi today: numbers in Indian grouping, rupee amounts, dates, times, percentages, and long digit runs such as phone numbers read digit by digit); a language it has no rules for passes through. provider: the text reaches TTS as the LLM wrote it and the TTS provider's own preprocessing decides.",
+          "enum": ["platform", "provider"],
+          "default": "platform"
+        },
+        "substitutions": {
+          "type": "object",
+          "description": "Words replaced before TTS, keyed by base language and then by the word as written, for names and brands the voice says wrongly. A TTS provider's own pronunciation dictionary, where it has one, is a provider option instead.",
+          "propertyNames": { "pattern": "^[a-z]{2,3}$" },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": { "minLength": 1, "maxLength": 64 },
+            "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "maxProperties": 200
+          }
+        },
+        "fillers": { "$ref": "#/$defs/Fillers" },
+        "situations": { "$ref": "#/$defs/Situations" },
+        "expressive": {
+          "type": "boolean",
+          "description": "Hand the media framework's expressive mode to the LLM, which lets it tag its reply with delivery markup the TTS renders. The framework keeps it off unless the TTS declares a markup dialect, so it has no effect with a TTS that declares none.",
+          "default": false
+        }
+      }
+    },
+    "Fillers": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "A short phrase spoken only when a reply is slow, never on every turn: when no reply text has reached TTS afterMs after the reply started, and while a slow tool runs. Phrases rotate and come from the session's language; a language with none plays none.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "afterMs": { "type": "integer", "minimum": 100, "maximum": 10000, "default": 1000 },
+        "phrases": { "$ref": "#/$defs/PhrasesByLanguage" }
+      }
+    },
+    "Situation": {
+      "type": "string",
+      "description": "What the moment calls for in the voice. neutral is the default; greeting is the opening line and replies to a greeting; concern is a caller describing a problem or complaint, answered calmer.",
+      "enum": ["neutral", "greeting", "concern"]
+    },
+    "Situations": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "A deterministic classifier over the caller's last turn picks the situation of each reply: concern when any concern cue is said, else greeting when a greeting cue is said, else neutral; the opening line is a greeting. The TTS provider maps a situation to its own voice settings in its options.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "cues": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "description": "Cues per situation that has any; neutral is what is left when none is said.",
+          "properties": {
+            "greeting": { "$ref": "#/$defs/PhrasesByLanguage" },
+            "concern": { "$ref": "#/$defs/PhrasesByLanguage" }
           }
         }
       }

@@ -7,15 +7,16 @@ from dafter_core.config import ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError, ProviderContext
 from livekit.agents import APIConnectionError, APIStatusError, APITimeoutError, llm, stt, tts
-from livekit.plugins import sarvam as plugin
 
 from .. import credentials
 from ..options import Options
 from .batch import build_batch as build_batch
 from .languages import LANGUAGES as LANGUAGES
 from .languages import language_code
+from .llm import SarvamLLM
 from .realtime import FinalFirstSTT
 from .sentences import SentenceTTS
+from .voices import voices
 
 NAME = "sarvam"
 STT_MODELS = frozenset({"saaras:v3-realtime"})
@@ -23,6 +24,7 @@ LLM_MODELS = frozenset({"sarvam-105b", "sarvam-105b-conversations"})
 TTS_MODELS = frozenset({"bulbul:v3"})
 REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
+CREDENTIAL = "SARVAM_API_KEY"
 
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
 STT_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
@@ -81,7 +83,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -
             "an option is out of range",
             f"at '{opts.pointer('finalGraceMs')}': between 0 and {MAX_FINAL_GRACE_MS}",
         )
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.STT, {CREDENTIAL})
     return _construct(
         Stage.STT,
         lambda: FinalFirstSTT(
@@ -108,12 +110,12 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     thinking = opts.get("thinking", bool, False)
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.LLM, {CREDENTIAL})
     model = ref.model or ""
     if thinking:
         return _construct(
             Stage.LLM,
-            lambda: plugin.LLM(
+            lambda: SarvamLLM(
                 model=model,
                 api_key=key,
                 base_url=LLM_BASE_URL,
@@ -123,7 +125,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
         )
     return _construct(
         Stage.LLM,
-        lambda: plugin.LLM(
+        lambda: SarvamLLM(
             model=model,
             api_key=key,
             base_url=LLM_BASE_URL,
@@ -140,7 +142,17 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         Stage.TTS,
         NAME,
         ref.options,
-        ("prewarm", "encoding", "sampleRate", "voice", "pace", "minBufferSize"),
+        (
+            "prewarm",
+            "encoding",
+            "sampleRate",
+            "voice",
+            "pace",
+            "temperature",
+            "styles",
+            "dictionaryId",
+            "minBufferSize",
+        ),
     )
     code = language_code(language, Stage.TTS)
     min_buffer = opts.get("minBufferSize", int, 50)
@@ -152,20 +164,23 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         )
     encoding = opts.choice("encoding", TTS_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", TTS_SAMPLE_RATES, 24000)
-    voice = opts.get("voice", str, "priya")
-    pace = opts.get("pace", float, 1.0)
+    speaker = opts.get("voice", str, "priya")
+    voice, styles = voices(opts)
+    dictionary = opts.optional("dictionaryId", str)
     opts.get("prewarm", bool, True)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.TTS, {CREDENTIAL})
     model = ref.model or ""
     return _construct(
         Stage.TTS,
         lambda: SentenceTTS(
+            voice=voice,
+            styles=styles,
             target_language_code=code,
             model=model,
-            speaker=voice,
+            speaker=speaker,
             speech_sample_rate=sample_rate,
-            pace=pace,
             min_buffer_size=min_buffer,
+            dict_id=dictionary,
             api_key=key,
             output_audio_codec=encoding,
         ),

@@ -137,6 +137,16 @@ var targets = []target{
 		Package: "config", Type: "TranscriptionMode", Prefix: "Transcription",
 		Out: "internal/config/transcription_gen.go", AllName: "AllTranscriptionModes",
 	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Speech", "properties", "normalization", "enum"},
+		Package: "config", Type: "SpeechNormalization", Prefix: "Normalization",
+		Out: "internal/config/normalization_gen.go", AllName: "AllSpeechNormalizations",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Situation", "enum"},
+		Package: "config", Type: "Situation", Prefix: "Situation",
+		Out: "internal/config/situations_gen.go", AllName: "AllSituations",
+	},
 }
 
 var initialisms = map[string]string{

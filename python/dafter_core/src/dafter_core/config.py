@@ -25,6 +25,7 @@ from .enums import (
 )
 from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
+from .speech import Backchannel, Speech
 from .validation import validate_document
 
 
@@ -80,6 +81,7 @@ class Interruption:
     min_words: int = 0
     false_interruption_timeout_ms: int = 0
     resume_false_interruption: bool = True
+    backchannel: Backchannel = field(default_factory=Backchannel)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Interruption:
@@ -90,6 +92,7 @@ class Interruption:
             min_words=d.get("minWords", 0),
             false_interruption_timeout_ms=d.get("falseInterruptionTimeoutMs", 0),
             resume_false_interruption=d.get("resumeFalseInterruption", True),
+            backchannel=Backchannel.from_dict(d.get("backchannel") or {}),
         )
 
 
@@ -161,6 +164,7 @@ class Agent:
     persona_ref: str | None = None
     pipeline: Pipeline | None = None
     addressing: Addressing = field(default_factory=Addressing)
+    speech: Speech = field(default_factory=Speech)
 
     @property
     def near_miss_is_its_name(self) -> bool:
@@ -178,6 +182,7 @@ class Agent:
             persona_ref=d.get("personaRef"),
             pipeline=Pipeline.from_dict(d["pipeline"]) if d.get("pipeline") else None,
             addressing=Addressing.from_dict(d.get("addressing") or {}),
+            speech=Speech.from_dict(d.get("speech") or {}),
         )
 
 
