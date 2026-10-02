@@ -12,6 +12,8 @@ function form(values) {
   g.addressingOverride = () => null;
   g.transcriptionOverride = () => null;
   g.scribeOverride = () => false;
+  g.chosenLlm = () => undefined;
+  g.speechOverrides = () => {};
   return run;
 }
 
