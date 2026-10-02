@@ -6,11 +6,17 @@ import pytest
 from dafter_core.config import ProviderRef
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError
-from dafter_providers import VENDORS, openai_compat, sarvam, vendor_for
+from dafter_providers import VENDORS, sarvam, vendor_for
 
 AT = "/scribe/llm"
 SARVAM_KEY = "secret://tenants/t_9c21a4be/sarvam/api-key"
 GEMINI_KEY = "secret://tenants/t_9c21a4be/gemini/api-key"
+
+
+def google(r: ProviderRef, at: str = "/agent/pipeline/llm") -> Any:
+    build = VENDORS["google"].llm
+    assert build is not None
+    return build(r, at)
 
 
 @pytest.fixture(autouse=True)
@@ -27,10 +33,10 @@ def sarvam_ref(model: str = "sarvam-105b", key: str = SARVAM_KEY, **options: Any
 
 def compat_ref(model: str | None = "a-model", key: str = GEMINI_KEY, **options: Any) -> ProviderRef:
     return ProviderRef(
-        provider="openai_compat",
+        provider="google",
         model=model,
         credential_ref=key,
-        options={"endpoint": "google", **options},
+        options=options,
     )
 
 
@@ -41,7 +47,7 @@ def compat_ref(model: str | None = "a-model", key: str = GEMINI_KEY, **options: 
         (sarvam_ref(thinking="no"), f"{AT}/options/thinking"),
         (sarvam_ref(key=GEMINI_KEY), f"{AT}/credentialRef"),
         (compat_ref(model=None), f"{AT}/model"),
-        (compat_ref(endpoint="nowhere"), f"{AT}/options/endpoint"),
+        (compat_ref(temperature="hot"), f"{AT}/options/temperature"),
         (compat_ref(key=SARVAM_KEY), f"{AT}/credentialRef"),
     ],
 )
@@ -61,13 +67,13 @@ def test_an_llm_in_the_pipeline_still_locates_its_problems_in_the_pipeline() -> 
         sarvam.build_llm(sarvam_ref(model="sarvam-m"))
     assert any("/agent/pipeline/llm/model" in d for d in caught.value.details)
     with pytest.raises(DafterError) as caught:
-        openai_compat.build_llm(compat_ref(endpoint="nowhere"))
-    assert any("/agent/pipeline/llm/options/endpoint" in d for d in caught.value.details)
+        google(compat_ref(temperature="hot"))
+    assert any("/agent/pipeline/llm/options/temperature" in d for d in caught.value.details)
 
 
 def test_both_vendors_build_an_llm_placed_outside_the_pipeline() -> None:
     assert sarvam.build_llm(sarvam_ref(), AT) is not None
-    assert openai_compat.build_llm(compat_ref(), AT) is not None
+    assert google(compat_ref(), AT) is not None
 
 
 def test_the_vendor_lookup_names_the_place_the_document_gives() -> None:
