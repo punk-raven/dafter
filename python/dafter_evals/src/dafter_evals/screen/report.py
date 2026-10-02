@@ -9,7 +9,7 @@ from typing import Any
 
 from dafter_core.enums import ErrorCode
 
-from ..turns import percentile
+from ..measure import percentile
 from .catalog import Candidate
 
 CRITERIA = ("correctness", "language", "register", "speakability")

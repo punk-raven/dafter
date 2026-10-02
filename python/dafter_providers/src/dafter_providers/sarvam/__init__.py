@@ -7,7 +7,6 @@ from dafter_core.config import ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError, ProviderContext
 from livekit.agents import APIConnectionError, APIStatusError, APITimeoutError, llm, stt, tts
-from livekit.plugins import sarvam as plugin
 
 from .. import credentials
 from ..options import Options

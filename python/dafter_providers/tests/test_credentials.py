@@ -23,7 +23,7 @@ STAGES: dict[str, tuple[Stage, str, dict[str, Any], Build]] = {
         Stage.STT,
         "saaras:v3-realtime",
         {},
-        lambda r: sarvam.build_stt(r, "hi", TURN),
+        lambda r: sarvam.build_stt(r, "hi", TURN, None),
     ),
     "sarvam llm": (Stage.LLM, "sarvam-105b", {}, sarvam.build_llm),
     "sarvam tts": (Stage.TTS, "bulbul:v3", {}, lambda r: sarvam.build_tts(r, "hi")),

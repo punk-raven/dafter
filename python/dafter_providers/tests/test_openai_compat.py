@@ -112,7 +112,7 @@ def test_an_unstated_effort_is_left_to_the_endpoint() -> None:
 def test_the_vendor_serves_llm_only_in_the_languages_it_declares() -> None:
     vendor = vendor_for(ref(), Stage.LLM)
     assert vendor.languages == frozenset({"hi", "hi-IN"})
-    assert set(VENDORS) == {"sarvam", "openai_compat"}
+    assert set(VENDORS) == {"sarvam", "openai_compat", "silero"}
     with pytest.raises(DafterError) as caught:
         vendor_for(ref(), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY

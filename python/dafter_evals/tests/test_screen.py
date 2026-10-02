@@ -374,11 +374,16 @@ def test_several_languages_rank_together_and_apart(
     assert [h.split(", judge")[0].split("languages: ")[1] for h in heads] == ["hi, en", "hi", "en"]
 
 
+def unregistered_persona(ref: str | None, language: str, name: str | None) -> Persona:
+    raise DafterError(ErrorCode.UNSUPPORTED_CAPABILITY, "no persona document is registered")
+
+
 def test_a_language_without_a_persona_is_skipped_by_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     english = banks.Bank("en", "English", None, None, (banks.Question("en-01", "Hello?"),))
     monkeypatch.setattr(banks, "load", lambda lang: english)
+    monkeypatch.setattr(cli, "persona_for", unregistered_persona)
     assert run_cli(["--out", str(tmp_path), "--language", "en"], monkeypatch) == 2
     assert "skipped: no English persona: no persona document" in capsys.readouterr().err
 
