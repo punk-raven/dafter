@@ -297,6 +297,10 @@
           "$ref": "#/$defs/LayerMs",
           "description": "From the last voiced audio of the user's the worker received to the agent starting to speak: endpointMs and everything after it, the reply gap as the worker sees it. A client's heard gap adds the network and playout on both sides."
         },
+        "filler": {
+          "type": "boolean",
+          "description": "True when the reply was slow enough that a filler phrase played ahead of it (agent.speech.fillers): ttsNodeTtfbMs and e2eLatencyMs then count from the filler, the first audio the caller heard, while the LLM layers still show what was slow. Present only when a filler played."
+        },
         "serial": {
           "type": "boolean",
           "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs) although that sentence was under 80% of the reply, so the reply waited on more than its first sentence and its latency tracked the length of the reply. A reply that is mostly its first sentence is not serial however long that sentence took. Present only when both LLM layers were measured."

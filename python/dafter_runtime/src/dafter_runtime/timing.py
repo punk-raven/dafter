@@ -62,6 +62,7 @@ class TurnTiming:
     turn: int
     interrupted: bool
     seconds: dict[str, float] = field(default_factory=dict)
+    filler: bool = False
     first_sentence_share: float | None = None
 
     def milliseconds(self) -> dict[str, int]:
@@ -81,6 +82,8 @@ class TurnTiming:
         body.update({PAYLOAD_FIELDS[k]: ms for k, ms in self.milliseconds().items()})
         if (serial := self.serial()) is not None:
             body["serial"] = serial
+        if self.filler:
+            body["filler"] = True
         return body
 
     def span_attributes(self) -> dict[str, int | bool]:
@@ -91,6 +94,8 @@ class TurnTiming:
         attrs.update({f"dafter.turn.{k}_ms": ms for k, ms in self.milliseconds().items()})
         if (serial := self.serial()) is not None:
             attrs["dafter.turn.serial"] = serial
+        if self.filler:
+            attrs["dafter.turn.filler"] = True
         return attrs
 
     def log_fields(self) -> dict[str, Any]:
@@ -98,6 +103,8 @@ class TurnTiming:
         fields.update({k: round(v, 4) for k, v in self.seconds.items()})
         if (serial := self.serial()) is not None:
             fields["serial"] = serial
+        if self.filler:
+            fields["filler"] = True
         if self.first_sentence_share is not None:
             fields["first_sentence_share"] = round(self.first_sentence_share, 2)
         return fields
@@ -130,7 +137,7 @@ class Turns:
             return {}
         return {REPLY_GAP: float(started) - voiced_until}
 
-    def add(self, item: ChatMessage) -> TurnTiming | None:
+    def add(self, item: ChatMessage, filler: bool = False) -> TurnTiming | None:
         if item.role == "user":
             self._user_turn(item)
             return None
@@ -142,6 +149,7 @@ class Turns:
             turn=self._count,
             interrupted=item.interrupted,
             seconds=seconds,
+            filler=filler,
             first_sentence_share=first_sentence_share(item.text_content),
         )
         self._count += 1

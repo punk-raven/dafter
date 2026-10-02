@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from livekit.agents import tokenize
 from livekit.agents.tokenize.tokenizer import SentenceStream
 from livekit.plugins import sarvam as plugin
+
+from .voices import Voice
 
 SENTENCE_END = re.compile(r"[.!?\u0964\u0965]+[\"'\u201d\u2019)\]]*\s+")
 MIN_SENTENCE_LEN = 20
@@ -39,6 +42,14 @@ class SentenceTokenizer(tokenize.SentenceTokenizer):
 
 
 class SentenceTTS(plugin.TTS):
-    def __init__(self, **options: Any) -> None:
-        super().__init__(**options)
+    def __init__(
+        self, *, voice: Voice, styles: Mapping[str, Voice] | None = None, **options: Any
+    ) -> None:
+        super().__init__(pace=voice.pace, temperature=voice.temperature, **options)
         self._opts.word_tokenizer = SentenceTokenizer()
+        self._voice = voice
+        self._styles = dict(styles or {})
+
+    def style(self, situation: str) -> None:
+        voice = self._styles.get(situation, self._voice)
+        self.update_options(pace=voice.pace, temperature=voice.temperature)
