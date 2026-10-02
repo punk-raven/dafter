@@ -1,0 +1,7 @@
+provider,model,unit,inr,per,source,as_of
+sarvam,saaras:v3-realtime,audio_second,30.00,3600,https://www.sarvam.ai/api-pricing,2026-09-27
+sarvam,sarvam-105b,input_token,29.28,1000000,https://www.sarvam.ai/api-pricing,2026-09-27
+sarvam,sarvam-105b,output_token,73.20,1000000,https://www.sarvam.ai/api-pricing,2026-09-27
+sarvam,sarvam-105b-conversations,input_token,29.28,1000000,https://www.sarvam.ai/api-pricing,2026-09-27
+sarvam,sarvam-105b-conversations,output_token,73.20,1000000,https://www.sarvam.ai/api-pricing,2026-09-27
+sarvam,bulbul:v3,character,3.00,1000,https://www.sarvam.ai/api-pricing,2026-09-27

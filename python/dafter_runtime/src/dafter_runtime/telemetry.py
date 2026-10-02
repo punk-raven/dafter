@@ -4,6 +4,7 @@ import os
 
 from dafter_core.config import ResolvedSessionConfig
 from livekit.agents.telemetry import set_tracer_provider
+from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -32,3 +33,7 @@ def install(cfg: ResolvedSessionConfig) -> TracerProvider | None:
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     set_tracer_provider(provider, metadata=dict(span_attributes(cfg)), allow_pii=False)
     return provider
+
+
+def tracer(provider: TracerProvider | None) -> trace.Tracer:
+    return provider.get_tracer(SERVICE) if provider is not None else trace.NoOpTracer()

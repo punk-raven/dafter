@@ -1,0 +1,33 @@
+{
+  "eventId": "e_8d1b2c3a4f5e6d7c8b9a0f1e2d3c4b5a",
+  "type": "session.usage",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 9,
+  "occurredAt": "2026-09-24T10:02:41.007Z",
+  "payload": {
+    "final": true,
+    "costInr": 0.5,
+    "unpricedItems": 1,
+    "items": [
+      {
+        "stage": "stt",
+        "provider": "sarvam",
+        "model": "saaras:v3-realtime",
+        "unit": "audio_second",
+        "quantity": 60,
+        "priced": true,
+        "costInr": 0.5
+      },
+      {
+        "stage": "llm",
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "unit": "input_token",
+        "quantity": 1840,
+        "priced": false
+      }
+    ]
+  }
+}

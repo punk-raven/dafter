@@ -5,6 +5,8 @@
     "agent": {
       "enabled": true,
       "pool": "dafter-py",
+      "name": "Nivya",
+      "greets": false,
       "mode": "cascaded"
     },
     "turn": {
@@ -86,7 +88,7 @@
             "model": "bulbul:v3",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh" }
+            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya" }
           }
         }
       }
@@ -118,7 +120,7 @@
             "model": "bulbul:v3",
             "region": "ap-south-1",
             "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "shubh" }
+            "options": { "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya" }
           }
         }
       }

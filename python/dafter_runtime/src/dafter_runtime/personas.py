@@ -14,24 +14,52 @@ class Persona:
     greeting: str
 
 
+@dataclass(frozen=True, slots=True)
+class Script:
+    role: str
+    rules: str
+    greeting: str
+    introduction: str
+
+    def spoken_by(self, name: str | None) -> Persona:
+        if not name:
+            return Persona(
+                instructions=f"You are {self.role}. {FEMININE} {self.rules}",
+                greeting=self.greeting,
+            )
+        return Persona(
+            instructions=f"You are {name}, {self.role}. {FEMININE} {self.rules}",
+            greeting=self.introduction.format(name=name),
+        )
+
+
 _HINDI_VOICE_RULES = (
     "You are speaking on a live voice call. Reply only in Hindi, written in Devanagari script. "
     "Keep every reply to one or two short spoken sentences. Never use markdown, lists, "
     "headings, emojis or symbols that cannot be spoken aloud. Write numbers as words. "
     "If the caller only says something like hmm or okay, reply with a very short acknowledgement."
 )
+_GENERAL = "a friendly general assistant"
+_SUPPORT = (
+    "a patient customer support agent who helps callers describe and solve their problem "
+    "step by step"
+)
 
-PERSONAS: dict[tuple[str, str], Persona] = {
-    (DEFAULT_REF, "hi"): Persona(
-        instructions="You are Dafter, a friendly general assistant. " + _HINDI_VOICE_RULES,
-        greeting="नमस्ते! मैं आपकी क्या मदद कर सकता हूँ?",
+FEMININE = "You are a woman: whenever you speak about yourself, use feminine grammar."
+_HINDI_FEMININE = " In Hindi say मैं कर सकती हूँ, मैं देख रही हूँ, मैं बताती हूँ, never सकता, रहा or बताता."
+
+SCRIPTS: dict[tuple[str, str], Script] = {
+    (DEFAULT_REF, "hi"): Script(
+        role=_GENERAL,
+        rules=_HINDI_VOICE_RULES + _HINDI_FEMININE,
+        greeting="नमस्ते! मैं आपकी क्या मदद कर सकती हूँ?",
+        introduction="नमस्ते! मैं {name} हूँ। मैं आपकी क्या मदद कर सकती हूँ?",
     ),
-    ("persona://support/v3", "hi"): Persona(
-        instructions=(
-            "You are Dafter, a patient customer support agent who helps callers "
-            "describe and solve their problem step by step. " + _HINDI_VOICE_RULES
-        ),
-        greeting="नमस्ते! मैं सहायता टीम से बात कर रहा हूँ। बताइए, क्या समस्या है?",
+    ("persona://support/v3", "hi"): Script(
+        role=_SUPPORT,
+        rules=_HINDI_VOICE_RULES + _HINDI_FEMININE,
+        greeting="नमस्ते! मैं सहायता टीम से बात कर रही हूँ। बताइए, क्या समस्या है?",
+        introduction="नमस्ते! मैं {name}, सहायता टीम से बात कर रही हूँ। बताइए, क्या समस्या है?",
     ),
 }
 
@@ -40,13 +68,13 @@ def base_language(tag: str) -> str:
     return tag.split("-", 1)[0].lower()
 
 
-def persona_for(ref: str | None, language: str) -> Persona:
+def persona_for(ref: str | None, language: str, name: str | None) -> Persona:
     key = (ref or DEFAULT_REF, base_language(language))
-    persona = PERSONAS.get(key)
-    if persona is None:
+    script = SCRIPTS.get(key)
+    if script is None:
         raise DafterError(
             ErrorCode.UNSUPPORTED_CAPABILITY,
             "no persona document is available for this reference and language",
             details=("at '/agent/personaRef': not registered in this worker for the language",),
         )
-    return persona
+    return script.spoken_by(name)

@@ -71,6 +71,14 @@
     {
       "if": { "properties": { "type": { "const": "agent.state_changed" } }, "required": ["type"] },
       "then": { "properties": { "payload": { "$ref": "#/$defs/AgentStateChangedPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "agent.turn_metrics" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/AgentTurnMetricsPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "session.usage" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/SessionUsagePayload" } }, "required": ["payload"] }
     }
   ],
 
@@ -82,11 +90,13 @@
         "session.created",
         "session.ended",
         "session.signal",
+        "session.usage",
         "connection.established",
         "connection.lost",
         "connection.restored",
         "agent.dispatched",
         "agent.state_changed",
+        "agent.turn_metrics",
         "agent.handoff_requested",
         "transcript.partial",
         "transcript.final",
@@ -105,6 +115,18 @@
     "AgentState": {
       "type": "string",
       "enum": ["idle", "listening", "thinking", "speaking"]
+    },
+
+    "UsageUnit": {
+      "type": "string",
+      "description": "What a provider bills by. Singular, because a price is stated per one of it.",
+      "enum": ["audio_second", "input_token", "output_token", "character"]
+    },
+
+    "LayerMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "One layer of a turn's latency in milliseconds, as the worker measured it. Absent when the worker did not measure that layer for the turn, never zero in its place."
     },
 
     "SessionCreatedPayload": {
@@ -207,6 +229,95 @@
       "properties": {
         "state": { "$ref": "#/$defs/AgentState" },
         "previousState": { "$ref": "#/$defs/AgentState" }
+      }
+    },
+
+    "AgentTurnMetricsPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["turn", "interrupted"],
+      "description": "Where one agent turn's latency went, layer by layer, measured inside the worker. The user-side layers come from the user's message that the reply answers, so a turn the agent opened itself (a greeting) carries none of them. A consumer compares replyGapMs with the gap it heard itself; the difference is the network and playout on its side.",
+      "properties": {
+        "turn": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The agent's turn within the session, counted from 0."
+        },
+        "interrupted": { "type": "boolean" },
+        "endpointMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the last voiced audio of the user's the worker received to the speech-to-text provider releasing end of speech: the provider's silence window and its wait for the final transcript. The framework starts every other user layer at that release, so none of them contains this."
+        },
+        "endOfTurnDelayMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the end of the user's speech to the decision that their turn ended."
+        },
+        "transcriptionDelayMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the end of the user's speech to the final transcript."
+        },
+        "llmNodeTtftMs": { "$ref": "#/$defs/LayerMs", "description": "LLM time to first token." },
+        "llmNodeTtfsMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "LLM time to the first sentence handed to TTS."
+        },
+        "ttsNodeTtfbMs": { "$ref": "#/$defs/LayerMs", "description": "TTS time to first audio byte." },
+        "playbackLatencyMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the first audio frame forwarded to playback reported started."
+        },
+        "e2eLatencyMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the end of the user's speech to the agent starting to speak, as the agent framework measures it: its end of speech is the provider's release, so endpointMs comes before it."
+        },
+        "replyGapMs": {
+          "$ref": "#/$defs/LayerMs",
+          "description": "From the last voiced audio of the user's the worker received to the agent starting to speak: endpointMs and everything after it, the reply gap as the worker sees it. A client's heard gap adds the network and playout on both sides."
+        },
+        "serial": {
+          "type": "boolean",
+          "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs) although that sentence was under 80% of the reply, so the reply waited on more than its first sentence and its latency tracked the length of the reply. A reply that is mostly its first sentence is not serial however long that sentence took. Present only when both LLM layers were measured."
+        }
+      },
+      "dependentRequired": { "serial": ["llmNodeTtftMs", "llmNodeTtfsMs"] }
+    },
+
+    "UsageItem": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["stage", "provider", "model", "unit", "quantity", "priced"],
+      "description": "One provider, model and unit's consumption so far. An item the price table has no row for is unpriced and carries no cost, because a zero would read as free.",
+      "properties": {
+        "stage": { "$ref": "https://schemas.dafter.dev/errors/v1/error.schema.json#/properties/stage" },
+        "provider": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "unit": { "$ref": "#/$defs/UsageUnit" },
+        "quantity": { "type": "number", "minimum": 0 },
+        "priced": { "type": "boolean" },
+        "costInr": { "type": "number", "minimum": 0 }
+      },
+      "if": { "properties": { "priced": { "const": true } }, "required": ["priced"] },
+      "then": { "required": ["costInr"] },
+      "else": { "not": { "required": ["costInr"] } }
+    },
+
+    "SessionUsagePayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["final", "costInr", "unpricedItems", "items"],
+      "description": "What the session has consumed and what it cost in INR. Sent after each agent turn as a running figure and once more when the session ends; the last one sent is the one to keep.",
+      "properties": {
+        "final": {
+          "type": "boolean",
+          "description": "True for the figure taken when the session ended."
+        },
+        "costInr": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The sum of the priced items. A floor, not a total, while unpricedItems is above zero."
+        },
+        "unpricedItems": { "type": "integer", "minimum": 0 },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/UsageItem" } }
       }
     }
   }

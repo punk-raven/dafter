@@ -10,6 +10,8 @@ from livekit.agents.utils import is_given
 from livekit.plugins import sarvam as plugin
 from livekit.plugins.sarvam.stt_streaming import RealtimeSTTOptions
 
+from ..endpointing import AudioFrame, Endpoint, endpoints_of
+
 FINAL_GRACE_S = 1.5
 
 
@@ -33,6 +35,15 @@ class FinalFirstStream(plugin.RealtimeSpeechStream):
         if self._utterance_idx == utterance and not self._eos_emitted_for_utterance:
             self._emit_end_of_speech()
 
+    def push_frame(self, frame: AudioFrame) -> None:
+        endpoints_of(self._stt).heard(frame)
+        super().push_frame(frame)
+
+    def _emit_end_of_speech(self) -> None:
+        if not self._eos_emitted_for_utterance:
+            endpoints_of(self._stt).released()
+        super()._emit_end_of_speech()
+
 
 class FinalFirstSTT(plugin.STTRealtime):
     def stream(
@@ -52,3 +63,6 @@ class FinalFirstSTT(plugin.STTRealtime):
         )
         self._streams.add(stream)
         return stream
+
+    def take_endpoint(self) -> Endpoint | None:
+        return endpoints_of(self).take()

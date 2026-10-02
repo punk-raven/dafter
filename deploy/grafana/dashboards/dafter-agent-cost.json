@@ -1,0 +1,269 @@
+{
+  "uid": "dafter-agent-cost",
+  "title": "Dafter agent cost",
+  "description": "What agent sessions cost in INR, priced from the worker's prices.csv. Scraped from the worker (DAFTER_METRICS_PORT, job dafter-agent).",
+  "tags": ["dafter"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]},
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "links": [
+    {
+      "title": "Dafter",
+      "type": "dashboards",
+      "tags": ["dafter"],
+      "asDropdown": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cost per session (1 h)",
+      "description": "Mean INR cost of the agent sessions that ended in the last hour. A floor while any item is unpriced.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "noValue": "-",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#5794F2", "value": null}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(dafter_agent_session_cost_inr_sum[1h])) / (sum(increase(dafter_agent_session_cost_inr_count[1h])) > 0)",
+          "legendFormat": "Cost per session (1 h)",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Spend per hour",
+      "description": "INR the agent is spending per hour at the rate of the last 15 min, counted as each turn's usage is priced.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "noValue": "-",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "#5794F2", "value": null}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(dafter_agent_cost_inr_total[15m])) * 3600 or vector(0)",
+          "legendFormat": "Spend per hour",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Unpriced items (1 h)",
+      "description": "Usage items with no row in prices.csv among sessions that ended in the last hour. Above 0, every cost shown is a floor.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "-",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "#73BF69", "value": null}, {"color": "#FF9830", "value": 1}]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(dafter_agent_unpriced_items_total[1h])) or vector(0)",
+          "legendFormat": "Unpriced items (1 h)",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Spend per hour by provider",
+      "description": "INR per hour by stage and provider/model, at the rate of the last 5 min.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (stage, provider, model) (rate(dafter_agent_cost_inr_total[5m])) * 3600",
+          "legendFormat": "{{stage}} {{provider}}/{{model}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Cost per session (mean / p95)",
+      "description": "INR per ended agent session over the last 30 min. p95 is read from buckets, so it is coarse.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "mean"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#5794F2"}}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "p95"},
+            "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#FF9830"}}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(dafter_agent_session_cost_inr_sum[30m])) / (sum(rate(dafter_agent_session_cost_inr_count[30m])) > 0)",
+          "legendFormat": "mean",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dafter_agent_session_cost_inr_bucket[30m])))",
+          "legendFormat": "p95",
+          "refId": "B",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Unpriced items by provider (1 h)",
+      "description": "What prices.csv needs a row for: unpriced items among sessions that ended in the last hour.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 13},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (stage, provider, model, unit) (increase(dafter_agent_unpriced_items_total[1h]))",
+          "legendFormat": "{{stage}} {{provider}}/{{model}} {{unit}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    }
+  ]
+}

@@ -636,6 +636,7 @@ dependencies = [
     { name = "livekit-agents" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
+    { name = "prometheus-client" },
 ]
 
 [package.metadata]
@@ -646,6 +647,7 @@ requires-dist = [
     { name = "livekit-agents", specifier = "==1.8.3" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.30" },
     { name = "opentelemetry-sdk", specifier = ">=1.30" },
+    { name = "prometheus-client", specifier = ">=0.22" },
 ]
 
 [[package]]

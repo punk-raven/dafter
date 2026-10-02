@@ -14,7 +14,10 @@ const AGENT_PENDING_MS = 20000;
 
 function agentOverride() {
   const value = document.getElementById('agent-mode').value;
-  return value === '' ? null : { enabled: value === 'on' };
+  const greeting = document.getElementById('agent-greeting').value;
+  const override = value === '' ? {} : { enabled: value === 'on' };
+  if (greeting !== '' && value !== 'off') override.greets = greeting === 'on';
+  return Object.keys(override).length ? override : null;
 }
 
 function agentParticipant(room) {
@@ -44,16 +47,20 @@ function agentPanel() {
         <div id="agent-lines" class="agent-lines"><div class="agent-empty">speech shows here as it is recognised</div></div>
       </div>
       <div class="agent-col agent-latency">
-        <div class="agent-col-head"><span>Turn latency</span><span id="agent-p50" class="agent-p50">p50 -</span></div>
+        <div class="agent-col-head"><span>Turn latency <span class="agent-hint">ms</span></span><span id="agent-cost" class="agent-cost">cost -</span><span id="agent-p50" class="agent-p50" title="median of the heard column">p50 -</span></div>
         <div class="agent-turns-body">
           <table class="agent-turns">
             <thead><tr>
-              <th>#</th>
-              <th class="num" title="end of your speech to the agent starting to think">endpoint</th>
-              <th class="num" title="agent thinking to its first audio heard here">respond</th>
-              <th class="num" title="end of your speech to the agent's first audio heard here">total</th>
+              <th title="the agent's turn, counted from 0 (the greeting, when it greets); (n) until the worker reports it; orange marks a turn that went serial, its first sentence (under 80% of the reply) reaching TTS over 500 ms after the LLM's first token">#</th>
+              <th class="num" title="worker: the last voiced audio of yours it received to the speech-to-text provider releasing end of speech (its silence window and the wait for the final transcript)">ep</th>
+              <th class="num" title="worker: the provider's end of speech to deciding your turn ended">eot</th>
+              <th class="num" title="worker: the provider's end of speech to the final transcript">stt</th>
+              <th class="num" title="worker: LLM time to first token">llm</th>
+              <th class="num" title="worker: TTS time to first audio">tts</th>
+              <th class="num" title="worker: the provider's end of speech to the agent starting to speak, so ep comes before it; the row's tooltip has the reply gap from your last voiced audio">e2e</th>
+              <th class="num" title="this browser: end of your speech to the agent's first audio heard here">heard</th>
             </tr></thead>
-            <tbody id="agent-turn-rows"><tr class="agent-empty-row"><td colspan="4">no turn yet</td></tr></tbody>
+            <tbody id="agent-turn-rows"><tr class="agent-empty-row"><td colspan="${TURN_COLUMNS}">no turn yet</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -135,7 +142,16 @@ function onAgentEvent(payload) {
     log(`agent event is not JSON: ${err.message}`, 'warn');
     return;
   }
-  if (event.type !== 'agent.state_changed' || !event.payload) return;
+  if (!event.payload) return;
+  if (event.type === 'agent.turn_metrics') {
+    onTurnMetrics(event.payload);
+    return;
+  }
+  if (event.type === 'session.usage') {
+    onSessionUsage(event.payload);
+    return;
+  }
+  if (event.type !== 'agent.state_changed') return;
   const previous = agentView.state;
   agentView.state = event.payload.state;
   agentTurnState(previous, agentView.state, performance.now());

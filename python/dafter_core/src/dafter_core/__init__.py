@@ -16,6 +16,7 @@ from .enums import (
     Role,
     Stage,
     TurnStrategy,
+    UsageUnit,
     VideoCodec,
     VideoResolution,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "Role",
     "Stage",
     "TurnStrategy",
+    "UsageUnit",
     "VideoCodec",
     "VideoResolution",
     "enums",

@@ -105,6 +105,7 @@ services:
       DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:-devworker}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
+      DAFTER_METRICS_PORT: "9464"
     depends_on:
       livekit:
         condition: service_started
@@ -149,6 +150,7 @@ services:
 
   tunnel:
     image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
     command: tunnel --no-autoupdate run --token ${DAFTER_CF_TUNNEL_TOKEN}
     depends_on:
       control:
@@ -163,3 +165,10 @@ services:
 volumes:
   control-data:
   minio-data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.213.0.0/24
+          gateway: 10.213.0.1
