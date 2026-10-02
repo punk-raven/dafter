@@ -12,6 +12,7 @@ TRANSCRIPT_EVENTS = "events/v1/transcript.schema.json"
 ERROR = "errors/v1/error.schema.json"
 IDS = "common/v1/ids.schema.json"
 LANGUAGE_SWITCHING = "config/v1/language-switching.schema.json"
+BACKCHANNEL = "config/v1/backchannel.schema.json"
 
 
 def load(relative: str) -> dict[str, Any]:
