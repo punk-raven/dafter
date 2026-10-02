@@ -52,6 +52,28 @@ class Options:
             )
         return value
 
+    def optional(self, key: str, kind: type[T]) -> T | None:
+        value = self._raw.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, kind) or (kind is not bool and isinstance(value, bool)):
+            raise self.error(
+                "an option has the wrong type",
+                f"at '{self.pointer(key)}': expected {kind.__name__}",
+            )
+        return value
+
+    def ranged(self, key: str, default: float, bounds: tuple[float, float]) -> float:
+        value = self.get(key, float, default)
+        self.within(value, bounds, self.pointer(key))
+        return value
+
+    def within(self, value: float, bounds: tuple[float, float], pointer: str) -> None:
+        if not bounds[0] <= value <= bounds[1]:
+            raise self.error(
+                "an option is out of range", f"at '{pointer}': between {bounds[0]} and {bounds[1]}"
+            )
+
     def choice(self, key: str, choices: Mapping[Any, T], default: Any) -> T:
         value = self._raw.get(key, default)
         if value not in choices:

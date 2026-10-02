@@ -32,11 +32,10 @@
     "role": "judge",
     "family": "Gemini Flash, newest stable, low thinking",
     "provider": {
-      "provider": "openai_compat",
+      "provider": "google",
       "model": "gemini-3.8-flash",
       "credentialRef": "secret://evals/gemini/api-key",
       "options": {
-        "endpoint": "google",
         "temperature": 0.0,
         "maxTokens": 400,
         "reasoningEffort": "low"
@@ -94,11 +93,10 @@
       "role": "default",
       "family": "Gemini Flash-Lite, minimal thinking",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "google",
         "model": "gemini-3.5-flash-lite",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200
         }
@@ -127,11 +125,10 @@
       "role": "ceiling",
       "family": "Gemini Flash, minimal thinking",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "google",
         "model": "gemini-3.6-flash",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200,
           "reasoningEffort": "minimal"
@@ -163,11 +160,10 @@
       "role": "latest",
       "family": "Gemini Flash, newest stable, low thinking",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "google",
         "model": "gemini-3.8-flash",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200,
           "reasoningEffort": "low"
@@ -198,11 +194,10 @@
       "role": "open_weights",
       "family": "Gemma 4 26B mixture of experts, thinking off",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "google",
         "model": "gemma-4-26b-a4b-it",
         "credentialRef": "secret://evals/gemini/api-key",
         "options": {
-          "endpoint": "google",
           "temperature": 0.4,
           "maxTokens": 200,
           "extraBody": {
@@ -235,11 +230,10 @@
       "role": "open_weights",
       "family": "Gemma 4 31B dense on OpenRouter's free variant, reasoning off",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "openrouter",
         "model": "google/gemma-4-31b-it:free",
         "credentialRef": "secret://evals/openrouter/api-key",
         "options": {
-          "endpoint": "openrouter",
           "temperature": 0.4,
           "maxTokens": 200,
           "extraBody": {
@@ -267,11 +261,10 @@
       "role": "runner_up",
       "family": "OpenAI GPT mini, no reasoning",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "openai",
         "model": "gpt-5.4-mini-2026-03-17",
         "credentialRef": "secret://evals/openai/api-key",
         "options": {
-          "endpoint": "openai",
           "maxTokens": 200,
           "reasoningEffort": "none"
         }
@@ -296,11 +289,10 @@
       "role": "free_endpoint",
       "family": "NVIDIA Nemotron Lightning, OpenCode Zen free trial",
       "provider": {
-        "provider": "openai_compat",
+        "provider": "opencode_zen",
         "model": "nemotron-3.5-lightning-free",
         "credentialRef": "secret://evals/opencode/api-key",
         "options": {
-          "endpoint": "opencode_zen",
           "temperature": 0.4,
           "maxTokens": 200
         }

@@ -16,6 +16,7 @@ from .languages import language_code
 from .llm import SarvamLLM
 from .realtime import FinalFirstSTT
 from .sentences import SentenceTTS
+from .voices import voices
 
 NAME = "sarvam"
 STT_MODELS = frozenset({"saaras:v3-realtime"})
@@ -26,7 +27,9 @@ LLM_BASE_URL = "https://api.sarvam.ai/v1"
 AGENT_LLM = "/agent/pipeline/llm"
 CREDENTIAL = "SARVAM_API_KEY"
 
+IDENTIFY = "auto"
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
+STT_MODES = {"transcribe": "transcribe", "codemix": "codemix"}
 STT_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
 STT_SAMPLE_RATES = {8000: 8000, 16000: 16000}
 TTS_ENCODINGS = {"pcm_s16le": "linear16", "mulaw": "mulaw"}
@@ -69,13 +72,19 @@ def _construct(stage: Stage, build: Callable[[], T]) -> T:
         ) from exc
 
 
-def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -> stt.STT[Any]:
+def build_stt(
+    ref: ProviderRef, language: str | None, turn: Turn, prompt: str | None
+) -> stt.STT[Any]:
     _checked(ref, Stage.STT, STT_MODELS)
     opts = Options(
-        Stage.STT, NAME, ref.options, ("chunkMs", "encoding", "sampleRate", "finalGraceMs")
+        Stage.STT,
+        NAME,
+        ref.options,
+        ("chunkMs", "encoding", "sampleRate", "finalGraceMs", "mode"),
     )
-    code = language_code(language, Stage.STT)
+    code = IDENTIFY if language is None else language_code(language, Stage.STT)
     stream_type = opts.choice("chunkMs", CHUNK_PROFILES, 500)
+    mode = opts.choice("mode", STT_MODES, "transcribe")
     encoding = opts.choice("encoding", STT_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", STT_SAMPLE_RATES, 16000)
     final_grace_ms = opts.get("finalGraceMs", int, 1500)
@@ -90,6 +99,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -
         lambda: FinalFirstSTT(
             language=code,
             stream_type=stream_type,
+            mode=mode,
             endpointing="vad",
             encoding=encoding,
             sample_rate=sample_rate,
@@ -143,7 +153,18 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         Stage.TTS,
         NAME,
         ref.options,
-        ("prewarm", "encoding", "sampleRate", "voice", "pace", "minBufferSize"),
+        (
+            "prewarm",
+            "encoding",
+            "sampleRate",
+            "voice",
+            "pace",
+            "temperature",
+            "styles",
+            "dictionaryId",
+            "minBufferSize",
+            "firstSentenceAlone",
+        ),
     )
     code = language_code(language, Stage.TTS)
     min_buffer = opts.get("minBufferSize", int, 50)
@@ -155,20 +176,26 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         )
     encoding = opts.choice("encoding", TTS_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", TTS_SAMPLE_RATES, 24000)
-    voice = opts.get("voice", str, "priya")
-    pace = opts.get("pace", float, 1.0)
+    speaker = opts.get("voice", str, "priya")
+    voice, styles = voices(opts)
+    dictionary = opts.optional("dictionaryId", str)
+    first_sentence_alone = opts.get("firstSentenceAlone", bool, False)
     opts.get("prewarm", bool, True)
     key = credentials.resolve(ref, Stage.TTS, {CREDENTIAL})
     model = ref.model or ""
     return _construct(
         Stage.TTS,
         lambda: SentenceTTS(
+            voice=voice,
+            styles=styles,
+            languages=LANGUAGES,
             target_language_code=code,
             model=model,
-            speaker=voice,
+            speaker=speaker,
             speech_sample_rate=sample_rate,
-            pace=pace,
             min_buffer_size=min_buffer,
+            first_sentence_alone=first_sentence_alone,
+            dict_id=dictionary,
             api_key=key,
             output_audio_codec=encoding,
         ),

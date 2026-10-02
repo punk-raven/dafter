@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, cast
 
 import pytest
+from dafter_runtime.backchannel import Events
 from dafter_runtime.listeners import Listener, is_human, listener_options
 from livekit import rtc
-from livekit.agents import StopResponse, llm
+from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 from livekit.agents.types import ATTRIBUTE_PUBLISH_ON_BEHALF
 
 AGENT = "agent-AJ_x"
@@ -67,3 +69,26 @@ def test_a_listener_passes_each_finished_turn_and_its_timing_on_and_stops_the_re
     asyncio.run(turn(" निव्या, समय क्या है? "))
     asyncio.run(turn("  "))
     assert heard == [("p_4b81e0d7", "निव्या, समय क्या है?", timing)]
+
+
+def test_a_listener_hears_through_its_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    said = stt.SpeechEvent(type=stt.SpeechEventType.FINAL_TRANSCRIPT)
+
+    async def recognized(agent: Agent, audio: object, settings: object) -> AsyncIterator[object]:
+        yield said
+
+    async def dropped(events: Events) -> AsyncIterator[stt.SpeechEvent | str]:
+        async for _ in events:
+            pass
+        return
+        yield
+
+    monkeypatch.setattr(Agent.default, "stt_node", recognized)
+
+    async def hear(listener: Listener) -> list[stt.SpeechEvent | str]:
+        return [e async for e in listener.stt_node(cast(Any, None), ModelSettings())]
+
+    plain = Listener("p_4b81e0d7", lambda *_: None)
+    filtered = Listener("p_4b81e0d7", lambda *_: None, dropped)
+    assert asyncio.run(hear(plain)) == [said]
+    assert asyncio.run(hear(filtered)) == []

@@ -123,6 +123,29 @@ def test_the_shipped_table_prices_the_sarvam_pipeline() -> None:
     assert table[("sarvam", "bulbul:v3", UsageUnit.CHARACTER)].cost(1000) == Decimal("3")
 
 
+def test_a_free_model_is_priced_at_zero_and_an_unverified_one_stays_unpriced() -> None:
+    usage = AgentSessionUsage(
+        model_usage=[
+            LLMModelUsage(
+                provider="openrouter",
+                model="nvidia/nemotron-3-super-120b-a12b:free",
+                input_tokens=900,
+                output_tokens=80,
+            ),
+            LLMModelUsage(
+                provider="groq", model="qwen/qwen3.8-27b", input_tokens=900, output_tokens=80
+            ),
+        ]
+    )
+    payload = usage_payload(priced(usage, load_prices()), final=False)
+    by_provider = {(i["provider"], i["unit"]): i for i in payload["items"]}
+    free = by_provider[("openrouter", "output_token")]
+    assert (free["priced"], free["costInr"]) == (True, 0.0)
+    assert by_provider[("groq", "output_token")]["priced"] is False
+    assert "costInr" not in by_provider[("groq", "output_token")]
+    assert (payload["costInr"], payload["unpricedItems"]) == (0.0, 2)
+
+
 @pytest.mark.parametrize(
     ("row", "because"),
     [

@@ -36,10 +36,15 @@ var agentJobs = []struct {
 	fixture   string
 	language  string
 	overrides string
+	llm       string
 }{
-	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", ""},
-	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", semanticOverride},
-	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", ""},
+	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", "", ""},
+	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", semanticOverride, ""},
+	{"../../../testdata/agent/hindi-groq-webrtc-job.json", "hi", "", "groq/qwen/qwen3.8-27b"},
+	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", "", ""},
+	{"../../../testdata/agent/kannada-webrtc-job.json", "kn-IN", "", ""},
+	{"../../../testdata/agent/marathi-webrtc-job.json", "mr-IN", "", ""},
+	{"../../../testdata/agent/telugu-webrtc-job.json", "te-IN", "", ""},
 }
 
 func embeddedCatalog(t *testing.T) *config.Catalog {
@@ -61,7 +66,7 @@ func TestTheAgentJobsArePinnedForTheWorker(t *testing.T) {
 	for _, job := range agentJobs {
 		resolved, err := catalog.Resolve(config.Request{
 			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: job.language, Channel: config.ChannelWebRTC,
-			Overrides: json.RawMessage(job.overrides),
+			LLM: job.llm, Overrides: json.RawMessage(job.overrides),
 		})
 		if err != nil {
 			t.Fatalf("%s: %v", job.fixture, err)

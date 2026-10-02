@@ -4,11 +4,12 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 import aiohttp
-from dafter_core.config import parse
+from dafter_core.config import ResolvedSessionConfig, parse
 from livekit.agents import utils
 
 from .connect import join, session_overrides
@@ -69,9 +70,11 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     async with utils.http_context.open():
         voice = Voice(cfg, args.speaker)
         try:
+            started = time.monotonic()
             await join(probe, args.control, created)
             scenarios = frozenset(args.scenarios.split(","))
             report = await run(probe, voice, HINDI, args.turns, scenarios, cfg.budgets)
+            report["usage"] = usage(probe.events.usage, time.monotonic() - started)
         finally:
             await voice.aclose()
             await probe.close()
@@ -82,8 +85,28 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "language": args.language,
         "channel": args.channel,
         "overrides": overrides(args),
+        "pipeline": route(cfg),
     }
     return report
+
+
+def route(cfg: ResolvedSessionConfig) -> dict[str, str | None]:
+    pipeline = cfg.agent.pipeline
+    refs = {"stt": pipeline.stt, "llm": pipeline.llm, "tts": pipeline.tts} if pipeline else {}
+    return {stage: f"{r.provider}/{r.model}" if r else None for stage, r in refs.items()}
+
+
+def usage(payload: dict[str, Any] | None, seconds: float) -> dict[str, Any]:
+    cost = payload.get("costInr") if payload else None
+    items = payload.get("items", []) if payload else []
+    return {
+        "callSeconds": round(seconds, 1),
+        "costInr": cost,
+        "costPerMinuteInr": round(cost / (seconds / 60), 4) if cost is not None else None,
+        "unpriced": [
+            f"{i['stage']}:{i['provider']}/{i['model']}" for i in items if not i["priced"]
+        ],
+    }
 
 
 def main() -> None:

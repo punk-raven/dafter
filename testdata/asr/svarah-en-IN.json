@@ -1,0 +1,172 @@
+{
+  "dataset": "svarah",
+  "language": "en-IN",
+  "source": {
+    "dataset": "ai4bharat/Svarah",
+    "revision": "ebbf7777fe771490696a3f7b007097606fa8c924",
+    "license": "CC-BY-4.0"
+  },
+  "selection": "rows whose duration is 3 to 12 s, ordered by row; one clip per first language and district, taken in turn from each gender group, until 20 are chosen",
+  "clips": [
+    {
+      "id": "test-0",
+      "member": "test/0",
+      "speaker": "Kannada/Hassan",
+      "durationS": 8.7595,
+      "sha256": "0bea42dc354b4a1dd2175d36ca08962cb013b4a892fe15dbde83988d0a585c7f",
+      "reference": "Our district Hasana was the land of the great Hoysala dynasty who ruled over this region from 11th to 14th century CE."
+    },
+    {
+      "id": "test-10",
+      "member": "test/10",
+      "speaker": "Kannada/Shimoga",
+      "durationS": 5.48,
+      "sha256": "61477e905ca5678d470521f30cd9a9a48cc07e769cbf5a8486bbfd5e8ba97517",
+      "reference": "Among the poets, I remember William Wordsworth, T.S."
+    },
+    {
+      "id": "test-1",
+      "member": "test/1",
+      "speaker": "Kannada/Gulbarga",
+      "durationS": 3.1001,
+      "sha256": "af73bd446968a4e9509f44ba87f9c7907757adadc1bc83bcefe6507c7026c0bd",
+      "reference": "There is a gradual shift in the mentality"
+    },
+    {
+      "id": "test-1001",
+      "member": "test/1001",
+      "speaker": "Bodo/Kokrajhar",
+      "durationS": 3.4854,
+      "sha256": "0e6c5f2d1d2c43e8443682caf2f968ffd381bcaf7fb9e601ede9d5c510dbdfb6",
+      "reference": "Their holistic approach to the disease of addiction"
+    },
+    {
+      "id": "test-100",
+      "member": "test/100",
+      "speaker": "Telugu/Hyderabad",
+      "durationS": 4.56,
+      "sha256": "2bbe0be3432c643c0255d3d8e1d4dfbb6630f8892b62fc1396846715cff7e352",
+      "reference": "Different nations face different complex problems in various domains."
+    },
+    {
+      "id": "test-1003",
+      "member": "test/1003",
+      "speaker": "Assamese/Biswanath",
+      "durationS": 7.8454,
+      "sha256": "bf8a582cf12d11c24a23866427dc36e83fcafe25288d7a7a8026479418efb420",
+      "reference": "The book is really inspiring and can put a new hope in our lives."
+    },
+    {
+      "id": "test-1007",
+      "member": "test/1007",
+      "speaker": "Bengali/Kolkata",
+      "durationS": 6.8806,
+      "sha256": "e905bb3e8372acd47b7f69a242a794eb06bfce94a5f2b2bb3e49132643f63fb8",
+      "reference": "Your MPIN is invalid for mobile number 98631297536"
+    },
+    {
+      "id": "test-1005",
+      "member": "test/1005",
+      "speaker": "Bodo/Udalguri",
+      "durationS": 7.7195,
+      "sha256": "5aed7d17fc0acce50bdd803649ae014d6d2e278319e5f8164cf7bbab9295326e",
+      "reference": "And in between, during daytime, also whenever I get time, I do meditation and"
+    },
+    {
+      "id": "test-1008",
+      "member": "test/1008",
+      "speaker": "Maithili/Darbhanga",
+      "durationS": 5.2516,
+      "sha256": "241c8ea4571e96803b8576c3c6c61421904de1f5fc89b7768bf72f0d8cd9c076",
+      "reference": "Can you track the application status on National Scholarship portal for my mobile number"
+    },
+    {
+      "id": "test-1009",
+      "member": "test/1009",
+      "speaker": "Tamil/Karur",
+      "durationS": 5.0309,
+      "sha256": "57c4f30070de08a670118b1254d3a8f660424f31f8e975d03b18895376bee11a",
+      "reference": "Payments, transactions, account statements and other things are happening online"
+    },
+    {
+      "id": "test-101",
+      "member": "test/101",
+      "speaker": "Nepali/Kalimpong",
+      "durationS": 11.0,
+      "sha256": "41f67d207ae4ef992d6f23241a2c84ec5fef7e59cd7c48861466b1156e2738c9",
+      "reference": "Commonly here, the culture is followed according to the norms of Nepali people."
+    },
+    {
+      "id": "test-1012",
+      "member": "test/1012",
+      "speaker": "Assamese/Nagaon",
+      "durationS": 6.7987,
+      "sha256": "e11d4159b05060763ec7c4f7c917e63be6846c21e76a3cfdb526d8ddf0147d57",
+      "reference": "Please enter my private car number to proceed forward on Repco Finance car insurance page"
+    },
+    {
+      "id": "test-1010",
+      "member": "test/1010",
+      "speaker": "Bengali/South 24 Parganas",
+      "durationS": 4.2186,
+      "sha256": "28172bb7fd255c4b70f80e1a40ff4010b997da6467beb5dfb88b0ca29832da11",
+      "reference": "English is a gender neutral language"
+    },
+    {
+      "id": "test-1013",
+      "member": "test/1013",
+      "speaker": "Odia/Puri",
+      "durationS": 7.6792,
+      "sha256": "3d75af5acaca9fda3abf701f93f3937c311dde51c49de2ee635718eb654ccf75",
+      "reference": "find all Renewal scholarship applications in the academic year 2019 - 2020"
+    },
+    {
+      "id": "test-1019",
+      "member": "test/1019",
+      "speaker": "Malayalam/Pathanamthitta",
+      "durationS": 6.3391,
+      "sha256": "4e55aad6bd759505e55f3b4141805e4e16630d4f933e1fc7236571717a425733",
+      "reference": "It's a main theme or the one of the advice that is given by the writer to the readers."
+    },
+    {
+      "id": "test-1026",
+      "member": "test/1026",
+      "speaker": "Kashmiri/Anantnag",
+      "durationS": 3.9314,
+      "sha256": "9c7ba80f3f2901a7975bdd81c5d200278413b229c8dc85572bb65b16daf78c4a",
+      "reference": "Show a list of all available vaccination center in State Goa"
+    },
+    {
+      "id": "test-1021",
+      "member": "test/1021",
+      "speaker": "Urdu/Satara",
+      "durationS": 5.247,
+      "sha256": "00f09aa3b8aef288a479fe4162ec986315739a48da3f8f8368b082ded8fe0f45",
+      "reference": "I find it better while speaking as well as writing in English."
+    },
+    {
+      "id": "test-1038",
+      "member": "test/1038",
+      "speaker": "Kashmiri/Srinagar",
+      "durationS": 9.9409,
+      "sha256": "fea92ec561b2c21ace639546a5ba95f674c041cd4586405ba35a48e9b8b88749",
+      "reference": "Show all vaccination centres available for age group 18+ years in area with pincode 795489"
+    },
+    {
+      "id": "test-1022",
+      "member": "test/1022",
+      "speaker": "Dogri/Jammu",
+      "durationS": 5.8593,
+      "sha256": "52e2be5c2128cffa6ef4e87ab35e905a958cc1cc1f4b7928c0e178dab8b7f75a",
+      "reference": "That if someone speaks in English, then he is literate. We can justify that, we can judge that."
+    },
+    {
+      "id": "test-1043",
+      "member": "test/1043",
+      "speaker": "Kannada/Bangalore Urban",
+      "durationS": 4.7781,
+      "sha256": "5e8ef5e39a61ab3fcd27d4dbb409461d9296e446160a2acd6fb43a8af553fe57",
+      "reference": "What is availability status of Fresho Diced Broad Beans"
+    }
+  ]
+}

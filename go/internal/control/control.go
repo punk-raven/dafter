@@ -56,6 +56,7 @@ type createSessionRequest struct {
 	Profile   string          `json:"profile,omitempty"`
 	Language  string          `json:"language"`
 	Channel   config.Channel  `json:"channel"`
+	LLM       string          `json:"llm,omitempty"`
 	Role      config.Role     `json:"role,omitempty"`
 	Overrides json.RawMessage `json:"overrides,omitempty"`
 }
@@ -120,6 +121,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		Profile:   req.Profile,
 		Language:  req.Language,
 		Channel:   req.Channel,
+		LLM:       req.LLM,
 		Overrides: req.Overrides,
 	})
 	if err != nil {

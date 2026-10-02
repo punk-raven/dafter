@@ -52,7 +52,7 @@ def build(plan: Plan) -> Stages:
         raise DafterError(ErrorCode.INTERNAL, "a planned vendor lost a stage factory")
 
     def listener_stt() -> lk_stt.STT[Any]:
-        return new_stt(stt_ref, cfg.language, cfg.turn, plan.stt_prompt)
+        return new_stt(stt_ref, plan.hearing, cfg.turn, plan.stt_prompt)
 
     stages = Stages(
         stt=listener_stt(),

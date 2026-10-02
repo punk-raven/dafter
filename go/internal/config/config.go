@@ -19,6 +19,7 @@ type ResolvedSessionConfig struct {
 	PrivacyMode PrivacyMode `json:"privacyMode"`
 	Language    string      `json:"language"`
 	Channel     Channel     `json:"channel"`
+	LLM         string      `json:"llm,omitempty"`
 
 	Residency *Residency `json:"residency,omitempty"`
 	Agent     Agent      `json:"agent"`
@@ -45,6 +46,9 @@ type Agent struct {
 	PersonaRef string      `json:"personaRef,omitempty"`
 	Pipeline   *Pipeline   `json:"pipeline,omitempty"`
 	Addressing *Addressing `json:"addressing,omitempty"`
+	Speech     *Speech     `json:"speech,omitempty"`
+
+	LanguageSwitching *LanguageSwitching `json:"languageSwitching,omitempty"`
 }
 
 type Addressing struct {
@@ -106,12 +110,13 @@ type PreemptiveGeneration struct {
 }
 
 type Interruption struct {
-	Enabled                    *bool `json:"enabled,omitempty"`
-	LocalVADEnabled            *bool `json:"localVadEnabled,omitempty"`
-	MinDurationMs              int   `json:"minDurationMs,omitempty"`
-	MinWords                   int   `json:"minWords,omitempty"`
-	FalseInterruptionTimeoutMs int   `json:"falseInterruptionTimeoutMs,omitempty"`
-	ResumeFalseInterruption    *bool `json:"resumeFalseInterruption,omitempty"`
+	Enabled                    *bool        `json:"enabled,omitempty"`
+	LocalVADEnabled            *bool        `json:"localVadEnabled,omitempty"`
+	MinDurationMs              int          `json:"minDurationMs,omitempty"`
+	MinWords                   int          `json:"minWords,omitempty"`
+	FalseInterruptionTimeoutMs int          `json:"falseInterruptionTimeoutMs,omitempty"`
+	ResumeFalseInterruption    *bool        `json:"resumeFalseInterruption,omitempty"`
+	Backchannel                *Backchannel `json:"backchannel,omitempty"`
 }
 
 type Media struct {

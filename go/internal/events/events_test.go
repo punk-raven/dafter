@@ -130,6 +130,8 @@ func TestMeasurementVectorsParse(t *testing.T) {
 		"agent-state-changed.json": events.EventAgentStateChanged,
 		"agent-turn-metrics.json":  events.EventAgentTurnMetrics,
 		"session-usage.json":       events.EventSessionUsage,
+		"agent-configured.json":    events.EventAgentConfigured,
+		"provider-degraded.json":   events.EventProviderDegraded,
 	} {
 		raw, err := os.ReadFile(vectors + name)
 		if err != nil {
@@ -159,7 +161,9 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 		{"unknown layer", "agent-turn-metrics.json", func(p map[string]any) { p["vadDelayMs"] = 10 }},
 		{"missing turn", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "turn") }},
 		{"serial not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["serial"] = "yes" }},
+		{"filler not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["filler"] = "yes" }},
 		{"serial without its layers", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "llmNodeTtfsMs") }},
+		{"reply language not a tag", "agent-turn-metrics.json", func(p map[string]any) { p["language"] = "Kannada" }},
 		{"unpriced item with a cost", "session-usage.json", func(p map[string]any) { item(p, 1)["costInr"] = 0 }},
 		{"priced item without a cost", "session-usage.json", func(p map[string]any) { delete(item(p, 0), "costInr") }},
 		{"unknown unit", "session-usage.json", func(p map[string]any) { item(p, 0)["unit"] = "minute" }},
@@ -171,6 +175,13 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 		{"woken by a name", "agent-state-changed.json", func(p map[string]any) { p["wokenBy"] = "Asha" }},
 		{"woken without how", "agent-state-changed.json", func(p map[string]any) { delete(p, "wokenVia") }},
 		{"unknown wake source", "agent-state-changed.json", func(p map[string]any) { p["wokenVia"] = "wake_word" }},
+		{"configured without its LLM", "agent-configured.json", func(p map[string]any) { delete(p, "llm") }},
+		{"configured LLM by vendor spelling", "agent-configured.json", func(p map[string]any) { p["llm"].(map[string]any)["provider"] = "Groq" }},
+		{"normalization not a mode", "agent-configured.json", func(p map[string]any) { p["normalization"] = "on" }},
+		{"fillers not a boolean", "agent-configured.json", func(p map[string]any) { p["fillers"] = "off" }},
+		{"degraded without its error", "provider-degraded.json", func(p map[string]any) { delete(p, "error") }},
+		{"degraded error without a code", "provider-degraded.json", func(p map[string]any) { delete(p["error"].(map[string]any), "code") }},
+		{"degraded without recoverable", "provider-degraded.json", func(p map[string]any) { delete(p, "recoverable") }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

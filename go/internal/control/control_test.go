@@ -294,7 +294,7 @@ func TestHindiAndEnglishResolveDifferentTurnStrategies(t *testing.T) {
 func TestEveryLanguageSpeaksInAFemaleVoiceByDefault(t *testing.T) {
 	t.Parallel()
 	h := serve(t)
-	for _, language := range []string{"hi", "en-IN"} {
+	for _, language := range []string{"hi", "en-IN", "kn-IN", "mr-IN", "te-IN"} {
 		cfg, err := config.Parse(h.create(t, request(language, "webrtc")).Config)
 		if err != nil {
 			t.Fatalf("%s: the returned document is not a valid resolved config: %v", language, err)

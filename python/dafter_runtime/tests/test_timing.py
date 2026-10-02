@@ -174,3 +174,15 @@ def test_a_turn_without_both_llm_layers_is_not_judged(seconds: dict[str, float])
     assert "serial" not in timing.payload()
     assert "dafter.turn.serial" not in timing.span_attributes()
     assert "serial" not in timing.log_fields()
+
+
+def test_a_turn_a_filler_played_ahead_of_says_so_everywhere_it_is_reported() -> None:
+    turns = Turns()
+    turns.add(message("user", USER))
+    filled = turns.add(message("assistant", AGENT), filler=True)
+    plain = turns.add(message("assistant", AGENT))
+    assert filled is not None and plain is not None
+    assert filled.payload()["filler"] is True
+    assert filled.span_attributes()["dafter.turn.filler"] is True
+    assert filled.log_fields()["filler"] is True
+    assert "filler" not in plain.payload()

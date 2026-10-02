@@ -107,11 +107,6 @@ def test_every_price_converts_to_inr_at_the_one_dated_rate() -> None:
 OPENAI = "secret://evals/openai/api-key"
 
 
-def options(doc: dict[str, Any]) -> dict[str, Any]:
-    found: dict[str, Any] = doc["candidates"][1]["provider"]["options"]
-    return found
-
-
 def broken(change: Any) -> str:
     doc = copy.deepcopy(raw())
     change(doc)
@@ -133,9 +128,8 @@ def broken(change: Any) -> str:
         (lambda d: d["usdToInr"].pop("asOf"), "exactly inrPerUsd"),
         (lambda d: d["candidates"][1]["provider"].pop("model"), "pinned model"),
         (lambda d: d.pop("judge"), "judge"),
-        (lambda d: options(d).__setitem__("endpoint", "nowhere"), "nowhere"),
-        (lambda d: options(d).pop("endpoint"), "needs a named endpoint"),
-        (lambda d: d["endpoints"].__setitem__("groq", d["endpoints"]["openai"]), "binds"),
+        (lambda d: d["candidates"][1]["provider"].__setitem__("provider", "groq"), "groq"),
+        (lambda d: d["endpoints"].__setitem__("nowhere", d["endpoints"]["openai"]), "registers"),
         (lambda d: d["endpoints"]["google"].__setitem__("baseUrl", "https://x"), "exactly"),
         (lambda d: d["candidates"][1]["provider"].__setitem__("credentialRef", OPENAI), "GEMINI"),
     ],

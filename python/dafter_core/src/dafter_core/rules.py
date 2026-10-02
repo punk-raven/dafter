@@ -56,6 +56,15 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         ),
     ),
     CrossFieldRule(
+        broken=lambda c: c.agent.language_switching.leaves_out(c.language),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/agent/languageSwitching/languages",
+        because=(
+            "the agent starts in the session's language, so a list of languages to switch "
+            "between that leaves it out could never switch back to it"
+        ),
+    ),
+    CrossFieldRule(
         broken=lambda c: c.recording.enabled and not c.recording.consent_artifact_id,
         code=ErrorCode.CONSENT_REQUIRED,
         pointer="/recording/consentArtifactId",

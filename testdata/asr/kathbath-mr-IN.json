@@ -1,0 +1,173 @@
+{
+  "dataset": "kathbath",
+  "language": "mr-IN",
+  "source": {
+    "archive": "https://indicwhisper.objectstore.e2enetworks.net/vistaar_benchmarks/kathbath.zip",
+    "bytes": 3457654951,
+    "etag": "\"bab49044464c3d44b500ec4258894da7-207\"",
+    "license": "CC-BY-4.0"
+  },
+  "selection": "rows whose duration is 3 to 12 s, ordered by audio path; one clip per speaker, taken in turn from each gender group, until 20 are chosen",
+  "clips": [
+    {
+      "id": "844424930557192-737-f",
+      "member": "kathbath/marathi/wavs/844424930557192-737-f.wav",
+      "speaker": "737",
+      "durationS": 8.1037,
+      "sha256": "825f06fd0f4061d73389774927a78fa827a0a35333306df374500458157b11af",
+      "reference": "जैतापूरच्या धगधगत्या वातावरणात प्रत्यक्ष प्रकल्प स्थळावर जाऊन ताकद दाखवण्याचे काम राणेंनी केले"
+    },
+    {
+      "id": "844424930323251-60-m",
+      "member": "kathbath/marathi/wavs/844424930323251-60-m.wav",
+      "speaker": "60",
+      "durationS": 5.1548,
+      "sha256": "7975cb360ffcac069ccc582b086352e25bd99098921f34477e334204e825a063",
+      "reference": "बँकींग प्रणाली अधिक सक्षम आणि स्वच्छ करण्याचा सरकारचा निर्धार आहे"
+    },
+    {
+      "id": "844424930834511-954-f",
+      "member": "kathbath/marathi/wavs/844424930834511-954-f.wav",
+      "speaker": "954",
+      "durationS": 5.5264,
+      "sha256": "22ba50feb702c11aaddc7530f8d6633d019d066e93da6be4693af2b82b7e57e2",
+      "reference": "कारण त्यांनी त्यांचं असं असणं स्वीकारलं होतं म्हणून त्यांना ते निभावता आलं"
+    },
+    {
+      "id": "844424930649722-823-m",
+      "member": "kathbath/marathi/wavs/844424930649722-823-m.wav",
+      "speaker": "823",
+      "durationS": 8.3592,
+      "sha256": "0c2035289364aa3109dd20a545cc5e96c52a6aeb41b69c4d46e380f8f816ed56",
+      "reference": "अगाथा ख्रिस्ती या लेखिकेच्या २७ इंग्रजी कादंबऱ्यांचा मराठी अनुवादही त्यांनी केला होता"
+    },
+    {
+      "id": "844424930868428-933-f",
+      "member": "kathbath/marathi/wavs/844424930868428-933-f.wav",
+      "speaker": "933",
+      "durationS": 6.7106,
+      "sha256": "86bd6120ceacc6faf56fc0e62a8934f3da9885dc4a16253a2b1ef66247c5cc42",
+      "reference": "ही पाणी गळती थांबविण्यासाठी महापालिकेकडून त्वरीत दुरुस्तीचे काम हाती घेण्यात आले"
+    },
+    {
+      "id": "844424930746691-6-m",
+      "member": "kathbath/marathi/wavs/844424930746691-6-m.wav",
+      "speaker": "6",
+      "durationS": 8.2199,
+      "sha256": "c8ee1c83ba4d7c9dcc87bf828491d8dcc1df46f20cb84bc8a2cd2be49a18cc51",
+      "reference": "शाहरुख राकेश शर्मा यांच्या बायोपिकसाठी अमेरिकेला प्रशिक्षण घेणार असल्याचेही समजते आहे"
+    },
+    {
+      "id": "844424930902673-715-f",
+      "member": "kathbath/marathi/wavs/844424930902673-715-f.wav",
+      "speaker": "715",
+      "durationS": 5.0388,
+      "sha256": "a4e7761d49512ee60e5a946431429208d48ead37bc821ff780b9da4844abea79",
+      "reference": "आता तुम्हाला माहीत आहे एका जेवणातील प्रथिने किती शोषून घेतली जाते"
+    },
+    {
+      "id": "844424933280411-817-m",
+      "member": "kathbath/marathi/wavs/844424933280411-817-m.wav",
+      "speaker": "817",
+      "durationS": 8.5218,
+      "sha256": "024dacb129504dc8535305fcd66a51c53b7c65a62bf0ef1605c3889925d4488e",
+      "reference": "बसरा हे इराक देशामधील एक प्रमुख शहर व सर्वात मोठे बंदर आहे"
+    },
+    {
+      "id": "844424930906914-972-f",
+      "member": "kathbath/marathi/wavs/844424930906914-972-f.wav",
+      "speaker": "972",
+      "durationS": 7.0821,
+      "sha256": "623fbdfa05cb5db8837f35722876ae9f723b9164621dadd58f99001169bb7902",
+      "reference": "इंग्रजी भाषेचे आक्रमण आणि तिच्या ज्ञानाचे संपादन अशीदेखील लढाई सुरू आहे"
+    },
+    {
+      "id": "844424933355957-1120-m",
+      "member": "kathbath/marathi/wavs/844424933355957-1120-m.wav",
+      "speaker": "1120",
+      "durationS": 6.966,
+      "sha256": "645d4177864f57e7059e9fc753ea94bd1498886bc24d4d8691cd90af404d8ff2",
+      "reference": "काहींच्या मते वटेश्वर म्हणजे चांगदेवांच्या अंतरंगात प्रकाशणारे ईश्वराचे रूप"
+    },
+    {
+      "id": "844424931570509-236-f",
+      "member": "kathbath/marathi/wavs/844424931570509-236-f.wav",
+      "speaker": "236",
+      "durationS": 7.7091,
+      "sha256": "dbc8c91012038265957821eedf9cdebc5e5343fff0249eb3e5a41dab831e0750",
+      "reference": "ह्या कैसरच्या विधानाने इंग्लडला एकूणच त्याच्या बद्दल शंका यायला सुरुवात झाली"
+    },
+    {
+      "id": "844424933373379-962-m",
+      "member": "kathbath/marathi/wavs/844424933373379-962-m.wav",
+      "speaker": "962",
+      "durationS": 8.8004,
+      "sha256": "6ec167b7083d59af85b31fa55ab82acd0db9d35de067cb2b69815d8dc66f537a",
+      "reference": "प्रकार दूर्वा गवती चहा कसाट बेर लवी दवणा मरवा कांडीचार भोबडा कारवी खवण्या"
+    },
+    {
+      "id": "844424932262358-809-f",
+      "member": "kathbath/marathi/wavs/844424932262358-809-f.wav",
+      "speaker": "809",
+      "durationS": 10.1704,
+      "sha256": "a89991a949fff2abeadcff35f8dbbc3547f944ab7e09a500c891497d29c9a668",
+      "reference": "ते ट्रॅक्टर मालकाने विना परवानगी पळवून नेल्याची बाब २ जानेवारी रोजी महसूलच्या लक्षात आली"
+    },
+    {
+      "id": "844424933379896-487-m",
+      "member": "kathbath/marathi/wavs/844424933379896-487-m.wav",
+      "speaker": "487",
+      "durationS": 6.9892,
+      "sha256": "314d1616b602e1774c0687d7a1730283d713b72e3ee4141a7438fd127cdb1986",
+      "reference": "या काळात येथे अनेक उच्चतम प्रतीची स्नेह सम्मेलणे झाली"
+    },
+    {
+      "id": "844424932266660-980-f",
+      "member": "kathbath/marathi/wavs/844424932266660-980-f.wav",
+      "speaker": "980",
+      "durationS": 4.7369,
+      "sha256": "213df41f4bd09bbc0d4c5d24f46941e3d23e323509707f800c03b0e1cbe1756f",
+      "reference": "त्यामुळे त्या दिवशी मतदान ठवेल्यास कमी मतदान होण्याची शक्यता असायची"
+    },
+    {
+      "id": "844424933381571-676-m",
+      "member": "kathbath/marathi/wavs/844424933381571-676-m.wav",
+      "speaker": "676",
+      "durationS": 7.4304,
+      "sha256": "6d7c46405400252e6ea9cb75c8466c07cb45f161a13b3cd81d22d0d2ff559ae2",
+      "reference": "तिच्यात क्रंतिकारक बदल घडून आला आणि अबला की सबला हाच प्रश्न निर्माण झाला"
+    },
+    {
+      "id": "844424932372154-132-f",
+      "member": "kathbath/marathi/wavs/844424932372154-132-f.wav",
+      "speaker": "132",
+      "durationS": 6.2229,
+      "sha256": "62f08ac49c1da82ad9fea782aef0824df47bccd469c1edee650b9b4b0504dd8c",
+      "reference": "शेवटच्या तासात पुन्हा रिकव्हरी आल्याने बाजार वधारत बंद झाला"
+    },
+    {
+      "id": "844424933393988-426-m",
+      "member": "kathbath/marathi/wavs/844424933393988-426-m.wav",
+      "speaker": "426",
+      "durationS": 10.0775,
+      "sha256": "ec27e83c0d583252cd76471f8d0998e331a336ba443111474a1daa1f3eb1ff6f",
+      "reference": "ख्रिस्ती मिशनरी चालविणाऱ्या ख्रिस्ती शाळांमध्ये अनेक मुले सक्रियपणे ख्रिसमस कार्यक्रमात सहभागी होतात"
+    },
+    {
+      "id": "844424932484354-573-f",
+      "member": "kathbath/marathi/wavs/844424932484354-573-f.wav",
+      "speaker": "573",
+      "durationS": 8.6611,
+      "sha256": "9581ca1e6ada1cdd171d05062605cc498ad8ac9669f2514bde0fcf45fdd5fccb",
+      "reference": "मुलीच्या यशाबद्दल तिचे कौतुक करण्यासाठी वडील विजय भिसे घरी पेढे घेऊन आले"
+    },
+    {
+      "id": "844424933394787-566-m",
+      "member": "kathbath/marathi/wavs/844424933394787-566-m.wav",
+      "speaker": "566",
+      "durationS": 8.336,
+      "sha256": "de1052222c20b9196c9105c8a435bbf3319b3015c88f092078bfdd948752f07d",
+      "reference": "या समाजाने रोजगाराच्या संधी निर्माण करून देशाच्या अर्थव्यवस्थेला चालना दिली आहे"
+    }
+  ]
+}

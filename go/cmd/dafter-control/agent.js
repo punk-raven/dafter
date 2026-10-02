@@ -8,6 +8,7 @@ const agentView = {
   busy: false,
   pending: null,
   pendingTimer: null,
+  effective: null,
 };
 
 const AGENT_PENDING_MS = 20000;
@@ -36,11 +37,11 @@ function agentPanel() {
   panel.className = 'agent-panel';
   panel.innerHTML = `
     <div class="agent-bar">
-      <strong>Agent</strong>
+      <strong id="agent-title">Agent</strong>
       <span id="agent-presence" class="agent-pill agent-pill-off">not in call</span>
-      <button id="agent-toggle" class="agent-btn" type="button">Invite agent</button>
-      <button id="agent-wake" class="agent-btn agent-btn-wake" type="button" style="display:none">Wake</button>
     </div>
+    <div id="agent-llm" class="agent-llm"></div>
+    <div id="agent-speech" class="agent-speech"></div>
     <div id="agent-reason" class="agent-reason"></div>
     <div class="agent-body">
       <div class="agent-col agent-latency">
@@ -74,8 +75,6 @@ function agentPanel() {
     <div class="agent-col-head"><span>Live transcript</span><span class="agent-hint">interim in italics</span></div>
     <div id="agent-lines" class="agent-lines"><div class="agent-empty">speech shows here as it is recognised</div></div>`;
   document.getElementById('transcripts').append(transcript);
-  document.getElementById('agent-toggle').addEventListener('click', toggleAgent);
-  document.getElementById('agent-wake').addEventListener('click', wakeAgent);
   return panel;
 }
 
@@ -88,19 +87,21 @@ function agentBlockedReason(config) {
 
 function renderAgentControls() {
   const button = document.getElementById('agent-toggle');
-  if (!button) return;
+  const presence = document.getElementById('agent-presence');
+  if (!presence) return;
   const reason = agentBlockedReason(agentView.config);
   const present = agentParticipant(agentView.room) !== null;
-  const presence = document.getElementById('agent-presence');
   const pending = agentView.pending === (present ? 'leaving' : 'joining') ? agentView.pending : null;
   const dormant = present && agentAddressing.dormant === true;
   presence.textContent = pending || (present ? (dormant ? 'dormant' : (agentView.state || 'joining')) : 'not in call');
   presence.className = `agent-pill agent-pill-${present ? (dormant ? 'dormant' : (agentView.state || 'initializing')) : (pending ? 'initializing' : 'off')}`;
   presence.title = present ? addressingText(agentView.state) || '' : '';
   renderWakeButton(present);
-  document.getElementById('agent-reason').textContent = reason || agentRefusalText();
+  const reasonEl = document.getElementById('agent-reason');
+  reasonEl.textContent = reason || agentRefusalText() || agentDegradedText();
+  reasonEl.classList.toggle('agent-reason-error', !reason && !agentRefusalText() && agentDegradedText() !== '');
   button.textContent = present ? 'Remove agent' : 'Invite agent';
-  button.className = `agent-btn ${present ? 'agent-btn-remove' : ''}`;
+  button.className = present ? 'btn-agent btn-agent-remove' : 'btn-agent';
   button.disabled = agentView.busy || pending !== null || (!present && reason !== '');
   button.title = reason;
 }
@@ -161,6 +162,19 @@ function onAgentEvent(payload) {
   }
   if (event.type === 'session.usage') {
     onSessionUsage(event.payload);
+    const served = servedLlms(event.payload.items);
+    renderAgentLlm(agentView.config, served.length ? served : reportedLlm(agentView.effective));
+    return;
+  }
+  if (event.type === 'agent.configured') {
+    agentView.effective = event.payload;
+    renderAgentLlm(agentView.config, reportedLlm(event.payload));
+    renderAgentSpeech(agentView.config, event.payload);
+    log(`Agent runs ${reportedLlm(event.payload)[0]}; fillers ${event.payload.fillers ? 'on' : 'off'}, backchannel ${event.payload.backchannel ? 'on' : 'off'}, normalization ${event.payload.normalization}`, 'success');
+    return;
+  }
+  if (event.type === 'provider.degraded') {
+    showAgentDegraded(event.payload);
     return;
   }
   if (SCRIBE_EVENTS.has(event.type)) {
@@ -170,6 +184,7 @@ function onAgentEvent(payload) {
   if (event.type !== 'agent.state_changed') return;
   const previous = agentView.state;
   agentView.state = event.payload.state;
+  if (agentView.state === 'speaking') clearAgentDegraded();
   const addressed = onAgentAddressing(event.payload);
   agentTurnState(previous, agentView.state, performance.now());
   setAgentTileState(agentView.state);
@@ -186,8 +201,12 @@ function watchAgent(room, data) {
   agentView.state = null;
   resetAgentAddressing();
   agentPanel().style.display = '';
+  document.getElementById('agent-title').textContent = (data.config && data.config.agent && data.config.agent.name) || 'Agent';
   document.getElementById('agent-transcript').style.display = '';
   resetAgentTurns();
+  agentView.effective = null;
+  renderAgentLlm(data.config, []);
+  renderAgentSpeech(data.config, null);
   watchTranscripts(room);
 
   room.on(RoomEvent.DataReceived, (payload, participant, kind, topic) => {

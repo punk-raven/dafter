@@ -71,6 +71,24 @@ def test_stt_carries_a_prompt_to_the_realtime_endpoint() -> None:
     )
 
 
+def test_stt_hears_code_mixed_speech_in_codemix_mode() -> None:
+    plain = sarvam.build_stt(ref("saaras:v3-realtime"), "kn-IN", TURN, None)
+    mixed = sarvam.build_stt(ref("saaras:v3-realtime", mode="codemix"), "kn-IN", TURN, None)
+    opts = mixed._opts  # type: ignore[attr-defined]
+    assert plain._opts.mode == "transcribe"  # type: ignore[attr-defined]
+    assert opts.mode == "codemix"
+    url = stt_streaming._build_realtime_ws_url(opts.base_url, opts)
+    assert parse_qs(urlsplit(url).query)["mode"] == ["codemix"]
+
+
+def test_stt_refuses_a_mode_whose_text_the_agent_cannot_answer() -> None:
+    for mode in ("translate", "translit", "verbatim", "Codemix"):
+        with pytest.raises(DafterError) as caught:
+            sarvam.build_stt(ref("saaras:v3-realtime", mode=mode), "hi", TURN, None)
+        assert caught.value.code is ErrorCode.INVALID_CONFIG
+        assert "/agent/pipeline/stt/options/mode" in caught.value.details[0]
+
+
 def test_llm_turns_thinking_off_on_the_generally_available_endpoint() -> None:
     llm = sarvam.build_llm(ref("sarvam-105b", thinking=False, maxTokens=200))
     assert llm._opts.reasoning_effort is None  # type: ignore[attr-defined]
@@ -176,4 +194,23 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
     with pytest.raises(DafterError) as caught:
         vendor_for(ProviderRef(provider="deepgram"), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
-    assert set(VENDORS) == {"sarvam", "silero", "openai_compat"}
+    assert set(VENDORS) == {
+        "sarvam",
+        "silero",
+        "groq",
+        "openrouter",
+        "google",
+        "opencode_zen",
+        "openai",
+        "nvidia",
+    }
+    assert "deepgram" in caught.value.message
+
+
+def test_stt_identifies_the_language_when_the_session_switches() -> None:
+    assert VENDORS["sarvam"].detects_language and not VENDORS["silero"].detects_language
+    stt = sarvam.build_stt(ref("saaras:v3-realtime", mode="codemix"), None, TURN, None)
+    opts = stt._opts  # type: ignore[attr-defined]
+    assert (opts.language, opts.mode) == ("auto", "codemix")
+    url = stt_streaming._build_realtime_ws_url(opts.base_url, opts)
+    assert parse_qs(urlsplit(url).query)["language_code"] == ["auto"]

@@ -88,7 +88,7 @@
         },
         "speakers": { "type": "array", "items": { "$ref": "#/$defs/ScribeSpeakerPoints" }, "maxItems": 50 },
         "notes": { "type": "array", "items": { "$ref": "#/$defs/AgentNote" }, "maxItems": 100 },
-        "source": { "$ref": "https://schemas.dafter.dev/events/v1/envelope.schema.json#/$defs/TranscriptSource", "description": "The LLM that wrote them." }
+        "source": { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/TranscriptSource", "description": "The LLM that wrote them." }
       }
     },
 
@@ -120,7 +120,7 @@
             "meanScore": { "type": "number", "minimum": 0, "maximum": 1, "description": "Absent while no turn has a score." }
           }
         },
-        "source": { "$ref": "https://schemas.dafter.dev/events/v1/envelope.schema.json#/$defs/TranscriptSource", "description": "The LLM that wrote them." }
+        "source": { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/TranscriptSource", "description": "The LLM that wrote them." }
       }
     },
 
@@ -139,7 +139,7 @@
           "additionalProperties": { "type": "string", "enum": ["pass", "fail", "maybe"] }
         },
         "error": { "$ref": "https://schemas.dafter.dev/errors/v1/error.schema.json#/$defs/ErrorCode" },
-        "source": { "$ref": "https://schemas.dafter.dev/events/v1/envelope.schema.json#/$defs/TranscriptSource", "description": "The judge." }
+        "source": { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/TranscriptSource", "description": "The judge." }
       },
       "oneOf": [
         { "required": ["score", "criteria"], "not": { "required": ["error"] } },

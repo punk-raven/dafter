@@ -62,7 +62,9 @@ class TurnTiming:
     turn: int
     interrupted: bool
     seconds: dict[str, float] = field(default_factory=dict)
+    filler: bool = False
     first_sentence_share: float | None = None
+    language: str | None = None
 
     def milliseconds(self) -> dict[str, int]:
         return {key: round(value * 1000) for key, value in self.seconds.items()}
@@ -81,16 +83,24 @@ class TurnTiming:
         body.update({PAYLOAD_FIELDS[k]: ms for k, ms in self.milliseconds().items()})
         if (serial := self.serial()) is not None:
             body["serial"] = serial
+        if self.filler:
+            body["filler"] = True
+        if self.language is not None:
+            body["language"] = self.language
         return body
 
-    def span_attributes(self) -> dict[str, int | bool]:
-        attrs: dict[str, int | bool] = {
+    def span_attributes(self) -> dict[str, int | bool | str]:
+        attrs: dict[str, int | bool | str] = {
             "dafter.turn.index": self.turn,
             "dafter.turn.interrupted": self.interrupted,
         }
         attrs.update({f"dafter.turn.{k}_ms": ms for k, ms in self.milliseconds().items()})
         if (serial := self.serial()) is not None:
             attrs["dafter.turn.serial"] = serial
+        if self.filler:
+            attrs["dafter.turn.filler"] = True
+        if self.language is not None:
+            attrs["dafter.turn.language"] = self.language
         return attrs
 
     def log_fields(self) -> dict[str, Any]:
@@ -98,8 +108,12 @@ class TurnTiming:
         fields.update({k: round(v, 4) for k, v in self.seconds.items()})
         if (serial := self.serial()) is not None:
             fields["serial"] = serial
+        if self.filler:
+            fields["filler"] = True
         if self.first_sentence_share is not None:
             fields["first_sentence_share"] = round(self.first_sentence_share, 2)
+        if self.language is not None:
+            fields["language"] = self.language
         return fields
 
     def record(self, tracer: trace.Tracer) -> None:
@@ -112,6 +126,7 @@ class Turns:
         self._endpoint = endpoint
         self._user: dict[str, float] = {}
         self._voiced_until: float | None = None
+        self._answering_in: str | None = None
 
     def _user_turn(self, item: ChatMessage) -> None:
         self._user = {}
@@ -130,26 +145,40 @@ class Turns:
             return {}
         return {REPLY_GAP: float(started) - voiced_until}
 
-    def add(self, item: ChatMessage) -> TurnTiming | None:
+    def add(
+        self,
+        item: ChatMessage,
+        filler: bool = False,
+        language: str | None = None,
+        reply: Mapping[str, float] | None = None,
+    ) -> TurnTiming | None:
         if item.role == "user":
             self._user_turn(item)
+            self._answering_in = language
             return None
         if item.role != "assistant":
             return None
-        seconds = {**self._user, **_layers(item.metrics, AGENT_LAYERS), **self._reply_gap(item)}
-        self._user = {}
+        agent = {**_layers(item.metrics, AGENT_LAYERS), **_layers(reply or {}, AGENT_LAYERS)}
+        seconds = {**self._user, **agent, **self._reply_gap(item)}
+        replied_in = self._answering_in or language
+        self._user, self._answering_in = {}, None
         timing = TurnTiming(
             turn=self._count,
             interrupted=item.interrupted,
             seconds=seconds,
+            filler=filler,
             first_sentence_share=first_sentence_share(item.text_content),
+            language=replied_in,
         )
         self._count += 1
         return timing
 
     def unheard(self) -> TurnTiming:
-        timing = TurnTiming(turn=self._count, interrupted=True, seconds=self._user)
+        timing = TurnTiming(
+            turn=self._count, interrupted=True, seconds=self._user, language=self._answering_in
+        )
         self._user = {}
         self._voiced_until = None
+        self._answering_in = None
         self._count += 1
         return timing
