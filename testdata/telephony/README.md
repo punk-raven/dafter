@@ -1,7 +1,8 @@
 # Telephony rule vectors
 
 `rules.json` pins what the cross-field rules decide about a session on the
-telephony channel, fed to both halves unchanged:
+telephony channel, and about a session on another channel that takes phone
+guests, fed to both halves unchanged:
 `go/internal/config/telephony_test.go` and
 `python/dafter_core/tests/test_telephony.py`.
 
@@ -17,3 +18,15 @@ the room, so telephony needs privacy mode `open`; and a recorded telephony
 session needs the agent, because a person on a phone sees no recording
 indicator and only the agent tells them. A `trusted_agent` session on
 `webrtc` is not a phone call and passes.
+
+A session on another channel takes phone guests only when its telephony
+block says `phoneGuests: dial_out`: the trunk is the tenant's phone line and
+says which carrier a call would use, not whether the session wants phones, so
+a trunk with `phoneGuests` off admits no phone and changes nothing. Phone
+guests need a trunk to be called in on (`/telephony/phoneGuests`), and on the
+telephony channel `phoneGuests` must stay off, because the session is the
+call itself (`/telephony/phoneGuests`). The same two privacy rules then apply
+to a meeting that takes phone guests: an end-to-end encrypted one cannot
+(`/telephony/phoneGuests`), and a recorded one needs the agent
+(`/agent/enabled`). On the telephony channel the channel rules above report
+instead, so a broken phone call is reported once.

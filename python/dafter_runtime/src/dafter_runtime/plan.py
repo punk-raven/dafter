@@ -23,6 +23,7 @@ from dafter_core.enums import (
 )
 from dafter_core.errors import DafterError
 from dafter_core.hashing import hash_document
+from dafter_core.rules import phone_guests
 from dafter_providers import Vendor, vendor_for
 from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
 
@@ -68,6 +69,10 @@ class Plan:
     @property
     def on_a_phone(self) -> bool:
         return self.config.channel is Channel.TELEPHONY
+
+    @property
+    def takes_phone_calls(self) -> bool:
+        return self.on_a_phone or phone_guests(self.config)
 
 
 def load(metadata: str | bytes) -> ResolvedSessionConfig:
@@ -250,7 +255,7 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
 
 
 def disclosure(cfg: ResolvedSessionConfig) -> str | None:
-    if cfg.channel is not Channel.TELEPHONY:
+    if cfg.channel is not Channel.TELEPHONY and not phone_guests(cfg):
         return None
     always = cfg.telephony.recording_notice is RecordingNotice.ALWAYS
     return recording_notice(cfg.language, cfg.recording.enabled, always)

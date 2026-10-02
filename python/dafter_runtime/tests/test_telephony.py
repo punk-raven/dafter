@@ -1,21 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pytest
 from dafter_core.enums import AddressingMode, Channel
 from dafter_core.hashing import seal
-from dafter_runtime import worker
 from dafter_runtime.personas import RECORDING_NOTICES, SCRIPTS
 from dafter_runtime.plan import Plan, load, plan
-from dafter_runtime.telephony import CALL_STATUS, answered
-from dafter_runtime.worker import room_options, speak_first, stt_sample_rate
-from livekit import rtc
+from dafter_runtime.worker import room_options, stt_sample_rate
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-telephony-job.json"
 WEB_JOB = JOB.with_name("hindi-webrtc-job.json")
@@ -44,7 +39,7 @@ def test_the_pinned_phone_call_answers_every_turn_on_the_narrowband_line() -> No
     assert stt_sample_rate(p) == 8000
     assert p.pipeline.tts is not None and p.pipeline.tts.options["sampleRate"] == 8000
     options = room_options(p, 8000)
-    assert options.audio_input is not False and options.close_on_disconnect
+    assert options.audio_input is not False and not options.close_on_disconnect
 
 
 def unrecorded(doc: dict[str, Any]) -> None:
@@ -93,91 +88,27 @@ def test_every_language_the_worker_speaks_has_its_recording_notice() -> None:
         assert recorded and not_recorded and recorded != not_recorded
 
 
-@dataclass
-class Line:
-    identity: str
-    kind: int = rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-    attributes: dict[str, str] = field(default_factory=dict)
+def takes_phone_guests(doc: dict[str, Any]) -> None:
+    doc["telephony"] = {"trunk": "vobiz", "phoneGuests": "dial_out"}
+    doc["recording"] = {"enabled": True, "layout": "track", "consentArtifactId": "consent_rec"}
 
 
-@dataclass
-class Room:
-    remote_participants: dict[str, Line] = field(default_factory=dict)
-    handlers: dict[str, list[Callable[..., Any]]] = field(default_factory=dict)
-
-    def on(self, event: str, callback: Callable[..., Any]) -> None:
-        self.handlers.setdefault(event, []).append(callback)
-
-    def off(self, event: str, callback: Callable[..., Any]) -> None:
-        self.handlers[event].remove(callback)
-
-    def emit(self, event: str, *args: Any) -> None:
-        for callback in list(self.handlers.get(event, [])):
-            callback(*args)
+def test_a_meeting_that_takes_phone_guests_keeps_its_own_tuning_and_tells_them() -> None:
+    p = variant(takes_phone_guests, WEB_JOB)
+    assert p.takes_phone_calls and not p.on_a_phone
+    assert p.disclosure == RECORDED
+    assert p.called_by_name and p.opening is None
+    assert stt_sample_rate(p) == 16000
 
 
-async def ring_then_answer(room: Room) -> None:
-    await asyncio.sleep(0)
-    room.remote_participants["p_browser"] = Line(
-        "p_browser", rtc.ParticipantKind.PARTICIPANT_KIND_STANDARD, {CALL_STATUS: "active"}
-    )
-    room.emit("participant_connected", room.remote_participants["p_browser"])
-    phone = Line(CALLER, attributes={CALL_STATUS: "dialing"})
-    room.remote_participants[CALLER] = phone
-    room.emit("participant_connected", phone)
-    await asyncio.sleep(0)
-    phone.attributes[CALL_STATUS] = "ringing"
-    room.emit("participant_attributes_changed", {CALL_STATUS: "ringing"}, phone)
-    await asyncio.sleep(0)
-    phone.attributes[CALL_STATUS] = "active"
-    room.emit("participant_attributes_changed", {CALL_STATUS: "active"}, phone)
+def always(doc: dict[str, Any]) -> None:
+    doc["agent"]["addressing"]["mode"] = "always"
 
 
-def test_the_agent_waits_until_the_phone_is_picked_up() -> None:
-    async def scenario() -> tuple[str | None, Room]:
-        room = Room()
-        caller, _ = await asyncio.gather(answered(room, 1), ring_then_answer(room))
-        return caller, room
+def test_an_always_meeting_stays_up_for_later_phones_only_when_it_takes_them() -> None:
+    def always_with_phones(doc: dict[str, Any]) -> None:
+        always(doc)
+        takes_phone_guests(doc)
 
-    caller, room = asyncio.run(scenario())
-    assert caller == CALLER
-    assert all(not callbacks for callbacks in room.handlers.values())
-
-
-def test_a_phone_nobody_picks_up_is_given_up() -> None:
-    room = Room(remote_participants={CALLER: Line(CALLER, attributes={CALL_STATUS: "ringing"})})
-    assert asyncio.run(answered(room, 0.01)) is None
-
-
-class Session:
-    def __init__(self) -> None:
-        self.said: list[tuple[str, bool]] = []
-
-    def say(self, text: str, allow_interruptions: bool) -> None:
-        self.said.append((text, allow_interruptions))
-
-
-def test_once_answered_the_notice_comes_first_and_cannot_be_talked_over() -> None:
-    p = plan(load(job()), POOL)
-    room = Room(remote_participants={CALLER: Line(CALLER, attributes={CALL_STATUS: "active"})})
-    session = Session()
-    asyncio.run(speak_first(p, session, room))  # type: ignore[arg-type]
-    assert session.said == [(RECORDED, False), (p.persona.greeting, True)]
-
-
-def test_nothing_is_said_to_a_phone_that_never_answered(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def never(room: Any, within: float) -> None:
-        assert within == 30 + 15
-        return None
-
-    monkeypatch.setattr(worker, "answered", never)
-    session = Session()
-    asyncio.run(speak_first(plan(load(job()), POOL), session, Room()))  # type: ignore[arg-type]
-    assert session.said == []
-
-
-def test_a_webrtc_greeting_waits_for_no_phone() -> None:
-    p = variant(lambda doc: doc["agent"].update(greets=True), WEB_JOB)
-    session = Session()
-    asyncio.run(speak_first(p, session, Room()))  # type: ignore[arg-type]
-    assert session.said == [(p.persona.greeting, True)]
+    assert not room_options(variant(always_with_phones, WEB_JOB), 24000).close_on_disconnect
+    assert room_options(variant(always, WEB_JOB), 24000).close_on_disconnect
