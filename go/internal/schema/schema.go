@@ -21,6 +21,7 @@ import (
 
 const (
 	ResolvedSessionConfig = "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json"
+	AgentDefinition       = "https://schemas.dafter.dev/config/v1/agent-definition.schema.json"
 	EventEnvelope         = "https://schemas.dafter.dev/events/v1/envelope.schema.json"
 	Error                 = "https://schemas.dafter.dev/errors/v1/error.schema.json"
 )
