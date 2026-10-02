@@ -30,7 +30,9 @@ STAGES: dict[str, tuple[Stage, str, dict[str, Any], Build]] = {
     "groq llm": (Stage.LLM, "a-model", {}, lambda r: llm_of("groq")(r)),
     "openrouter llm": (Stage.LLM, "a-model", {}, lambda r: llm_of("openrouter")(r)),
     "google llm": (Stage.LLM, "a-model", {}, lambda r: llm_of("google")(r)),
+    "sarvam batch": (Stage.STT, "saaras:v3", {}, sarvam.build_batch),
 }
+POINTERS = {"sarvam batch": "/transcription/batch"}
 
 
 @pytest.fixture(autouse=True)
@@ -65,7 +67,7 @@ def refused(vendor_stage: str, credential_ref: str) -> DafterError:
         build(stage_ref(vendor_stage, credential_ref))
     err = caught.value
     assert err.code is ErrorCode.INVALID_CONFIG, err
-    pointer = f"/agent/pipeline/{stage}/credentialRef"
+    pointer = f"{POINTERS.get(vendor_stage, f'/agent/pipeline/{stage}')}/credentialRef"
     assert any(pointer in d for d in err.details), err.details
     assert PLATFORM_VALUE not in f"{err.message} {err.details}"
     return err
@@ -85,6 +87,7 @@ def test_no_stage_resolves_a_platform_secret_whatever_the_ref_says(
         ("sarvam stt", "groq"),
         ("sarvam llm", "openrouter"),
         ("sarvam tts", "groq"),
+        ("sarvam batch", "groq"),
         ("groq llm", "openrouter"),
         ("groq llm", "sarvam"),
         ("openrouter llm", "groq"),

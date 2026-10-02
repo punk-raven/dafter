@@ -5,6 +5,7 @@ description = "Vendor adapters behind the stage contracts, one subpackage per ve
 requires-python = ">=3.11"
 dependencies = [
     "dafter-core",
+    "aiohttp>=3.9",
     "livekit-agents==1.8.3",
     "httpx[http2]==0.28.1",
     "livekit-plugins-openai==1.8.3",

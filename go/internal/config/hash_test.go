@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -104,5 +105,37 @@ func TestResolvedConfigHashIsPinnedAcrossBothHalves(t *testing.T) {
 	}
 	if _, err := config.Parse(raw); err != nil {
 		t.Errorf("the shared vector is not a valid resolved config: %v", err)
+	}
+}
+
+const transcriptVersionHash = "4010587f3b7e5c5efc778288684a658a53c3266c6a572909d1b157b1d44efe9a"
+
+func TestTranscriptHashIsPinnedAcrossBothHalves(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(testdataDir + "/events/transcript-version-created.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	got, err := config.HashWithout(envelope.Payload, "transcriptHash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != transcriptVersionHash {
+		t.Fatalf("transcript hash %s, pinned %s", got, transcriptVersionHash)
+	}
+	var payload struct {
+		TranscriptHash string `json:"transcriptHash"`
+	}
+	if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.TranscriptHash != got {
+		t.Errorf("the vector states %s, and hashes to %s", payload.TranscriptHash, got)
 	}
 }

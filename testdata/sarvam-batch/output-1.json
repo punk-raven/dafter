@@ -1,0 +1,11 @@
+{
+  "request_id": "20260924_req_0002",
+  "transcript": "दस बजे है ना",
+  "timestamps": {
+    "words": ["दस बजे है ना"],
+    "start_time_seconds": [2.9],
+    "end_time_seconds": [4.71]
+  },
+  "diarized_transcript": null,
+  "language_code": "hi-IN"
+}

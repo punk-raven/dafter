@@ -1,0 +1,10 @@
+{
+  "job_state": "Running",
+  "created_at": "2026-09-24T10:31:00Z",
+  "updated_at": "2026-09-24T10:31:01Z",
+  "job_id": "20260924_9f8b7c6d-5e4a-3b2c-1d0e-000000000001",
+  "storage_container_type": "Azure_V1",
+  "total_files": 2,
+  "successful_files_count": 0,
+  "failed_files_count": 0
+}

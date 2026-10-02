@@ -17,6 +17,7 @@ from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
 from .backchannel import Acknowledgements, Filter, SessionFloor, acknowledged
 from .barge_in import BargeIn, Resume, follow
+from .captions import Captions
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
@@ -96,11 +97,13 @@ class Called:
         sample_rate: int,
         switching: Switching | None = None,
         hears: Callable[[AgentSession[Any]], None] = lambda _: None,
+        captions: Captions | None = None,
     ) -> None:
         self._ctx = ctx
         self._hears = hears
         self._switching = switching if switching is not None and switching.enabled else None
         self._session = session
+        self._captions = captions
         self.roster = Roster()
         self.voice = Voice(session, self.roster, interruptible=p.config.turn.interruption.enabled)
         loop = asyncio.get_running_loop()
@@ -133,6 +136,8 @@ class Called:
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)
         self._hears(session)
+        if self._captions is not None:
+            self._captions.follow(speaker, session)
 
     def _hearing(self, speaker: str) -> Filter:
         sieve = acknowledged(
@@ -162,6 +167,8 @@ class Called:
         self.roster.leave(participant.identity)
         self.gate.left(participant.identity)
         self.barge_in.left(participant.identity)
+        if self._captions is not None:
+            self._captions.left(participant.identity)
         self._spawn(self.listeners.leave(participant.identity))
         if not self.roster.present():
             log.info("everyone left, closing the agent session")

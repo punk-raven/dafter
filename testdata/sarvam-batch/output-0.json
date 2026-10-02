@@ -1,0 +1,11 @@
+{
+  "request_id": "20260924_req_0001",
+  "transcript": "मुझे कल की मीटिंग का टाइम बताओ उम्म और एजेंडा भी",
+  "timestamps": {
+    "words": ["मुझे कल की मीटिंग का टाइम बताओ", "उम्म और एजेंडा भी"],
+    "start_time_seconds": [1.21, 4.02],
+    "end_time_seconds": [3.48, 5.9]
+  },
+  "diarized_transcript": null,
+  "language_code": "hi-IN"
+}

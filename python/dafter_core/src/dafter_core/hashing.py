@@ -24,21 +24,24 @@ def canonicalize(raw: bytes | str) -> bytes:
         raise DafterError(ErrorCode.INVALID_CONFIG, f"canonicalize document: {exc}") from exc
 
 
-def hash_document(raw: bytes | str) -> str:
-    """Hex SHA-256 over the canonicalization of raw with configHash removed.
+CONFIG_HASH = "configHash"
+
+
+def hash_document(raw: bytes | str, field: str = CONFIG_HASH) -> str:
+    """Hex SHA-256 over the canonicalization of raw with its own hash field removed.
 
     A stored document carries the hash of itself, so a reader can recompute it.
     """
     doc = _object(raw)
-    doc.pop("configHash", None)
+    doc.pop(field, None)
     return hashlib.sha256(rfc8785.dumps(doc)).hexdigest()
 
 
-def seal(raw: bytes | str) -> tuple[bytes, str]:
+def seal(raw: bytes | str, field: str = CONFIG_HASH) -> tuple[bytes, str]:
     """Stamp the document with its own hash and return the canonical form."""
-    digest = hash_document(raw)
+    digest = hash_document(raw, field)
     doc = _object(raw)
-    doc["configHash"] = digest
+    doc[field] = digest
     return rfc8785.dumps(doc), digest
 
 

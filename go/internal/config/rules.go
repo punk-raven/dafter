@@ -106,6 +106,47 @@ var crossFieldRules = []crossFieldRule{
 	},
 	{
 		broken: func(c *ResolvedSessionConfig) bool {
+			return c.TranscriptionMode().Transcribes() && c.transcriptionConsent() == ""
+		},
+		code:    errs.CodeConsentRequired,
+		pointer: "/transcription/consentArtifactId",
+		because: "transcribing the people in the call cannot proceed without a consent artifact",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.PrivacyMode == PrivacySealed && c.TranscriptionMode().Transcribes()
+		},
+		code:    errs.CodePrivacyModeForbids,
+		pointer: "/transcription/mode",
+		because: "a sealed session never sends its audio to a transcription provider",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.TranscriptionMode().Live() && !c.Agent.Enabled
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/transcription/mode",
+		because: "live captions are transcribed by the session's agent worker, so a session without an agent has nobody to caption it",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.TranscriptionMode().AfterCall() &&
+				(!c.Recording.Enabled || c.Recording.EffectiveLayout() != LayoutTrack)
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/recording/layout",
+		because: "the transcript after the call is made from each participant's own recorded track, so it needs recording on with the track layout",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.TranscriptionMode().AfterCall() && c.transcriptionBatch() == nil
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/transcription/batch",
+		because: "the transcript after the call is made by a batch provider, and the session pins none",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
 			return c.Turn.Strategy == TurnProviderEndpointing && c.Turn.LocalVADDecidesTurn()
 		},
 		code:    errs.CodeInvalidConfig,

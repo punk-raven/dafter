@@ -53,6 +53,11 @@ var targets = []target{
 		Out: "internal/events/units_gen.go", AllName: "AllUsageUnits",
 	},
 	{
+		Schema: "events/v1/envelope.schema.json", Pointer: []string{"$defs", "SpeakerKind", "enum"},
+		Package: "events", Type: "SpeakerKind", Prefix: "Speaker",
+		Out: "internal/events/speakers_gen.go", AllName: "AllSpeakerKinds",
+	},
+	{
 		Schema: "common/v1/ids.schema.json", Pointer: []string{"$defs", "Role", "enum"},
 		Package: "config", Type: "Role", Prefix: "Role",
 		Out: "internal/config/roles_gen.go", AllName: "AllRoles",
@@ -126,6 +131,11 @@ var targets = []target{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Recording", "properties", "startAt", "enum"},
 		Package: "config", Type: "RecordingStart", Prefix: "StartAt",
 		Out: "internal/config/start_gen.go", AllName: "AllRecordingStarts",
+	},
+	{
+		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Transcription", "properties", "mode", "enum"},
+		Package: "config", Type: "TranscriptionMode", Prefix: "Transcription",
+		Out: "internal/config/transcription_gen.go", AllName: "AllTranscriptionModes",
 	},
 	{
 		Schema: "config/v1/resolved-session-config.schema.json", Pointer: []string{"$defs", "Speech", "properties", "normalization", "enum"},

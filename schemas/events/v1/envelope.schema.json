@@ -87,7 +87,8 @@
     {
       "if": { "properties": { "type": { "const": "provider.degraded" } }, "required": ["type"] },
       "then": { "properties": { "payload": { "$ref": "#/$defs/ProviderDegradedPayload" } }, "required": ["payload"] }
-    }
+    },
+    { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/Payloads" }
   ],
 
   "$defs": {
@@ -262,6 +263,26 @@
           "then": { "required": ["wokenBy"] }
         }
       ]
+    },
+
+    "SpeakerKind": {
+      "type": "string",
+      "description": "Who spoke a line: human, a participant who joined with a token the control plane minted; agent, the session's AI agent, whose identity the media server assigns and which is therefore never a participant id.",
+      "enum": ["human", "agent"]
+    },
+
+    "Speaker": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["kind"],
+      "description": "Who said it, as an opaque participant id and never a name. A human line always names the participant; an agent line never does.",
+      "properties": {
+        "kind": { "$ref": "#/$defs/SpeakerKind" },
+        "participantId": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/ParticipantId" }
+      },
+      "if": { "properties": { "kind": { "const": "human" } }, "required": ["kind"] },
+      "then": { "required": ["participantId"] },
+      "else": { "not": { "required": ["participantId"] } }
     },
 
     "AgentTurnMetricsPayload": {

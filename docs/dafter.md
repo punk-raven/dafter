@@ -346,6 +346,29 @@ Two gaps between Sarvam and livekit-plugins-sarvam 1.8.3: the plugin refuses eve
 
 **Raw artifacts are the source of truth; transcripts are derived.** Recorded audio, raw provider events, and provider/model metadata are write-once. Transcripts, translations, summaries, and redactions are regenerable derivatives. When a better model ships later, reprocess the original audio and produce a **new** canonical transcript version with its own provenance, without overwriting the original. Three schema details are easy to skip and expensive to add later: **language at word level** (code-switching is normal), **`normalized_text` alongside `text`** (neither is reliably derivable from the other afterward), and **`source` provenance per segment** (a session that fell back mid-call has segments from two providers).
 
+**What ships today** is a per-session choice, `transcription.mode`: `off`
+(the default), `live`, `after_call` or `both`. Transcribing people keeps what
+they said, so it is gated like recording: it needs its own consent artifact
+(`transcription.consentArtifactId`; consent to be recorded is not consent to
+be transcribed), and a sealed session is never transcribed, a rule on both
+halves. `live` publishes captions of everyone, the agent included, while they
+speak; the agent worker transcribes each human separately with the session's
+STT provider, so it needs the agent in the session, and every human's speech
+goes to that provider whatever the addressing mode. Captions are the realtime
+pass: they go only to the call's own participants and are never stored.
+`after_call` makes the canonical transcript from each participant's own
+recorded track, so it needs per-track recording; the batch provider is pinned
+in `transcription.batch`, the pass produces a verbatim and a clean rendering,
+and each run is a new version with its provenance and a hash a consumer can
+recompute. Reading a version back is as guarded as writing one: until tenant
+API keys exist, both take the worker credential, and a participant's media
+token never grants a read of what was said. Three things from the list above are not built yet: language at
+word level (the batch provider returns phrase-level chunks, so language is per
+line), `normalized_text` beside each line's `text` (the clean rendering is a
+second pass over the audio, so its lines do not pair up with the verbatim
+ones), and the terminology service. Diarization is not used, because every
+source is one speaker's own track.
+
 ### Recording, encryption, and governance
 
 | Egress layout | Cost | Best for |

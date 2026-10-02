@@ -1,0 +1,4 @@
+{
+  "code": "failed_precondition",
+  "msg": "egress with status EGRESS_COMPLETE cannot be stopped"
+}

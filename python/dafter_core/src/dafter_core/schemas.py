@@ -8,6 +8,7 @@ _ROOT = "dafter_core._schemas"
 
 RESOLVED_SESSION_CONFIG = "config/v1/resolved-session-config.schema.json"
 EVENT_ENVELOPE = "events/v1/envelope.schema.json"
+TRANSCRIPT_EVENTS = "events/v1/transcript.schema.json"
 ERROR = "errors/v1/error.schema.json"
 IDS = "common/v1/ids.schema.json"
 LANGUAGE_SWITCHING = "config/v1/language-switching.schema.json"

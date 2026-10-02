@@ -1,0 +1,14 @@
+{
+  "eventId": "e_9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
+  "type": "transcript.final",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 21,
+  "occurredAt": "2026-09-24T10:00:06.950Z",
+  "payload": {
+    "segmentId": "sg_07c3a9e15b2d4f68",
+    "speaker": { "kind": "agent" },
+    "text": "जी, कल की मीटिंग सुबह दस बजे है।"
+  }
+}

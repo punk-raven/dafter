@@ -7,7 +7,7 @@ scores a transcript against the verified reference of a known clip:
       --transcript export.json --rendering verbatim --participant p_4b81e0d7
 
 `--transcript` takes a transcript version as `GET
-/sessions/{id}/transcripts/{version}` exports it; `--text` takes plain text
+/sessions/{id}/transcripts/{version}` (worker credential) exports it; `--text` takes plain text
 instead. It prints the clip, the rendering, `wer` (substitutions, deletions and
 insertions over the reference's word count) and each count. It calls no
 provider.

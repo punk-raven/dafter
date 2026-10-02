@@ -40,6 +40,10 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
+	mux.HandleFunc("POST /sessions/{sessionID}/transcripts", s.storeTranscript)
+	mux.HandleFunc("GET /sessions/{sessionID}/transcripts", s.listTranscripts)
+	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
 	return mux
 }
 
@@ -142,7 +146,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
-		if _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true); err != nil {
+		if _, _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true, state.Egress{}); err != nil {
 			s.fail(w, err)
 			return
 		}

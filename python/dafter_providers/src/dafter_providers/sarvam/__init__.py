@@ -7,10 +7,13 @@ from dafter_core.config import ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError, ProviderContext
 from livekit.agents import APIConnectionError, APIStatusError, APITimeoutError, llm, stt, tts
-from livekit.plugins import sarvam as plugin
 
 from .. import credentials
 from ..options import Options
+from .batch import build_batch as build_batch
+from .languages import LANGUAGES as LANGUAGES
+from .languages import language_code
+from .llm import SarvamLLM
 from .realtime import FinalFirstSTT
 from .sentences import SentenceTTS
 from .voices import voices
@@ -23,20 +26,6 @@ REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
 CREDENTIAL = "SARVAM_API_KEY"
 
-LANGUAGES = {
-    "hi": "hi-IN",
-    "hi-IN": "hi-IN",
-    "en-IN": "en-IN",
-    "bn-IN": "bn-IN",
-    "kn-IN": "kn-IN",
-    "ml-IN": "ml-IN",
-    "mr-IN": "mr-IN",
-    "ta-IN": "ta-IN",
-    "te-IN": "te-IN",
-    "gu-IN": "gu-IN",
-    "pa-IN": "pa-IN",
-    "or-IN": "or-IN",
-}
 IDENTIFY = "auto"
 CHUNK_PROFILES = {500: "fast", 1000: "balanced"}
 STT_MODES = {"transcribe": "transcribe", "codemix": "codemix"}
@@ -67,19 +56,6 @@ def _checked(ref: ProviderRef, stage: Stage, models: frozenset[str]) -> None:
             stage=stage,
             provider=context,
         )
-
-
-def language_code(tag: str, stage: Stage) -> str:
-    code = LANGUAGES.get(tag)
-    if code is None:
-        raise DafterError(
-            ErrorCode.UNSUPPORTED_CAPABILITY,
-            f"{NAME} {stage} does not serve this session's language",
-            stage=stage,
-            provider=ProviderContext(NAME),
-            details=("at '/language': not a language this provider declares",),
-        )
-    return code
 
 
 def _construct(stage: Stage, build: Callable[[], T]) -> T:
@@ -148,7 +124,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     if thinking:
         return _construct(
             Stage.LLM,
-            lambda: plugin.LLM(
+            lambda: SarvamLLM(
                 model=model,
                 api_key=key,
                 base_url=LLM_BASE_URL,
@@ -158,7 +134,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
         )
     return _construct(
         Stage.LLM,
-        lambda: plugin.LLM(
+        lambda: SarvamLLM(
             model=model,
             api_key=key,
             base_url=LLM_BASE_URL,

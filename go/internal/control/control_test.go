@@ -41,6 +41,10 @@ type stubTransport struct {
 	recalled    []string
 	live        []string
 	recallErr   error
+
+	owners    map[string]transport.TrackPublisher
+	files     map[string]transport.RecordingFile
+	forgotten map[string]bool
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {
@@ -101,6 +105,9 @@ func (s *stubTransport) StopEgress(_ context.Context, egressID string) (transpor
 	defer s.mu.Unlock()
 	if s.egressErr != nil {
 		return transport.EgressInfo{}, s.egressErr
+	}
+	if f, ok := s.files[egressID]; ok && f.Ended {
+		return transport.EgressInfo{}, errs.Errorf(errs.CodeInvalidConfig, "media server refused StopEgress (http 412, failed_precondition)")
 	}
 	s.stopped = append(s.stopped, egressID)
 	return transport.EgressInfo{EgressID: egressID, Status: "EGRESS_ENDING",

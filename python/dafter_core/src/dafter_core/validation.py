@@ -17,6 +17,7 @@ _FILES = (
     schemas.LANGUAGE_SWITCHING,
     schemas.RESOLVED_SESSION_CONFIG,
     schemas.EVENT_ENVELOPE,
+    schemas.TRANSCRIPT_EVENTS,
     schemas.ERROR,
 )
 

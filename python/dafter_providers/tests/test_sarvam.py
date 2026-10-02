@@ -194,7 +194,15 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
     with pytest.raises(DafterError) as caught:
         vendor_for(ProviderRef(provider="deepgram"), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
-    assert set(VENDORS) == {"sarvam", "silero", "groq", "openrouter", "google"}
+    assert set(VENDORS) == {
+        "sarvam",
+        "silero",
+        "groq",
+        "openrouter",
+        "google",
+        "opencode_zen",
+        "openai",
+    }
     assert "deepgram" in caught.value.message
 
 

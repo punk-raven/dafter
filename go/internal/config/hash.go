@@ -19,11 +19,15 @@ func Canonicalize(raw []byte) ([]byte, error) {
 }
 
 func HashDocument(raw []byte) (string, error) {
+	return HashWithout(raw, "configHash")
+}
+
+func HashWithout(raw []byte, field string) (string, error) {
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return "", errs.Wrap(errs.CodeInvalidConfig, err, "document is not a JSON object")
 	}
-	delete(doc, "configHash")
+	delete(doc, field)
 
 	stripped, err := json.Marshal(doc)
 	if err != nil {

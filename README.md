@@ -36,7 +36,7 @@ package boundary is unstable and may change without notice.
 
 ## Build and test
 
-Three prerequisites:
+Four prerequisites:
 
 - `go` - `go/go.mod` pins the toolchain, so any Go 1.21 or newer fetches the
   right version on first use.
@@ -44,12 +44,14 @@ Three prerequisites:
   dependency, from the committed `python/uv.lock`.
 - a C compiler (`gcc` or `clang`) - `make test` runs the race detector, which
   links through cgo.
+- `node` 20 or newer - `make js-test` runs the test client's scripts under
+  Node's built-in test runner, with no packages to install.
 
 Everything derived from `schemas/` is built rather than committed, so a fresh
 clone does not compile until it has been generated once. The setup script does
-that, and first checks for `git`, `make`, a C compiler, `go` and `uv`, offering
-the install command for this machine for whichever is missing. Without a clone
-yet, one command does all of it, clone included:
+that, and first checks for `git`, `make`, a C compiler, `go`, `uv` and
+`node`, offering the install command for this machine for whichever is
+missing. Without a clone yet, one command does all of it, clone included:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/punk-raven/dafter/main/scripts/setup.sh | bash

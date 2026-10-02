@@ -412,6 +412,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"KeyModel", cfg, []string{"$defs", "EncryptionProfile", "properties", "keyModel", "enum"}, schema.Names(config.AllKeyModels)},
 		{"EgressLayout", cfg, []string{"$defs", "Recording", "properties", "layout", "enum"}, schema.Names(config.AllEgressLayouts)},
 		{"RecordingStart", cfg, []string{"$defs", "Recording", "properties", "startAt", "enum"}, schema.Names(config.AllRecordingStarts)},
+		{"TranscriptionMode", cfg, []string{"$defs", "Transcription", "properties", "mode", "enum"}, schema.Names(config.AllTranscriptionModes)},
 		{"SpeechNormalization", cfg, []string{"$defs", "Speech", "properties", "normalization", "enum"}, schema.Names(config.AllSpeechNormalizations)},
 		{"Situation", cfg, []string{"$defs", "Situation", "enum"}, schema.Names(config.AllSituations)},
 	}
