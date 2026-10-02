@@ -49,11 +49,18 @@ class Substitutions:
 
 class SpeechPlan:
     def __init__(self, speech: Speech, language: str) -> None:
+        self._speech = speech
+        self.speak_in(language)
+
+    def speak_in(self, language: str) -> None:
         base = base_language(language)
-        self._substitute = Substitutions(speech.substitutions.get(base, {}))
-        self._normalize = (
-            NORMALIZERS.get(base) if speech.normalization is SpeechNormalization.PLATFORM else None
-        )
+        self._substitute = Substitutions(self._speech.substitutions.get(base, {}))
+        platform = self._speech.normalization is SpeechNormalization.PLATFORM
+        self._normalize = NORMALIZERS.get(base) if platform else None
+
+    @property
+    def normalizes(self) -> bool:
+        return self._normalize is not None
 
     def spoken(self, text: str) -> str:
         text = self._substitute(LIST_MARKER.sub("", text))

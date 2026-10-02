@@ -26,6 +26,7 @@ from .enums import (
 from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
 from .speech import Backchannel, Speech
+from .switching import LanguageSwitching
 from .validation import validate_document
 
 
@@ -165,6 +166,7 @@ class Agent:
     pipeline: Pipeline | None = None
     addressing: Addressing = field(default_factory=Addressing)
     speech: Speech = field(default_factory=Speech)
+    language_switching: LanguageSwitching = field(default_factory=LanguageSwitching)
 
     @property
     def near_miss_is_its_name(self) -> bool:
@@ -183,6 +185,7 @@ class Agent:
             pipeline=Pipeline.from_dict(d["pipeline"]) if d.get("pipeline") else None,
             addressing=Addressing.from_dict(d.get("addressing") or {}),
             speech=Speech.from_dict(d.get("speech") or {}),
+            language_switching=LanguageSwitching.from_dict(d.get("languageSwitching") or {}),
         )
 
 
@@ -417,6 +420,7 @@ class ResolvedSessionConfig:
     transcription: Transcription = field(default_factory=Transcription)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
+    llm: str | None = None
 
     def validate_cross_field_rules(self) -> None:
         broken = [rule for rule in CROSS_FIELD_RULES if rule.broken(self)]
@@ -449,6 +453,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         transcription=Transcription.from_dict(doc.get("transcription") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
+        llm=doc.get("llm"),
     )
     cfg.validate_cross_field_rules()
     return cfg

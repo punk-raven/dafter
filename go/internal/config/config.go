@@ -19,6 +19,7 @@ type ResolvedSessionConfig struct {
 	PrivacyMode PrivacyMode `json:"privacyMode"`
 	Language    string      `json:"language"`
 	Channel     Channel     `json:"channel"`
+	LLM         string      `json:"llm,omitempty"`
 
 	Residency *Residency `json:"residency,omitempty"`
 	Agent     Agent      `json:"agent"`
@@ -45,6 +46,8 @@ type Agent struct {
 	Pipeline   *Pipeline   `json:"pipeline,omitempty"`
 	Addressing *Addressing `json:"addressing,omitempty"`
 	Speech     *Speech     `json:"speech,omitempty"`
+
+	LanguageSwitching *LanguageSwitching `json:"languageSwitching,omitempty"`
 }
 
 type Addressing struct {

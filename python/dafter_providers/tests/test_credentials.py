@@ -7,7 +7,7 @@ import pytest
 from dafter_core.config import ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage, TurnStrategy
 from dafter_core.errors import DafterError
-from dafter_providers import credentials, openai_compat, sarvam
+from dafter_providers import VENDORS, credentials, sarvam
 
 PLATFORM_VALUE = "platform-secret-value"
 PLATFORM_REFS = {
@@ -27,7 +27,9 @@ STAGES: dict[str, tuple[Stage, str, dict[str, Any], Build]] = {
     ),
     "sarvam llm": (Stage.LLM, "sarvam-105b", {}, sarvam.build_llm),
     "sarvam tts": (Stage.TTS, "bulbul:v3", {}, lambda r: sarvam.build_tts(r, "hi")),
-    "openai_compat llm": (Stage.LLM, "a-model", {"endpoint": "google"}, openai_compat.build_llm),
+    "groq llm": (Stage.LLM, "a-model", {}, lambda r: llm_of("groq")(r)),
+    "openrouter llm": (Stage.LLM, "a-model", {}, lambda r: llm_of("openrouter")(r)),
+    "google llm": (Stage.LLM, "a-model", {}, lambda r: llm_of("google")(r)),
     "sarvam batch": (Stage.STT, "saaras:v3", {}, sarvam.build_batch),
 }
 POINTERS = {"sarvam batch": "/transcription/batch"}
@@ -37,8 +39,14 @@ POINTERS = {"sarvam batch": "/transcription/batch"}
 def platform_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in PLATFORM_REFS:
         monkeypatch.setenv(name, PLATFORM_VALUE)
-    for name in ("SARVAM_API_KEY", "GEMINI_API_KEY"):
+    for name in ("SARVAM_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY"):
         monkeypatch.setenv(name, "test-only-not-a-key")
+
+
+def llm_of(vendor: str) -> Build:
+    build = VENDORS[vendor].llm
+    assert build is not None
+    return build
 
 
 def stage_ref(vendor_stage: str, credential_ref: str) -> ProviderRef:
@@ -73,9 +81,22 @@ def test_no_stage_resolves_a_platform_secret_whatever_the_ref_says(
     refused(vendor_stage, platform_ref)
 
 
-@pytest.mark.parametrize("vendor_stage", ["sarvam stt", "sarvam llm", "sarvam tts", "sarvam batch"])
-def test_a_vendor_never_receives_another_vendors_key(vendor_stage: str) -> None:
-    refused(vendor_stage, "secret://tenants/t_9c21a4be/gemini/api-key")
+@pytest.mark.parametrize(
+    ("vendor_stage", "other"),
+    [
+        ("sarvam stt", "groq"),
+        ("sarvam llm", "openrouter"),
+        ("sarvam tts", "groq"),
+        ("sarvam batch", "groq"),
+        ("groq llm", "openrouter"),
+        ("groq llm", "sarvam"),
+        ("openrouter llm", "groq"),
+        ("google llm", "openrouter"),
+        ("sarvam llm", "gemini"),
+    ],
+)
+def test_a_vendor_never_receives_another_vendors_key(vendor_stage: str, other: str) -> None:
+    refused(vendor_stage, f"secret://tenants/t_9c21a4be/{other}/api-key")
 
 
 def test_the_allow_list_holds_provider_keys_only() -> None:

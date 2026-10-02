@@ -80,6 +80,14 @@
       "if": { "properties": { "type": { "const": "session.usage" } }, "required": ["type"] },
       "then": { "properties": { "payload": { "$ref": "#/$defs/SessionUsagePayload" } }, "required": ["payload"] }
     },
+    {
+      "if": { "properties": { "type": { "const": "agent.configured" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/AgentConfiguredPayload" } }, "required": ["payload"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "provider.degraded" } }, "required": ["type"] },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/ProviderDegradedPayload" } }, "required": ["payload"] }
+    },
     { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/Payloads" }
   ],
 
@@ -96,6 +104,7 @@
         "connection.lost",
         "connection.restored",
         "agent.dispatched",
+        "agent.configured",
         "agent.state_changed",
         "agent.turn_metrics",
         "agent.handoff_requested",
@@ -320,16 +329,51 @@
         },
         "filler": {
           "type": "boolean",
-          "description": "True when the reply was slow enough that a filler phrase played ahead of it (agent.speech.fillers): ttsNodeTtfbMs and e2eLatencyMs then count from the filler, the first audio the caller heard, while the LLM layers still show what was slow. Present only when a filler played."
+          "description": "True when the reply was slow enough that a filler phrase played ahead of it (agent.speech.fillers): e2eLatencyMs and replyGapMs then count to the filler, the first audio the caller heard, while llmNodeTtfsMs and ttsNodeTtfbMs stay the reply's own, measured on its first audio after the filler. Present only when a filler played."
         },
         "serial": {
           "type": "boolean",
           "description": "True when the turn went serial: its first sentence reached TTS more than 500 ms after the LLM's first token (llmNodeTtfsMs minus llmNodeTtftMs) although that sentence was under 80% of the reply, so the reply waited on more than its first sentence and its latency tracked the length of the reply. A reply that is mostly its first sentence is not serial however long that sentence took. Present only when both LLM layers were measured."
+        },
+        "language": {
+          "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag",
+          "description": "The language the agent replied in, as a session language tag. Present only in a session that switches languages (agent.languageSwitching), where it can differ from the session's language, so its turns can be measured per language."
         }
       },
       "dependentRequired": { "serial": ["llmNodeTtftMs", "llmNodeTtfsMs"] }
     },
 
+    "AgentConfiguredPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["llm", "fillers", "backchannel", "normalization"],
+      "description": "What the agent worker actually runs for this session, sent once when its session starts. Each field is the effective state, which can differ from the session document: a setting that is on but has nothing to work with in the session's language is reported off, so a consumer can show what the caller will really hear.",
+      "properties": {
+        "llm": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "required": ["provider", "model"],
+          "description": "The LLM the worker built, named as its usage is reported.",
+          "properties": {
+            "provider": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+            "model": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        "fillers": { "type": "boolean", "description": "True when a slow reply can be preceded by a filler phrase: agent.speech.fillers is enabled and the session's language has phrases." },
+        "backchannel": { "type": "boolean", "description": "True when a caller's short acknowledgement over the agent is dropped rather than taken as a turn: turn.interruption.backchannel is enabled and lists words." },
+        "normalization": { "type": "string", "enum": ["platform", "provider"], "description": "platform when the worker's speech planner rewrites numbers, dates, prices and phone numbers for this language before TTS; provider when the text reaches TTS as the LLM wrote it, including under platform for a language the planner has no rules for." }
+      }
+    },
+    "ProviderDegradedPayload": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["error", "recoverable"],
+      "description": "A pipeline stage's provider failed during the session, so a consumer can say why the agent went quiet instead of leaving silence. Sent for every failure the agent framework reports, including one it will retry.",
+      "properties": {
+        "error": { "$ref": "https://schemas.dafter.dev/errors/v1/error.schema.json" },
+        "recoverable": { "type": "boolean", "description": "True when the framework will retry; false when the stage gave up and the reply is lost." }
+      }
+    },
     "UsageItem": {
       "type": "object",
       "unevaluatedProperties": false,

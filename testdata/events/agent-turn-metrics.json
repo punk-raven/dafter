@@ -19,6 +19,7 @@
     "playbackLatencyMs": 3,
     "e2eLatencyMs": 1968,
     "replyGapMs": 2980,
-    "serial": false
+    "serial": false,
+    "language": "kn-IN"
   }
 }

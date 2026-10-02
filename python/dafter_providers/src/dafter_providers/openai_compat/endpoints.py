@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib import resources
@@ -10,6 +11,7 @@ from .. import credentials
 
 TABLE = "endpoints.json"
 FIELDS = frozenset({"baseUrl", "credentialEnv"})
+VENDOR_NAME = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +22,8 @@ class Endpoint:
 
 
 def _endpoint(name: str, raw: object) -> Endpoint:
+    if not VENDOR_NAME.match(name):
+        raise ValueError(f"endpoint {name}: a provider name, lowercase letters, digits and _")
     if not isinstance(raw, dict) or set(raw) != FIELDS:
         raise ValueError(f"endpoint {name}: exactly {', '.join(sorted(FIELDS))}")
     endpoint = Endpoint(name=name, base_url=raw["baseUrl"], credential_env=raw["credentialEnv"])

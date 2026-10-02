@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/language-switching.schema.json",
+  "title": "LanguageSwitching",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "description": "Live language switching. Enabled, the session's STT identifies the language of every utterance instead of being pinned to the session's language, and the agent replies in the language the caller is speaking: its persona, the language its voice speaks and its spoken-text rules follow the caller, while the pipeline's providers, voice and turn constants stay the session language's. A caller can also ask for a language, which holds until they ask for another. Off without this block, because an STT that identifies the language also mishears the utterances whose language it guesses wrong.",
+  "required": ["enabled"],
+  "properties": {
+    "enabled": { "type": "boolean", "default": false },
+    "languages": {
+      "type": "array",
+      "description": "The languages the agent may switch into, as session language tags, matched to what the STT identifies by base language. The session's own language must be one of them, which is a cross-field rule; every one needs the pipeline's providers and a persona in that language, which the worker checks before it joins.",
+      "items": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
+      "maxItems": 16,
+      "uniqueItems": true
+    },
+    "minConfidence": {
+      "type": "number",
+      "description": "An utterance whose language the STT identified with less confidence than this never switches the language. An STT that reports no confidence is taken at its word.",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.8
+    },
+    "minWords": {
+      "type": "integer",
+      "description": "An utterance shorter than this never switches the language: a one-word ok, a name or a number says little about the language the caller is speaking.",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 3
+    }
+  }
+}
