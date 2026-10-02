@@ -91,6 +91,50 @@
   .session-created { margin-top: 8px; padding: 10px; background: #1a2e1a; border: 1px solid #2d5a2d; border-radius: 6px; font-size: 12px; }
   .session-created .room-id { font-family: monospace; font-size: 14px; font-weight: 600; color: #4ade80; }
 
+  .start { display: flex; flex-direction: column; }
+  .start label { font-size: 13px; color: #aaa; }
+  .start select { padding: 10px; font-size: 15px; text-overflow: ellipsis; }
+  .start .llm-provider { float: right; color: #666; font-size: 12px; }
+  .speech-toggles { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; }
+  .start .speech-toggle { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: #aaa; cursor: pointer; }
+  .speech-toggle input { width: auto; margin: 0; accent-color: #7c3aed; }
+  .btn-start { background: #7c3aed; color: white; padding: 12px 16px; font-size: 15px; margin-top: 12px; }
+  .btn-start:hover { background: #6d28d9; }
+  .btn-start:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .call-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .call-controls button { margin: 0; }
+  .call-controls .wide { grid-column: 1 / -1; }
+  .btn-toggle { background: #1f2937; color: #e0e0e0; }
+  .btn-toggle:hover { background: #374151; }
+  .btn-toggle.off { background: #3a1c1c; color: #fca5a5; }
+  .btn-toggle:disabled { background: #1a1a1a; color: #555; cursor: not-allowed; }
+  .btn-wake { background: #1d4ed8; color: white; }
+  .btn-wake:hover { background: #1e40af; }
+  .btn-wake:disabled { background: #262626; color: #666; cursor: not-allowed; }
+  .btn-agent { background: #7c3aed; color: white; }
+  .btn-agent:hover { background: #6d28d9; }
+  .btn-agent-remove { background: #374151; color: #fca5a5; }
+  .btn-agent-remove:hover { background: #4b5563; }
+  .btn-agent:disabled { background: #262626; color: #666; cursor: not-allowed; }
+  body.in-call #panel-start, body:not(.in-call) #panel-call, body.in-call .lobby-hint, body:not(.in-call) .main > :not(.lobby-hint) { display: none; }
+
+  .advanced { margin-top: 20px; border-top: 1px solid #222; padding-top: 12px; }
+  .advanced > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: #888; list-style: none; user-select: none; }
+  .advanced > summary::before { content: '\25B8'; display: inline-block; width: 14px; }
+  .advanced[open] > summary::before { content: '\25BE'; }
+  .advanced[open] > summary { margin-bottom: 12px; }
+  .sidebar:has(.advanced[open]) { width: 520px; min-width: 520px; }
+  .advanced .stats-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
+  .advanced .log-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
+  .lobby-hint { margin: auto; color: #555; font-size: 14px; }
+
+  @media (max-width: 640px) {
+    .header { padding: 12px 16px; }
+    .layout { flex-direction: column; height: auto; min-height: calc(100vh - 49px); }
+    .sidebar, .sidebar:has(.advanced[open]) { width: auto; min-width: 0; border-right: none; border-bottom: 1px solid #222; overflow-y: visible; }
+    .main { flex: 1; min-height: 50vh; }
+    .lobby-hint { padding: 24px 16px; text-align: center; }
+  }
 </style>
 </head>
 <body>
@@ -103,97 +147,27 @@
 
 <div class="layout">
   <div class="sidebar">
-    <div id="panel-create">
-      <fieldset>
-        <legend>Create Session</legend>
-        <label>Tenant ID</label>
-        <input id="tenant" value="t_9c21a4be">
-        <label>Language</label>
-        <select id="language">
-          <option value="en-IN" selected>en-IN (English)</option>
-          <option value="hi">hi (Hindi)</option>
-        </select>
-        <label>Channel</label>
-        <select id="channel">
-          <option value="webrtc" selected>webrtc</option>
-          <option value="telephony">telephony</option>
-        </select>
-        <label>Profile (optional)</label>
-        <input id="profile" value="support">
-        <label>Privacy mode</label>
-        <select id="privacy-mode">
-          <option value="" selected>open - transport encryption only</option>
-          <option value="sealed">sealed - end to end, no agent</option>
-          <option value="trusted_agent">trusted_agent - end to end, agent holds the key</option>
-        </select>
-        <label>Video resolution</label>
-        <select id="resolution">
-          <option value="" selected>profile default (h720)</option>
-          <option value="auto">auto - let this client choose</option>
-          <option value="h180">h180</option>
-          <option value="h360">h360</option>
-          <option value="h540">h540</option>
-          <option value="h720">h720</option>
-          <option value="h1080">h1080</option>
-        </select>
-        <label>Noise filter</label>
-        <select id="noise-cancellation">
-          <option value="" selected>follow the catalog</option>
-        </select>
-        <label>Agent</label>
-        <select id="agent-mode">
-          <option value="" selected>follow the catalog</option>
-          <option value="on">on - dispatch the worker pool</option>
-          <option value="off">off - no agent</option>
-        </select>
-        <label>Agent answers</label>
-        <select id="addressing-mode">
-          <option value="" selected>follow the catalog (called by name)</option>
-          <option value="always">always - every turn of one person</option>
-          <option value="transcript">transcript - only when called by name</option>
-          <option value="on_device">on_device - local name spotting, refused until built</option>
-        </select>
-        <label>Greeting</label>
-        <select id="agent-greeting">
-          <option value="" selected>follow the catalog (silent)</option>
-          <option value="on">on - the agent speaks first</option>
-          <option value="off">off - silent until spoken to</option>
-        </select>
-        <label>Recording</label>
-        <select id="recording-layout">
-          <option value="" selected>off</option>
-          <option value="room_composite">room_composite</option>
-          <option value="track_composite">track_composite</option>
-          <option value="track">track</option>
-        </select>
-        <label>Transcription</label>
-        <select id="transcription-mode">
-          <option value="" selected>follow the catalog (off)</option>
-          <option value="off">off</option>
-          <option value="live">live - captions for everyone</option>
-          <option value="after_call">after_call - transcript from each track</option>
-          <option value="both">both</option>
-        </select>
-        <label>Scribe</label>
-        <select id="scribe-mode">
-          <option value="" selected>follow the catalog (off)</option>
-          <option value="on">on - live notes, scores and minutes</option>
-        </select>
-        <label>Phone guests</label>
-        <select id="phone-guests">
-          <option value="" selected>off</option>
-          <option value="dial_out">dial out - call phones into the meeting</option>
-        </select>
-      </fieldset>
-      <button id="btn-create" class="btn-create" onclick="createSession()">Create Session</button>
+    <div id="panel-start" class="start">
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="kn-IN">Kannada</option>
+        <option value="hi" selected>Hindi</option>
+        <option value="en-IN">English</option>
+        <option value="mr-IN">Marathi</option>
+        <option value="te-IN">Telugu</option>
+      </select>
+      <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
+      <select id="llm" onchange="rememberLlm()"></select>
+      <div id="speech-toggles" class="speech-toggles"></div>
+      <button id="btn-start" class="btn-start" onclick="startCall()">Start call</button>
     </div>
 
-    <div id="session-created-info" class="session-created" style="display:none">
-      <div>Session created</div>
-      <div style="margin-top:6px">Room: <span id="created-room-id" class="room-id"></span></div>
-      <div style="margin-top:6px;font-size:11px;color:#888">Share this link to join:</div>
-      <input id="join-link" readonly style="margin-top:4px;font-size:11px;color:#4ade80;background:#0f1f0f;border-color:#2d5a2d;cursor:pointer" onclick="this.select();copyJoinLink()">
-      <button id="btn-copy-link" class="btn-copy" onclick="copyJoinLink()">Copy join link</button>
+    <div id="panel-call" class="call-controls">
+      <button id="btn-mic" class="btn-toggle" type="button" onclick="toggleMic()">Mic on</button>
+      <button id="btn-camera" class="btn-toggle" type="button" onclick="toggleCamera()">Camera on</button>
+      <button id="agent-wake" class="btn-wake wide" type="button" onclick="wakeAgent()" style="display:none">Wake the agent</button>
+      <button class="btn-copy wide" type="button" onclick="copyJoinLink(this)">Copy join link</button>
+      <button id="btn-leave" class="btn-leave wide" type="button" onclick="leaveSession()">Leave</button>
     </div>
 
     <hr id="phone-divider" class="divider">
@@ -210,107 +184,200 @@
       </fieldset>
     </div>
 
-    <hr class="divider">
+    <details id="advanced" class="advanced">
+      <summary>Advanced</summary>
 
-    <div id="panel-join">
+      <div id="panel-create">
+        <fieldset>
+          <legend>Session</legend>
+          <label>Tenant ID</label>
+          <input id="tenant" value="t_9c21a4be">
+          <label>Channel</label>
+          <select id="channel">
+            <option value="webrtc" selected>webrtc</option>
+            <option value="telephony">telephony</option>
+          </select>
+          <label>Profile (optional)</label>
+          <input id="profile" value="">
+          <label>Privacy mode</label>
+          <select id="privacy-mode">
+            <option value="" selected>open - transport encryption only</option>
+            <option value="sealed">sealed - end to end, no agent</option>
+            <option value="trusted_agent">trusted_agent - end to end, agent holds the key</option>
+          </select>
+          <label>Video resolution</label>
+          <select id="resolution">
+            <option value="" selected>profile default (h720)</option>
+            <option value="auto">auto - let this client choose</option>
+            <option value="h180">h180</option>
+            <option value="h360">h360</option>
+            <option value="h540">h540</option>
+            <option value="h720">h720</option>
+            <option value="h1080">h1080</option>
+          </select>
+          <label>Noise filter</label>
+          <select id="noise-cancellation">
+            <option value="" selected>follow the catalog</option>
+          </select>
+          <label>Agent</label>
+          <select id="agent-mode">
+            <option value="" selected>follow the catalog</option>
+            <option value="on">on - dispatch the worker pool</option>
+            <option value="off">off - no agent</option>
+          </select>
+          <label>Agent answers</label>
+          <select id="addressing-mode">
+            <option value="" selected>follow the catalog (called by name)</option>
+            <option value="always">always - every turn of one person</option>
+            <option value="transcript">transcript - only when called by name</option>
+            <option value="on_device">on_device - local name spotting, refused until built</option>
+          </select>
+          <label>Greeting</label>
+          <select id="agent-greeting">
+            <option value="" selected>follow the catalog (silent)</option>
+            <option value="on">on - the agent speaks first</option>
+            <option value="off">off - silent until spoken to</option>
+          </select>
+          <label>Recording</label>
+          <select id="recording-layout">
+            <option value="" selected>off</option>
+            <option value="room_composite">room_composite</option>
+            <option value="track_composite">track_composite</option>
+            <option value="track">track</option>
+          </select>
+          <label>Transcription</label>
+          <select id="transcription-mode">
+            <option value="" selected>follow the catalog (off)</option>
+            <option value="off">off</option>
+            <option value="live">live - captions for everyone</option>
+            <option value="after_call">after_call - transcript from each track</option>
+            <option value="both">both</option>
+          </select>
+          <label>Scribe</label>
+          <select id="scribe-mode">
+            <option value="" selected>follow the catalog (off)</option>
+            <option value="on">on - live notes, scores and minutes</option>
+          </select>
+          <label>Phone guests</label>
+          <select id="phone-guests">
+            <option value="" selected>off</option>
+            <option value="dial_out">dial out - call phones into the meeting</option>
+          </select>
+        </fieldset>
+        <button id="btn-create" class="btn-create" onclick="createSession()">Create session only</button>
+      </div>
+
+      <div id="session-created-info" class="session-created" style="display:none">
+        <div>Session created</div>
+        <div style="margin-top:6px">Room: <span id="created-room-id" class="room-id"></span></div>
+        <div style="margin-top:6px;font-size:11px;color:#888">Share this link to join:</div>
+        <input id="join-link" readonly style="margin-top:4px;font-size:11px;color:#4ade80;background:#0f1f0f;border-color:#2d5a2d;cursor:pointer" onclick="this.select()">
+        <button class="btn-copy" onclick="copyJoinLink(this)">Copy join link</button>
+      </div>
+
+      <div id="panel-join">
+        <fieldset>
+          <legend>Join Room</legend>
+          <label>Room ID</label>
+          <input id="room-id" placeholder="s_xxxxxxxx">
+          <label>Role</label>
+          <select id="role">
+            <option value="participant" selected>participant</option>
+            <option value="presenter">presenter</option>
+            <option value="observer">observer</option>
+          </select>
+          <label>ICE transport</label>
+          <select id="ice-policy">
+            <option value="all" selected>all (normal)</option>
+            <option value="relay">relay only (TURN test)</option>
+          </select>
+        </fieldset>
+        <button id="btn-join" class="btn-join" onclick="joinRoom()">Join Room</button>
+      </div>
+
+      <div id="panel-myvideo">
+        <fieldset>
+          <legend>My video</legend>
+          <label>Capture resolution</label>
+          <select id="my-resolution" onchange="applyMyResolution()">
+            <option value="" selected>follow the session profile</option>
+            <option value="auto">auto - let my browser choose</option>
+            <option value="h180">h180</option>
+            <option value="h360">h360</option>
+            <option value="h540">h540</option>
+            <option value="h720">h720</option>
+            <option value="h1080">h1080</option>
+          </select>
+        </fieldset>
+      </div>
+
+      <div id="panel-recording" style="display:none">
+        <fieldset>
+          <legend>Recording</legend>
+          <button id="btn-record-start" class="btn-record" onclick="startRecording()">Start recording</button>
+          <button id="btn-record-stop" class="btn-record" onclick="stopRecording()">Stop recording</button>
+          <div id="recording-status" class="recording-status">not started</div>
+        </fieldset>
+      </div>
+
       <fieldset>
-        <legend>Join Room</legend>
-        <label>Room ID</label>
-        <input id="room-id" placeholder="s_xxxxxxxx">
-        <label>Role</label>
-        <select id="role">
-          <option value="participant" selected>participant</option>
-          <option value="presenter">presenter</option>
-          <option value="observer">observer</option>
-        </select>
-        <label>ICE transport</label>
-        <select id="ice-policy">
-          <option value="all" selected>all (normal)</option>
-          <option value="relay">relay only (TURN test)</option>
-        </select>
+        <legend>Agent</legend>
+        <button id="agent-toggle" class="btn-agent" type="button" onclick="toggleAgent()" disabled>Invite agent</button>
       </fieldset>
-      <button id="btn-join" class="btn-join" onclick="joinRoom()">Join Room</button>
-    </div>
 
-    <div id="panel-myvideo">
-      <fieldset>
-        <legend>My video</legend>
-        <label>Capture resolution</label>
-        <select id="my-resolution" onchange="applyMyResolution()">
-          <option value="" selected>follow the session profile</option>
-          <option value="auto">auto - let my browser choose</option>
-          <option value="h180">h180</option>
-          <option value="h360">h360</option>
-          <option value="h540">h540</option>
-          <option value="h720">h720</option>
-          <option value="h1080">h1080</option>
-        </select>
-      </fieldset>
-    </div>
+      <div id="session-response" class="response-box" style="display:none"></div>
 
-    <div id="panel-recording" style="display:none">
-      <fieldset>
-        <legend>Recording</legend>
-        <button id="btn-record-start" class="btn-record" onclick="startRecording()">Start recording</button>
-        <button id="btn-record-stop" class="btn-record" onclick="stopRecording()">Stop recording</button>
-        <div id="recording-status" class="recording-status">not started</div>
-      </fieldset>
-    </div>
+      <div id="ice-info" class="ice-info" style="display:none">
+        <dl>
+          <dt>Type</dt><dd id="ice-type">-</dd>
+          <dt>ICE state</dt><dd id="ice-state">-</dd>
+          <dt>Candidate</dt><dd id="ice-candidate">-</dd>
+          <dt>Protocol</dt><dd id="ice-protocol">-</dd>
+          <dt>Remote</dt><dd id="ice-remote">-</dd>
+          <dt>TURN</dt><dd id="ice-turn-status">-</dd>
+          <dt>E2EE</dt><dd id="e2ee-state">-</dd>
+        </dl>
+      </div>
 
-    <button id="btn-leave" class="btn-leave" onclick="leaveSession()" style="display:none">Leave</button>
+      <div id="stats-panel" class="stats-panel" style="display:none">
+        <div class="stats-head">
+          <strong>Live media</strong>
+          <span id="stats-profile" class="stats-profile"></span>
+          <span id="stats-totals" class="stats-totals"></span>
+          <span class="stats-actions">
+            <span id="stats-count" class="count"></span>
+            <button onclick="downloadStats('json')">Download JSON</button>
+            <button onclick="downloadStats('csv')">Download CSV</button>
+          </span>
+        </div>
+        <div class="stats-body">
+          <table class="stats">
+            <thead>
+              <tr>
+                <th></th><th>Participant</th><th>Kind</th><th>Layer</th><th>Codec</th>
+                <th>Size</th><th class="num">FPS</th><th class="num">kbps</th>
+                <th class="num">Target</th><th class="num">Lost</th><th>State</th>
+              </tr>
+            </thead>
+            <tbody id="stats-rows">
+              <tr class="empty"><td colspan="11">waiting for the first sample...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-    <div id="session-response" class="response-box" style="display:none"></div>
-
-    <div id="ice-info" class="ice-info" style="display:none">
-      <dl>
-        <dt>Type</dt><dd id="ice-type">-</dd>
-        <dt>ICE state</dt><dd id="ice-state">-</dd>
-        <dt>Candidate</dt><dd id="ice-candidate">-</dd>
-        <dt>Protocol</dt><dd id="ice-protocol">-</dd>
-        <dt>Remote</dt><dd id="ice-remote">-</dd>
-        <dt>TURN</dt><dd id="ice-turn-status">-</dd>
-        <dt>E2EE</dt><dd id="e2ee-state">-</dd>
-      </dl>
-    </div>
+      <div id="log" class="log-panel"></div>
+    </details>
   </div>
 
   <div class="main">
     <div id="video-grid" class="video-grid"></div>
-
     <div id="transcripts" class="transcripts"></div>
-
-    <div id="stats-panel" class="stats-panel" style="display:none">
-      <div class="stats-head">
-        <strong>Live media</strong>
-        <span id="stats-profile" class="stats-profile"></span>
-        <span id="stats-totals" class="stats-totals"></span>
-        <span class="stats-actions">
-          <span id="stats-count" class="count"></span>
-          <button onclick="downloadStats('json')">Download JSON</button>
-          <button onclick="downloadStats('csv')">Download CSV</button>
-        </span>
-      </div>
-      <div class="stats-body">
-        <table class="stats">
-          <thead>
-            <tr>
-              <th></th><th>Participant</th><th>Kind</th><th>Layer</th><th>Codec</th>
-              <th>Size</th><th class="num">FPS</th><th class="num">kbps</th>
-              <th class="num">Target</th><th class="num">Lost</th><th>State</th>
-            </tr>
-          </thead>
-          <tbody id="stats-rows">
-            <tr class="empty"><td colspan="11">waiting for the first sample...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div id="log" class="log-panel"></div>
+    <div class="lobby-hint">Pick a language and an LLM, then Start call</div>
   </div>
 </div>
 
-<script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script>
+<script src="/agent-llm.js"></script><script src="/agent-speech.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
+<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script>
 </body>
 </html>

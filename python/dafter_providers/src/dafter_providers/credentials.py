@@ -11,6 +11,7 @@ SECRET_SCHEME = "secret://"
 PROVIDER_CREDENTIALS = frozenset(
     {
         "SARVAM_API_KEY",
+        "GROQ_API_KEY",
         "GEMINI_API_KEY",
         "OPENROUTER_API_KEY",
         "OPENCODE_API_KEY",

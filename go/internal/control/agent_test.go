@@ -41,11 +41,16 @@ var agentJobs = []struct {
 	language  string
 	channel   config.Channel
 	overrides string
+	llm       string
 }{
-	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", config.ChannelWebRTC, ""},
-	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", config.ChannelWebRTC, semanticOverride},
-	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", config.ChannelWebRTC, ""},
-	{"../../../testdata/agent/hindi-telephony-job.json", "hi", config.ChannelTelephony, recordedPhoneCall},
+	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", config.ChannelWebRTC, "", ""},
+	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", config.ChannelWebRTC, semanticOverride, ""},
+	{"../../../testdata/agent/hindi-groq-webrtc-job.json", "hi", config.ChannelWebRTC, "", "groq/qwen/qwen3.8-27b"},
+	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", config.ChannelWebRTC, "", ""},
+	{"../../../testdata/agent/kannada-webrtc-job.json", "kn-IN", config.ChannelWebRTC, "", ""},
+	{"../../../testdata/agent/marathi-webrtc-job.json", "mr-IN", config.ChannelWebRTC, "", ""},
+	{"../../../testdata/agent/telugu-webrtc-job.json", "te-IN", config.ChannelWebRTC, "", ""},
+	{"../../../testdata/agent/hindi-telephony-job.json", "hi", config.ChannelTelephony, recordedPhoneCall, ""},
 }
 
 func embeddedCatalog(t *testing.T) *config.Catalog {
@@ -67,7 +72,7 @@ func TestTheAgentJobsArePinnedForTheWorker(t *testing.T) {
 	for _, job := range agentJobs {
 		resolved, err := catalog.Resolve(config.Request{
 			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: job.language, Channel: job.channel,
-			Overrides: json.RawMessage(job.overrides),
+			LLM: job.llm, Overrides: json.RawMessage(job.overrides),
 		})
 		if err != nil {
 			t.Fatalf("%s: %v", job.fixture, err)

@@ -21,7 +21,9 @@ from dafter_core import (
     RecordingNotice,
     RecordingStart,
     Role,
+    Situation,
     SpeakerKind,
+    SpeechNormalization,
     Stage,
     TranscriptionMode,
     TurnStrategy,
@@ -68,6 +70,8 @@ CASES = [
         schemas.TELEPHONY,
         ("$defs", "Telephony", "properties", "recordingNotice", "enum"),
     ),
+    (SpeechNormalization, CFG, ("$defs", "Speech", "properties", "normalization", "enum")),
+    (Situation, CFG, ("$defs", "Situation", "enum")),
     (
         PhoneGuests,
         schemas.TELEPHONY,

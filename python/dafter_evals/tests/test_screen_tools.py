@@ -20,7 +20,7 @@ from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions, llm
 from livekit.agents.llm.tool_context import get_fnc_tool_names
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 
-classify: Classify = openai_compat.classify
+classify: Classify = openai_compat.classifier(openai_compat.ENDPOINTS["google"])
 Step = list[tuple[str, str]] | str
 SCORES = {
     "correctness": "pass",

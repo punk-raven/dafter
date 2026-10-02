@@ -14,9 +14,13 @@ from .errors import DafterError
 
 _FILES = (
     schemas.IDS,
+    schemas.LANGUAGE_SWITCHING,
+    schemas.BACKCHANNEL,
+    schemas.SCRIBE_CONFIG,
     schemas.RESOLVED_SESSION_CONFIG,
     schemas.TELEPHONY,
     schemas.EVENT_ENVELOPE,
+    schemas.TRANSCRIPT_EVENTS,
     schemas.SCRIBE_EVENTS,
     schemas.ERROR,
 )

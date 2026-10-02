@@ -25,6 +25,11 @@
     },
     "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
     "channel": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Channel" },
+    "llm": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}/[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+      "description": "The operator's LLM route the session chose by name, as provider/model. Resolution lands it after the language and channel overlays, so agent.pipeline.llm states the route in full; absent, the session runs the language's own LLM. A session names a route and never an endpoint or a credential, which stay in the operator's table."
+    },
     "residency": {
       "type": "object",
       "unevaluatedProperties": false,
@@ -73,14 +78,16 @@
           "description": "Reference to a prompt/persona document. Never inline prose."
         },
         "pipeline": { "$ref": "#/$defs/Pipeline" },
-        "addressing": { "$ref": "#/$defs/Addressing" }
+        "addressing": { "$ref": "#/$defs/Addressing" },
+        "speech": { "$ref": "#/$defs/Speech" },
+        "languageSwitching": { "$ref": "https://schemas.dafter.dev/config/v1/language-switching.schema.json" }
       }
     },
     "turn": { "$ref": "#/$defs/Turn" },
     "media": { "$ref": "#/$defs/Media" },
     "recording": { "$ref": "#/$defs/Recording" },
     "transcription": { "$ref": "#/$defs/Transcription" },
-    "scribe": { "$ref": "#/$defs/Scribe" },
+    "scribe": { "$ref": "https://schemas.dafter.dev/config/v1/scribe.schema.json" },
     "telephony": { "$ref": "https://schemas.dafter.dev/config/v1/telephony.schema.json#/$defs/Telephony" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
@@ -196,7 +203,82 @@
             "minDurationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
             "minWords": { "type": "integer", "minimum": 0, "maximum": 20 },
             "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
-            "resumeFalseInterruption": { "type": "boolean", "default": true }
+            "resumeFalseInterruption": { "type": "boolean", "default": true },
+            "backchannel": { "$ref": "https://schemas.dafter.dev/config/v1/backchannel.schema.json" }
+          }
+        }
+      }
+    },
+    "PhrasesByLanguage": {
+      "type": "object",
+      "description": "Words or short phrases keyed by base language (hi, en, kn, mr, te), so a language overlay restates its own list without repeating the others.",
+      "propertyNames": { "pattern": "^[a-z]{2,3}$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "maxItems": 64,
+        "uniqueItems": true
+      }
+    },
+    "Speech": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How the agent's reply is spoken: the text handed to TTS, what fills a slow reply, and the voice chosen for the moment. The LLM decides what to say; this block decides how it is said.",
+      "properties": {
+        "normalization": {
+          "type": "string",
+          "description": "Who turns digits and symbols into words before they are spoken. platform: the worker's deterministic speech planner, per language (Hindi today: numbers in Indian grouping, rupee amounts, dates, times, percentages, and long digit runs such as phone numbers read digit by digit); a language it has no rules for passes through. provider: the text reaches TTS as the LLM wrote it and the TTS provider's own preprocessing decides.",
+          "enum": ["platform", "provider"],
+          "default": "platform"
+        },
+        "substitutions": {
+          "type": "object",
+          "description": "Words replaced before TTS, keyed by base language and then by the word as written, for names and brands the voice says wrongly. A TTS provider's own pronunciation dictionary, where it has one, is a provider option instead.",
+          "propertyNames": { "pattern": "^[a-z]{2,3}$" },
+          "additionalProperties": {
+            "type": "object",
+            "propertyNames": { "minLength": 1, "maxLength": 64 },
+            "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "maxProperties": 200
+          }
+        },
+        "fillers": { "$ref": "#/$defs/Fillers" },
+        "situations": { "$ref": "#/$defs/Situations" },
+        "expressive": {
+          "type": "boolean",
+          "description": "Hand the media framework's expressive mode to the LLM, which lets it tag its reply with delivery markup the TTS renders. The framework keeps it off unless the TTS declares a markup dialect, so it has no effect with a TTS that declares none.",
+          "default": false
+        }
+      }
+    },
+    "Fillers": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "A short phrase spoken only when a reply is slow, never on every turn: when no reply audio is ready afterMs after the reply started, and while a slow tool runs. It never starts while anyone in the call is speaking. Phrases rotate and come from the session's language; a language with none plays none.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "afterMs": { "type": "integer", "minimum": 100, "maximum": 10000, "default": 1000 },
+        "phrases": { "$ref": "#/$defs/PhrasesByLanguage" }
+      }
+    },
+    "Situation": {
+      "type": "string",
+      "description": "What the moment calls for in the voice. neutral is the default; greeting is the opening line and replies to a greeting; concern is a caller describing a problem or complaint, answered calmer.",
+      "enum": ["neutral", "greeting", "concern"]
+    },
+    "Situations": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "A deterministic classifier over the caller's last turn picks the situation of each reply: concern when any concern cue is said, else greeting when a greeting cue is said, else neutral; the opening line is a greeting. The TTS provider maps a situation to its own voice settings in its options.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "cues": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "description": "Cues per situation that has any; neutral is what is left when none is said.",
+          "properties": {
+            "greeting": { "$ref": "#/$defs/PhrasesByLanguage" },
+            "concern": { "$ref": "#/$defs/PhrasesByLanguage" }
           }
         }
       }
@@ -378,48 +460,6 @@
         "batch": {
           "$ref": "#/$defs/ProviderRef",
           "description": "The provider and pinned model of the after-call pass. It is the batch class of STT, tuned for accuracy rather than first-partial latency, so it is named separately from agent.pipeline.stt. The after-call pass needs one, which is a cross-field rule."
-        }
-      }
-    },
-    "Scribe": {
-      "type": "object",
-      "unevaluatedProperties": false,
-      "description": "A second agent in the session that never speaks. It joins hidden and publishes no track, reads the live captions the agent worker already publishes rather than transcribing again, and keeps rolling notes: a short summary, decisions, action items with an owner, open questions, and the names and numbers mentioned. The voice agent reads those notes as the call's context and answers summarize_call from them. It scores each agent turn with the stage 4 judge, and when the call ends it writes the minutes, starts the transcript after the call and logs the session's cost. It is off the conversation's path: when it is slow or fails, only the notes are late. A session without this block has no scribe. It sends what everyone said to its own LLM provider and keeps the minutes, so it is gated like transcription: it needs its own consent artifact, a sealed session refuses it, and it needs transcription live or both, since it reads those captions. All three are cross-field rules.",
-      "required": ["enabled"],
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "pool": {
-          "type": "string",
-          "description": "The worker pool the scribe is dispatched to, beside the agent's own pool and never the same one: one room holds one agent per pool, and the scribe runs a different program.",
-          "pattern": "^[a-z][a-z0-9-]{1,62}$",
-          "default": "dafter-scribe"
-        },
-        "consentArtifactId": {
-          "type": "string",
-          "minLength": 1,
-          "description": "The scribe cannot run without a valid artifact, the same gate recording and transcription have. A separate field from transcription.consentArtifactId because consent to captions is not consent to an LLM reading the whole call and to minutes being kept."
-        },
-        "llm": {
-          "$ref": "#/$defs/ProviderRef",
-          "description": "Writes the notes and the minutes. Not latency bound, so a slower or free model fits here that could never answer a turn. A scribe needs one, which is a cross-field rule."
-        },
-        "judge": {
-          "$ref": "#/$defs/ProviderRef",
-          "description": "Grades each agent turn on the stage 4 criteria (correct, right language, speakable). Absent: turns are not scored."
-        },
-        "summaryIntervalMs": {
-          "type": "integer",
-          "description": "How often the rolling notes are rewritten while people are talking. Also the longest one rewrite may take, so rewrites never pile up.",
-          "minimum": 10000,
-          "maximum": 600000,
-          "default": 60000
-        },
-        "afterCallTimeoutSeconds": {
-          "type": "integer",
-          "description": "How long the scribe keeps working once the call has ended: the minutes, waiting for the track recordings to finish, and the transcript after the call. Work still running at the deadline is abandoned and logged; the call itself is already over.",
-          "minimum": 60,
-          "maximum": 3600,
-          "default": 900
         }
       }
     },

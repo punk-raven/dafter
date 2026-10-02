@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from dafter_core.config import Pipeline, ProviderRef, ResolvedSessionConfig, Turn, parse
+from dafter_core.config import (
+    Agent,
+    Pipeline,
+    ProviderRef,
+    ResolvedSessionConfig,
+    Turn,
+    parse,
+)
 from dafter_core.enums import (
     AddressingMode,
     AgentMode,
@@ -39,6 +46,11 @@ class Plan:
     persona: Persona
     stt_prompt: str | None = None
     disclosure: str | None = None
+    personas: dict[str, Persona] = field(default_factory=dict)
+
+    @property
+    def hearing(self) -> str | None:
+        return None if self.config.agent.language_switching.enabled else self.config.language
 
     @property
     def called_by_name(self) -> bool:
@@ -249,17 +261,66 @@ def disclosure(cfg: ResolvedSessionConfig) -> str | None:
     return recording_notice(cfg.language, cfg.recording.enabled, always)
 
 
+def voiced(agent: Agent, language: str) -> Persona:
+    persona = persona_for(agent.persona_ref, language, agent.name, agent.addressing.aliases)
+    return called_by_name(persona) if agent.addressing.waits_to_be_called else persona
+
+
+def _switchable(cfg: ResolvedSessionConfig, vendors: tuple[Vendor, ...]) -> dict[str, Persona]:
+    switching = cfg.agent.language_switching
+    if not switching.enabled:
+        return {}
+    stt = vendors[0]
+    if not stt.detects_language:
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "the session switches languages and its STT cannot identify one",
+            "/agent/languageSwitching/enabled",
+            f"{stt.name} does not identify the language of an utterance",
+        )
+    personas: dict[str, Persona] = {}
+    bases: set[str] = set()
+    for i, tag in enumerate(switching.languages):
+        pointer = f"/agent/languageSwitching/languages/{i}"
+        if base_language(tag) in bases:
+            raise _refuse(
+                ErrorCode.INVALID_CONFIG,
+                "two languages the session may switch into share a base language",
+                pointer,
+                "an identified language could mean either",
+            )
+        bases.add(base_language(tag))
+        for vendor in vendors:
+            if tag not in vendor.languages:
+                raise _refuse(
+                    ErrorCode.UNSUPPORTED_CAPABILITY,
+                    "a provider does not serve a language the session may switch into",
+                    pointer,
+                    f"not declared by {vendor.name}",
+                )
+        try:
+            personas[tag] = voiced(cfg.agent, tag)
+        except DafterError as exc:
+            raise _refuse(
+                ErrorCode.UNSUPPORTED_CAPABILITY,
+                "no persona document is available for a language the session may switch into",
+                pointer,
+                "not registered in this worker for the language",
+            ) from exc
+    return personas
+
+
 def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> Plan:
     pipeline = _check_session(cfg, pool, fetches_keys)
     stt = _vendor(pipeline.stt, Stage.STT, cfg.language)
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
     detection = turn_detection(cfg.turn, stt, cfg.language)
-    persona = persona_for(cfg.agent.persona_ref, cfg.language, cfg.agent.name)
     addressing = cfg.agent.addressing
+    persona = voiced(cfg.agent, cfg.language)
+    personas = _switchable(cfg, (stt, llm, tts)) or {cfg.language: persona}
     prompt = None
     if addressing.waits_to_be_called:
-        persona = called_by_name(persona)
         prompt = ", ".join(dict.fromkeys((cfg.agent.name or "", *addressing.aliases)))
     return Plan(
         config=cfg,
@@ -273,4 +334,5 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         persona=persona,
         stt_prompt=prompt,
         disclosure=disclosure(cfg),
+        personas=personas,
     )

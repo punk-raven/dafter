@@ -39,7 +39,7 @@ SCORES = {
     "reasoning": "fine",
 }
 VERDICT = {"verdict": "pass", "reasoning": "the tool was used well"}
-classify: Classify = openai_compat.classify
+classify: Classify = openai_compat.classifier(openai_compat.ENDPOINTS["google"])
 Llm = llm.LLM[Any]
 
 
@@ -275,7 +275,7 @@ def test_the_screen_records_rate_limits_and_skips_a_candidate_it_cannot_build() 
     record = ok.records[0]
     assert (record.date, record.provider, record.model) == (
         "2026-09-27",
-        "openai_compat",
+        "google",
         "gemini-3.5-flash-lite",
     )
     assert record.cost == pytest.approx((50 * 0.3 + 7 * 2.5) / 1_000_000)
@@ -337,7 +337,7 @@ def test_the_cli_writes_a_ranked_table_and_a_spot_check_sample(
     assert [r["candidate"] for r in summary["ranking"]] == ["gemini_flash_lite", "openai_mini"]
     table = capsys.readouterr().out
     assert table == (tmp_path / "ranking.md").read_text(encoding="utf-8")
-    assert "judge: judge_gemini_flash" in table and "openai_compat/gpt-5.4-mini" in table
+    assert "judge: judge_gemini_flash" in table and "openai/gpt-5.4-mini" in table
     assert "USD prices converted at USD 1 = INR 95.82 on 2026-09-25 (https://" in table
     assert summary["usdToInr"]["inrPerUsd"] == 95.82
 
@@ -374,13 +374,18 @@ def test_several_languages_rank_together_and_apart(
     assert [h.split(", judge")[0].split("languages: ")[1] for h in heads] == ["hi, en", "hi", "en"]
 
 
+def unregistered_persona(ref: str | None, language: str, name: str | None) -> Persona:
+    raise DafterError(ErrorCode.UNSUPPORTED_CAPABILITY, "no persona document is registered")
+
+
 def test_a_language_without_a_persona_is_skipped_by_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    kannada = banks.Bank("kn", "Kannada", None, None, (banks.Question("kn-01", "ನಮಸ್ಕಾರ?"),))
-    monkeypatch.setattr(banks, "load", lambda lang: kannada)
-    assert run_cli(["--out", str(tmp_path), "--language", "kn"], monkeypatch) == 2
-    assert "skipped: no Kannada persona: no persona document" in capsys.readouterr().err
+    english = banks.Bank("en", "English", None, None, (banks.Question("en-01", "Hello?"),))
+    monkeypatch.setattr(banks, "load", lambda lang: english)
+    monkeypatch.setattr(cli, "persona_for", unregistered_persona)
+    assert run_cli(["--out", str(tmp_path), "--language", "en"], monkeypatch) == 2
+    assert "skipped: no English persona: no persona document" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
