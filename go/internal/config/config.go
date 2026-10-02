@@ -59,18 +59,26 @@ type Pipeline struct {
 }
 
 type Turn struct {
-	Strategy           TurnStrategy `json:"strategy"`
-	SilenceMs          int          `json:"silenceMs,omitempty"`
-	MinSpeechMs        int          `json:"minSpeechMs,omitempty"`
-	EndpointingDelayMs int          `json:"endpointingDelayMs,omitempty"`
+	Strategy              TurnStrategy `json:"strategy"`
+	SilenceMs             int          `json:"silenceMs,omitempty"`
+	MinSpeechMs           int          `json:"minSpeechMs,omitempty"`
+	EndpointingDelayMs    int          `json:"endpointingDelayMs,omitempty"`
+	EndpointingMaxDelayMs int          `json:"endpointingMaxDelayMs,omitempty"`
 
 	LocalVADEnabled *bool `json:"localVadEnabled,omitempty"`
 
-	Interruption *Interruption `json:"interruption,omitempty"`
+	PreemptiveGeneration *PreemptiveGeneration `json:"preemptiveGeneration,omitempty"`
+	Interruption         *Interruption         `json:"interruption,omitempty"`
+}
+
+type PreemptiveGeneration struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	TTS     *bool `json:"tts,omitempty"`
 }
 
 type Interruption struct {
 	Enabled                    *bool `json:"enabled,omitempty"`
+	LocalVADEnabled            *bool `json:"localVadEnabled,omitempty"`
 	MinDurationMs              int   `json:"minDurationMs,omitempty"`
 	MinWords                   int   `json:"minWords,omitempty"`
 	FalseInterruptionTimeoutMs int   `json:"falseInterruptionTimeoutMs,omitempty"`
@@ -102,6 +110,10 @@ type AudioProfile struct {
 	DTX               *bool             `json:"dtx,omitempty"`
 	EchoCancellation  *bool             `json:"echoCancellation,omitempty"`
 	NoiseCancellation NoiseCancellation `json:"noiseCancellation,omitempty"`
+}
+
+func (t Turn) LocalVADDecidesTurn() bool {
+	return t.LocalVADEnabled == nil || *t.LocalVADEnabled
 }
 
 func (c *ResolvedSessionConfig) VideoEnabled() bool {
@@ -196,6 +208,7 @@ type Recording struct {
 type Budgets struct {
 	TurnGapP50Ms      int     `json:"turnGapP50Ms"`
 	TurnGapP95Ms      int     `json:"turnGapP95Ms"`
+	BargeInStopP50Ms  int     `json:"bargeInStopP50Ms,omitempty"`
 	MaxSessionCostUSD float64 `json:"maxSessionCostUsd,omitempty"`
 }
 

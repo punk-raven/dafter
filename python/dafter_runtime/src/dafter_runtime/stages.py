@@ -6,11 +6,15 @@ from typing import Any
 from dafter_core.config import ProviderRef
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError
+from livekit.agents import inference
 from livekit.agents import llm as lk_llm
 from livekit.agents import stt as lk_stt
 from livekit.agents import tts as lk_tts
+from livekit.agents import vad as lk_vad
 
 from .plan import Plan
+
+TURN_DETECTOR_VERSION: inference.TurnDetectorVersions = "v1-mini"
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,12 +22,22 @@ class Stages:
     stt: lk_stt.STT[Any]
     llm: lk_llm.LLM[Any]
     tts: lk_tts.TTS[Any]
+    vad: lk_vad.VAD | None
+    turn_detector: inference.TurnDetector | None
 
 
 def _ref(ref: ProviderRef | None, stage: Stage) -> ProviderRef:
     if ref is None:
         raise DafterError(ErrorCode.INTERNAL, f"a planned pipeline lost its {stage} stage")
     return ref
+
+
+def _vad(plan: Plan) -> lk_vad.VAD | None:
+    if plan.vad is None:
+        return None
+    if plan.vad.vad is None:
+        raise DafterError(ErrorCode.INTERNAL, "a planned vendor lost a stage factory")
+    return plan.vad.vad(_ref(plan.pipeline.vad, Stage.VAD))
 
 
 def build(plan: Plan) -> Stages:
@@ -37,7 +51,15 @@ def build(plan: Plan) -> Stages:
         stt=plan.stt.stt(stt_ref, cfg.language, cfg.turn),
         llm=plan.llm.llm(llm_ref),
         tts=plan.tts.tts(tts_ref, cfg.language),
+        vad=_vad(plan),
+        turn_detector=(
+            inference.TurnDetector(version=TURN_DETECTOR_VERSION)
+            if plan.turn_detection == "semantic"
+            else None
+        ),
     )
+    if plan.llm.wants_prewarm(llm_ref):
+        stages.llm.prewarm()
     if plan.tts.wants_prewarm(tts_ref):
         stages.tts.prewarm()
     return stages

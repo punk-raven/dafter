@@ -44,12 +44,27 @@ def test_stt_is_the_realtime_class_on_the_fast_profile() -> None:
     assert (opts.language, opts.stream_type, opts.endpointing) == ("hi-IN", "fast", "vad")
     assert (opts.encoding, opts.sample_rate) == ("linear16", 16000)
     assert (opts.vad_min_silence_ms, opts.vad_min_speech_ms) == (500, 120)
+    assert stt._final_grace == 1.5
+
+
+def test_the_wait_for_a_late_final_is_a_stt_option() -> None:
+    stt = sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=400), "hi", TURN)
+    assert stt._final_grace == 0.4  # type: ignore[attr-defined]
 
 
 def test_llm_turns_thinking_off_on_the_generally_available_endpoint() -> None:
     llm = sarvam.build_llm(ref("sarvam-105b", thinking=False, maxTokens=200))
     assert llm._opts.reasoning_effort is None  # type: ignore[attr-defined]
     assert str(llm._client.base_url).rstrip("/") == sarvam.LLM_BASE_URL  # type: ignore[attr-defined]
+
+
+def test_the_first_tts_chunk_size_and_the_llm_prewarm_are_options() -> None:
+    tts = sarvam.build_tts(ref("bulbul:v3", minBufferSize=30), "hi")
+    assert tts._opts.min_buffer_size == 30  # type: ignore[attr-defined]
+    llm = ref("sarvam-105b", prewarm=False)
+    sarvam.build_llm(llm)
+    assert sarvam.wants_prewarm(llm) is False
+    assert sarvam.wants_prewarm(ref("sarvam-105b")) is True
 
 
 def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
@@ -71,6 +86,16 @@ def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
             lambda: sarvam.build_stt(ref("saaras:v3-realtime", chunkMs=250), "hi", TURN),
             ErrorCode.INVALID_CONFIG,
             "/agent/pipeline/stt/options/chunkMs",
+        ),
+        (
+            lambda: sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=-1), "hi", TURN),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/stt/options/finalGraceMs",
+        ),
+        (
+            lambda: sarvam.build_tts(ref("bulbul:v3", minBufferSize=20), "hi"),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/tts/options/minBufferSize",
         ),
         (
             lambda: sarvam.build_tts(ref("bulbul:v3", codec="opus"), "hi"),
@@ -132,4 +157,4 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
     with pytest.raises(DafterError) as caught:
         vendor_for(ProviderRef(provider="deepgram"), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
-    assert set(VENDORS) == {"sarvam"}
+    assert set(VENDORS) == {"sarvam", "silero"}

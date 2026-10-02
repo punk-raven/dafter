@@ -73,6 +73,7 @@ class Pipeline:
 @dataclass(frozen=True, slots=True)
 class Interruption:
     enabled: bool = True
+    local_vad_enabled: bool = False
     min_duration_ms: int = 0
     min_words: int = 0
     false_interruption_timeout_ms: int = 0
@@ -82,6 +83,7 @@ class Interruption:
     def from_dict(cls, d: dict[str, Any]) -> Interruption:
         return cls(
             enabled=d.get("enabled", True),
+            local_vad_enabled=d.get("localVadEnabled", False),
             min_duration_ms=d.get("minDurationMs", 0),
             min_words=d.get("minWords", 0),
             false_interruption_timeout_ms=d.get("falseInterruptionTimeoutMs", 0),
@@ -90,12 +92,24 @@ class Interruption:
 
 
 @dataclass(frozen=True, slots=True)
+class PreemptiveGeneration:
+    enabled: bool = True
+    tts: bool = False
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> PreemptiveGeneration:
+        return cls(enabled=d.get("enabled", True), tts=d.get("tts", False))
+
+
+@dataclass(frozen=True, slots=True)
 class Turn:
     strategy: TurnStrategy
     silence_ms: int = 0
     min_speech_ms: int = 0
     endpointing_delay_ms: int = 0
+    endpointing_max_delay_ms: int | None = None
     local_vad_enabled: bool = True
+    preemptive_generation: PreemptiveGeneration = field(default_factory=PreemptiveGeneration)
     interruption: Interruption = field(default_factory=Interruption)
 
     @classmethod
@@ -105,7 +119,11 @@ class Turn:
             silence_ms=d.get("silenceMs", 0),
             min_speech_ms=d.get("minSpeechMs", 0),
             endpointing_delay_ms=d.get("endpointingDelayMs", 0),
+            endpointing_max_delay_ms=d.get("endpointingMaxDelayMs"),
             local_vad_enabled=d.get("localVadEnabled", True),
+            preemptive_generation=PreemptiveGeneration.from_dict(
+                d.get("preemptiveGeneration") or {}
+            ),
             interruption=Interruption.from_dict(d.get("interruption") or {}),
         )
 
@@ -307,6 +325,7 @@ class Recording:
 class Budgets:
     turn_gap_p50_ms: int
     turn_gap_p95_ms: int
+    barge_in_stop_p50_ms: int = 300
     max_session_cost_usd: float | None = None
 
     @classmethod
@@ -314,6 +333,7 @@ class Budgets:
         return cls(
             turn_gap_p50_ms=d["turnGapP50Ms"],
             turn_gap_p95_ms=d["turnGapP95Ms"],
+            barge_in_stop_p50_ms=d.get("bargeInStopP50Ms", 300),
             max_session_cost_usd=d.get("maxSessionCostUsd"),
         )
 

@@ -11,6 +11,7 @@ from .enums import (
     ErrorCode,
     PrivacyMode,
     RecordingStart,
+    TurnStrategy,
 )
 
 if TYPE_CHECKING:
@@ -117,6 +118,18 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
             "every recording layout is a server-side egress, and under end-to-end encryption "
             "the media server and its egress see only ciphertext, so this session is recorded "
             "client-side or not at all"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: (
+            c.turn.strategy is TurnStrategy.PROVIDER_ENDPOINTING and c.turn.local_vad_enabled
+        ),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/turn/localVadEnabled",
+        because=(
+            "under provider endpointing the recognizer's own VAD decides the turn, so a local "
+            "VAD deciding it too runs two detectors on one stream; a local VAD that only "
+            "catches barge-in is turn.interruption.localVadEnabled"
         ),
     ),
 )

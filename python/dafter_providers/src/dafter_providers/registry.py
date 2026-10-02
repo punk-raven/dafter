@@ -13,7 +13,7 @@ from livekit.agents import stt as lk_stt
 from livekit.agents import tts as lk_tts
 from livekit.agents import vad as lk_vad
 
-from . import sarvam
+from . import sarvam, silero
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +41,17 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             tts=sarvam.build_tts,
             wants_prewarm=sarvam.wants_prewarm,
             classify=sarvam.classify,
+        ),
+        silero.NAME: Vendor(
+            name=silero.NAME,
+            languages=frozenset(),
+            native_endpointing=False,
+            vad=silero.build_vad,
+            stt=None,
+            llm=None,
+            tts=None,
+            wants_prewarm=lambda _: False,
+            classify=silero.classify,
         ),
     }
 )

@@ -5,11 +5,19 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from dafter_runtime.control import CONTROL_URL_ENV
-from dafter_runtime.worker import FRAMEWORK_LOGGER, POOL_ENV, on_request, redact_framework_logs
+from dafter_runtime.worker import (
+    FRAMEWORK_LOGGER,
+    POOL_ENV,
+    on_request,
+    prewarm,
+    redact_framework_logs,
+    server,
+)
+from livekit.agents import JobProcess
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
 
@@ -46,6 +54,11 @@ def test_framework_log_records_lose_their_transcript_fields(framework: logging.L
     assert "lk.pii.user_input" not in record.__dict__
     assert record.__dict__["room"] == "s_7f3a9c21"
     assert sum(type(f).__name__ == "RedactTranscripts" for f in framework.filters) == 1
+
+
+def test_every_worker_process_loads_the_local_models_before_its_first_job() -> None:
+    assert server().setup_fnc is prewarm
+    prewarm(cast(JobProcess, None))
 
 
 class Request:

@@ -120,16 +120,40 @@
         "silenceMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
         "minSpeechMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
         "endpointingDelayMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+        "endpointingMaxDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "The longest the agent waits once speech has stopped: under the semantic strategy, the wait when the turn detector judges the caller unlikely to be done, and the ceiling its learned delay never passes."
+        },
         "localVadEnabled": {
           "type": "boolean",
-          "description": "Turn off where a provider's server VAD is authoritative: a second local VAD sees the same audio as the recognizer and fights it.",
+          "description": "Whether a local VAD takes part in deciding the user's turn, as it does under the vad and semantic strategies. False under provider_endpointing, where the recognizer's own VAD decides the turn and a second detector deciding it would fight the first. A local VAD that only catches the caller talking over the agent is interruption.localVadEnabled.",
           "default": true
+        },
+        "preemptiveGeneration": {
+          "type": "object",
+          "unevaluatedProperties": false,
+          "description": "Start the reply on the transcript while the turn is still being decided, and keep it when the turn ends on that transcript. Where the recognizer ends the turn together with its final transcript there is nothing to overlap, so this pays off under the semantic strategy.",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "tts": {
+              "type": "boolean",
+              "description": "Synthesize the preemptive reply too, not only generate it; spends TTS on replies a continuing turn discards.",
+              "default": false
+            }
+          }
         },
         "interruption": {
           "type": "object",
           "unevaluatedProperties": false,
           "properties": {
             "enabled": { "type": "boolean", "default": true },
+            "localVadEnabled": {
+              "type": "boolean",
+              "description": "Run the local VAD in agent.pipeline.vad to detect the caller starting to talk over the agent, without it deciding the end of the turn, so barge-in does not wait for the recognizer's first transcript. One VAD serves both jobs, so it is implied wherever turn.localVadEnabled is true.",
+              "default": false
+            },
             "minDurationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
             "minWords": { "type": "integer", "minimum": 0, "maximum": 20 },
             "falseInterruptionTimeoutMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
@@ -303,6 +327,12 @@
       "properties": {
         "turnGapP50Ms": { "type": "integer", "minimum": 1, "default": 800 },
         "turnGapP95Ms": { "type": "integer", "minimum": 1, "default": 1500 },
+        "bargeInStopP50Ms": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 300,
+          "description": "Median time from the caller starting to talk over the agent to the agent leaving the speaking state."
+        },
         "maxSessionCostUsd": { "type": "number", "minimum": 0 }
       }
     }

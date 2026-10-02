@@ -30,10 +30,20 @@ func TestAnAgentSessionHandsTheStoredDocumentToItsPool(t *testing.T) {
 	}
 }
 
-const agentJobFixture = "../../../testdata/agent/hindi-webrtc-job.json"
+const semanticOverride = `{"turn": {"strategy": "semantic", "localVadEnabled": true}}`
 
-func TestTheHindiAgentJobIsPinnedForTheWorker(t *testing.T) {
-	t.Parallel()
+var agentJobs = []struct {
+	fixture   string
+	language  string
+	overrides string
+}{
+	{"../../../testdata/agent/hindi-webrtc-job.json", "hi", ""},
+	{"../../../testdata/agent/hindi-semantic-webrtc-job.json", "hi", semanticOverride},
+	{"../../../testdata/agent/english-webrtc-job.json", "en-IN", ""},
+}
+
+func embeddedCatalog(t *testing.T) *config.Catalog {
+	t.Helper()
 	raw, err := os.ReadFile(catalogPath)
 	if err != nil {
 		t.Fatal(err)
@@ -42,36 +52,56 @@ func TestTheHindiAgentJobIsPinnedForTheWorker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved, err := catalog.Resolve(config.Request{
-		SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: config.ChannelWebRTC,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if os.Getenv("DAFTER_UPDATE_FIXTURES") == "1" {
-		if err := os.WriteFile(agentJobFixture, append(resolved.Document, '\n'), 0o644); err != nil {
+	return catalog
+}
+
+func TestTheAgentJobsArePinnedForTheWorker(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for _, job := range agentJobs {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: job.language, Channel: config.ChannelWebRTC,
+			Overrides: json.RawMessage(job.overrides),
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", job.fixture, err)
+		}
+		if os.Getenv("DAFTER_UPDATE_FIXTURES") == "1" {
+			if err := os.WriteFile(job.fixture, append(resolved.Document, '\n'), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want, err := os.ReadFile(job.fixture)
+		if err != nil {
 			t.Fatal(err)
 		}
+		if !bytes.Equal(bytes.TrimSpace(want), resolved.Document) {
+			t.Errorf("the agent job changed; the worker's tests read %s, so rerun with DAFTER_UPDATE_FIXTURES=1 and check both halves\n got: %s", job.fixture, resolved.Document)
+		}
 	}
-	want, err := os.ReadFile(agentJobFixture)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(bytes.TrimSpace(want), resolved.Document) {
-		t.Errorf("the Hindi agent job changed; the worker's tests read %s, so rerun with DAFTER_UPDATE_FIXTURES=1 and check both halves\n got: %s", agentJobFixture, resolved.Document)
+}
+
+func TestASessionOverrideSelectsTheTurnDetectorForHindi(t *testing.T) {
+	t.Parallel()
+	catalog := embeddedCatalog(t)
+	for _, channel := range []config.Channel{config.ChannelWebRTC, config.ChannelTelephony} {
+		resolved, err := catalog.Resolve(config.Request{
+			SessionID: "s_7f3a9c21", TenantID: tenantID, Language: "hi", Channel: channel,
+			Overrides: json.RawMessage(semanticOverride),
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", channel, err)
+		}
+		turn := resolved.Config.Turn
+		if turn.Strategy != config.TurnSemantic || !turn.LocalVADDecidesTurn() {
+			t.Errorf("%s: the override resolved to %s with a local VAD deciding it %v; an A/B cannot select the turn detector", channel, turn.Strategy, turn.LocalVADDecidesTurn())
+		}
 	}
 }
 
 func TestTheCatalogAgentIsNamedAndJoinsSilentlyUnlessASessionAsksItToGreet(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile(catalogPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	catalog, err := config.LoadCatalog(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
+	catalog := embeddedCatalog(t)
 	for _, tc := range []struct {
 		overrides string
 		greets    bool

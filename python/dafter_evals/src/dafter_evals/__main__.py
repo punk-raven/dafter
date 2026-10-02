@@ -12,6 +12,7 @@ from dafter_core.config import parse
 from livekit.agents import utils
 
 from .connect import join, session_overrides
+from .measure import compare
 from .probe import Probe
 from .script import HINDI
 from .turns import SCENARIOS, run
@@ -34,7 +35,13 @@ def arguments() -> argparse.Namespace:
     p.add_argument("--speaker", default="ritu")
     p.add_argument("--scenarios", default=",".join(SCENARIOS))
     p.add_argument("--overrides", default=None, help="session overrides, as JSON")
-    p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--out", type=Path, default=None, help="write the full report here, as JSON")
+    p.add_argument(
+        "--baseline",
+        type=Path,
+        default=None,
+        help="an earlier --out report; print the change on each clock against it",
+    )
     return p.parse_args()
 
 
@@ -64,7 +71,7 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         try:
             await join(probe, args.control, created)
             scenarios = frozenset(args.scenarios.split(","))
-            report = await run(probe, voice, HINDI, args.turns, scenarios)
+            report = await run(probe, voice, HINDI, args.turns, scenarios, cfg.budgets)
         finally:
             await voice.aclose()
             await probe.close()
@@ -81,11 +88,15 @@ async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> None:
     args = arguments()
+    baseline = json.loads(args.baseline.read_text(encoding="utf-8")) if args.baseline else None
     report = asyncio.run(evaluate(args))
+    if baseline is not None:
+        report["comparison"] = compare(baseline["summary"], report["summary"])
     text = json.dumps(report, ensure_ascii=False, indent=2)
     if args.out:
         args.out.write_text(text + "\n", encoding="utf-8")
-    sys.stdout.write(json.dumps(report["summary"], indent=2) + "\n")
+    shown = {"summary": report["summary"], "comparison": report.get("comparison")}
+    sys.stdout.write(json.dumps(shown, indent=2) + "\n")
 
 
 if __name__ == "__main__":
