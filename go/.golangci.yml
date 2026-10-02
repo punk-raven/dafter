@@ -122,6 +122,58 @@ linters:
             - pkg: github.com/punk-raven/dafter/go/internal/ids
               desc: turn is a leaf; it depends on no internal package
 
+        configcheck-depends-on-core-only:
+          files:
+            - "**/internal/configcheck/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/configstore
+              desc: configcheck judges a document set; storing it is configstore's, which depends on configcheck
+            - pkg: github.com/punk-raven/dafter/go/internal/admin
+              desc: the admin API depends on configcheck, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: configcheck is pure; sessions are state's
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: configcheck is pure; the media server is transport's
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: configcheck is pure; control depends on core, never the other way round
+
+        configstore-sits-below-admin:
+          files:
+            - "**/internal/configstore/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/admin
+              desc: the admin API depends on configstore, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: configstore and state are siblings; sessions record a release id, not a store
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: configstore and transport are siblings
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: control reads the catalog through config.Snapshot, never the other way round
+
+        admin-is-its-own-listener:
+          files:
+            - "**/internal/admin/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/state
+              desc: the admin API edits config, never sessions
+            - pkg: github.com/punk-raven/dafter/go/internal/transport
+              desc: the admin API edits config, never the media server
+            - pkg: github.com/punk-raven/dafter/go/internal/control
+              desc: the admin API and the public API are siblings on separate listeners
+
+        control-sees-config-only-through-a-snapshot:
+          files:
+            - "**/internal/control/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/admin
+              desc: the admin API is served on its own listener, never from the public mux
+            - pkg: github.com/punk-raven/dafter/go/internal/configstore
+              desc: control reads the live catalog through config.Snapshot, so a store can change without touching it
+
         core-sits-below-everything:
           files:
             - "**/internal/ids/**"
@@ -131,6 +183,12 @@ linters:
             - "**/internal/config/**"
             - "!$test"
           deny:
+            - pkg: github.com/punk-raven/dafter/go/internal/configcheck
+              desc: configcheck depends on core, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/configstore
+              desc: configstore depends on core, never the other way round
+            - pkg: github.com/punk-raven/dafter/go/internal/admin
+              desc: admin depends on core, never the other way round
             - pkg: github.com/punk-raven/dafter/go/internal/state
               desc: state depends on core, never the other way round
             - pkg: github.com/punk-raven/dafter/go/internal/transport

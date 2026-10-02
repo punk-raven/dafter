@@ -80,6 +80,7 @@ type sessionView struct {
 	SessionID     string          `json:"sessionId"`
 	Room          string          `json:"room"`
 	ConfigHash    string          `json:"configHash"`
+	ReleaseID     int64           `json:"releaseId,omitempty"`
 	Config        json.RawMessage `json:"config"`
 	CreatedAt     time.Time       `json:"createdAt"`
 	Recordings    []recordingView `json:"recordings"`
@@ -241,7 +242,7 @@ func (s *Service) readSession(w http.ResponseWriter, r *http.Request) {
 		views = append(views, viewOf(e, ""))
 	}
 	s.write(w, http.StatusOK, sessionView{
-		SessionID: sess.SessionID, Room: sess.Room, ConfigHash: sess.ConfigHash,
+		SessionID: sess.SessionID, Room: sess.Room, ConfigHash: sess.ConfigHash, ReleaseID: sess.ReleaseID,
 		Config: sess.Config, CreatedAt: sess.CreatedAt, Recordings: views,
 		AgentRefusal: sess.AgentRefusal, ScribeRefusal: sess.ScribeRefusal,
 	})

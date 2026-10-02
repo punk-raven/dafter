@@ -126,7 +126,7 @@
         },
         "nearMisses": {
           "type": "array",
-          "description": "Words one letter away from the name that must never wake the agent: other people's names and ordinary words that a recognizer or a tolerant matcher would otherwise take for it. A near miss that is also the name or an alias contradicts itself, which is a cross-field rule.",
+          "description": "Words one letter away from the name that must never wake the agent: other people's names and ordinary words that a recognizer or a tolerant matcher would otherwise take for it. A near miss that is also the name or an alias contradicts itself, which is a cross-field rule. Unlike every other list, the layers add to this one rather than replace it, so a tenant, agent, profile or session that states a near miss keeps every near miss the layers below it stated, each word once.",
           "items": { "type": "string", "minLength": 1, "maxLength": 32 },
           "maxItems": 64,
           "uniqueItems": true

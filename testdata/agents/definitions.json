@@ -1,0 +1,10 @@
+{
+  "cases": [
+    { "name": "a named agent with its spellings, near misses and persona profile", "document": { "name": "Asha", "aliases": ["आशा", "ಆಶಾ"], "nearMisses": ["Usha", "Isha", "उषा"], "profile": "support" }, "rejected": null },
+    { "name": "a name alone", "document": { "name": "Asha" }, "rejected": null },
+    { "name": "no name", "document": { "aliases": ["आशा"] }, "rejected": { "code": "invalid_config", "pointers": [""] } },
+    { "name": "a name longer than a person says it", "document": { "name": "Asha the very helpful voice agent" }, "rejected": { "code": "invalid_config", "pointers": ["/name"] } },
+    { "name": "a near miss listed twice", "document": { "name": "Asha", "nearMisses": ["Usha", "Usha"] }, "rejected": { "code": "invalid_config", "pointers": ["/nearMisses"] } },
+    { "name": "an empty name and a profile that is not a slug", "document": { "name": "", "profile": "Support Team" }, "rejected": { "code": "invalid_config", "pointers": ["/name", "/profile"] } }
+  ]
+}

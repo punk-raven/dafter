@@ -70,11 +70,15 @@ services:
       context: ./go
     ports:
       - "8080:8080"
+      - "127.0.0.1:8081:8081"
     volumes:
       - control-data:/var/lib/dafter
     environment:
       DAFTER_DB: /var/lib/dafter/dafter.db
       DAFTER_ADDR: 0.0.0.0:8080
+      DAFTER_ADMIN_ADDR: 0.0.0.0:8081
+      DAFTER_ADMIN_TOKEN: ${DAFTER_ADMIN_TOKEN:-devadmin}
+      DAFTER_STATE_KEY: ${DAFTER_STATE_KEY:-ZGV2LW9ubHktc3RhdGUta2V5LW5vdC1hLXNlY3JldCE=}
       DAFTER_LIVEKIT_URL: ws://livekit:7880
       DAFTER_LIVEKIT_API_KEY: devkey
       DAFTER_LIVEKIT_API_SECRET: secret

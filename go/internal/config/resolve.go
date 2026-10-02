@@ -18,16 +18,18 @@ type Catalog struct {
 	Languages map[string]Axis            `json:"languages"`
 	Channels  map[Channel]Axis           `json:"channels"`
 	LLMs      map[string]json.RawMessage `json:"llms"`
+	Agents    map[string]json.RawMessage `json:"agents,omitempty"`
 }
 
 type Axis struct {
-	Tuning  json.RawMessage `json:"tuning"`
-	Overlay json.RawMessage `json:"overlay"`
+	Tuning  json.RawMessage `json:"tuning,omitempty"`
+	Overlay json.RawMessage `json:"overlay,omitempty"`
 }
 
 type Request struct {
 	SessionID string
 	TenantID  string
+	Agent     string
 	Profile   string
 	Language  string
 	Channel   Channel
@@ -85,16 +87,25 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 	sources := []source{{name: "defaults", raw: c.Defaults}}
 	var problems []string
 
+	profile, profilePointer := req.Profile, "/profile"
+	if req.Agent != "" {
+		agent, agentProfile, unknown := c.agentLayer(req.Agent)
+		problems = append(problems, unknown...)
+		sources = append(sources, agent)
+		if profile == "" && agentProfile != "" {
+			profile, profilePointer = agentProfile, "/agents/"+pointerEscaper.Replace(req.Agent)+"/profile"
+		}
+	}
 	if raw, ok := c.Tenants[req.TenantID]; ok {
 		sources = append(sources, source{name: "tenant", raw: raw})
 	} else {
 		problems = append(problems, located("/tenantId", "no tenant configuration is registered"))
 	}
-	if req.Profile != "" {
-		if raw, ok := c.Profiles[req.Profile]; ok {
+	if profile != "" {
+		if raw, ok := c.Profiles[profile]; ok {
 			sources = append(sources, source{name: "profile", raw: raw})
 		} else {
-			problems = append(problems, located("/profile", "no profile of that name is registered"))
+			problems = append(problems, located(profilePointer, "no profile of that name is registered"))
 		}
 	}
 	if len(req.Overrides) > 0 {
@@ -135,19 +146,19 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		doc = merge(doc, m)
+		doc = merge(doc, m, "")
 	}
 	overrides, err := decode(source{name: "overrides", raw: req.Overrides})
 	if err != nil {
 		return nil, err
 	}
-	doc = merge(doc, overrides)
+	doc = merge(doc, overrides, "")
 	pins := make([]map[string]any, len(overlays))
 	for i, s := range overlays {
 		if pins[i], err = s.pin(); err != nil {
 			return nil, err
 		}
-		doc = merge(cut(doc, s.replaces), pins[i])
+		doc = merge(cut(doc, s.replaces), pins[i], "")
 	}
 
 	for _, pointer := range dropped(overrides, doc, "") {
@@ -202,6 +213,9 @@ func dropped(over, doc map[string]any, pointer string) []string {
 		dm, docIsObject := doc[k].(map[string]any)
 		if overIsObject && docIsObject {
 			pointers = append(pointers, dropped(om, dm, at)...)
+			continue
+		}
+		if at == nearMissesPointer && keptAll(over[k], doc[k]) {
 			continue
 		}
 		if !reflect.DeepEqual(over[k], doc[k]) {
@@ -310,17 +324,24 @@ func present(doc map[string]any, path []string) bool {
 	return ok
 }
 
-func merge(base, over map[string]any) map[string]any {
+func merge(base, over map[string]any, pointer string) map[string]any {
 	out := make(map[string]any, len(base)+len(over))
 	for k, v := range base {
 		out[k] = v
 	}
 	for k, v := range over {
+		at := pointer + "/" + pointerEscaper.Replace(k)
 		bm, baseIsObject := out[k].(map[string]any)
 		om, overIsObject := v.(map[string]any)
 		if baseIsObject && overIsObject {
-			out[k] = merge(bm, om)
+			out[k] = merge(bm, om, at)
 			continue
+		}
+		if at == nearMissesPointer {
+			if union, ok := unionNearMisses(out[k], v); ok {
+				out[k] = union
+				continue
+			}
 		}
 		out[k] = v
 	}

@@ -17,6 +17,7 @@ type Session struct {
 	TenantID   string
 	Room       string
 	ConfigHash string
+	ReleaseID  int64
 	Config     json.RawMessage
 	CreatedAt  time.Time
 
@@ -59,7 +60,14 @@ type SessionStore interface {
 }
 
 type Store struct {
-	db *sql.DB
+	db   *sql.DB
+	keys *KeyCipher
+}
+
+type Option func(*Store)
+
+func WithKeyCipher(k *KeyCipher) Option {
+	return func(s *Store) { s.keys = k }
 }
 
 const migration = `
@@ -72,7 +80,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 	created_at     INTEGER NOT NULL,
 	encryption_key TEXT NOT NULL DEFAULT '',
 	agent_refusal  TEXT NOT NULL DEFAULT '',
-	scribe_refusal TEXT NOT NULL DEFAULT ''
+	scribe_refusal TEXT NOT NULL DEFAULT '',
+	release_id     INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 CREATE TABLE IF NOT EXISTS egresses (
 	egress_id   TEXT PRIMARY KEY,
@@ -95,6 +104,7 @@ var addedColumns = map[string][]column{
 		{"encryption_key", "TEXT NOT NULL DEFAULT ''"},
 		{"agent_refusal", "TEXT NOT NULL DEFAULT ''"},
 		{"scribe_refusal", "TEXT NOT NULL DEFAULT ''"},
+		{"release_id", "INTEGER NOT NULL DEFAULT 0"},
 	},
 	"egresses": {
 		{"track_id", "TEXT NOT NULL DEFAULT ''"},
@@ -104,7 +114,7 @@ var addedColumns = map[string][]column{
 	},
 }
 
-func Open(ctx context.Context, path string) (*Store, error) {
+func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -126,7 +136,19 @@ func Open(ctx context.Context, path string) (*Store, error) {
 			return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
 		}
 	}
-	return &Store{db: db}, nil
+	s := &Store{db: db}
+	for _, opt := range opts {
+		opt(s)
+	}
+	if s.keys == nil {
+		if s.keys, err = EphemeralKeyCipher(); err != nil {
+			return nil, closing(db, err)
+		}
+	}
+	if err := s.keys.sealUnsealedKeys(ctx, db); err != nil {
+		return nil, closing(db, err)
+	}
+	return s, nil
 }
 
 func addMissingColumns(ctx context.Context, db *sql.DB, table string) error {
@@ -163,11 +185,15 @@ func closing(db *sql.DB, err error) error {
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at, encryption_key)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	sealed, err := s.keys.seal(sess.SessionID, sess.EncryptionKey)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at, encryption_key, release_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		sess.SessionID, sess.TenantID, sess.Room, sess.ConfigHash,
-		string(sess.Config), sess.CreatedAt.UnixMicro(), sess.EncryptionKey)
+		string(sess.Config), sess.CreatedAt.UnixMicro(), sealed, sess.ReleaseID)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternal, err, "store session")
 	}
@@ -177,19 +203,24 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT session_id, tenant_id, room, config_hash, config, created_at, encryption_key,
-		        agent_refusal, scribe_refusal
+		        agent_refusal, scribe_refusal, release_id
 		 FROM sessions WHERE session_id = ?`, sessionID)
 
 	var sess Session
-	var config, refusal, scribeRefusal string
+	var config, sealed, refusal, scribeRefusal string
 	var createdAt int64
 	switch err := row.Scan(&sess.SessionID, &sess.TenantID, &sess.Room,
-		&sess.ConfigHash, &config, &createdAt, &sess.EncryptionKey, &refusal, &scribeRefusal); {
+		&sess.ConfigHash, &config, &createdAt, &sealed, &refusal, &scribeRefusal, &sess.ReleaseID); {
 	case errors.Is(err, sql.ErrNoRows):
 		return Session{}, ErrNotFound
 	case err != nil:
 		return Session{}, errs.Wrap(errs.CodeInternal, err, "read session")
 	}
+	key, err := s.keys.open(sess.SessionID, sealed)
+	if err != nil {
+		return Session{}, err
+	}
+	sess.EncryptionKey = key
 
 	sess.Config = json.RawMessage(config)
 	if refusal != "" {
