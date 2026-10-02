@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Callable, Coroutine, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -33,7 +33,7 @@ class Effect(StrEnum):
 
 CONFIRMED = frozenset({Effect.EXTERNAL, Effect.BINDING})
 
-Run = Callable[[dict[str, Any]], Awaitable[str]]
+Run = Callable[[dict[str, Any]], Coroutine[Any, Any, str]]
 Deliver = Callable[[str, str], None]
 
 

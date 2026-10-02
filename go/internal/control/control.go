@@ -20,13 +20,12 @@ import (
 )
 
 type Service struct {
-	Catalog   *config.Catalog
-	Store     state.SessionStore
-	Transport transport.Transport
-	TURN      *turn.Fetcher
-	TokenTTL  time.Duration
-	Log       *slog.Logger
-
+	Catalog      *config.Catalog
+	Store        state.SessionStore
+	Transport    transport.Transport
+	TURN         *turn.Fetcher
+	TokenTTL     time.Duration
+	Log          *slog.Logger
 	WorkerSecret string
 }
 
@@ -65,8 +64,7 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	EncryptionKey string `json:"encryptionKey,omitempty"`
-
+	EncryptionKey   string `json:"encryptionKey,omitempty"`
 	AgentDispatchID string `json:"agentDispatchId,omitempty"`
 }
 
@@ -178,17 +176,16 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.write(w, http.StatusCreated, createSessionResponse{
-		SessionID:     sessionID,
-		ParticipantID: participantID,
-		Room:          sessionID,
-		ConfigHash:    resolved.Hash,
-		Config:        resolved.Document,
-		Token:         token.JWT,
-		URL:           token.URL,
-		ExpiresAt:     token.ExpiresAt,
-		ICEServers:    iceServers,
-		EncryptionKey: keyFor(resolved.Config, sess, req.Role),
-
+		SessionID:       sessionID,
+		ParticipantID:   participantID,
+		Room:            sessionID,
+		ConfigHash:      resolved.Hash,
+		Config:          resolved.Document,
+		Token:           token.JWT,
+		URL:             token.URL,
+		ExpiresAt:       token.ExpiresAt,
+		ICEServers:      iceServers,
+		EncryptionKey:   keyFor(resolved.Config, sess, req.Role),
 		AgentDispatchID: dispatchID,
 	})
 }
