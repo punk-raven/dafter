@@ -26,6 +26,51 @@ OUT_DIR=${OUT_DIR:-.loadtest-media/$(date +%Y%m%d-%H%M%S)}
 die() { printf 'loadtest-media: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+usage() {
+  cat <<'EOF'
+Usage: ROOMS=100 DURATION=60s scripts/loadtest-media.sh
+       RAMP="10 25 50" scripts/loadtest-media.sh
+
+N concurrent video calls through the control plane and the LiveKit SFU.
+Every session and token is minted by the control plane (POST /sessions,
+POST /sessions/{id}/join, agent off); real WebRTC participants are then
+driven into each room with `lk load-test` and held concurrently for DURATION.
+RAMP runs each size in turn and stops at the first size that fails.
+
+Requires the dev stack (make dev), curl, and lk fetched into go/bin by make tools.
+
+Knobs (environment, default in brackets):
+  ROOMS             concurrent rooms                              [100]
+  RAMP              sizes to run in turn instead of ROOMS         []
+  DURATION          hold once every room is up (60s, 2m, 1h30m)   [60s]
+  PUBLISHERS        video publishers per room                     [1]
+  SUBSCRIBERS       subscribers per room, each receives all       [1]
+  VIDEO_RESOLUTION  low, medium, high                             [low]
+  SIMULCAST         1 to publish simulcast layers                 [0]
+  LAYOUT            lk subscriber layout                          [speaker]
+  ROOMS_PER_SECOND  rooms launched per second                     [2]
+  LOSS_MAX_PCT      packet loss above which a size fails          [5]
+  MEM_MIN_MB        MemAvailable required to start a size         [3072]
+  MEM_FLOOR_MB      MemAvailable under which the run aborts       [1500]
+  DAFTER_URL        control plane                                 [http://127.0.0.1:8080]
+  LIVEKIT_URL       SFU signalling URL                            [ws://127.0.0.1:7880]
+  LIVEKIT_API_KEY, LIVEKIT_API_SECRET                             [devkey, secret]
+  PROM_URL          Prometheus, for the progress line             [http://127.0.0.1:9090]
+  TENANT, LANGUAGE, CHANNEL                                       [t_9c21a4be, en-IN, webrtc]
+  OUT_DIR           per-room logs and summaries                   [.loadtest-media/<timestamp>]
+  LK_BIN            lk binary to use instead of go/bin/lk
+
+A size passes when every room has all its tracks subscribed with no connect
+failures and overall packet loss is at most LOSS_MAX_PCT.
+
+Exit status: 0 every size held, 1 a size failed, 2 the memory floor aborted the run.
+EOF
+}
+
+case ${1:-} in
+  -h | --help) usage; exit 0 ;;
+esac
+
 duration_seconds() {
   local s=$1 total=0 n unit
   [[ $s =~ ^[0-9]+$ ]] && { echo "$s"; return; }
