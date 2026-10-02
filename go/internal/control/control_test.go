@@ -31,12 +31,11 @@ type stubTransport struct {
 	grant transport.Grant
 	err   error
 
-	mu        sync.Mutex
-	started   []transport.EgressRequest
-	stopped   []string
-	egressErr error
-	nextID    int
-
+	mu          sync.Mutex
+	started     []transport.EgressRequest
+	stopped     []string
+	egressErr   error
+	nextID      int
 	dispatched  []transport.AgentDispatch
 	dispatchErr error
 	recalled    []string
@@ -161,18 +160,17 @@ func serve(t *testing.T) *harness {
 }
 
 type sessionResponse struct {
-	SessionID     string           `json:"sessionId"`
-	ParticipantID string           `json:"participantId"`
-	Room          string           `json:"room"`
-	ConfigHash    string           `json:"configHash"`
-	Config        json.RawMessage  `json:"config"`
-	Token         string           `json:"token"`
-	URL           string           `json:"url"`
-	ExpiresAt     time.Time        `json:"expiresAt"`
-	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
-	EncryptionKey string           `json:"encryptionKey,omitempty"`
-
-	AgentDispatchID string `json:"agentDispatchId,omitempty"`
+	SessionID       string           `json:"sessionId"`
+	ParticipantID   string           `json:"participantId"`
+	Room            string           `json:"room"`
+	ConfigHash      string           `json:"configHash"`
+	Config          json.RawMessage  `json:"config"`
+	Token           string           `json:"token"`
+	URL             string           `json:"url"`
+	ExpiresAt       time.Time        `json:"expiresAt"`
+	ICEServers      []turn.ICEServer `json:"iceServers,omitempty"`
+	EncryptionKey   string           `json:"encryptionKey,omitempty"`
+	AgentDispatchID string           `json:"agentDispatchId,omitempty"`
 }
 
 func (h *harness) post(t *testing.T, body string) (int, []byte) {

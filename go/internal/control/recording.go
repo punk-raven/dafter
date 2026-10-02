@@ -77,13 +77,12 @@ type recordingResponse struct {
 }
 
 type sessionView struct {
-	SessionID  string          `json:"sessionId"`
-	Room       string          `json:"room"`
-	ConfigHash string          `json:"configHash"`
-	Config     json.RawMessage `json:"config"`
-	CreatedAt  time.Time       `json:"createdAt"`
-	Recordings []recordingView `json:"recordings"`
-
+	SessionID    string          `json:"sessionId"`
+	Room         string          `json:"room"`
+	ConfigHash   string          `json:"configHash"`
+	Config       json.RawMessage `json:"config"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	Recordings   []recordingView `json:"recordings"`
 	AgentRefusal json.RawMessage `json:"agentRefusal,omitempty"`
 }
 
