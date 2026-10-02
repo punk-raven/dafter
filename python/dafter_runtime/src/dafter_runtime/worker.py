@@ -48,8 +48,10 @@ from .control import ControlPlane, encryption
 from .cost import OutputTokens, load_prices, model_name, priced, provider_name, usage_payload
 from .delivery import Delivery
 from .events import TOPIC, SessionEvents
+from .listeners import is_worker
 from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
+from .scribing import Scribing
 from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
 from .switching import Switching
@@ -141,6 +143,19 @@ def captions_for(p: Plan, events: SessionEvents) -> Captions | None:
     if not p.config.transcription.live:
         return None
     return Captions(events.emit, source_of(p.pipeline.stt))
+
+
+def scribing_for(p: Plan, room: rtc.Room, events: SessionEvents, roster: Roster) -> Scribing | None:
+    if not p.config.scribe.enabled:
+        return None
+    scribing = Scribing(p.config.session_id, events.emit, roster.label)
+
+    def received(packet: rtc.DataPacket) -> None:
+        if packet.topic == TOPIC:
+            scribing.received(packet.data, is_worker(packet.participant))
+
+    room.on("data_received", received)
+    return scribing
 
 
 def current_trace_id() -> str | None:
@@ -341,18 +356,28 @@ async def entrypoint(ctx: JobContext) -> None:
         else None
     )
     caller: Callable[[], str | None]
+    sleep: Callable[[], None] | None = None
     if called is not None:
-        caller = called.addressee
-        registry = registry_for(
-            p, session, called.roster, caller, called.gate.sleep, delivery, switching
-        )
-        called.voice.before_answer = answering(switching, registry.heard)
-        called.voice.announce = events.addressed
+        caller, roster, sleep = called.addressee, called.roster, called.gate.sleep
     else:
         roster = Roster()
         follow(ctx.room, roster)
         caller = linked(session)
-        registry = registry_for(p, session, roster, caller, None, delivery, switching)
+    scribing = scribing_for(p, ctx.room, events, roster)
+    registry = registry_for(p, session, roster, caller, sleep, delivery, switching, scribing)
+    if called is not None:
+        called.voice.before_answer = answering(switching, registry.heard)
+        called.voice.announce = events.addressed
+    agent = Answering(
+        p.persona.instructions,
+        registry,
+        caller,
+        Acknowledgements.of(p.config.turn.interruption.backchannel),
+        delivery,
+        switching,
+    )
+    if scribing is not None:
+        scribing.briefed = lambda: agent.brief(scribing.context())
     watch(
         session,
         p,
@@ -364,14 +389,7 @@ async def entrypoint(ctx: JobContext) -> None:
         language=lambda: switching.language if switching.enabled else None,
     )
     await session.start(
-        agent=Answering(
-            p.persona.instructions,
-            registry,
-            caller,
-            Acknowledgements.of(p.config.turn.interruption.backchannel),
-            delivery,
-            switching,
-        ),
+        agent=agent,
         room=ctx.room,
         room_options=room_options(p, stages.tts.sample_rate, captions),
         record=False,

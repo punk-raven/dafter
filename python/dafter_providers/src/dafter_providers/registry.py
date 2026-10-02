@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Protocol
 
 from dafter_core.config import ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage
@@ -16,6 +16,12 @@ from livekit.agents import vad as lk_vad
 from . import openai_compat, sarvam, silero
 from .batch import BatchTranscriber
 
+AGENT_LLM = "/agent/pipeline/llm"
+
+
+class BuildLLM(Protocol):
+    def __call__(self, ref: ProviderRef, at: str = AGENT_LLM) -> lk_llm.LLM[Any]: ...
+
 
 @dataclass(frozen=True, slots=True)
 class Vendor:
@@ -25,7 +31,7 @@ class Vendor:
     detects_language: bool
     vad: Callable[[ProviderRef], lk_vad.VAD] | None
     stt: Callable[[ProviderRef, str | None, Turn, str | None], lk_stt.STT[Any]] | None
-    llm: Callable[[ProviderRef], lk_llm.LLM[Any]] | None
+    llm: BuildLLM | None
     tts: Callable[[ProviderRef, str], lk_tts.TTS[Any]] | None
     batch: Callable[[ProviderRef], BatchTranscriber] | None
     wants_prewarm: Callable[[ProviderRef], bool]
@@ -103,13 +109,14 @@ def batch_for(ref: ProviderRef | None) -> BatchTranscriber:
     return vendor.batch(ref)
 
 
-def vendor_for(ref: ProviderRef | None, stage: Stage) -> Vendor:
+def vendor_for(ref: ProviderRef | None, stage: Stage, at: str | None = None) -> Vendor:
+    base = at or f"/agent/pipeline/{stage}"
     if ref is None:
         raise DafterError(
             ErrorCode.INVALID_CONFIG,
-            f"the pipeline names no {stage} provider",
+            f"the session names no {stage} provider",
             stage=stage,
-            details=(f"at '/agent/pipeline/{stage}': required for a cascaded agent",),
+            details=(f"at '{base}': required",),
         )
     vendor = VENDORS.get(ref.provider)
     if vendor is None or getattr(vendor, str(stage)) is None:
@@ -118,6 +125,6 @@ def vendor_for(ref: ProviderRef | None, stage: Stage) -> Vendor:
             f"no {stage} provider named {ref.provider} is registered in this worker",
             stage=stage,
             provider=ProviderContext(ref.provider),
-            details=(f"at '/agent/pipeline/{stage}/provider': registered: {', '.join(VENDORS)}",),
+            details=(f"at '{base}/provider': registered: {', '.join(VENDORS)}",),
         )
     return vendor

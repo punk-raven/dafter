@@ -1,0 +1,11 @@
+.scribe-panel { display: flex; flex-direction: column; min-height: 0; }
+.scribe-head { display: flex; align-items: baseline; gap: 12px; padding: 4px 12px; border-bottom: 1px solid #1c1c1c; }
+.scribe-head strong { font-size: 13px; font-weight: 600; }
+.scribe-meta { font-size: 12px; color: #6b7280; }
+.scribe-quality { margin-left: auto; font-size: 12px; color: #a78bfa; font-family: monospace; }
+.scribe-body { flex: 1; overflow-y: auto; padding: 4px 12px 8px; font-size: 14px; line-height: 1.35; }
+.scribe-summary { color: #e5e7eb; margin: 2px 0 6px; overflow-wrap: anywhere; }
+.scribe-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; margin-top: 6px; }
+.scribe-list { margin: 2px 0 0; padding-left: 18px; color: #d1d5db; }
+.scribe-list li { overflow-wrap: anywhere; }
+.scribe-refusal { color: #f87171; font-size: 13px; margin: 4px 0; overflow-wrap: anywhere; }

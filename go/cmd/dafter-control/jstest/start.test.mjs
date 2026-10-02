@@ -9,7 +9,7 @@ const ROOM = 's_1a2b3c4d';
 const FORM = {
   tenant: 't_9c21a4be', language: 'hi', llm: 'groq/qwen/qwen3.8-27b', channel: 'webrtc', profile: '',
   resolution: '', 'noise-cancellation': '', 'privacy-mode': '', 'agent-mode': '',
-  'addressing-mode': '', 'agent-greeting': '', 'recording-layout': '', 'transcription-mode': '', role: 'participant',
+  'addressing-mode': '', 'agent-greeting': '', 'recording-layout': '', 'transcription-mode': '', 'scribe-mode': '', role: 'participant',
   'speech-fillers': false, 'speech-backchannel': true, 'speech-normalization': true,
 };
 
@@ -23,7 +23,7 @@ function element(id, form) {
 function page({ search = '', answers, form = FORM }) {
   const elements = new Map();
   const calls = [];
-  const run = load('agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js');
+  const run = load('agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js', 'client-scribe.js');
   const global = run('globalThis');
   Object.assign(global, {
     document: {

@@ -77,7 +77,7 @@ def test_each_endpoint_is_a_vendor_reached_with_the_key_it_is_bound_to(name: str
 
 def test_the_endpoint_table_binds_each_https_host_to_its_own_provider_key() -> None:
     table = openai_compat.ENDPOINTS
-    assert set(table) == {"groq", "openrouter", "google", "opencode_zen", "openai"}
+    assert set(table) == {"groq", "openrouter", "google", "opencode_zen", "openai", "nvidia"}
     assert table["groq"].base_url == GROQ
     assert table["openrouter"].base_url == "https://openrouter.ai/api/v1"
     assert table["google"].base_url == "https://generativelanguage.googleapis.com/v1beta/openai/"

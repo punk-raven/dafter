@@ -266,6 +266,29 @@ Resending the whole conversation every turn is the chat default and wrong for vo
 
 **Confirmed entities are marked so the agent stops re-asking** - one of the most trust-destroying behaviours - and commitments become durable obligations rather than sentences that scroll out of context. Structured memory caches with the prompt prefix, survives agent handoff as state, and is inspectable when the agent misbehaves. Compaction runs **between turns, never inside one**. **Retrieval** sits after turn confirmation and before generation, always parallel across sources (four sources at 150ms each run sequentially is 600ms of budget spent on plumbing) and always bounded by a hard deadline, with slow sources dropped from the merge and the omission recorded: a slow index degrades the answer, never the conversation.
 
+**What ships today is the background scribe**, a second agent in the session
+that never speaks (`scribe` in the config, pool `dafter-scribe`,
+`python/dafter_scribe`). It joins hidden and publishes no track, so it has
+no tile and appears in no recording, and it never hears audio: it reads the
+live captions the agent worker already publishes and the agent's taken
+notes, so it adds no speech-to-text. About every `summaryIntervalMs` it asks
+its LLM to rewrite structured notes of the whole call from the last notes and
+the new lines only (summary, decisions, action items with owner and due as
+said, open questions, names and numbers, who said what) and publishes them
+as `scribe.notes`. The agent worker re-briefs the agent with them between
+turns, marked as data and never as instructions, so a woken agent already
+knows the conversation, and answers `summarize_call` from them. The scribe
+also grades each agent reply with the stage 4 judge (`agent.turn_scored`,
+named by its caption segment, no content). When everyone has left it writes
+the minutes (`scribe.minutes`, with the session's cost: the agent's last
+usage plus its own), stores them through the control plane, logs one
+"session cost" line, and starts the transcript after the call once the
+track recordings have finished. Its LLM is not latency bound, so it is a
+config value that a profile can point at a free model. Everything it does is
+off the path: a slow or failed rewrite leaves the last notes standing, a
+failed judge publishes an error code, and a failed dispatch leaves the call
+without notes but never fails it.
+
 ### Agent behaviours
 
 The things that make an agent feel human are cross-cutting, so they are composable middleware rather than a monolith inside the agent class.
@@ -295,6 +318,15 @@ Configured by `agent.speech`. `normalization: platform` (the default) runs the w
 Tools carry two classifications. **`latency_class`** governs delay hiding: `fast` (<300ms) runs inline, `slow` engages filler and keeps the floor, `async` acknowledges and completes off-session with an event. **`effect_class`** governs authorization, enforced in code and never left to the prompt: `read` and `draft` run automatically, `external` requires an explicit confirmation turn, and `binding` requires confirmation plus a role check. An effect-class gate is a guarantee where a prompt instruction is only a suggestion, and it is also the injection defence: a user saying "ignore your instructions and send it" still hits a code path that requires confirmation.
 
 **Design tools for voice, not chat.** Voice punishes every round trip, so prefer one coarse, purpose-built call over a chain of fine-grained ones, and return the minimum (`{status, next_appointment}`), not the whole record.
+
+**What ships today** is one registry (`dafter_runtime/tools.py`) where each
+tool declares both classes and the registry enforces them: `current_time`,
+`who_is_here` and, when the agent waits to be called, `go_quiet` (all fast,
+read); and, in a session with a scribe, `summarize_call` (fast, read: the
+scribe's latest notes, a local lookup that never waits on an LLM),
+`take_note` (fast, draft: the note is published as `agent.note_taken` and
+lands in the notes and minutes) and `list_notes` (fast, read). Calls run
+one at a time.
 
 ### Language capabilities
 
@@ -424,6 +456,19 @@ every turn states `always`. `on_device` is the mode that keeps speech local unti
 spotted; it is declared in the schema and refused by the worker until a local
 spotter exists. Events about the agent's addressing carry who woke it as an
 opaque participant id and never what anyone said.
+
+**The scribe reads the whole call, so it is gated like transcription.** It
+sends what everyone said to its own LLM provider, which may be a different
+vendor from the pipeline's, and the control plane keeps the minutes. So it
+needs its own consent artifact (`scribe.consentArtifactId`; consent to
+captions is not consent to an LLM reading the call and minutes being kept),
+a sealed session refuses it, and it needs transcription `live` or `both`,
+since it reads those captions: cross-field rules on both halves. Under
+`trusted_agent` it fetches the session key the way the agent does, from
+`POST /sessions/{id}/scribe/key`, so it can read the encrypted data channel.
+Its notes and minutes carry call content like captions: published only to the
+call's own participants, never logged, and the stored minutes read back only
+with the worker credential.
 
 **Envelope encryption.** Each recording gets a unique data key (fast, local); the data key is wrapped by the tenant master key and stored beside the object. This buys per-object isolation, cheap bulk crypto, revocation by disabling the master key, and rotation without re-encrypting media.
 

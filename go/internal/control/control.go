@@ -40,10 +40,14 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
+	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
 	mux.HandleFunc("POST /sessions/{sessionID}/transcripts", s.storeTranscript)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts", s.listTranscripts)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
+	mux.HandleFunc("POST /sessions/{sessionID}/minutes", s.storeMinutes)
+	mux.HandleFunc("GET /sessions/{sessionID}/minutes", s.readMinutes)
 	return mux
 }
 
@@ -68,8 +72,9 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	EncryptionKey   string `json:"encryptionKey,omitempty"`
-	AgentDispatchID string `json:"agentDispatchId,omitempty"`
+	EncryptionKey    string `json:"encryptionKey,omitempty"`
+	AgentDispatchID  string `json:"agentDispatchId,omitempty"`
+	ScribeDispatchID string `json:"scribeDispatchId,omitempty"`
 }
 
 func mintEncryptionKey() (string, error) {
@@ -157,6 +162,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	scribeDispatchID := s.dispatchScribe(r.Context(), sess, resolved.Config)
 
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sessionID,
@@ -180,17 +186,18 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.write(w, http.StatusCreated, createSessionResponse{
-		SessionID:       sessionID,
-		ParticipantID:   participantID,
-		Room:            sessionID,
-		ConfigHash:      resolved.Hash,
-		Config:          resolved.Document,
-		Token:           token.JWT,
-		URL:             token.URL,
-		ExpiresAt:       token.ExpiresAt,
-		ICEServers:      iceServers,
-		EncryptionKey:   keyFor(resolved.Config, sess, req.Role),
-		AgentDispatchID: dispatchID,
+		SessionID:        sessionID,
+		ParticipantID:    participantID,
+		Room:             sessionID,
+		ConfigHash:       resolved.Hash,
+		Config:           resolved.Document,
+		Token:            token.JWT,
+		URL:              token.URL,
+		ExpiresAt:        token.ExpiresAt,
+		ICEServers:       iceServers,
+		EncryptionKey:    keyFor(resolved.Config, sess, req.Role),
+		AgentDispatchID:  dispatchID,
+		ScribeDispatchID: scribeDispatchID,
 	})
 }
 
