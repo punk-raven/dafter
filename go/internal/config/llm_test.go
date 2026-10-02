@@ -102,7 +102,7 @@ func TestResolveRefusesAnOverrideThatNamesOrTunesTheRoute(t *testing.T) {
 		},
 		"points the route at another host": {
 			groqRoute, `{"agent": {"pipeline": {"llm": {"credentialRef": "secret://tenants/t_9c21a4be/dafter/worker-secret"}}}}`,
-			"'/agent/pipeline/llm/credentialRef': the " + groqRoute + " LLM route pins this",
+			"'/agent/pipeline/llm/credentialRef': names the endpoint or credential a stage uses",
 		},
 	}
 	for name, tc := range cases {
