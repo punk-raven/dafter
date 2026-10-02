@@ -77,7 +77,7 @@ def test_each_endpoint_is_a_vendor_reached_with_the_key_it_is_bound_to(name: str
 
 def test_the_endpoint_table_binds_each_https_host_to_its_own_provider_key() -> None:
     table = openai_compat.ENDPOINTS
-    assert set(table) == {"groq", "openrouter", "google"}
+    assert set(table) == {"groq", "openrouter", "google", "opencode_zen", "openai"}
     assert table["groq"].base_url == GROQ
     assert table["openrouter"].base_url == "https://openrouter.ai/api/v1"
     assert table["google"].base_url == "https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -129,10 +129,14 @@ def test_an_unstated_effort_is_left_to_the_endpoint() -> None:
     assert not isinstance(built(ref())._opts.reasoning_effort, str)
 
 
+def table_names() -> set[str]:
+    return set(openai_compat.ENDPOINTS)
+
+
 def test_the_vendor_serves_llm_only_in_the_languages_it_declares() -> None:
     vendor = vendor_for(ref(), Stage.LLM)
     assert vendor.languages == frozenset({"hi", "hi-IN", "en-IN", "kn-IN", "mr-IN", "te-IN"})
-    assert set(VENDORS) == {"sarvam", "silero", "groq", "openrouter", "google"}
+    assert set(VENDORS) == {"sarvam", "silero", *table_names()}
     with pytest.raises(DafterError) as caught:
         vendor_for(ref(), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
