@@ -19,6 +19,20 @@ var crossFieldRules = []crossFieldRule{
 		because: "a sealed session cannot have an agent dispatched into it, because an agent that transcribes or responds must decrypt the audio",
 	},
 	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Agent.Addressing.WaitsToBeCalled() && c.Agent.Name == ""
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/name",
+		because: "an agent that stays quiet until it is called by name needs a name to be called by",
+	},
+	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.Agent.NearMissIsItsName() },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/addressing/nearMisses",
+		because: "a near miss is a word that must never wake the agent, so one that is also its name or an alias contradicts itself",
+	},
+	{
 		broken:  func(c *ResolvedSessionConfig) bool { return c.Recording.Enabled && c.Recording.ConsentArtifactID == "" },
 		code:    errs.CodeConsentRequired,
 		pointer: "/recording/consentArtifactId",
@@ -83,6 +97,14 @@ var crossFieldRules = []crossFieldRule{
 		code:    errs.CodePrivacyModeForbids,
 		pointer: "/recording/enabled",
 		because: "every recording layout is a server-side egress, and under end-to-end encryption the media server and its egress see only ciphertext, so this session is recorded client-side or not at all",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Turn.Strategy == TurnProviderEndpointing && c.Turn.LocalVADDecidesTurn()
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/turn/localVadEnabled",
+		because: "under provider endpointing the recognizer's own VAD decides the turn, so a local VAD deciding it too runs two detectors on one stream; a local VAD that only catches barge-in is turn.interruption.localVadEnabled",
 	},
 }
 

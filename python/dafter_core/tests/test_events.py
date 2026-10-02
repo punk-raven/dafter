@@ -124,6 +124,7 @@ def vector(name: str) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("name", "typ"),
     [
+        ("agent-state-changed.json", EventType.AGENT_STATE_CHANGED),
         ("agent-turn-metrics.json", EventType.AGENT_TURN_METRICS),
         ("session-usage.json", EventType.SESSION_USAGE),
     ],
@@ -155,7 +156,30 @@ MUTATIONS: list[tuple[str, str, Callable[[dict[str, Any]], object]]] = [
         lambda p: _item(p, 0).update(provider="Sarvam"),
     ),
     ("missing final", "session-usage.json", lambda p: p.pop("final")),
+    (
+        "awake without who woke it",
+        "agent-state-changed.json",
+        lambda p: (p.pop("wokenBy"), p.pop("wokenVia")),
+    ),
+    ("dormant yet woken", "agent-state-changed.json", lambda p: p.update(dormant=True)),
+    ("woken without dormant", "agent-state-changed.json", lambda p: p.pop("dormant")),
+    ("woken by a name", "agent-state-changed.json", lambda p: p.update(wokenBy="Asha")),
+    ("woken without how", "agent-state-changed.json", lambda p: p.pop("wokenVia")),
+    ("unknown wake source", "agent-state-changed.json", lambda p: p.update(wokenVia="wake_word")),
 ]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"state": "listening", "dormant": True},
+        {"state": "listening", "dormant": False, "wokenBy": "p_4b81e0d7", "wokenVia": "manual"},
+    ],
+)
+def test_a_dormant_agent_names_nobody(payload: dict[str, Any]) -> None:
+    doc = vector("agent-state-changed.json")
+    doc["payload"] = payload
+    assert parse_event(json.dumps(doc)).payload == payload
 
 
 @pytest.mark.parametrize(("name", "file", "mutate"), MUTATIONS, ids=[m[0] for m in MUTATIONS])

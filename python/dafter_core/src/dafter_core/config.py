@@ -5,6 +5,7 @@ from typing import Any
 
 from . import schemas
 from .enums import (
+    AddressingMode,
     AgentMode,
     Channel,
     EgressLayout,
@@ -73,6 +74,7 @@ class Pipeline:
 @dataclass(frozen=True, slots=True)
 class Interruption:
     enabled: bool = True
+    local_vad_enabled: bool = False
     min_duration_ms: int = 0
     min_words: int = 0
     false_interruption_timeout_ms: int = 0
@@ -82,6 +84,7 @@ class Interruption:
     def from_dict(cls, d: dict[str, Any]) -> Interruption:
         return cls(
             enabled=d.get("enabled", True),
+            local_vad_enabled=d.get("localVadEnabled", False),
             min_duration_ms=d.get("minDurationMs", 0),
             min_words=d.get("minWords", 0),
             false_interruption_timeout_ms=d.get("falseInterruptionTimeoutMs", 0),
@@ -90,12 +93,24 @@ class Interruption:
 
 
 @dataclass(frozen=True, slots=True)
+class PreemptiveGeneration:
+    enabled: bool = True
+    tts: bool = False
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> PreemptiveGeneration:
+        return cls(enabled=d.get("enabled", True), tts=d.get("tts", False))
+
+
+@dataclass(frozen=True, slots=True)
 class Turn:
     strategy: TurnStrategy
     silence_ms: int = 0
     min_speech_ms: int = 0
     endpointing_delay_ms: int = 0
+    endpointing_max_delay_ms: int | None = None
     local_vad_enabled: bool = True
+    preemptive_generation: PreemptiveGeneration = field(default_factory=PreemptiveGeneration)
     interruption: Interruption = field(default_factory=Interruption)
 
     @classmethod
@@ -105,8 +120,33 @@ class Turn:
             silence_ms=d.get("silenceMs", 0),
             min_speech_ms=d.get("minSpeechMs", 0),
             endpointing_delay_ms=d.get("endpointingDelayMs", 0),
+            endpointing_max_delay_ms=d.get("endpointingMaxDelayMs"),
             local_vad_enabled=d.get("localVadEnabled", True),
+            preemptive_generation=PreemptiveGeneration.from_dict(
+                d.get("preemptiveGeneration") or {}
+            ),
             interruption=Interruption.from_dict(d.get("interruption") or {}),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Addressing:
+    mode: AddressingMode = AddressingMode.ALWAYS
+    aliases: tuple[str, ...] = ()
+    near_misses: tuple[str, ...] = ()
+    follow_up_window_ms: int = 20000
+
+    @property
+    def waits_to_be_called(self) -> bool:
+        return self.mode is not AddressingMode.ALWAYS
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Addressing:
+        return cls(
+            mode=AddressingMode(d.get("mode", AddressingMode.ALWAYS)),
+            aliases=tuple(d.get("aliases", ())),
+            near_misses=tuple(d.get("nearMisses", ())),
+            follow_up_window_ms=d.get("followUpWindowMs", 20000),
         )
 
 
@@ -119,6 +159,12 @@ class Agent:
     mode: AgentMode = AgentMode.CASCADED
     persona_ref: str | None = None
     pipeline: Pipeline | None = None
+    addressing: Addressing = field(default_factory=Addressing)
+
+    @property
+    def near_miss_is_its_name(self) -> bool:
+        spellings = {self.name, *self.addressing.aliases}
+        return any(m in spellings for m in self.addressing.near_misses)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Agent:
@@ -130,6 +176,7 @@ class Agent:
             mode=AgentMode(d.get("mode", AgentMode.CASCADED)),
             persona_ref=d.get("personaRef"),
             pipeline=Pipeline.from_dict(d["pipeline"]) if d.get("pipeline") else None,
+            addressing=Addressing.from_dict(d.get("addressing") or {}),
         )
 
 
@@ -307,6 +354,7 @@ class Recording:
 class Budgets:
     turn_gap_p50_ms: int
     turn_gap_p95_ms: int
+    barge_in_stop_p50_ms: int = 300
     max_session_cost_usd: float | None = None
 
     @classmethod
@@ -314,6 +362,7 @@ class Budgets:
         return cls(
             turn_gap_p50_ms=d["turnGapP50Ms"],
             turn_gap_p95_ms=d["turnGapP95Ms"],
+            barge_in_stop_p50_ms=d.get("bargeInStopP50Ms", 300),
             max_session_cost_usd=d.get("maxSessionCostUsd"),
         )
 

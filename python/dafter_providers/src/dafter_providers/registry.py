@@ -13,7 +13,7 @@ from livekit.agents import stt as lk_stt
 from livekit.agents import tts as lk_tts
 from livekit.agents import vad as lk_vad
 
-from . import openai_compat, sarvam
+from . import openai_compat, sarvam, silero
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +22,7 @@ class Vendor:
     languages: frozenset[str]
     native_endpointing: bool
     vad: Callable[[ProviderRef], lk_vad.VAD] | None
-    stt: Callable[[ProviderRef, str, Turn], lk_stt.STT[Any]] | None
+    stt: Callable[[ProviderRef, str, Turn, str | None], lk_stt.STT[Any]] | None
     llm: Callable[[ProviderRef], lk_llm.LLM[Any]] | None
     tts: Callable[[ProviderRef, str], lk_tts.TTS[Any]] | None
     wants_prewarm: Callable[[ProviderRef], bool]
@@ -52,6 +52,17 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
             tts=None,
             wants_prewarm=openai_compat.wants_prewarm,
             classify=openai_compat.classify,
+        ),
+        silero.NAME: Vendor(
+            name=silero.NAME,
+            languages=frozenset(),
+            native_endpointing=False,
+            vad=silero.build_vad,
+            stt=None,
+            llm=None,
+            tts=None,
+            wants_prewarm=lambda _: False,
+            classify=silero.classify,
         ),
     }
 )

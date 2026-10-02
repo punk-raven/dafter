@@ -253,6 +253,29 @@ func TestValidateRefusesServerSideRecordingUnderEndToEndEncryption(t *testing.T)
 	}
 }
 
+func TestValidateRefusesALocalVADDecidingAProviderEndpointedTurn(t *testing.T) {
+	t.Parallel()
+	off, on := false, true
+	for _, stated := range []*bool{nil, &on} {
+		c := validConfig(t)
+		c.Turn = config.Turn{Strategy: config.TurnProviderEndpointing, LocalVADEnabled: stated}
+		var de *errs.Error
+		err := c.Validate()
+		if !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig || !strings.Contains(de.Details[0], "/turn/localVadEnabled") {
+			t.Errorf("localVadEnabled %v: want a refusal at /turn/localVadEnabled, got %v", stated, err)
+		}
+	}
+	c := validConfig(t)
+	c.Turn = config.Turn{
+		Strategy:        config.TurnProviderEndpointing,
+		LocalVADEnabled: &off,
+		Interruption:    &config.Interruption{LocalVADEnabled: &on},
+	}
+	if err := c.Validate(); err != nil {
+		t.Errorf("a local VAD that only catches barge-in was refused: %v", err)
+	}
+}
+
 func TestKeyDisclosureFollowsThePrivacyModeAndTheRole(t *testing.T) {
 	t.Parallel()
 	humans := []config.Role{config.RoleParticipant, config.RolePresenter, config.RoleObserver}
@@ -378,6 +401,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"Channel", ids, []string{"$defs", "Channel", "enum"}, schema.Names(config.AllChannels)},
 		{"PrivacyMode", cfg, []string{"properties", "privacyMode", "enum"}, schema.Names(config.AllPrivacyModes)},
 		{"AgentMode", cfg, []string{"properties", "agent", "properties", "mode", "enum"}, schema.Names(config.AllAgentModes)},
+		{"AddressingMode", cfg, []string{"$defs", "Addressing", "properties", "mode", "enum"}, schema.Names(config.AllAddressingModes)},
 		{"TurnStrategy", cfg, []string{"$defs", "Turn", "properties", "strategy", "enum"}, schema.Names(config.AllTurnStrategies)},
 		{"VideoCodec", cfg, []string{"$defs", "VideoProfile", "properties", "codec", "enum"}, schema.Names(config.AllVideoCodecs)},
 		{"VideoResolution", cfg, []string{"$defs", "VideoProfile", "properties", "resolution", "enum"}, schema.Names(config.AllVideoResolutions)},

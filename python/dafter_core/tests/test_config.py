@@ -343,3 +343,43 @@ def test_pipeline_fields_are_assigned_by_name() -> None:
         c.agent.pipeline.realtime is not None
         and c.agent.pipeline.realtime.provider == "realtime_vendor"
     )
+
+
+@pytest.mark.parametrize("stated", [{"localVadEnabled": True}, {}])
+def test_provider_endpointing_refuses_a_local_vad_deciding_the_turn(
+    stated: dict[str, Any],
+) -> None:
+    err = refuse(doc(turn={"strategy": "provider_endpointing", **stated}))
+    assert err.code is ErrorCode.INVALID_CONFIG
+    assert "/turn/localVadEnabled" in err.details[0]
+
+
+def test_provider_endpointing_takes_a_local_vad_that_only_catches_barge_in() -> None:
+    c = parse(
+        doc(
+            turn={
+                "strategy": "provider_endpointing",
+                "localVadEnabled": False,
+                "interruption": {"localVadEnabled": True},
+            }
+        )
+    )
+    assert (c.turn.local_vad_enabled, c.turn.interruption.local_vad_enabled) == (False, True)
+    assert parse(doc()).turn.interruption.local_vad_enabled is False
+
+
+def test_preemptive_generation_defaults_to_the_reply_without_its_speech() -> None:
+    pg = parse(doc()).turn.preemptive_generation
+    assert (pg.enabled, pg.tts) == (True, False)
+    stated = parse(doc(turn={"strategy": "auto", "preemptiveGeneration": {"tts": True}}))
+    assert stated.turn.preemptive_generation.tts is True
+    assert refuse(doc(turn={"strategy": "auto", "preemptiveGeneration": {"llm": True}})).code is (
+        ErrorCode.INVALID_CONFIG
+    )
+
+
+def test_the_barge_in_stop_budget_defaults_to_the_schema_value() -> None:
+    assert parse(doc()).budgets.barge_in_stop_p50_ms == 300
+    stated = doc(budgets={"turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 250})
+    assert parse(stated).budgets.barge_in_stop_p50_ms == 250
+    assert refuse(doc(budgets={"turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 0}))

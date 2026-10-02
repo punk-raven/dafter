@@ -1,5 +1,6 @@
 from . import enums, schemas
 from .enums import (
+    AddressingMode,
     AgentMode,
     AgentState,
     Channel,
@@ -19,9 +20,11 @@ from .enums import (
     UsageUnit,
     VideoCodec,
     VideoResolution,
+    WakeSource,
 )
 
 __all__ = [
+    "AddressingMode",
     "AgentMode",
     "AgentState",
     "Channel",
@@ -41,6 +44,7 @@ __all__ = [
     "UsageUnit",
     "VideoCodec",
     "VideoResolution",
+    "WakeSource",
     "enums",
     "schemas",
 ]

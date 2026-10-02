@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 
 	"github.com/punk-raven/dafter/go/internal/errs"
 	"github.com/punk-raven/dafter/go/internal/schema"
@@ -32,13 +33,37 @@ type Residency struct {
 }
 
 type Agent struct {
-	Enabled    bool      `json:"enabled"`
-	Pool       string    `json:"pool"`
-	Name       string    `json:"name,omitempty"`
-	Greets     *bool     `json:"greets,omitempty"`
-	Mode       AgentMode `json:"mode,omitempty"`
-	PersonaRef string    `json:"personaRef,omitempty"`
-	Pipeline   *Pipeline `json:"pipeline,omitempty"`
+	Enabled    bool        `json:"enabled"`
+	Pool       string      `json:"pool"`
+	Name       string      `json:"name,omitempty"`
+	Greets     *bool       `json:"greets,omitempty"`
+	Mode       AgentMode   `json:"mode,omitempty"`
+	PersonaRef string      `json:"personaRef,omitempty"`
+	Pipeline   *Pipeline   `json:"pipeline,omitempty"`
+	Addressing *Addressing `json:"addressing,omitempty"`
+}
+
+type Addressing struct {
+	Mode             AddressingMode `json:"mode"`
+	Aliases          []string       `json:"aliases,omitempty"`
+	NearMisses       []string       `json:"nearMisses,omitempty"`
+	FollowUpWindowMs int            `json:"followUpWindowMs,omitempty"`
+}
+
+func (a *Addressing) WaitsToBeCalled() bool {
+	return a != nil && a.Mode != AddressingAlways
+}
+
+func (a Agent) NearMissIsItsName() bool {
+	if a.Addressing == nil {
+		return false
+	}
+	for _, miss := range a.Addressing.NearMisses {
+		if miss == a.Name || slices.Contains(a.Addressing.Aliases, miss) {
+			return true
+		}
+	}
+	return false
 }
 
 type ProviderRef struct {
@@ -59,18 +84,26 @@ type Pipeline struct {
 }
 
 type Turn struct {
-	Strategy           TurnStrategy `json:"strategy"`
-	SilenceMs          int          `json:"silenceMs,omitempty"`
-	MinSpeechMs        int          `json:"minSpeechMs,omitempty"`
-	EndpointingDelayMs int          `json:"endpointingDelayMs,omitempty"`
+	Strategy              TurnStrategy `json:"strategy"`
+	SilenceMs             int          `json:"silenceMs,omitempty"`
+	MinSpeechMs           int          `json:"minSpeechMs,omitempty"`
+	EndpointingDelayMs    int          `json:"endpointingDelayMs,omitempty"`
+	EndpointingMaxDelayMs int          `json:"endpointingMaxDelayMs,omitempty"`
 
 	LocalVADEnabled *bool `json:"localVadEnabled,omitempty"`
 
-	Interruption *Interruption `json:"interruption,omitempty"`
+	PreemptiveGeneration *PreemptiveGeneration `json:"preemptiveGeneration,omitempty"`
+	Interruption         *Interruption         `json:"interruption,omitempty"`
+}
+
+type PreemptiveGeneration struct {
+	Enabled *bool `json:"enabled,omitempty"`
+	TTS     *bool `json:"tts,omitempty"`
 }
 
 type Interruption struct {
 	Enabled                    *bool `json:"enabled,omitempty"`
+	LocalVADEnabled            *bool `json:"localVadEnabled,omitempty"`
 	MinDurationMs              int   `json:"minDurationMs,omitempty"`
 	MinWords                   int   `json:"minWords,omitempty"`
 	FalseInterruptionTimeoutMs int   `json:"falseInterruptionTimeoutMs,omitempty"`
@@ -102,6 +135,10 @@ type AudioProfile struct {
 	DTX               *bool             `json:"dtx,omitempty"`
 	EchoCancellation  *bool             `json:"echoCancellation,omitempty"`
 	NoiseCancellation NoiseCancellation `json:"noiseCancellation,omitempty"`
+}
+
+func (t Turn) LocalVADDecidesTurn() bool {
+	return t.LocalVADEnabled == nil || *t.LocalVADEnabled
 }
 
 func (c *ResolvedSessionConfig) VideoEnabled() bool {
@@ -196,6 +233,7 @@ type Recording struct {
 type Budgets struct {
 	TurnGapP50Ms      int     `json:"turnGapP50Ms"`
 	TurnGapP95Ms      int     `json:"turnGapP95Ms"`
+	BargeInStopP50Ms  int     `json:"bargeInStopP50Ms,omitempty"`
 	MaxSessionCostUSD float64 `json:"maxSessionCostUsd,omitempty"`
 }
 

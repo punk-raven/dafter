@@ -33,11 +33,19 @@ class Script:
         )
 
 
+_VOICE_RULES = (
+    "Open every reply with one short sentence of five to eight words, so it can be spoken "
+    "at once, and keep the whole reply to one or two short spoken sentences. Never use "
+    "markdown, lists, headings, emojis or symbols that cannot be spoken aloud. Write numbers as "
+    "words. "
+    "If the caller only says something like hmm or okay, reply with a very short acknowledgement."
+)
 _HINDI_VOICE_RULES = (
     "You are speaking on a live voice call. Reply only in Hindi, written in Devanagari script. "
-    "Keep every reply to one or two short spoken sentences. Never use markdown, lists, "
-    "headings, emojis or symbols that cannot be spoken aloud. Write numbers as words. "
-    "If the caller only says something like hmm or okay, reply with a very short acknowledgement."
+    + _VOICE_RULES
+)
+_ENGLISH_VOICE_RULES = (
+    "You are speaking on a live voice call. Reply only in English. " + _VOICE_RULES
 )
 _GENERAL = "a friendly general assistant"
 _SUPPORT = (
@@ -61,7 +69,33 @@ SCRIPTS: dict[tuple[str, str], Script] = {
         greeting="नमस्ते! मैं सहायता टीम से बात कर रही हूँ। बताइए, क्या समस्या है?",
         introduction="नमस्ते! मैं {name}, सहायता टीम से बात कर रही हूँ। बताइए, क्या समस्या है?",
     ),
+    (DEFAULT_REF, "en"): Script(
+        role=_GENERAL,
+        rules=_ENGLISH_VOICE_RULES,
+        greeting="Hello! How can I help you today?",
+        introduction="Hello! I'm {name}. How can I help you today?",
+    ),
+    ("persona://support/v3", "en"): Script(
+        role=_SUPPORT,
+        rules=_ENGLISH_VOICE_RULES,
+        greeting="Hello, this is the support team. Tell me, what is the problem?",
+        introduction="Hello, this is {name} from the support team. Tell me, what is the problem?",
+    ),
 }
+
+
+def called_by_name(persona: Persona) -> Persona:
+    return Persona(
+        instructions=(
+            f"{persona.instructions}\n\nYou are in a call with several people and you speak "
+            "only when one of them calls you by your name. Each message starts with who "
+            "spoke in square brackets: lines marked 'to you' are the person talking to "
+            "you, who is the one you answer; lines marked 'not to you' are what others said "
+            "in the call just before, which you may use as context but never answer or quote. "
+            "Call go_quiet when the person talking to you is done or asks you to be quiet."
+        ),
+        greeting=persona.greeting,
+    )
 
 
 def base_language(tag: str) -> str:

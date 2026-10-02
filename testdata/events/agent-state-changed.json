@@ -1,0 +1,16 @@
+{
+  "eventId": "e_7c2d9e4f1a3b5c6d8e9f0a1b2c3d4e5f",
+  "type": "agent.state_changed",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 2,
+  "occurredAt": "2026-09-24T10:00:01.207Z",
+  "payload": {
+    "state": "thinking",
+    "previousState": "listening",
+    "dormant": false,
+    "wokenBy": "p_4b81e0d7",
+    "wokenVia": "name"
+  }
+}

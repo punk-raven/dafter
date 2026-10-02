@@ -4,14 +4,23 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from dafter_core.config import Pipeline, ProviderRef, ResolvedSessionConfig, Turn, parse
-from dafter_core.enums import AgentMode, EncryptionMode, ErrorCode, Stage, TurnStrategy
+from dafter_core.enums import (
+    AddressingMode,
+    AgentMode,
+    EncryptionMode,
+    ErrorCode,
+    Stage,
+    TurnStrategy,
+)
 from dafter_core.errors import DafterError
 from dafter_core.hashing import hash_document
 from dafter_providers import Vendor, vendor_for
+from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
 
-from .personas import Persona, persona_for
+from .personas import Persona, base_language, called_by_name, persona_for
 
-TurnDetection = Literal["stt", "manual"]
+TurnDetection = Literal["stt", "semantic", "manual"]
+TURN_DETECTOR_LANGUAGES = frozenset(LOCAL_LANGUAGES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,9 +30,21 @@ class Plan:
     stt: Vendor
     llm: Vendor
     tts: Vendor
+    vad: Vendor | None
     turn_detection: TurnDetection
     turn_handling: dict[str, Any]
     persona: Persona
+    stt_prompt: str | None = None
+
+    @property
+    def called_by_name(self) -> bool:
+        return self.config.agent.addressing.waits_to_be_called
+
+    @property
+    def voice_turn_handling(self) -> dict[str, Any]:
+        if self.called_by_name:
+            return {**self.turn_handling, "turn_detection": "manual"}
+        return self.turn_handling
 
     @property
     def opening(self) -> str | None:
@@ -64,6 +85,20 @@ def _check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
         )
 
 
+RUNS_ADDRESSING = frozenset({AddressingMode.ALWAYS, AddressingMode.TRANSCRIPT})
+
+
+def _check_addressing(cfg: ResolvedSessionConfig) -> None:
+    mode = cfg.agent.addressing.mode
+    if mode not in RUNS_ADDRESSING:
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "this worker cannot wait to be called by name in this addressing mode",
+            "/agent/addressing/mode",
+            f"{mode} is not built in this worker; always and transcript are",
+        )
+
+
 def _check_session(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool) -> Pipeline:
     if not cfg.agent.enabled:
         raise _refuse(
@@ -87,6 +122,7 @@ def _check_session(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool) ->
             "half_cascade and speech_to_speech need a realtime provider",
         )
     _check_encryption(cfg, fetches_keys)
+    _check_addressing(cfg)
     if cfg.agent.pipeline is None:
         raise _refuse(
             ErrorCode.INVALID_CONFIG,
@@ -109,12 +145,44 @@ def _vendor(ref: ProviderRef | None, stage: Stage, language: str) -> Vendor:
     return vendor
 
 
-def turn_detection(turn: Turn, stt: Vendor) -> TurnDetection:
+def local_vad(pipeline: Pipeline, turn: Turn, detection: TurnDetection) -> Vendor | None:
+    if detection == "semantic":
+        why = "the turn detector reads the local VAD's speech boundaries"
+    elif turn.interruption.local_vad_enabled:
+        why = "turn.interruption.localVadEnabled needs one"
+    else:
+        return None
+    if pipeline.vad is None:
+        raise _refuse(
+            ErrorCode.INVALID_CONFIG,
+            "the session needs a local VAD and the pipeline names none",
+            "/agent/pipeline/vad",
+            why,
+        )
+    return vendor_for(pipeline.vad, Stage.VAD)
+
+
+def _semantic(turn: Turn, stt: Vendor, language: str) -> TurnDetection | None:
+    if base_language(language) not in TURN_DETECTOR_LANGUAGES:
+        return "stt" if stt.native_endpointing else None
+    if not turn.local_vad_enabled:
+        raise _refuse(
+            ErrorCode.INVALID_CONFIG,
+            "the turn detector decides the turn with a local VAD, and the session turns it off",
+            "/turn/localVadEnabled",
+            "must be true under the semantic strategy",
+        )
+    return "semantic"
+
+
+def turn_detection(turn: Turn, stt: Vendor, language: str) -> TurnDetection:
     strategy = turn.strategy
     if strategy is TurnStrategy.AUTO:
         strategy = TurnStrategy.PROVIDER_ENDPOINTING if stt.native_endpointing else TurnStrategy.VAD
     if strategy is TurnStrategy.MANUAL:
         return "manual"
+    if strategy is TurnStrategy.SEMANTIC and (detection := _semantic(turn, stt, language)):
+        return detection
     if strategy is TurnStrategy.PROVIDER_ENDPOINTING and stt.native_endpointing:
         if turn.local_vad_enabled:
             raise _refuse(
@@ -132,13 +200,26 @@ def turn_detection(turn: Turn, stt: Vendor) -> TurnDetection:
     )
 
 
+def endpointing(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "mode": "dynamic" if detection == "semantic" else "fixed",
+        "min_delay": turn.endpointing_delay_ms / 1000,
+    }
+    if turn.endpointing_max_delay_ms is not None:
+        options["max_delay"] = turn.endpointing_max_delay_ms / 1000
+    return options
+
+
 def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
     i = turn.interruption
-    return {
-        "turn_detection": detection,
-        "endpointing": {"min_delay": turn.endpointing_delay_ms / 1000},
+    handling: dict[str, Any] = {} if detection == "semantic" else {"turn_detection": detection}
+    pg = turn.preemptive_generation
+    return handling | {
+        "endpointing": endpointing(turn, detection),
+        "preemptive_generation": {"enabled": pg.enabled, "preemptive_tts": pg.tts},
         "interruption": {
             "enabled": i.enabled,
+            "mode": "vad",
             "min_duration": i.min_duration_ms / 1000,
             "min_words": i.min_words,
             "false_interruption_timeout": (
@@ -154,14 +235,22 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     stt = _vendor(pipeline.stt, Stage.STT, cfg.language)
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
-    detection = turn_detection(cfg.turn, stt)
+    detection = turn_detection(cfg.turn, stt, cfg.language)
+    persona = persona_for(cfg.agent.persona_ref, cfg.language, cfg.agent.name)
+    addressing = cfg.agent.addressing
+    prompt = None
+    if addressing.waits_to_be_called:
+        persona = called_by_name(persona)
+        prompt = ", ".join(dict.fromkeys((cfg.agent.name or "", *addressing.aliases)))
     return Plan(
         config=cfg,
         pipeline=pipeline,
         stt=stt,
         llm=llm,
         tts=tts,
+        vad=local_vad(pipeline, cfg.turn, detection),
         turn_detection=detection,
         turn_handling=turn_handling(cfg.turn, detection),
-        persona=persona_for(cfg.agent.persona_ref, cfg.language, cfg.agent.name),
+        persona=persona,
+        stt_prompt=prompt,
     )

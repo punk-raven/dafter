@@ -361,6 +361,25 @@ recording is refused outright under both end-to-end modes rather than falling
 back to a client-side or consumer-keyed path, because every egress layout the
 platform has is server-side and sees ciphertext.
 
+**Who the agent hears is a privacy decision too, and `agent.addressing.mode`
+states it.** In `always` the agent is linked to one participant, and only that
+person's speech goes to the STT provider. In `transcript` the agent waits to be
+called by name, so it must hear everyone: **every human's speech in the call is
+sent to the session's STT provider** (one stream per participant), including
+everything never meant for the agent, and the last few lines anyone said are
+handed to the LLM as context when it is called. A session that picks
+`transcript` is a session whose consent covers every participant being
+transcribed by that provider, not only the one who talks to the agent; the
+provider, region and residency rules are the same ones the pipeline already
+names. **The catalog's default is `transcript`**: every new session gets one
+agent, Nivya, that joins silently (`agent.greets` is off) and speaks only when
+someone says its name or presses Wake, so a session created with the defaults
+is such a session, and one that wants the agent to answer a single person's
+every turn states `always`. `on_device` is the mode that keeps speech local until the name is
+spotted; it is declared in the schema and refused by the worker until a local
+spotter exists. Events about the agent's addressing carry who woke it as an
+opaque participant id and never what anyone said.
+
 **Envelope encryption.** Each recording gets a unique data key (fast, local); the data key is wrapped by the tenant master key and stored beside the object. This buys per-object isolation, cheap bulk crypto, revocation by disabling the master key, and rotation without re-encrypting media.
 
 **The seal stage.** Egress writes to object storage directly and cannot apply the envelope itself, so sealing is an explicit stage in the processing plane:
@@ -463,7 +482,7 @@ Self-hosted OSS is the reference, keeping decryption out of a third party's hand
 
 VAD is a **first-class, provider-agnostic pipeline stage** (see the architecture document). Any VAD LiveKit supports is usable and configurable, independent of the STT/LLM/TTS providers. A provider's own server-side VAD is one option, not a requirement.
 
-The only provider-specific VAD tuning worth encoding once: **when a provider's server VAD is authoritative, turn the local VAD off.** A second local VAD sees the same audio as the provider's recognizer and fights it. This is a per-provider config detail, not a property of the pipeline.
+The only provider-specific VAD tuning worth encoding once: **when a provider's server VAD is authoritative, the local VAD does not decide the turn; it runs for interruptions only.** Two detectors deciding one turn fight each other, so the recognizer ends the turn (`turn.localVadEnabled` false, refused under `provider_endpointing` on both halves). The local VAD still hears the caller start to talk over the agent (`turn.interruption.localVadEnabled`), so barge-in does not wait for the recognizer's first transcript. This is a per-provider config detail, not a property of the pipeline.
 
 #### Sarvam
 
@@ -476,11 +495,14 @@ A language specialist, and the reason the config model has a per-language axis a
 | Setting | Value | Why |
 |---|---|---|
 | STT class | Streaming class, not the legacy one | Legacy has no real partials and no live reconfiguration |
-| Local VAD | **Off** | Sarvam's server VAD sees the same audio as the recognizer. A second local VAD fights it |
-| Turn strategy | `provider_endpointing` | The framework's semantic turn detector is English-trained; trust Sarvam's own end-of-speech events for Indic |
+| Local VAD | **Interruptions only** | Sarvam's server VAD decides the end of the turn; a second detector deciding it would fight it. A local Silero VAD only detects the caller talking over the agent, which Sarvam reports no sooner than its first transcript |
+| Turn strategy | `provider_endpointing` | Trust Sarvam's own end-of-speech events for Indic. `semantic` is selectable: LiveKit's on-device audio turn detector (`v1-mini`, bundled with the framework) with dynamic endpointing, run only for the languages it was tuned on (Hindi and English among Sarvam's); every other language falls back to provider endpointing. Sarvam still holds each final until its own end of speech, so it can delay a turn the caller has not finished, not end one sooner |
+| End-of-turn silence | 350ms (`turn.silenceMs`, Sarvam's `silence_duration_ms`) | The only wait before the turn ends: the framework's endpointing delay is 0 because the recognizer has already waited, and the adapter releases end of speech with the final transcript |
 | Chunk profile | `fast` (500ms) | The 1000ms default adds up to a full second before VAD even begins. **Single biggest latency knob** |
 | TTS codec | Raw PCM | Skips a decode pass per chunk. Use mulaw at 8kHz for telephony |
 | TTS connection | Prewarmed at worker start | Time-to-first-byte is dominated by TLS handshake, not the model |
+| TTS text | Sentence by sentence, the danda (।) ending a sentence; first chunk 30 characters (`minBufferSize`, the smallest Sarvam takes) | The framework's sentence splitter does not know the danda, so a Hindi reply would reach TTS only once fully written |
+| LLM connection | Prewarmed before the room is joined (`prewarm`) | Same handshake cost, paid before the first turn instead of in it |
 
 **Operational notes worth encoding once in the adapter:** construct providers in worker setup rather than per session, so bad config kills the worker at boot instead of mid-call; websocket close code `1003` (auth/quota) is **not** retryable and should page someone, while `1013` is transient; and the true TTS request ID appears only in the tracing span, not in client metrics, so tracing is mandatory for vendor support to debug a latency complaint.
 

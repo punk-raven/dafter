@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import statistics
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from .probe import Probe, now
+from dafter_core.config import Budgets
+
+from .measure import CALLER, CLOCKS, caller, percentile, state_stop, verdict, worker
+from .probe import Events, Probe, now
 from .script import Script
 from .voice import Voice
 
@@ -36,19 +38,11 @@ class OverlapResult:
     states: list[str]
     replied: bool
     inconclusive: bool
+    state_stop_ms: int | None
 
 
 def ms(seconds: float | None) -> int | None:
     return None if seconds is None else round(seconds * 1000)
-
-
-def percentile(values: list[int], p: float) -> int | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    k = (len(ordered) - 1) * p
-    lo, hi = int(k), min(int(k) + 1, len(ordered) - 1)
-    return round(ordered[lo] + (ordered[hi] - ordered[lo]) * (k - lo))
 
 
 async def turn(probe: Probe, voice: Voice, index: int, text: str) -> TurnResult:
@@ -84,7 +78,7 @@ async def overlap(
         first_audio = probe.meter.first_loud_after(asked.ended)
         await asyncio.sleep(0.01)
     if first_audio is None:
-        return OverlapResult(kind, text, 0, False, None, [], False, True)
+        return OverlapResult(kind, text, 0, False, None, [], False, True, None)
     await asyncio.sleep(max(0.0, first_audio + OVERLAP_AFTER - now()))
     spoken = await probe.speak(pcm)
     await asyncio.sleep(CONTINUE_WINDOW + STOP_QUIET + 0.2)
@@ -110,6 +104,7 @@ async def overlap(
         states=states,
         replied="thinking" in states,
         inconclusive=inconclusive,
+        state_stop_ms=state_stop(probe.states, spoken.started, window_end + STOP_QUIET),
     )
 
 
@@ -117,7 +112,12 @@ SCENARIOS = ("turns", "barge_in", "backchannel", "filler")
 
 
 async def run(
-    probe: Probe, voice: Voice, script: Script, turns: int, scenarios: frozenset[str]
+    probe: Probe,
+    voice: Voice,
+    script: Script,
+    turns: int,
+    scenarios: frozenset[str],
+    budgets: Budgets,
 ) -> dict[str, Any]:
     await probe.wait_agent_audio(REPLY_TIMEOUT)
     results: list[TurnResult] = []
@@ -135,39 +135,41 @@ async def run(
             continue
         for prompt, text in zip(script.long_prompts, texts, strict=False):
             overlaps.append(await overlap(probe, voice, kind, prompt, text, expect_stop))
-    return summarize(results, overlaps, probe.event_errors)
+    return summarize(results, overlaps, probe.events, budgets)
 
 
 def summarize(
-    results: list[TurnResult], overlaps: list[OverlapResult], event_errors: int
+    results: list[TurnResult], overlaps: list[OverlapResult], events: Events, budgets: Budgets
 ) -> dict[str, Any]:
     gaps = [r.gap_ms for r in results if r.gap_ms is not None]
-    endpoints = [r.endpoint_ms for r in results if r.endpoint_ms is not None]
+    ends = [r.endpoint_ms for r in results if r.endpoint_ms is not None]
     replies = [r.reply_ms for r in results if r.reply_ms is not None]
     summary: dict[str, Any] = {
+        "clocks": CLOCKS,
         "turns": len(results),
         "answered": len(gaps),
-        "gap_p50_ms": percentile(gaps, 0.5),
-        "gap_p95_ms": percentile(gaps, 0.95),
-        "gap_max_ms": max(gaps) if gaps else None,
-        "gap_stdev_ms": round(statistics.pstdev(gaps)) if len(gaps) > 1 else None,
-        "endpoint_p50_ms": percentile(endpoints, 0.5),
-        "endpoint_p95_ms": percentile(endpoints, 0.95),
-        "reply_p50_ms": percentile(replies, 0.5),
-        "reply_p95_ms": percentile(replies, 0.95),
-        "event_errors": event_errors,
+        "caller": caller(gaps, ends, replies),
+        "worker": worker(events.turn_metrics),
+        "event_errors": events.errors,
     }
     for kind in ("barge_in", "backchannel", "filler"):
         rows = [o for o in overlaps if o.kind == kind]
         stops = [o.stop_ms for o in rows if o.stop_ms is not None]
+        conclusive = [o for o in rows if not o.inconclusive]
+        state_stops = [o.state_stop_ms for o in conclusive if o.state_stop_ms is not None]
         summary[kind] = {
+            "clock": CALLER,
             "trials": len(rows),
             "stopped": sum(o.agent_stopped for o in rows),
             "inconclusive": sum(o.inconclusive for o in rows),
             "replied_to": sum(o.replied for o in rows),
             "stop_p50_ms": percentile(stops, 0.5),
             "stop_max_ms": max(stops) if stops else None,
+            "state_stopped": len(state_stops),
+            "state_stop_p50_ms": percentile(state_stops, 0.5),
+            "state_stop_p95_ms": percentile(state_stops, 0.95),
         }
+    summary["verdict"] = verdict(summary["caller"], summary["barge_in"], budgets)
     return {
         "summary": summary,
         "turns": [asdict(r) for r in results],

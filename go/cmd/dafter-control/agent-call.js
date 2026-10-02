@@ -44,7 +44,8 @@ function hideAgentTile(participant) {
 function setAgentTileState(state) {
   document.querySelectorAll('.agent-tile').forEach((tile) => {
     tile.dataset.state = state || 'initializing';
-    tile.querySelector('.agent-state-text').textContent = state || 'joining';
+    tile.dataset.dormant = agentAddressing.dormant === true ? 'true' : 'false';
+    tile.querySelector('.agent-state-text').textContent = state ? addressingText(state) : 'joining';
   });
 }
 

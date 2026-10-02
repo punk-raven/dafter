@@ -70,6 +70,17 @@ def test_each_unit_is_priced_from_its_row_and_an_unknown_one_is_unpriced() -> No
     assert payload["final"] is True
 
 
+def test_one_model_heard_by_several_listeners_is_one_item() -> None:
+    usage = AgentSessionUsage(
+        model_usage=[
+            STTModelUsage(provider="Sarvam", model="saaras:v3-realtime", audio_duration=60.0),
+            STTModelUsage(provider="Sarvam", model="saaras:v3-realtime", audio_duration=30.0),
+        ]
+    )
+    [item] = usage_payload(priced(usage, load_prices(TABLE)), final=False)["items"]
+    assert (item["quantity"], item["costInr"]) == (90.0, 0.75)
+
+
 def test_nothing_priced_is_a_zero_floor_with_every_item_unpriced() -> None:
     payload = usage_payload(priced(sarvam_call(), load_prices(HEADER)), final=False)
     assert payload["costInr"] == 0

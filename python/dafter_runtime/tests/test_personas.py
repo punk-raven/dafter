@@ -4,11 +4,12 @@ import pytest
 from dafter_runtime.personas import DEFAULT_REF, FEMININE, SCRIPTS, persona_for
 
 NAME = "Nivya"
-LANGUAGES = ("hi",)
+LANGUAGES = ("hi", "en")
 REFS = (DEFAULT_REF, "persona://support/v3")
 EVERY = [(ref, language) for ref in REFS for language in LANGUAGES]
 MASCULINE = {"hi": ("सकता", "रहा हूँ", "देखता", "बताता")}
 FEMININE_FORMS = {"hi": ("सकती", "रही")}
+GENDERED = [(ref, language) for ref, language in EVERY if language in MASCULINE]
 
 
 def test_every_persona_is_scripted_for_every_language_the_worker_speaks() -> None:
@@ -37,7 +38,7 @@ def test_the_agent_is_told_she_is_a_woman(ref: str, language: str, name: str | N
     assert FEMININE in persona_for(ref, language, name).instructions
 
 
-@pytest.mark.parametrize(("ref", "language"), EVERY)
+@pytest.mark.parametrize(("ref", "language"), GENDERED)
 def test_the_agent_greets_in_the_feminine(ref: str, language: str) -> None:
     script = SCRIPTS[(ref, language)]
     for line in (script.greeting, script.introduction):

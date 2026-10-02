@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from dafter_core.config import ProviderRef, Turn
@@ -9,6 +10,7 @@ from dafter_core.errors import DafterError
 from dafter_providers import VENDORS, credentials, sarvam, vendor_for
 from dafter_providers.sarvam.realtime import FinalFirstSTT
 from livekit.agents import APIConnectionError, APIStatusError, APITimeoutError
+from livekit.plugins.sarvam import stt_streaming
 
 KEY_REF = "secret://tenants/t_9c21a4be/sarvam/api-key"
 TURN = Turn(strategy=TurnStrategy.PROVIDER_ENDPOINTING, silence_ms=500, min_speech_ms=120)
@@ -38,18 +40,50 @@ def test_a_missing_credential_fails_at_construction_without_leaking() -> None:
 
 
 def test_stt_is_the_realtime_class_on_the_fast_profile() -> None:
-    stt = sarvam.build_stt(ref("saaras:v3-realtime", chunkMs=500, sampleRate=16000), "hi", TURN)
+    stt = sarvam.build_stt(
+        ref("saaras:v3-realtime", chunkMs=500, sampleRate=16000), "hi", TURN, None
+    )
     opts = stt._opts  # type: ignore[attr-defined]
     assert isinstance(stt, FinalFirstSTT)
     assert (opts.language, opts.stream_type, opts.endpointing) == ("hi-IN", "fast", "vad")
     assert (opts.encoding, opts.sample_rate) == ("linear16", 16000)
     assert (opts.vad_min_silence_ms, opts.vad_min_speech_ms) == (500, 120)
+    assert stt._final_grace == 1.5
+
+
+def test_the_wait_for_a_late_final_is_a_stt_option() -> None:
+    stt = sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=400), "hi", TURN, None)
+    assert stt._final_grace == 0.4  # type: ignore[attr-defined]
+
+
+def test_stt_carries_a_prompt_to_the_realtime_endpoint() -> None:
+    stt = sarvam.build_stt(ref("saaras:v3-realtime"), "hi", TURN, "Nivya, निव्या")
+    opts = stt._opts  # type: ignore[attr-defined]
+    assert opts.prompt == "Nivya, निव्या"
+    url = stt_streaming._build_realtime_ws_url(opts.base_url, opts)
+    assert parse_qs(urlsplit(url).query)["prompt"] == ["Nivya, निव्या"]
+    unprompted = sarvam.build_stt(ref("saaras:v3-realtime"), "hi", TURN, None)
+    assert (
+        "prompt"
+        not in urlsplit(
+            stt_streaming._build_realtime_ws_url(opts.base_url, unprompted._opts)  # type: ignore[attr-defined]
+        ).query
+    )
 
 
 def test_llm_turns_thinking_off_on_the_generally_available_endpoint() -> None:
     llm = sarvam.build_llm(ref("sarvam-105b", thinking=False, maxTokens=200))
     assert llm._opts.reasoning_effort is None  # type: ignore[attr-defined]
     assert str(llm._client.base_url).rstrip("/") == sarvam.LLM_BASE_URL  # type: ignore[attr-defined]
+
+
+def test_the_first_tts_chunk_size_and_the_llm_prewarm_are_options() -> None:
+    tts = sarvam.build_tts(ref("bulbul:v3", minBufferSize=30), "hi")
+    assert tts._opts.min_buffer_size == 30  # type: ignore[attr-defined]
+    llm = ref("sarvam-105b", prewarm=False)
+    sarvam.build_llm(llm)
+    assert sarvam.wants_prewarm(llm) is False
+    assert sarvam.wants_prewarm(ref("sarvam-105b")) is True
 
 
 def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
@@ -63,14 +97,24 @@ def test_tts_speaks_raw_pcm_at_the_output_rate() -> None:
     ("build", "code", "pointer"),
     [
         (
-            lambda: sarvam.build_stt(ref("saaras"), "hi", TURN),
+            lambda: sarvam.build_stt(ref("saaras"), "hi", TURN, None),
             ErrorCode.UNSUPPORTED_CAPABILITY,
             "/agent/pipeline/stt/model",
         ),
         (
-            lambda: sarvam.build_stt(ref("saaras:v3-realtime", chunkMs=250), "hi", TURN),
+            lambda: sarvam.build_stt(ref("saaras:v3-realtime", chunkMs=250), "hi", TURN, None),
             ErrorCode.INVALID_CONFIG,
             "/agent/pipeline/stt/options/chunkMs",
+        ),
+        (
+            lambda: sarvam.build_stt(ref("saaras:v3-realtime", finalGraceMs=-1), "hi", TURN, None),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/stt/options/finalGraceMs",
+        ),
+        (
+            lambda: sarvam.build_tts(ref("bulbul:v3", minBufferSize=20), "hi"),
+            ErrorCode.INVALID_CONFIG,
+            "/agent/pipeline/tts/options/minBufferSize",
         ),
         (
             lambda: sarvam.build_tts(ref("bulbul:v3", codec="opus"), "hi"),
@@ -132,4 +176,4 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
     with pytest.raises(DafterError) as caught:
         vendor_for(ProviderRef(provider="deepgram"), Stage.STT)
     assert caught.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
-    assert "deepgram" not in VENDORS
+    assert set(VENDORS) == {"sarvam", "openai_compat", "silero"}
