@@ -7,10 +7,10 @@ from dafter_core.config import ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError, ProviderContext
 from livekit.agents import APIConnectionError, APIStatusError, APITimeoutError, llm, stt, tts
-from livekit.plugins import sarvam as plugin
 
 from .. import credentials
 from ..options import Options
+from .llm import SarvamLLM
 from .realtime import FinalFirstSTT
 from .sentences import SentenceTTS
 
@@ -20,6 +20,7 @@ LLM_MODELS = frozenset({"sarvam-105b", "sarvam-105b-conversations"})
 TTS_MODELS = frozenset({"bulbul:v3"})
 REGIONS = frozenset({"ap-south-1"})
 LLM_BASE_URL = "https://api.sarvam.ai/v1"
+CREDENTIAL = "SARVAM_API_KEY"
 
 LANGUAGES = {
     "hi": "hi-IN",
@@ -105,7 +106,7 @@ def build_stt(ref: ProviderRef, language: str, turn: Turn, prompt: str | None) -
             "an option is out of range",
             f"at '{opts.pointer('finalGraceMs')}': between 0 and {MAX_FINAL_GRACE_MS}",
         )
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.STT, {CREDENTIAL})
     return _construct(
         Stage.STT,
         lambda: FinalFirstSTT(
@@ -132,12 +133,12 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
     thinking = opts.get("thinking", bool, False)
     temperature = opts.get("temperature", float, 0.4)
     max_tokens = opts.get("maxTokens", int, 200)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.LLM, {CREDENTIAL})
     model = ref.model or ""
     if thinking:
         return _construct(
             Stage.LLM,
-            lambda: plugin.LLM(
+            lambda: SarvamLLM(
                 model=model,
                 api_key=key,
                 base_url=LLM_BASE_URL,
@@ -147,7 +148,7 @@ def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
         )
     return _construct(
         Stage.LLM,
-        lambda: plugin.LLM(
+        lambda: SarvamLLM(
             model=model,
             api_key=key,
             base_url=LLM_BASE_URL,
@@ -179,7 +180,7 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
     voice = opts.get("voice", str, "priya")
     pace = opts.get("pace", float, 1.0)
     opts.get("prewarm", bool, True)
-    key = credentials.resolve(ref.credential_ref)
+    key = credentials.resolve(ref, Stage.TTS, {CREDENTIAL})
     model = ref.model or ""
     return _construct(
         Stage.TTS,
