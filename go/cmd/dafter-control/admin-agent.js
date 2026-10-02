@@ -1,0 +1,123 @@
+function cleanWords(list) {
+  return (list || []).map((w) => String(w).trim()).filter((w) => w !== '');
+}
+
+function agentDocumentFrom(values) {
+  const doc = { name: String(values.name || '').trim() };
+  const aliases = cleanWords(values.aliases);
+  const nearMisses = cleanWords(values.nearMisses);
+  const profile = String(values.profile || '').trim();
+  if (aliases.length) doc.aliases = aliases;
+  if (nearMisses.length) doc.nearMisses = nearMisses;
+  if (profile) doc.profile = profile;
+  return doc;
+}
+
+function agentValuesOf(doc) {
+  const d = doc && typeof doc === 'object' ? doc : {};
+  return {
+    name: typeof d.name === 'string' ? d.name : '',
+    aliases: Array.isArray(d.aliases) ? d.aliases.map(String) : [],
+    nearMisses: Array.isArray(d.nearMisses) ? d.nearMisses.map(String) : [],
+    profile: typeof d.profile === 'string' ? d.profile : '',
+  };
+}
+
+function fieldError(id) {
+  return el('p', { class: 'field-error', id, role: 'alert', hidden: '' });
+}
+
+function setFieldError(node, messages) {
+  node.textContent = (messages || []).map(friendlyMessage).join('; ');
+  node.hidden = !messages || messages.length === 0;
+}
+
+function wordList(field, label, hint, words) {
+  const items = el('ul', { class: 'word-list', 'aria-label': label });
+  const error = fieldError(`agent-${field}-error`);
+  const addInput = el('input', { type: 'text', id: `agent-${field}-add`, autocomplete: 'off', placeholder: 'Add a word' });
+  const addButton = el('button', { type: 'button', class: 'btn btn-quiet' }, 'Add');
+
+  function row(word) {
+    const input = el('input', { type: 'text', value: word, autocomplete: 'off', 'aria-describedby': `agent-${field}-error` });
+    const remove = el('button', { type: 'button', class: 'btn btn-icon', 'aria-label': `Remove ${word || 'word'}` }, '×');
+    const itemError = el('p', { class: 'field-error', role: 'alert', hidden: '' });
+    const li = el('li', { class: 'word' }, el('div', { class: 'word-row' }, input, remove), itemError);
+    input.addEventListener('input', () => remove.setAttribute('aria-label', `Remove ${input.value || 'word'}`));
+    remove.addEventListener('click', () => {
+      li.remove();
+      addInput.focus();
+    });
+    return li;
+  }
+
+  function add() {
+    for (const word of cleanWords(addInput.value.split(','))) items.append(row(word));
+    addInput.value = '';
+    addInput.focus();
+  }
+  addButton.addEventListener('click', add);
+  addInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      add();
+    }
+  });
+  for (const w of words) items.append(row(w));
+
+  const node = el('div', { class: 'field' },
+    el('label', { for: `agent-${field}-add` }, label),
+    el('p', { class: 'hint' }, hint),
+    items,
+    el('div', { class: 'word-add' }, addInput, addButton),
+    error);
+  return {
+    node,
+    read: () => [...items.querySelectorAll('.word input')].map((i) => i.value).concat(addInput.value.split(',')),
+    show(fieldMessages, itemMessages) {
+      setFieldError(error, fieldMessages);
+      let index = 0;
+      [...items.children].forEach((li) => {
+        const input = li.querySelector('input');
+        const messages = input.value.trim() === '' ? undefined : itemMessages[`${field}/${index++}`];
+        setFieldError(li.querySelector('.field-error'), messages);
+        input.toggleAttribute('aria-invalid', Boolean(messages));
+      });
+    },
+  };
+}
+
+function agentForm(doc, profiles) {
+  const values = agentValuesOf(doc);
+  const name = el('input', { type: 'text', id: 'agent-name', required: '', value: values.name, autocomplete: 'off', 'aria-describedby': 'agent-name-error' });
+  const nameError = fieldError('agent-name-error');
+  const profile = el('select', { id: 'agent-profile', 'aria-describedby': 'agent-profile-error' },
+    el('option', { value: '' }, 'None (sessions pick a profile)'),
+    ...profiles.map((p) => el('option', { value: p }, p)));
+  if (values.profile && !profiles.includes(values.profile)) profile.append(el('option', { value: values.profile }, values.profile));
+  profile.value = values.profile;
+  const profileError = fieldError('agent-profile-error');
+  const aliases = wordList('aliases', 'Aliases', 'Other spellings of the name that should wake the agent.', values.aliases);
+  const nearMisses = wordList('nearMisses', 'Near misses', 'Words that sound close to the name but must never wake the agent.', values.nearMisses);
+
+  const node = el('div', { class: 'agent-form' },
+    el('div', { class: 'field' }, el('label', { for: 'agent-name' }, 'Display name'), name, nameError),
+    aliases.node,
+    nearMisses.node,
+    el('div', { class: 'field' }, el('label', { for: 'agent-profile' }, 'Profile'),
+      el('p', { class: 'hint' }, 'The profile a session naming this agent uses when it names none; it carries the persona.'),
+      profile, profileError));
+
+  return {
+    node,
+    read: () => agentDocumentFrom({ name: name.value, aliases: aliases.read(), nearMisses: nearMisses.read(), profile: profile.value }),
+    show(placed) {
+      setFieldError(nameError, placed.fields.name);
+      name.toggleAttribute('aria-invalid', Boolean(placed.fields.name));
+      setFieldError(profileError, placed.fields.profile);
+      profile.toggleAttribute('aria-invalid', Boolean(placed.fields.profile));
+      aliases.show(placed.fields.aliases, placed.items);
+      nearMisses.show(placed.fields.nearMisses, placed.items);
+    },
+  };
+}
