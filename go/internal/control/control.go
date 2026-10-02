@@ -79,8 +79,7 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	EncryptionKey string `json:"encryptionKey,omitempty"`
-
+	EncryptionKey    string `json:"encryptionKey,omitempty"`
 	AgentDispatchID  string `json:"agentDispatchId,omitempty"`
 	ScribeDispatchID string `json:"scribeDispatchId,omitempty"`
 }
@@ -152,17 +151,16 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.write(w, http.StatusCreated, createSessionResponse{
-		SessionID:     sessionID,
-		ParticipantID: participantID,
-		Room:          sessionID,
-		ConfigHash:    resolved.Hash,
-		Config:        resolved.Document,
-		Token:         token.JWT,
-		URL:           token.URL,
-		ExpiresAt:     token.ExpiresAt,
-		ICEServers:    iceServers,
-		EncryptionKey: keyFor(resolved.Config, sess, req.Role),
-
+		SessionID:        sessionID,
+		ParticipantID:    participantID,
+		Room:             sessionID,
+		ConfigHash:       resolved.Hash,
+		Config:           resolved.Document,
+		Token:            token.JWT,
+		URL:              token.URL,
+		ExpiresAt:        token.ExpiresAt,
+		ICEServers:       iceServers,
+		EncryptionKey:    keyFor(resolved.Config, sess, req.Role),
 		AgentDispatchID:  opened.dispatchID,
 		ScribeDispatchID: opened.scribeDispatchID,
 	})
