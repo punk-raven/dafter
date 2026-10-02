@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -294,5 +295,86 @@ func TestAnEgressIsStoppedOnceAndBelongsToAStoredSession(t *testing.T) {
 	none, err := s.Egresses(t.Context(), "s_00000000")
 	if err != nil || len(none) != 0 {
 		t.Errorf("an unknown session lists %v, %v", none, err)
+	}
+}
+
+func rawKey(t *testing.T, path, sessionID string) string {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	var stored string
+	if err := db.QueryRowContext(t.Context(), `SELECT encryption_key FROM sessions WHERE session_id = ?`, sessionID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	return stored
+}
+
+func TestSessionKeysAreSealedAtRestAndReadOnlyUnderTheirKey(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "dafter.db")
+	sealer, err := state.ParseKeyCipher("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := state.EphemeralKeyCipher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	open := func(k *state.KeyCipher) *state.Store {
+		s, err := state.Open(t.Context(), path, state.WithKeyCipher(k))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	keyed := session(t)
+	keyed.EncryptionKey, keyed.ReleaseID = "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", 7
+	s := open(sealer)
+	if err := s.CreateSession(t.Context(), keyed); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if stored := rawKey(t, path, keyed.SessionID); strings.Contains(stored, keyed.EncryptionKey) || !strings.HasPrefix(stored, "v1:") {
+		t.Fatalf("the key is stored as %q", stored)
+	}
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), `INSERT INTO sessions (session_id, tenant_id, room, config_hash, config, created_at, encryption_key)
+		VALUES ('s_00000003', 't_9c21a4be', 'room', 'hash', '{}', 0, 'legacy-plaintext-key')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	s = open(sealer)
+	for id, want := range map[string]string{keyed.SessionID: keyed.EncryptionKey, "s_00000003": "legacy-plaintext-key"} {
+		got, err := s.Session(t.Context(), id)
+		if err != nil || got.EncryptionKey != want {
+			t.Errorf("%s: key %q err %v, want %q", id, got.EncryptionKey, err, want)
+		}
+	}
+	if got, _ := s.Session(t.Context(), keyed.SessionID); got.ReleaseID != 7 {
+		t.Errorf("release id came back %d, want the release the session resolved from", got.ReleaseID)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if stored := rawKey(t, path, "s_00000003"); !strings.HasPrefix(stored, "v1:") {
+		t.Errorf("a key stored before sealing existed is still %q after reopening", stored)
+	}
+
+	s = open(other)
+	defer func() { _ = s.Close() }()
+	if _, err := s.Session(t.Context(), keyed.SessionID); err == nil {
+		t.Error("a key sealed under one DAFTER_STATE_KEY opened under another")
 	}
 }
