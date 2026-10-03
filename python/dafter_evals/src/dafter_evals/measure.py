@@ -65,7 +65,7 @@ def worker(turn_metrics: list[dict[str, Any]]) -> dict[str, Any]:
         for layer in LAYERS
     }
     filled = sum(1 for m in turn_metrics if m.get("filler") is True)
-    return {"clock": WORKER, "layers": layers, "fillerTurns": filled}
+    return {"clock": WORKER, "layers": layers, "turns": len(turn_metrics), "fillerTurns": filled}
 
 
 def state_stop(states: list[tuple[float, str]], onset: float, until: float) -> int | None:

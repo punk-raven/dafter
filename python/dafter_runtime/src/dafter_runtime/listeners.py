@@ -20,7 +20,7 @@ log = logging.getLogger("dafter.runtime.listeners")
 
 Heard = Callable[[str, str, lk_llm.MetricsReport], None]
 Joined = Callable[[str, AgentSession[Any]], None]
-Hearing = Callable[[str], Filter]
+Hearing = Callable[[str, AgentSession[Any]], Filter]
 
 
 class Listener(Agent):
@@ -110,7 +110,7 @@ class Listeners:
         self._joined(identity, session)
         await session.start(
             agent=Listener(
-                identity, self._heard, self._hearing(identity) if self._hearing else None
+                identity, self._heard, self._hearing(identity, session) if self._hearing else None
             ),
             room=self._room,
             room_options=listener_options(identity, self._sample_rate),

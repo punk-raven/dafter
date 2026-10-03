@@ -99,9 +99,31 @@ class Utterance:
     ended: float
 
 
+@dataclass(frozen=True)
+class Echo:
+    gain: float
+    delay_ms: int
+
+
+class Returned:
+    def __init__(self, echo: Echo) -> None:
+        self._gain = echo.gain
+        self._pending = np.zeros(SAMPLE_RATE * echo.delay_ms // 1000, dtype=np.float32)
+
+    def heard(self, samples: np.ndarray) -> None:
+        self._pending = np.concatenate([self._pending, samples.astype(np.float32) * self._gain])
+
+    def over(self, chunk: np.ndarray) -> np.ndarray:
+        taken, self._pending = self._pending[: chunk.size], self._pending[chunk.size :]
+        mixed = chunk.astype(np.float32)
+        mixed[: taken.size] += taken
+        return np.clip(mixed, -32768, 32767).astype(np.int16)
+
+
 class Probe:
-    def __init__(self) -> None:
+    def __init__(self, echo: Echo | None = None) -> None:
         self.room = rtc.Room()
+        self._returned = Returned(echo) if echo is not None and echo.gain > 0 else None
         self.source = rtc.AudioSource(SAMPLE_RATE, 1, queue_size_ms=40)
         self.meter = Meter()
         self.events = Events()
@@ -178,6 +200,8 @@ class Probe:
                 done.set_result(Utterance(started=started or ended, ended=ended))
 
     def _frame(self, samples: np.ndarray) -> rtc.AudioFrame:
+        if self._returned is not None:
+            samples = self._returned.over(samples)
         return rtc.AudioFrame(samples.tobytes(), SAMPLE_RATE, 1, samples.size)
 
     def _subscribed(
@@ -193,6 +217,8 @@ class Probe:
         stream = rtc.AudioStream(track, sample_rate=SAMPLE_RATE, num_channels=1)
         async for event in stream:
             samples = np.frombuffer(event.frame.data, dtype=np.int16)
+            if self._returned is not None:
+                self._returned.heard(samples)
             level = rms(samples)
             self.meter.add(now(), level)
             if level >= LOUD:

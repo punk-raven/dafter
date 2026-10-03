@@ -14,7 +14,7 @@ from livekit.agents import utils
 
 from .connect import join, session_overrides
 from .measure import compare
-from .probe import Probe
+from .probe import Echo, Probe
 from .script import HINDI
 from .turns import SCENARIOS, run
 from .voice import Voice
@@ -36,6 +36,14 @@ def arguments() -> argparse.Namespace:
     p.add_argument("--speaker", default="ritu")
     p.add_argument("--scenarios", default=",".join(SCENARIOS))
     p.add_argument("--overrides", default=None, help="session overrides, as JSON")
+    p.add_argument(
+        "--echo",
+        type=float,
+        default=0.0,
+        help="feed the agent's own audio back into the microphone at this gain, as a "
+        "speakerphone or phone line without echo cancellation does (0 is off)",
+    )
+    p.add_argument("--echo-delay-ms", type=int, default=200)
     p.add_argument("--out", type=Path, default=None, help="write the full report here, as JSON")
     p.add_argument(
         "--baseline",
@@ -66,7 +74,7 @@ async def create_session(args: argparse.Namespace) -> dict[str, Any]:
 async def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     created = await create_session(args)
     cfg = parse(json.dumps(created["config"]))
-    probe = Probe()
+    probe = Probe(Echo(args.echo, args.echo_delay_ms))
     async with utils.http_context.open():
         voice = Voice(cfg, args.speaker)
         try:
