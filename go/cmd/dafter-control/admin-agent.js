@@ -23,12 +23,17 @@ function agentValuesOf(doc) {
   };
 }
 
+function setInvalid(node, invalid) {
+  if (invalid) node.setAttribute('aria-invalid', 'true');
+  else node.removeAttribute('aria-invalid');
+}
+
 function fieldError(id) {
   return el('p', { class: 'field-error', id, role: 'alert', hidden: '' });
 }
 
 function setFieldError(node, messages) {
-  node.textContent = (messages || []).map(friendlyMessage).join('; ');
+  node.textContent = (messages || []).map((m) => friendlyMessage(m).replace(/^\w/, (c) => c.toUpperCase())).join(' ');
   node.hidden = !messages || messages.length === 0;
 }
 
@@ -73,6 +78,12 @@ function wordList(field, label, hint, words) {
     error);
   return {
     node,
+    markClashes(words) {
+      const taken = new Set(cleanWords(words).map((w) => w.toLowerCase()));
+      for (const input of items.querySelectorAll('.word input')) {
+        if (taken.has(input.value.trim().toLowerCase())) input.setAttribute('aria-invalid', 'true');
+      }
+    },
     read: () => [...items.querySelectorAll('.word input')].map((i) => i.value).concat(addInput.value.split(',')),
     show(fieldMessages, itemMessages) {
       setFieldError(error, fieldMessages);
@@ -81,7 +92,7 @@ function wordList(field, label, hint, words) {
         const input = li.querySelector('input');
         const messages = input.value.trim() === '' ? undefined : itemMessages[`${field}/${index++}`];
         setFieldError(li.querySelector('.field-error'), messages);
-        input.toggleAttribute('aria-invalid', Boolean(messages));
+        setInvalid(input, Boolean(messages));
       });
     },
   };
@@ -113,11 +124,12 @@ function agentForm(doc, profiles) {
     read: () => agentDocumentFrom({ name: name.value, aliases: aliases.read(), nearMisses: nearMisses.read(), profile: profile.value }),
     show(placed) {
       setFieldError(nameError, placed.fields.name);
-      name.toggleAttribute('aria-invalid', Boolean(placed.fields.name));
+      setInvalid(name, Boolean(placed.fields.name));
       setFieldError(profileError, placed.fields.profile);
-      profile.toggleAttribute('aria-invalid', Boolean(placed.fields.profile));
+      setInvalid(profile, Boolean(placed.fields.profile));
       aliases.show(placed.fields.aliases, placed.items);
       nearMisses.show(placed.fields.nearMisses, placed.items);
+      if (placed.fields.nearMisses) nearMisses.markClashes([name.value, ...aliases.read()]);
     },
   };
 }

@@ -66,6 +66,8 @@ function placeProblems(kind, name, details) {
 
 function friendlyMessage(message) {
   return String(message)
+    .replace(/ \(resolving ([^)]*)\)(?: and (\d+) other combination\(s\))?$/, (_, where, more) =>
+      `. Found resolving ${where}${more ? ` and ${more} other session combination${more === '1' ? '' : 's'}` : ''}.`)
     .replace(/^false schema\b/, 'is not a field this document accepts')
     .replace(/^minLength: got 0, want 1$/, 'cannot be empty')
     .replace(/^minLength: got (\d+), want (\d+)$/, 'is $1 character(s), needs at least $2')

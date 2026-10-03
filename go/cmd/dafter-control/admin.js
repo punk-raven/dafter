@@ -21,21 +21,30 @@ function byId(id) {
   return document.getElementById(id);
 }
 
+function showMain(...nodes) {
+  byId('main').replaceChildren(...nodes.flat().filter(Boolean));
+}
+
 function notify(message, tone = 'ok') {
   const toast = el('div', { class: `toast toast-${tone}`, role: tone === 'error' ? 'alert' : 'status' }, message);
   byId('toasts').append(toast);
   setTimeout(() => toast.remove(), tone === 'error' ? 8000 : 4000);
 }
 
-function problemList(error, kind, name) {
+function problemList(error, kind, name, fieldsShown) {
   const placed = placeProblems(kind, name, error.details);
   const box = el('div', { class: 'problems', role: 'alert' },
     el('p', { class: 'problems-title' }, error.message));
-  const general = kind ? placed.general : (error.details || []).map(parseDetail);
-  if (general.length) {
-    box.append(el('ul', {}, general.map((p) =>
-      el('li', {}, p.pointer !== null ? el('code', {}, p.pointer || '/') : null, p.pointer !== null ? ' ' : null, friendlyMessage(p.message)))));
+  const all = (error.details || []).map(parseDetail).map((p) => {
+    const local = kind ? documentPointer(kind, name, p.pointer) : null;
+    return { pointer: local === null ? p.pointer : local || '/', message: p.message };
+  });
+  const listed = fieldsShown ? placed.general : all;
+  if (listed.length) {
+    box.append(el('ul', {}, listed.map((p) =>
+      el('li', {}, p.pointer !== null ? el('code', {}, p.pointer) : null, p.pointer !== null ? ' ' : null, friendlyMessage(p.message)))));
   }
+  if (listed.length < all.length) box.append(el('p', {}, listed.length ? 'The rest are marked next to the fields below.' : 'Each is marked next to its field below.'));
   return { box, placed };
 }
 
@@ -159,6 +168,7 @@ async function route() {
   }
   const main = byId('main');
   main.replaceChildren(el('p', { class: 'loading' }, 'Loading…'));
+  window.scrollTo(0, 0);
   try {
     if (ADMIN_VIEWS[view]) await ADMIN_VIEWS[view]();
     else if (name === 'new') await showEditor(view, null);
