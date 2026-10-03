@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -289,5 +291,77 @@ func TestAReleaseThatFailsToLoadIsNeverSwappedIn(t *testing.T) {
 	}
 	if after := live.Snapshot(); after != before {
 		t.Errorf("snapshot moved from release %d to %d", before.Release, after.Release)
+	}
+}
+
+func TestRemovedListsDocumentsWhoseLatestRevisionDeletesThem(t *testing.T) {
+	t.Parallel()
+	rev := func(id int64, name, doc string) configstore.Revision {
+		r := configstore.Revision{ID: id, Kind: config.KindAgents, Name: name, Deleted: doc == ""}
+		if doc != "" {
+			r.Document = json.RawMessage(doc)
+		}
+		return r
+	}
+	trail := []configstore.Revision{
+		rev(9, "asha", ""), rev(3, "asha", `{"name":"A1"}`), rev(5, "asha", `{"name":"A2"}`),
+		rev(4, "back", `{"name":"B"}`), rev(6, "back", ""), rev(8, "back", `{"name":"B"}`),
+		rev(7, "kept", `{"name":"K"}`), rev(10, "never", ""), rev(2, "old", `{"name":"O"}`), rev(4, "old", ""),
+	}
+	removed := configstore.Removed(trail)
+	got := []string{}
+	for _, r := range removed {
+		got = append(got, fmt.Sprintf("%s %d %s %d", r.Name, r.Last.ID, r.Last.Document, r.Deletion.ID))
+	}
+	if want := []string{`asha 5 {"name":"A2"} 9`, `old 2 {"name":"O"} 4`}; !slices.Equal(got, want) {
+		t.Errorf("removed %q, want %q", got, want)
+	}
+	ids := []int64{}
+	for _, r := range configstore.Trail(trail, "asha") {
+		ids = append(ids, r.ID)
+	}
+	if !slices.Equal(ids, []int64{3, 5, 9}) {
+		t.Errorf("trail of asha %v, want oldest first", ids)
+	}
+}
+
+func TestARemovedDocumentIsRestoredAsADraftFromItsLastRevision(t *testing.T) {
+	t.Parallel()
+	f := seeded(t)
+	f.put(t, config.KindAgents, "asha", asha)
+	last := f.put(t, config.KindAgents, "asha", ashaV2)
+	published := f.publish(t)
+	if _, err := f.editor.Restore(t.Context(), config.KindAgents, "asha", "ops", ""); err == nil {
+		t.Fatal("a document that is not removed was restored")
+	}
+	if _, err := f.editor.Delete(t.Context(), config.KindAgents, "asha", "ops", "gone"); err != nil {
+		t.Fatal(err)
+	}
+	trail, err := f.store.Revisions(t.Context(), config.KindAgents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed := configstore.Removed(trail); len(removed) != 1 || removed[0].Last.ID != last.ID || removed[0].Deletion.Note != "gone" {
+		t.Fatalf("removed %+v", removed)
+	}
+	restored, err := f.editor.Restore(t.Context(), config.KindAgents, "asha", "ops", "back")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.ID <= last.ID || string(restored.Document) != ashaV2 {
+		t.Fatalf("restored %d %s", restored.ID, restored.Document)
+	}
+	if live, err := f.store.LiveReleaseID(t.Context()); err != nil || live != published.ID {
+		t.Errorf("a restore moved the live release to %d (%v)", live, err)
+	}
+	if trail, _ = f.store.Revisions(t.Context(), config.KindAgents); len(configstore.Removed(trail)) != 0 {
+		t.Error("a restored document is still listed as removed")
+	}
+	if _, err := f.editor.Restore(t.Context(), config.KindLLMs, "groq", "ops", ""); err == nil {
+		t.Error("a git-owned document was restored through the admin path")
+	}
+	history, err := f.store.History(t.Context(), 1)
+	if err != nil || history[0].Action != configstore.ActionRestore || history[0].Note != "back" {
+		t.Errorf("history %+v %v", history, err)
 	}
 }

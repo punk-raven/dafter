@@ -109,7 +109,10 @@ func TestEveryRouteNeedsTheAdminToken(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			for _, route := range [][2]string{{"GET", "/admin/v1/agents"}, {"POST", "/admin/v1/releases"}, {"PUT", "/admin/v1/agents/asha"}} {
+			for _, route := range [][2]string{
+				{"GET", "/admin/v1/agents"}, {"POST", "/admin/v1/releases"}, {"PUT", "/admin/v1/agents/asha"},
+				{"GET", "/admin/v1/removed/agents"}, {"GET", "/admin/v1/agents/asha/revisions"}, {"POST", "/admin/v1/agents/asha/restore"},
+			} {
 				status, raw := h.call(t, route[0], route[1], asha, map[string]string{"Authorization": auth})
 				e := decoded[errs.Error](t, raw)
 				if status != http.StatusUnauthorized || e.Code != errs.CodeAuthenticationFailed {
@@ -236,5 +239,62 @@ func TestAnAgentIsWrittenPreviewedPublishedAndRolledBack(t *testing.T) {
 	_, raw = h.call(t, "GET", "/admin/v1/releases", ``, nil)
 	if releases := decoded[[]configstore.Release](t, raw); len(releases) != 3 || !releases[0].Live {
 		t.Errorf("releases %s", raw)
+	}
+}
+
+type removedEntry struct {
+	Name            string `json:"name"`
+	Revision        int64  `json:"revision"`
+	DeletedRevision int64  `json:"deletedRevision"`
+	DeletedBy       string `json:"deletedBy"`
+	Note            string `json:"note"`
+	Live            bool   `json:"live"`
+}
+
+func TestADeletedDocumentIsListedAsRemovedAndRestoredAsADraft(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	who := map[string]string{admin.ActorHeader: "priya@ops"}
+	for _, doc := range []string{asha, `{"name": "Asha", "aliases": ["Aasha"], "profile": "support"}`} {
+		if status, raw := h.call(t, "PUT", "/admin/v1/agents/asha", doc, who); status != http.StatusOK {
+			t.Fatalf("put: %d %s", status, raw)
+		}
+	}
+	h.call(t, "POST", "/admin/v1/releases", ``, who)
+	_, raw := h.call(t, "GET", "/admin/v1/agents/asha/revisions", ``, nil)
+	if revisions := decoded[[]configstore.Revision](t, raw); len(revisions) != 2 || !strings.Contains(string(revisions[0].Document), "Usha") {
+		t.Fatalf("revisions %s", raw)
+	}
+	if status, raw := h.call(t, "POST", "/admin/v1/agents/asha/restore", ``, nil); status != http.StatusBadRequest {
+		t.Fatalf("restoring a stored document: %d %s", status, raw)
+	}
+	h.call(t, "DELETE", "/admin/v1/agents/asha", ``, map[string]string{admin.ActorHeader: "priya@ops", admin.NoteHeader: "retire"})
+	_, raw = h.call(t, "GET", "/admin/v1/removed/agents", ``, nil)
+	removed := decoded[[]removedEntry](t, raw)
+	if len(removed) != 1 || removed[0].Name != "asha" || removed[0].DeletedBy != "priya@ops" || removed[0].Note != "retire" || !removed[0].Live {
+		t.Fatalf("removed %s", raw)
+	}
+	status, raw := h.call(t, "POST", "/admin/v1/agents/asha/restore", ``, who)
+	restored := decoded[configstore.Revision](t, raw)
+	if status != http.StatusOK || restored.ID <= removed[0].DeletedRevision || !strings.Contains(string(restored.Document), "Aasha") {
+		t.Fatalf("restore: %d %s", status, raw)
+	}
+	if _, raw = h.call(t, "GET", "/admin/v1/removed/agents", ``, nil); len(decoded[[]removedEntry](t, raw)) != 0 {
+		t.Errorf("still removed after a restore: %s", raw)
+	}
+	_, raw = h.call(t, "GET", "/admin/v1/diff", ``, nil)
+	if !strings.Contains(string(raw), `"changes":[]`) {
+		t.Errorf("restoring the published revision left a pending change: %s", raw)
+	}
+	if h.live.Snapshot().Release != 2 {
+		t.Errorf("a restore published release %d", h.live.Snapshot().Release)
+	}
+	for path, want := range map[string]int{
+		"/admin/v1/agents/nobody/revisions": http.StatusNotFound,
+		"/admin/v1/removed/roles":           http.StatusBadRequest,
+	} {
+		if status, raw := h.call(t, "GET", path, ``, nil); status != want {
+			t.Errorf("GET %s: %d %s", path, status, raw)
+		}
 	}
 }

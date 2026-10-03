@@ -144,6 +144,10 @@ func (s *SQLite) Heads(ctx context.Context) ([]Revision, error) {
 		WHERE r.document IS NOT NULL ORDER BY r.kind, r.name`)
 }
 
+func (s *SQLite) Revisions(ctx context.Context, kind config.Kind) ([]Revision, error) {
+	return s.revisions(ctx, `SELECT `+revisionColumns+` FROM config_revisions r WHERE r.kind = ? ORDER BY r.revision_id`, string(kind))
+}
+
 func (s *SQLite) revisions(ctx context.Context, query string, args ...any) ([]Revision, error) {
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
