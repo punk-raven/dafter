@@ -7,6 +7,8 @@ function sessionRequest() {
   };
   const profile = document.getElementById('profile').value.trim();
   if (profile) body.profile = profile;
+  const agentId = document.getElementById('agent-name').value.trim();
+  if (agentId) body.agent = agentId;
 
   const overrides = {};
   const resolution = document.getElementById('resolution').value;

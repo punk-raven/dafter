@@ -27,3 +27,8 @@ test('a telephony session never asks for phone guests, because it is the call it
   assert.equal(body.channel, 'telephony');
   assert.equal(body.overrides, undefined);
 });
+
+test('a session names the agent the form names, and leaves it to the defaults otherwise', () => {
+  assert.equal(form({ 'agent-name': ' maya ' })('sessionRequest()').agent, 'maya');
+  assert.equal(form({})('sessionRequest()').agent, undefined);
+});
