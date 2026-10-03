@@ -11,6 +11,7 @@ import pytest
 from dafter_runtime.control import CONTROL_URL_ENV
 from dafter_runtime.worker import (
     FRAMEWORK_LOGGER,
+    HTTP_PORT_ENV,
     POOL_ENV,
     on_request,
     prewarm,
@@ -59,6 +60,15 @@ def test_framework_log_records_lose_their_transcript_fields(framework: logging.L
 def test_every_worker_process_loads_the_local_models_before_its_first_job() -> None:
     assert server().setup_fnc is prewarm
     prewarm(cast(JobProcess, None))
+
+
+def test_the_health_server_takes_a_free_port_unless_one_is_named(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(HTTP_PORT_ENV, raising=False)
+    assert server()._port == 0
+    monkeypatch.setenv(HTTP_PORT_ENV, "18181")
+    assert server()._port == 18181
 
 
 class Request:
