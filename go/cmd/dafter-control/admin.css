@@ -11,6 +11,7 @@
   --accent-soft: #ece8fd;
   --danger: #c0262d;
   --danger-soft: #fdecec;
+  --danger-text: #ffffff;
   --ok: #17803d;
   --ok-soft: #e5f5ea;
   --warn: #9a5b00;
@@ -39,6 +40,7 @@
     --accent-soft: #241e44;
     --danger: #f07178;
     --danger-soft: #3a1a1d;
+    --danger-text: #1a0b0c;
     --ok: #5fd38a;
     --ok-soft: #14301e;
     --warn: #f2c35b;
@@ -66,6 +68,7 @@
   --accent-soft: #241e44;
   --danger: #f07178;
   --danger-soft: #3a1a1d;
+  --danger-text: #1a0b0c;
   --ok: #5fd38a;
   --ok-soft: #14301e;
   --warn: #f2c35b;
@@ -80,14 +83,14 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; scroll-padding-top: 72px; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 72px; scrollbar-gutter: stable; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; overflow-wrap: anywhere; }
 h1, h2, h3 { margin: 0; line-height: 1.25; }
 h1 { font-size: 20px; font-weight: 650; }
 h2 { font-size: 16px; font-weight: 600; }
 h3 { font-size: 14px; font-weight: 600; }
 p { margin: 0; }
-a { color: var(--accent); }
+a { color: var(--accent); text-underline-offset: 0.25em; }
 code, pre, textarea.json { font-family: var(--mono); font-size: 12.5px; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 [hidden] { display: none !important; }
@@ -138,7 +141,7 @@ main:focus { outline: none; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: 7px; border: 1px solid transparent; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; min-height: 36px; }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-primary { background: var(--accent); color: var(--accent-text); }
-.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger { background: var(--danger); color: var(--danger-text); }
 .btn-ghost-danger { background: transparent; color: var(--danger); border-color: var(--border); }
 .btn-quiet { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 .btn-small { padding: 4px 10px; min-height: 30px; font-size: 13px; }
@@ -155,6 +158,8 @@ textarea[readonly] { background: var(--surface-2); }
 [aria-invalid] { border-color: var(--danger) !important; }
 .field-error { color: var(--danger); font-size: 13px; margin-top: 4px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 16px; }
+.form-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.raw-config > summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
 fieldset.choice { border: 0; padding: 0; margin: 0 0 16px; }
 fieldset.choice legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
 .radios { display: flex; gap: 16px; flex-wrap: wrap; }
@@ -184,6 +189,8 @@ a.doc-name:hover { color: var(--accent); text-decoration: underline; }
 .btn-row svg { flex: none; }
 .section-lede { margin: -4px 0 8px; }
 .doc-meta { color: var(--muted); font-size: 13px; }
+.doc-summary { color: var(--text); font-size: 13px; margin-top: 2px; }
+.doc-summary .fact { display: inline-block; max-width: 100%; }
 
 .problems { border: 1px solid var(--danger); background: var(--danger-soft); color: var(--text); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
 .problems-title { font-weight: 600; color: var(--danger); }
@@ -223,6 +230,8 @@ pre.json { margin: 0; padding: 12px; background: var(--surface-2); border-radius
 .history li + li { border-top: 1px solid var(--border); }
 .history time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .history .what { min-width: 0; }
+.history .what a { text-decoration: none; font-weight: 600; }
+.history .what a:hover { text-decoration: underline; }
 .history .by { color: var(--muted); font-size: 13px; }
 .filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .filter > * { flex: 1 1 160px; }
@@ -248,6 +257,7 @@ pre.json { margin: 0; padding: 12px; background: var(--surface-2); border-radius
   .nav ul { display: contents; }
   .nav a { padding: 5px 10px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; }
   .card { padding: 14px; }
+  .form-grid-3 { grid-template-columns: minmax(0, 1fr); }
   .history li { grid-template-columns: minmax(0, 1fr) auto; }
   .history .what { grid-column: 1 / -1; }
   .doc-row { grid-template-columns: minmax(0, 1fr) auto; }

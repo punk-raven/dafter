@@ -6,14 +6,20 @@ const ADMIN_KINDS = [
   { kind: 'agents', label: 'Agents', single: 'agent', editable: true },
   { kind: 'profiles', label: 'Profiles', single: 'profile', editable: true },
   { kind: 'tenants', label: 'Tenants', single: 'tenant', editable: true },
-  { kind: 'languages', label: 'Languages', single: 'language overlay', editable: true },
-  { kind: 'channels', label: 'Channels', single: 'channel overlay', editable: true },
+  { kind: 'languages', label: 'Languages', single: 'language', editable: true },
+  { kind: 'channels', label: 'Channels', single: 'channel', editable: true },
   { kind: 'defaults', label: 'Defaults', single: 'defaults document', editable: false },
   { kind: 'llms', label: 'LLMs', single: 'LLM route', editable: false },
 ];
 
 function kindInfo(kind) {
   return ADMIN_KINDS.find((k) => k.kind === kind) || null;
+}
+
+function docLabel(kind, name) {
+  const info = kindInfo(kind);
+  if (kind === 'defaults') return 'defaults';
+  return `${info ? info.single : kind} ${name}`;
 }
 
 function sessionValue(key) {

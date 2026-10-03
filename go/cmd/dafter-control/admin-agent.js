@@ -57,7 +57,7 @@ function setFieldError(node, messages) {
 function wordList(field, label, hint, words, options = {}) {
   const items = el('ul', { class: 'word-list', 'aria-label': label });
   const error = fieldError(`agent-${field}-error`);
-  const addInput = el('input', { type: 'text', id: `agent-${field}-add`, autocomplete: 'off', placeholder: 'Add a word' });
+  const addInput = el('input', { type: 'text', id: `agent-${field}-add`, autocomplete: 'off', placeholder: 'Add words, comma separated', 'aria-describedby': `agent-${field}-hint` });
   const addButton = el('button', { type: 'button', class: 'btn btn-quiet' }, 'Add');
   const previous = el('div', { class: 'previous', role: 'group', 'aria-label': `Previously used ${label.toLowerCase()}`, hidden: '' });
   const changed = () => (options.onChange ? options.onChange() : null);
@@ -112,7 +112,7 @@ function wordList(field, label, hint, words, options = {}) {
 
   const node = el('div', { class: 'field' },
     el('label', { for: `agent-${field}-add` }, label),
-    el('p', { class: 'hint' }, hint),
+    el('p', { class: 'hint', id: `agent-${field}-hint` }, hint),
     items,
     el('div', { class: 'word-add' }, addInput, addButton),
     previous,
@@ -142,10 +142,10 @@ function wordList(field, label, hint, words, options = {}) {
 
 function agentForm(doc, profiles, history) {
   const values = agentValuesOf(doc);
-  const name = el('input', { type: 'text', id: 'agent-name', required: '', value: values.name, autocomplete: 'off', 'aria-describedby': 'agent-name-error' });
+  const name = el('input', { type: 'text', id: 'agent-name', required: '', value: values.name, autocomplete: 'off', 'aria-describedby': 'agent-name-hint agent-name-error' });
   const nameError = fieldError('agent-name-error');
-  const profile = el('select', { id: 'agent-profile', 'aria-describedby': 'agent-profile-error' },
-    el('option', { value: '' }, 'None (sessions pick a profile)'),
+  const profile = el('select', { id: 'agent-profile', 'aria-describedby': 'agent-profile-hint agent-profile-error' },
+    el('option', { value: '' }, 'None, use the defaults'),
     ...profiles.map((p) => el('option', { value: p }, p)));
   if (values.profile && !profiles.includes(values.profile)) profile.append(el('option', { value: values.profile }, values.profile));
   profile.value = values.profile;
@@ -160,11 +160,12 @@ function agentForm(doc, profiles, history) {
   suggestAll();
 
   const node = el('div', { class: 'agent-form' },
-    el('div', { class: 'field' }, el('label', { for: 'agent-name' }, 'Display name'), name, nameError),
+    el('div', { class: 'field' }, el('label', { for: 'agent-name' }, 'Display name'),
+      el('p', { class: 'hint', id: 'agent-name-hint' }, 'The name the agent introduces itself with and wakes up to, e.g. Maya.'), name, nameError),
     aliases.node,
     nearMisses.node,
     el('div', { class: 'field' }, el('label', { for: 'agent-profile' }, 'Profile'),
-      el('p', { class: 'hint' }, 'The profile a session naming this agent uses when it names none; it carries the persona.'),
+      el('p', { class: 'hint', id: 'agent-profile-hint' }, 'Settings used when a session asks for this agent without picking a profile itself, such as its persona (how it behaves) and the models it uses.'),
       profile, profileError));
 
   return {

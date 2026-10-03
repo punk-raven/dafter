@@ -154,3 +154,16 @@ test('an added document diffs against nothing', () => {
   const out = plain(run(`documentDiff({ change: 'added', draft: { name: 'Maya' } })`));
   assert.deepEqual(out.stats, { added: 3, removed: 0 });
 });
+
+test('an error title reads as an instruction, not a server message', () => {
+  const run = load(...SCRIPTS);
+  assert.equal(run(`problemTitle('the agents document has 1 problem(s)')`), 'Fix 1 problem before saving.');
+  assert.equal(run(`problemTitle('the agents document has 3 problem(s)')`), 'Fix 3 problems before saving.');
+  assert.equal(run(`problemTitle('the admin API could not be reached')`), 'The admin API could not be reached');
+});
+
+test('a document is named by its kind and name, the one defaults document by itself', () => {
+  const run = load(...SCRIPTS);
+  assert.equal(run(`docLabel('agents', 'maya')`), 'agent maya');
+  assert.equal(run(`docLabel('defaults', 'defaults')`), 'defaults');
+});

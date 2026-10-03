@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { load } from './harness.mjs';
 
-const run = load('admin-api.js', 'admin-fields.js', 'admin-diff.js', 'admin-agent.js', 'admin-list.js', 'admin-docs.js', 'admin-publish.js', 'admin-releases.js', 'admin.js');
+const run = load('admin-api.js', 'admin-fields.js', 'admin-diff.js', 'admin-agent.js', 'admin-list.js', 'admin-summary.js', 'admin-docs.js', 'admin-publish.js', 'admin-releases.js', 'admin.js');
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
 test('the hash routes to a view, a kind, or one document', () => {
@@ -70,11 +70,11 @@ test('editable kinds offer edit and delete on each row, git kinds only view', ()
 });
 
 test('a removed document says whether its removal is still waiting to be published', () => {
-  assert.deepEqual(plain(run(`removedStatus({ live: true })`)), { label: 'Pending removal', tone: 'removed' });
-  assert.deepEqual(plain(run(`removedStatus({ live: false })`)), { label: 'Removed', tone: 'muted' });
-  const meta = run(`removedMeta({ deletedAt: '2026-10-03T09:30:00Z', deletedBy: 'Asha', revision: 12, note: 'retired' })`);
-  assert.match(meta, /^deleted 2026-10-0\d \d\d:\d\d by Asha · last revision 12 · "retired"$/);
-  assert.match(run(`removedMeta({ deletedAt: '2026-10-03T09:30:00Z', deletedBy: '', revision: 3 })`), /by admin · last revision 3$/);
+  assert.deepEqual(plain(run(`removedStatus({ live: true })`)), { label: 'Still live until you publish', tone: 'removed' });
+  assert.equal(run(`removedStatus({ live: false })`), null);
+  const now = Date.parse('2026-10-03T12:30:00Z');
+  assert.equal(run(`removedMeta({ deletedAt: '2026-10-03T09:30:00Z', deletedBy: 'Asha', revision: 12, note: 'retired' }, ${now})`), 'deleted 3 hours ago by Asha · "retired"');
+  assert.equal(run(`removedMeta({ deletedAt: '2026-10-03T09:30:00Z', deletedBy: '', revision: 3 }, ${now})`), 'deleted 3 hours ago by admin');
 });
 
 test('previously used words come from earlier revisions, newest first, minus what the lists hold now', () => {
@@ -89,4 +89,9 @@ test('previously used words come from earlier revisions, newest first, minus wha
   assert.deepEqual(plain(run(`previouslyUsed(${history}, 'nearMisses', ['Maia'].concat(['Mira']))`)), [], 'a word now an alias is not offered as a near miss');
   assert.deepEqual(plain(run(`previouslyUsed([], 'aliases', [])`)), []);
   assert.deepEqual(plain(run(`previouslyUsed([{ aliases: 'not a list' }, null], 'aliases', [])`)), []);
+});
+
+test('deleting says whether running sessions are affected', () => {
+  assert.match(run(`deleteBody({ published: true, liveRevision: 3 })`), /^Sessions keep using it until you publish/);
+  assert.match(run(`deleteBody({ published: false })`), /^It was never published/);
 });

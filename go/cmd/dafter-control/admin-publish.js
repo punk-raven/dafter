@@ -1,5 +1,4 @@
 const CHANGE_LABELS = { added: 'Added', changed: 'Changed', removed: 'Removed' };
-const PREVIEW_CHANNELS = ['webrtc', 'telephony', 'long_form'];
 const previewChoice = { source: 'draft', tenantId: '', agent: '', profile: '', language: '', channel: 'webrtc' };
 
 function previewBody(values) {
@@ -17,11 +16,10 @@ function changeSummary(changes) {
 
 function changeBlock(change) {
   const { lines, stats } = documentDiff(change);
-  const info = kindInfo(change.kind);
   return el('details', { class: 'change', open: '' },
     el('summary', {},
       el('span', { class: `pill pill-${change.change}` }, CHANGE_LABELS[change.change] || change.change),
-      el('span', { class: 'change-name' }, `${info ? info.single : change.kind} ${change.name}`),
+      el('span', { class: 'change-name' }, docLabel(change.kind, change.name)),
       el('span', { class: 'stats', 'aria-label': `${stats.added} lines added, ${stats.removed} lines removed` },
         el('span', { class: 'plus' }, `+${stats.added}`), ' ', el('span', { class: 'minus' }, `-${stats.removed}`))),
     renderDiff(lines));
@@ -50,59 +48,87 @@ async function showChanges() {
   const problems = el('div', {});
   const base = diff.liveRelease ? `release ${diff.liveRelease}` : 'nothing published yet';
   if (diff.changes.length === 0) {
-    showMain(pageHead('Changes', `The draft matches what is live (${base}).`),
-      el('section', { class: 'card' }, el('p', { class: 'empty' }, 'Nothing to publish. Edit a document to start a change.')));
+    showMain(pageHead('Changes', `Everything saved is live (${base}).`),
+      el('section', { class: 'card' }, el('p', { class: 'empty' }, 'Nothing waiting to be published. Saved edits wait here until you publish them.')));
     return;
   }
   const publish = el('button', { type: 'button', class: 'btn btn-primary' }, 'Publish');
   publish.addEventListener('click', () => publishDraft(diff.changes.length, problems));
   showMain(
-    pageHead('Changes', `Draft compared with ${base}: ${changeSummary(diff.changes)}.`, el('a', { class: 'btn btn-quiet', href: '#/preview' }, 'Preview'), publish),
+    pageHead('Changes', `Saved edits that are not live yet (${changeSummary(diff.changes)}), compared with ${base}. Publishing makes them live for new sessions.`,
+      el('a', { class: 'btn btn-quiet', href: '#/preview' }, 'Preview'), publish),
     problems,
     el('section', { class: 'card', 'aria-label': 'Changed documents' }, diff.changes.map(changeBlock)));
 }
 
-function choiceSelect(id, label, options, value, emptyLabel) {
-  const select = el('select', { id },
+function choiceSelect(id, label, options, value, emptyLabel, hint) {
+  const select = el('select', { id, 'aria-describedby': hint ? `${id}-hint` : null },
     emptyLabel ? el('option', { value: '' }, emptyLabel) : null,
     options.map((o) => el('option', { value: o.value }, o.label)));
   select.value = options.some((o) => o.value === value) || (emptyLabel && value === '') ? value : (options[0] ? options[0].value : '');
-  return { select, node: el('div', { class: 'field' }, el('label', { for: id }, label), select) };
+  return { select, node: el('div', { class: 'field' }, el('label', { for: id }, label), hint ? el('p', { class: 'hint', id: `${id}-hint` }, hint) : null, select) };
 }
 
-function namesOf(views) {
-  return views.map((v) => ({ value: v.name, label: v.document && v.document.name && v.kind === 'agents' ? `${v.document.name} (${v.name})` : v.name }));
+function choicesOf(kind, views) {
+  return views.map((v) => {
+    const shown = docTitle(kind, v);
+    return { value: v.name, label: shown !== v.name ? `${shown} (${v.name})` : v.name };
+  });
 }
 
-function previewSummary(config) {
+function previewStartingChoice(defaults, languages) {
+  const preferred = at(defaults, 'agent.languageSwitching.languages') || [];
+  const names = languages.map((v) => v.name);
+  return preferred.find((tag) => names.includes(tag)) || names[0] || '';
+}
+
+function previewRows(config) {
   const agent = config.agent || {};
   const addressing = agent.addressing || {};
-  const rows = [
+  const pipeline = agent.pipeline || {};
+  const tts = pipeline.tts || {};
+  const voice = at(tts, 'options.voice');
+  return [
     ['Privacy', config.privacyMode],
-    ['Agent', agent.enabled === false ? 'disabled' : agent.name],
+    ['Agent', agent.enabled === false ? 'off' : agent.name],
+    ['Persona', agent.personaRef ? String(agent.personaRef).replace(/^persona:\/\//, '') : ''],
+    ['Speech-to-text', stageLabel(pipeline.stt)],
+    ['LLM', stageLabel(pipeline.llm) || stageLabel(pipeline.realtime)],
+    ['Voice', voice ? `${voice} (${stageLabel(tts)})` : stageLabel(tts)],
+    ['End of turn', config.turn && config.turn.strategy ? TURN_STRATEGIES[config.turn.strategy] || config.turn.strategy : ''],
+    ['Recording', config.recording && config.recording.enabled ? 'on' : 'off'],
+    ['Transcript', config.transcription && config.transcription.mode && config.transcription.mode !== 'off' ? config.transcription.mode.replace(/_/g, ' ') : 'none'],
     ['Aliases', (addressing.aliases || []).join(', ') || 'none'],
     ['Near misses', (addressing.nearMisses || []).join(', ') || 'none'],
   ];
-  return el('dl', { class: 'summary' }, rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v === undefined ? '-' : String(v))]));
+}
+
+function previewSummary(config) {
+  return el('dl', { class: 'summary' }, previewRows(config).flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v === undefined || v === '' ? '-' : String(v))]));
 }
 
 async function showPreview() {
-  const [tenants, agents, profiles, languages, channels] = await Promise.all(
-    ['tenants', 'agents', 'profiles', 'languages', 'channels'].map((k) => adminCall('GET', adminPath(k))));
-  const channelNames = [...new Set(PREVIEW_CHANNELS.concat(channels.map((c) => c.name)))].map((c) => ({ value: c, label: c }));
-  const tenant = choiceSelect('preview-tenant', 'Tenant', namesOf(tenants), previewChoice.tenantId);
-  const agent = choiceSelect('preview-agent', 'Agent', namesOf(agents), previewChoice.agent, 'None (defaults)');
-  const profile = choiceSelect('preview-profile', 'Profile', namesOf(profiles), previewChoice.profile, 'None (agent or defaults)');
-  const language = choiceSelect('preview-language', 'Language', namesOf(languages), previewChoice.language);
-  const channel = choiceSelect('preview-channel', 'Channel', channelNames, previewChoice.channel);
+  const [tenants, agents, profiles, languages, channels, defaults] = await Promise.all(
+    ['tenants', 'agents', 'profiles', 'languages', 'channels', 'defaults'].map((k) => adminCall('GET', adminPath(k))));
+  const baseline = defaults[0] ? defaults[0].document : {};
+  if (!previewChoice.language) previewChoice.language = previewStartingChoice(baseline, languages);
+  const channelViews = [...new Set(Object.keys(CHANNEL_LABELS).concat(channels.map((c) => c.name)))].map((name) => ({ name }));
+  const defaultAgent = at(baseline, 'agent.name');
+  const tenant = choiceSelect('preview-tenant', 'Tenant', choicesOf('tenants', tenants), previewChoice.tenantId);
+  const language = choiceSelect('preview-language', 'Language', choicesOf('languages', languages), previewChoice.language);
+  const channel = choiceSelect('preview-channel', 'Channel', choicesOf('channels', channelViews), previewChoice.channel);
+  const agent = choiceSelect('preview-agent', 'Agent', choicesOf('agents', agents), previewChoice.agent,
+    defaultAgent ? `Default agent (${defaultAgent})` : 'Default agent', 'The agent a session asks for by name, if any.');
+  const profile = choiceSelect('preview-profile', 'Profile', choicesOf('profiles', profiles), previewChoice.profile,
+    'The agent\'s own profile, or none', 'Only when a session names a profile itself.');
   const sources = ['draft', 'live'].map((s) => el('label', {},
     el('input', { type: 'radio', name: 'preview-source', value: s, checked: previewChoice.source === s || null }),
-    s === 'draft' ? 'Draft (what publishing would ship)' : 'Live release'));
+    s === 'draft' ? 'Draft, including unpublished edits' : `What is live now${adminState.liveRelease ? ` (release ${adminState.liveRelease})` : ''}`));
   const result = el('div', { 'aria-live': 'polite' });
-  const run = el('button', { type: 'submit', class: 'btn btn-primary' }, 'Resolve');
+  const run = el('button', { type: 'submit', class: 'btn btn-primary' }, 'Show settings');
   const form = el('form', { class: 'card', 'aria-label': 'Preview a session' },
-    el('fieldset', { class: 'choice' }, el('legend', {}, 'Resolve against'), el('div', { class: 'radios' }, sources)),
-    el('div', { class: 'form-grid' }, tenant.node, agent.node, profile.node, language.node, channel.node),
+    el('fieldset', { class: 'choice' }, el('legend', {}, 'Use'), el('div', { class: 'radios' }, sources)),
+    el('div', { class: 'form-grid form-grid-3' }, tenant.node, language.node, channel.node, agent.node, profile.node),
     el('div', { class: 'actions' }, run));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -115,12 +141,14 @@ async function showPreview() {
     try {
       const out = await adminCall('POST', adminPath('preview'), { body: previewBody(previewChoice) });
       const copy = el('button', { type: 'button', class: 'btn btn-quiet btn-small' }, 'Copy');
-      copy.addEventListener('click', () => navigator.clipboard.writeText(out.configHash).then(() => notify('Config hash copied.'), () => notify('The browser did not allow copying.', 'warn')));
-      result.replaceChildren(el('section', { class: 'card', 'aria-label': 'Resolved config' },
-        el('h2', {}, out.source === 'live' ? `Resolved from release ${out.release}` : 'Resolved from the draft'),
-        el('div', { class: 'hash' }, el('span', { class: 'label' }, 'configHash'), el('code', {}, out.configHash), copy),
+      copy.addEventListener('click', () => navigator.clipboard.writeText(out.configHash).then(() => notify('Fingerprint copied.'), () => notify('The browser did not allow copying.', 'warn')));
+      result.replaceChildren(el('section', { class: 'card', 'aria-label': 'Resolved settings' },
+        el('h2', {}, out.source === 'live' ? `Settings from release ${out.release}` : 'Settings from the draft'),
+        el('div', { class: 'hash' }, el('span', { class: 'label' }, 'Fingerprint'), el('code', {}, out.configHash), copy),
+        el('p', { class: 'hint' }, 'The fingerprint (configHash) changes whenever any setting below does, so two sessions with the same fingerprint ran with identical settings.'),
         previewSummary(out.config),
-        el('pre', { class: 'json', tabindex: '0', 'aria-label': 'Resolved session config' }, prettyJson(out.config))));
+        el('details', { class: 'raw-config' }, el('summary', {}, 'Full settings as JSON'),
+          el('pre', { class: 'json', tabindex: '0', 'aria-label': 'Resolved session config' }, prettyJson(out.config)))));
     } catch (err) {
       if (err.status !== 401) result.replaceChildren(problemList(err).box);
     } finally {
@@ -128,6 +156,6 @@ async function showPreview() {
     }
   });
   showMain(
-    pageHead('Preview', 'Resolve a session config the way the control plane would, and see its hash, before or after publishing.'),
+    pageHead('Preview', 'See the exact settings a new session would get for these choices, before or after publishing.'),
     form, result);
 }

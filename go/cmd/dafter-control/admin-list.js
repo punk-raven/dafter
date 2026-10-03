@@ -34,31 +34,38 @@ function rowButton(action, subject, attrs) {
     icon(action), el('span', { class: 'btn-label' }, label));
 }
 
-function docTitle(kind, view) {
-  return kind === 'agents' && view.document && view.document.name ? `${view.document.name}` : view.name;
-}
-
 function removedStatus(entry) {
-  return entry.live ? { label: 'Pending removal', tone: 'removed' } : { label: 'Removed', tone: 'muted' };
+  return entry.live ? { label: 'Still live until you publish', tone: 'removed' } : null;
 }
 
-function removedMeta(entry) {
-  const parts = [`deleted ${shortDate(entry.deletedAt)} by ${entry.deletedBy || 'admin'}`, `last revision ${entry.revision}`];
+function removedMeta(entry, now) {
+  const parts = [`deleted ${relativeTime(entry.deletedAt, now)} by ${entry.deletedBy || 'admin'}`];
   if (entry.note) parts.push(`"${entry.note}"`);
   return parts.join(' · ');
 }
 
-async function deleteFromList(kind, name, problems) {
+function deletedMessage(info, view) {
+  const live = view && (view.published || view.liveRevision);
+  return `Deleted ${info.single} ${view.name}. ${live ? 'Publish from Changes to stop sessions using it.' : 'It was never published, so nothing else is needed.'}`;
+}
+
+function deleteBody(view) {
+  const live = view && (view.published || view.liveRevision);
+  return `${live ? 'Sessions keep using it until you publish the deletion from Changes.' : 'It was never published, so no session uses it.'} You can restore it from the Removed list.`;
+}
+
+async function deleteFromList(kind, view, problems) {
+  const name = view.name;
   const info = kindInfo(kind);
   const answer = await confirmDialog({
     title: `Delete ${info.single} ${name}?`,
-    body: 'The deletion is a draft change: sessions keep using it until the next release is published. It stays under Removed, where it can be restored.',
+    body: deleteBody(view),
     confirmLabel: 'Delete', danger: true, withNote: true,
   });
   if (!answer.ok) return;
   try {
     await adminCall('DELETE', adminPath(kind, name), { note: answer.note });
-    notify(`Deleted ${info.single} ${name} from the draft. Publish it from Changes, or restore it under Removed.`);
+    notify(deletedMessage(info, view));
     await refreshSummary();
     await showKind(kind);
   } catch (err) {
@@ -89,17 +96,18 @@ function documentRow(kind, view, problems) {
   const title = docTitle(kind, view);
   const subject = `${info.single} ${view.name}`;
   const href = `#/${kind}/${encodeURIComponent(view.name)}`;
-  const summary = docSummary(kind, view.document);
+  const facts = docSummaryParts(kind, view.document);
   const actions = rowActionsFor(info).map((action) => {
     if (action !== 'delete') return rowButton(action, subject, { href });
     const button = rowButton(action, subject, {});
-    button.addEventListener('click', () => deleteFromList(kind, view.name, problems));
+    button.addEventListener('click', () => deleteFromList(kind, view, problems));
     return button;
   });
   return el('li', { class: 'doc-row' },
     el('div', { class: 'doc-main' },
       el('a', { class: 'doc-name', href }, title, title !== view.name ? el('span', { class: 'doc-meta' }, ` (${view.name})`) : null),
-      el('div', { class: 'doc-meta' }, `revision ${view.revision}`, summary ? ` · ${summary}` : '')),
+      facts.length ? el('div', { class: 'doc-summary' }, facts.flatMap((f, i) => [i ? ' · ' : null, el('span', { class: 'fact' }, f)])) : null,
+      el('div', { class: 'doc-meta', title: shortDate(view.updatedAt) }, updatedLine(view))),
     el('span', { class: `pill pill-${status.tone} doc-status` }, status.label),
     el('div', { class: 'row-actions' }, actions));
 }
@@ -114,7 +122,7 @@ function removedRow(kind, entry, problems) {
     el('div', { class: 'doc-main' },
       el('span', { class: 'doc-name' }, title, title !== entry.name ? el('span', { class: 'doc-meta' }, ` (${entry.name})`) : null),
       el('div', { class: 'doc-meta' }, removedMeta(entry))),
-    el('span', { class: `pill pill-${status.tone} doc-status` }, status.label),
+    status ? el('span', { class: `pill pill-${status.tone} doc-status` }, status.label) : el('span', {}),
     el('div', { class: 'row-actions' }, restore));
 }
 
@@ -125,16 +133,17 @@ async function showKind(kind) {
     info.editable ? adminCall('GET', adminPath('removed', kind)) : Promise.resolve([]),
   ]);
   const problems = el('div', {});
-  const create = info.editable ? el('a', { class: 'btn btn-primary', href: `#/${kind}/new` }, `New ${info.single}`) : null;
+  const full = kind === 'channels' && Object.keys(CHANNEL_LABELS).every((c) => views.some((v) => v.name === c));
+  const create = info.editable && !full ? el('a', { class: 'btn btn-primary', href: `#/${kind}/new` }, `New ${info.single}`) : null;
   const card = el('section', { class: 'card', 'aria-label': info.label });
   if (views.length === 0) {
-    card.append(el('p', { class: 'empty' }, `No ${info.label.toLowerCase()} yet.`));
+    card.append(el('p', { class: 'empty' }, `No ${info.label.toLowerCase()} yet.`, info.editable ? ` Use New ${info.single} to add one.` : ''));
   } else {
     card.append(el('ul', { class: 'doc-list' }, views.map((v) => documentRow(kind, v, problems))));
   }
   const gone = removed.length === 0 ? null : el('section', { class: 'card', 'aria-labelledby': 'removed-title' },
     el('h2', { id: 'removed-title' }, 'Removed'),
-    el('p', { class: 'hint section-lede' }, `${info.label} that were deleted. Restore brings back the last revision as a draft; nothing changes for sessions until you publish.`),
+    el('p', { class: 'hint section-lede' }, `${info.label} that were deleted. Restore brings back the last saved version as a draft; nothing changes for sessions until you publish.`),
     el('ul', { class: 'doc-list' }, removed.map((entry) => removedRow(kind, entry, problems))));
   showMain(
     pageHead(info.label, KIND_LEDES[kind], create),

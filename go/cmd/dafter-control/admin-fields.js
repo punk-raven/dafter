@@ -74,3 +74,10 @@ function friendlyMessage(message) {
     .replace(/^maxLength: got (\d+), want (\d+)$/, 'is $1 characters, at most $2 allowed')
     .replace(/^maxItems: got (\d+), want (\d+)$/, 'has $1 entries, at most $2 allowed');
 }
+
+function problemTitle(message) {
+  const text = String(message || '');
+  const counted = /^the \S+ document has (\d+) problem\(s\)$/.exec(text);
+  if (counted) return counted[1] === '1' ? 'Fix 1 problem before saving.' : `Fix ${counted[1]} problems before saving.`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

@@ -1,35 +1,49 @@
 const GIT_KIND_NOTE = 'Kept in git as catalog.json and imported when the control plane starts, so it is read-only here. Change it with a pull request.';
 
 const KIND_LEDES = {
-  agents: 'Named agents a session can ask for: the name it answers to, its aliases, the near misses that must never wake it, and its profile.',
-  profiles: 'Named bundles of settings a session or an agent picks, such as the persona and the LLM.',
-  tenants: 'Per-customer settings: residency, budgets and telephony.',
-  languages: 'Overlays and tuning applied when a session runs in a language.',
-  channels: 'Overlays and tuning applied per channel: webrtc, telephony and long_form.',
-  defaults: 'The baseline every session starts from.',
-  llms: 'The LLM routes a session can choose.',
+  agents: 'Named agents a session can ask for: the name it answers to, other spellings of that name, sound-alike words that must never wake it, and its profile.',
+  profiles: 'Named bundles of settings a session or an agent picks, such as the persona and the models it uses.',
+  tenants: 'Per-customer settings, such as where their data may be processed, how much a session may cost and which phone line they use.',
+  languages: 'Settings for each language a session can run in, such as speech-to-text, the voice and how the agent decides the caller has finished speaking.',
+  channels: 'Settings for how people join: webrtc for browser and app calls, telephony for phone calls, long_form for long meetings.',
+  defaults: 'The baseline every session starts from, before its tenant, profile, language and channel are applied.',
+  llms: 'The language models a session can be pointed at, with the provider and the key each one uses.',
 };
+
+const AXIS_HINT = 'Tuning is a starting point a session may still change; overlay settings always win, even over what a session asks for.';
+
+const KEY_LABELS = { agents: 'Agent id', tenants: 'Tenant id', languages: 'Language code', channels: 'Channel' };
+
+const KEY_HINTS = {
+  agents: 'What a session asks for, e.g. maya. Lowercase letters, digits and hyphens, 2 to 32 characters. It cannot change later.',
+  tenants: 'The customer id sessions are created with, e.g. t_9c21a4be. It cannot change later.',
+  languages: 'A language code such as hi, en-IN or ta-IN. It cannot change later.',
+  channels: 'One of webrtc, telephony or long_form. It cannot change later.',
+};
+
+const CHANNEL_LABELS = { webrtc: 'Browser and app calls', telephony: 'Phone calls', long_form: 'Long meetings' };
+
+function languageLabel(tag) {
+  try {
+    const label = new Intl.DisplayNames(['en'], { type: 'language' }).of(tag);
+    return label && label !== tag ? label : '';
+  } catch {
+    return '';
+  }
+}
+
+function docTitle(kind, view) {
+  const doc = view.document || {};
+  if (kind === 'agents' && doc.name) return doc.name;
+  if (kind === 'languages') return languageLabel(view.name) || view.name;
+  if (kind === 'channels') return CHANNEL_LABELS[view.name] || view.name;
+  return view.name;
+}
 
 function docStatus(view) {
   if (view.published) return { label: 'Live', tone: 'live' };
   if (view.liveRevision) return { label: 'Unpublished changes', tone: 'draft' };
   return { label: 'Not published', tone: 'draft' };
-}
-
-function countOf(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
-function docSummary(kind, doc) {
-  const d = doc && typeof doc === 'object' ? doc : {};
-  if (kind === 'agents') {
-    const parts = [];
-    if (d.profile) parts.push(`profile ${d.profile}`);
-    parts.push(countOf((d.aliases || []).length, 'alias', 'aliases'));
-    parts.push(countOf((d.nearMisses || []).length, 'near miss', 'near misses'));
-    return parts.join(' · ');
-  }
-  return Object.keys(d).join(', ');
 }
 
 function parseJsonDocument(text) {
@@ -76,6 +90,14 @@ function editorTabs(onSelect) {
   return el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Editor' }, form, raw);
 }
 
+function readOnlyBody(kind, doc, title) {
+  const rows = glanceRows(kind, doc);
+  return el('section', { class: 'card', 'aria-label': title },
+    rows.length ? el('dl', { class: 'summary' }, rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])) : null,
+    el('pre', { class: 'json', tabindex: '0', 'aria-label': 'Document JSON' }, prettyJson(doc)),
+    el('div', { class: 'actions' }, el('a', { class: 'btn btn-quiet', href: `#/${kind}` }, `Back to ${kindInfo(kind).label}`)));
+}
+
 async function showEditor(kind, name) {
   const info = kindInfo(kind);
   const isNew = name === null;
@@ -88,8 +110,8 @@ async function showEditor(kind, name) {
   const problems = el('div', { id: 'doc-problems' });
   const keyInput = el('input', { type: 'text', id: 'doc-key', required: '', autocomplete: 'off', spellcheck: 'false', 'aria-describedby': 'doc-key-hint' });
   const keyField = isNew ? el('div', { class: 'field' },
-    el('label', { for: 'doc-key' }, kind === 'agents' ? 'Agent id' : 'Name'),
-    el('p', { class: 'hint', id: 'doc-key-hint' }, kind === 'agents' ? 'What a session asks for, e.g. maya. Lowercase letters, digits and hyphens, 2 to 32 characters. It cannot change later.' : 'The document name. It cannot change later.'),
+    el('label', { for: 'doc-key' }, KEY_LABELS[kind] || 'Name'),
+    el('p', { class: 'hint', id: 'doc-key-hint' }, KEY_HINTS[kind] || 'The name sessions use to pick it. It cannot change later.'),
     keyInput) : null;
   const jsonError = el('p', { class: 'field-error', id: 'doc-json-error', role: 'alert', hidden: '' });
   let form = isAgent ? agentForm(doc, profiles, history) : null;
@@ -172,13 +194,13 @@ async function showEditor(kind, name) {
     remove.addEventListener('click', async () => {
       const answer = await confirmDialog({
         title: `Delete ${info.single} ${name}?`,
-        body: 'The deletion is a draft change: sessions keep using it until the next release is published. It stays under Removed, where it can be restored.',
+        body: deleteBody(view),
         confirmLabel: 'Delete', danger: true, withNote: true,
       });
       if (!answer.ok) return;
       try {
         await adminCall('DELETE', adminPath(kind, name), { note: answer.note });
-        notify(`Deleted ${info.single} ${name} from the draft.`);
+        notify(deletedMessage(info, view));
         await refreshSummary();
         location.hash = `#/${kind}`;
       } catch (err) {
@@ -188,8 +210,10 @@ async function showEditor(kind, name) {
   }
 
   const status = view ? docStatus(view) : null;
-  const title = isNew ? `New ${info.single}` : (isAgent && doc.name ? `${doc.name} (${name})` : name);
-  const body = el('form', { class: 'card', novalidate: '', 'aria-label': title }, tabs, keyField, panel);
+  const shown = isNew ? '' : docTitle(kind, view);
+  const title = isNew ? `New ${info.single}` : (shown !== name ? `${shown} (${name})` : name);
+  const axisHint = kind === 'languages' || kind === 'channels' ? el('p', { class: 'hint' }, AXIS_HINT) : null;
+  const body = info.editable ? el('form', { class: 'card', novalidate: '', 'aria-label': title }, tabs, keyField, axisHint, panel) : readOnlyBody(kind, doc, title);
   if (info.editable) {
     body.append(el('div', { class: 'field' }, el('label', { for: 'doc-note' }, 'Change note (optional)'), note),
       el('div', { class: 'actions' }, remove, el('a', { class: 'btn btn-quiet', href: `#/${kind}` }, 'Cancel'), save));
@@ -198,7 +222,7 @@ async function showEditor(kind, name) {
   showMain(
     el('p', { class: 'crumb' }, el('a', { href: `#/${kind}` }, info.label), ' / ', isNew ? 'new' : name),
     el('div', { class: 'page-head' }, el('div', {}, el('h1', {}, title),
-      view ? el('p', { class: 'lede' }, `Revision ${view.revision}`, view.liveRevision && !view.published ? `, live is revision ${view.liveRevision}` : '') : null),
+      view && updatedLine(view) ? el('p', { class: 'lede' }, updatedLine(view).replace(/^u/, 'U')) : null),
     status ? el('span', { class: `pill pill-${status.tone}` }, status.label) : null),
     info.editable ? null : el('p', { class: 'note' }, GIT_KIND_NOTE),
     problems,

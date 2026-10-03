@@ -16,8 +16,7 @@ function newestFirst(list, key) {
 
 function historySubject(entry) {
   if (entry.kind && entry.name) {
-    const info = kindInfo(entry.kind);
-    return { text: `${info ? info.single : entry.kind} ${entry.name}`, href: `#/${entry.kind}/${encodeURIComponent(entry.name)}`, detail: entry.revision ? `revision ${entry.revision}` : '' };
+    return { text: docLabel(entry.kind, entry.name), href: `#/${entry.kind}/${encodeURIComponent(entry.name)}`, detail: '' };
   }
   if (entry.release) return { text: `release ${entry.release}`, href: '#/releases', detail: '' };
   return { text: '', href: null, detail: '' };
@@ -31,7 +30,8 @@ function historyMatches(entry, query) {
 }
 
 function releaseOrigin(release) {
-  if (release.rolledBackFrom) return `rollback to release ${release.rolledBackFrom}`;
+  if (release.rolledBackFrom) return `rolled back to release ${release.rolledBackFrom}`;
+  if (release.actor === 'catalog.json') return 'imported from catalog.json';
   return 'published from the draft';
 }
 
@@ -63,7 +63,7 @@ function releaseDocuments(release) {
     try {
       const full = await adminCall('GET', adminPath('releases', String(release.release)));
       list.replaceChildren(...(full.revisions || []).map((r) => el('li', {},
-        el('a', { href: `#/${r.kind}/${encodeURIComponent(r.name)}` }, `${r.kind}/${r.name}`), ` revision ${r.revision}`)));
+        el('a', { href: `#/${r.kind}/${encodeURIComponent(r.name)}` }, docLabel(r.kind, r.name)))));
     } catch (err) {
       list.replaceChildren(el('li', {}, err.message));
     }
@@ -81,13 +81,13 @@ async function showReleases() {
     card.append(el('div', { class: 'release' },
       el('div', { class: 'release-main' },
         el('div', { class: 'release-title' }, `Release ${r.release}`, r.live ? el('span', { class: 'pill pill-live' }, 'Live') : null),
-        el('p', { class: 'release-meta' }, `${shortDate(r.createdAt)} by ${r.actor}, ${releaseOrigin(r)}`),
+        el('p', { class: 'release-meta' }, el('time', { datetime: r.createdAt, title: shortDate(r.createdAt) }, relativeTime(r.createdAt)), r.actor === 'catalog.json' ? `, ${releaseOrigin(r)}` : ` by ${r.actor}, ${releaseOrigin(r)}`),
         r.note ? el('p', {}, r.note) : null,
         releaseDocuments(r)),
       rollback));
   }
   showMain(
-    pageHead('Releases', 'Every publish and rollback makes a numbered release. Exactly one is live.', el('a', { class: 'btn btn-quiet', href: '#/history' }, 'History')),
+    pageHead('Releases', 'Each publish or rollback creates a numbered release: a snapshot of every setting. New sessions use the live one; rolling back makes an older one live again.', el('a', { class: 'btn btn-quiet', href: '#/history' }, 'History')),
     card);
 }
 

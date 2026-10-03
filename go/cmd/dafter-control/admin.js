@@ -34,7 +34,7 @@ function notify(message, tone = 'ok') {
 function problemList(error, kind, name, fieldsShown) {
   const placed = placeProblems(kind, name, error.details);
   const box = el('div', { class: 'problems', role: 'alert' },
-    el('p', { class: 'problems-title' }, error.message));
+    el('p', { class: 'problems-title' }, problemTitle(error.message)));
   const all = (error.details || []).map(parseDetail).map((p) => {
     const local = kind ? documentPointer(kind, name, p.pointer) : null;
     return { pointer: local === null ? p.pointer : local || '/', message: p.message };
@@ -103,15 +103,15 @@ function onAdminUnauthorized() {
 
 function showSignIn(message) {
   document.body.classList.remove('signed-in');
-  const token = el('input', { type: 'password', id: 'signin-token', required: '', autocomplete: 'current-password' });
-  const actor = el('input', { type: 'text', id: 'signin-actor', maxlength: '64', autocomplete: 'nickname', value: adminAuth.actor });
+  const token = el('input', { type: 'password', id: 'signin-token', required: '', autocomplete: 'current-password', 'aria-describedby': 'signin-token-hint' });
+  const actor = el('input', { type: 'text', id: 'signin-actor', maxlength: '64', autocomplete: 'username', value: adminAuth.actor, 'aria-describedby': 'signin-actor-hint' });
   const error = el('p', { class: 'field-error', role: 'alert', hidden: !message }, message || '');
   const form = el('form', { class: 'card signin', 'aria-labelledby': 'signin-title' },
     el('h1', { id: 'signin-title' }, 'Sign in to the config store'),
-    el('div', { class: 'field' }, el('label', { for: 'signin-token' }, 'Admin token'), token,
-      el('p', { class: 'hint' }, 'The value of DAFTER_ADMIN_TOKEN. It is kept in this browser tab only.')),
-    el('div', { class: 'field' }, el('label', { for: 'signin-actor' }, 'Your name'), actor,
-      el('p', { class: 'hint' }, 'Recorded in the change history beside every save, publish and rollback.')),
+    el('div', { class: 'field' }, el('label', { for: 'signin-actor' }, 'Your name'),
+      el('p', { class: 'hint', id: 'signin-actor-hint' }, 'Recorded in the change history beside every save, publish and rollback.'), actor),
+    el('div', { class: 'field' }, el('label', { for: 'signin-token' }, 'Admin token'),
+      el('p', { class: 'hint', id: 'signin-token-hint' }, 'The admin token your team set for this server (DAFTER_ADMIN_TOKEN). It is kept in this browser tab only.'), token),
     error,
     el('div', { class: 'actions' }, el('button', { type: 'submit', class: 'btn btn-primary' }, 'Sign in')));
   form.addEventListener('submit', async (e) => {
@@ -128,7 +128,7 @@ function showSignIn(message) {
     }
   });
   byId('main').replaceChildren(form);
-  token.focus();
+  (actor.value ? token : actor).focus();
 }
 
 async function refreshSummary() {
