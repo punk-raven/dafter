@@ -17,6 +17,7 @@ from livekit.agents.types import USERDATA_TTS_STARTED_TIME
 from livekit.agents.voice.events import AgentStateChangedEvent, CloseEvent, UserStateChangedEvent
 
 from .naming import words
+from .own_voice import OwnVoice
 from .personas import base_language
 
 log = logging.getLogger("dafter.runtime.delivery")
@@ -66,8 +67,11 @@ Arrival = tuple[rtc.AudioFrame, float]
 
 
 class Filler:
-    def __init__(self, fillers: Fillers, language: str) -> None:
+    def __init__(
+        self, fillers: Fillers, language: str, spoken: Callable[[str], None] = lambda _: None
+    ) -> None:
         self._fillers = fillers
+        self._spoken = spoken
         self._phrases = self._of(language)
         self.after = fillers.after_ms / 1000
         self._audio: dict[str, Frames] = {}
@@ -212,11 +216,13 @@ class Filler:
         return True
 
     def _filler(self, current: object) -> Frames:
-        audio = self._audio.get(self.phrase() or "", [])
+        phrase = self.phrase() or ""
+        audio = self._audio.get(phrase, [])
         if audio and current is not None:
             self._played.add(current)
         if audio:
             log.info("a slow reply got a filler")
+            self._spoken(phrase)
         return audio
 
     def _timed(self, current: object, frame: rtc.AudioFrame, arrived: float) -> None:
@@ -233,8 +239,13 @@ class Filler:
 class Delivery:
     def __init__(self, speech: Speech, language: str) -> None:
         self._situational = Situational(speech.situations)
-        self.filler = Filler(speech.fillers, language)
+        self.own_voice = OwnVoice()
+        self.filler = Filler(speech.fillers, language, self.own_voice.said)
         self.situation = self._situational.opening()
+
+    def start(self, session: AgentSession[Any], tts: lk_tts.TTS[Any]) -> None:
+        self.own_voice.follow(session)
+        self.filler.start(session, tts)
 
     def heard(self, chat_ctx: llm.ChatContext) -> None:
         self.situation = self._situational.of(last_heard(chat_ctx))

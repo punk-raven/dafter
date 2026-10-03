@@ -55,6 +55,7 @@ class BargeIn:
         self._schedule = schedule
         self._resume = resume
         self._hearing: dict[str, Hearing] = {}
+        self._echoing: set[str] = set()
         self._paused = False
         self._resuming: Timer | None = None
 
@@ -92,14 +93,19 @@ class BargeIn:
             self._hold_resume()
             self._resumed()
 
+    def echoing(self, speaker: str) -> None:
+        self._echoing.add(speaker)
+        self.acknowledged(speaker)
+
     def left(self, speaker: str) -> None:
+        self._echoing.discard(speaker)
         if (hearing := self._hearing.pop(speaker, None)) is not None:
             hearing.hush()
 
     def replying(self) -> None:
         caller = self._caller()
         if caller is not None and (hearing := self._hearing.get(caller)) and hearing.sustained:
-            self._pause()
+            self._pause(caller)
             self._try(caller, hearing)
 
     def _held(self, speaker: str) -> None:
@@ -109,10 +115,12 @@ class BargeIn:
         hearing.timer = None
         hearing.sustained = True
         if speaker == self._caller():
-            self._pause()
+            self._pause(speaker)
         self._try(speaker, hearing)
 
-    def _pause(self) -> None:
+    def _pause(self, speaker: str) -> None:
+        if speaker in self._echoing:
+            return
         if self._resume is not None and self._resume.pause():
             self._paused = True
 
@@ -130,8 +138,9 @@ class BargeIn:
     def _try(self, speaker: str, hearing: Hearing) -> None:
         if speaker != self._caller():
             return
-        if self._min_words > 0:
-            if len(split_words(hearing.transcript(), split_character=True)) < self._min_words:
+        needed = max(self._min_words, 1) if speaker in self._echoing else self._min_words
+        if needed > 0:
+            if len(split_words(hearing.transcript(), split_character=True)) < needed:
                 return
         self._hold_resume()
         self._paused = False
