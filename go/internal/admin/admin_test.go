@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/punk-raven/dafter/go/internal/admin"
 	"github.com/punk-raven/dafter/go/internal/config"
@@ -191,7 +192,14 @@ func TestAnAgentIsWrittenPreviewedPublishedAndRolledBack(t *testing.T) {
 	if status, raw := h.call(t, "PUT", "/admin/v1/agents/asha", asha, who); status != http.StatusOK {
 		t.Fatalf("put: %d %s", status, raw)
 	}
-	_, raw := h.call(t, "GET", "/admin/v1/diff", ``, nil)
+	_, raw := h.call(t, "GET", "/admin/v1/agents/asha", ``, nil)
+	if view := decoded[struct {
+		UpdatedAt time.Time `json:"updatedAt"`
+		UpdatedBy string    `json:"updatedBy"`
+	}](t, raw); view.UpdatedBy != "priya@ops" || time.Since(view.UpdatedAt) > time.Minute {
+		t.Fatalf("the document view does not say who changed it and when: %s", raw)
+	}
+	_, raw = h.call(t, "GET", "/admin/v1/diff", ``, nil)
 	diff := decoded[struct {
 		LiveRelease int64 `json:"liveRelease"`
 		Changes     []struct {
