@@ -79,6 +79,7 @@ type Change struct {
 type Store interface {
 	Put(ctx context.Context, w Write) (Revision, error)
 	Heads(ctx context.Context) ([]Revision, error)
+	Revisions(ctx context.Context, kind config.Kind) ([]Revision, error)
 	Publish(ctx context.Context, p Publication) (Release, error)
 	LiveReleaseID(ctx context.Context) (int64, error)
 	LiveRelease(ctx context.Context) (Release, error)

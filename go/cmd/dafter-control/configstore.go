@@ -61,7 +61,7 @@ func (c *configStore) serveAdmin(ctx context.Context) {
 		slog.Error("admin API disabled", "error", err)
 		return
 	}
-	server := &http.Server{Addr: c.adminAddr, Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: c.adminAddr, Handler: adminHandler(api.Handler()), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -71,7 +71,7 @@ func (c *configStore) serveAdmin(ctx context.Context) {
 		}
 	}()
 	go func() {
-		slog.Info("admin API listening", "addr", c.adminAddr)
+		slog.Info("admin API and panel listening", "addr", c.adminAddr, "panel", "http://"+c.adminAddr+"/")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("admin API stopped", "error", err)
 		}

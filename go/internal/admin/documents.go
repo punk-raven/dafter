@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/configstore"
@@ -20,6 +21,8 @@ type documentView struct {
 	Document     json.RawMessage `json:"document"`
 	LiveRevision int64           `json:"liveRevision,omitempty"`
 	Published    bool            `json:"published"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
+	UpdatedBy    string          `json:"updatedBy"`
 }
 
 func kindOf(r *http.Request) (config.Kind, error) {
@@ -54,6 +57,7 @@ func (a *API) views(r *http.Request, kind config.Kind) ([]documentView, error) {
 		views = append(views, documentView{
 			Kind: kind, Name: rev.Name, Revision: rev.ID, Document: rev.Document,
 			LiveRevision: published[rev.Name], Published: published[rev.Name] == rev.ID,
+			UpdatedAt: rev.CreatedAt, UpdatedBy: rev.Actor,
 		})
 	}
 	return views, nil

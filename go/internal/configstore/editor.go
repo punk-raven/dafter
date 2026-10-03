@@ -43,10 +43,36 @@ func (e *Editor) Delete(ctx context.Context, kind config.Kind, name, actor, note
 	return e.write(ctx, kind, name, nil, actor, note)
 }
 
+func (e *Editor) Restore(ctx context.Context, kind config.Kind, name, actor, note string) (Revision, error) {
+	if err := editable(kind); err != nil {
+		return Revision{}, err
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	trail, err := e.Store.Revisions(ctx, kind)
+	if err != nil {
+		return Revision{}, err
+	}
+	for _, r := range Removed(trail) {
+		if r.Name == name {
+			return e.apply(ctx, Write{Kind: kind, Name: name, Document: r.Last.Document, Action: ActionRestore, Actor: actor, Note: note})
+		}
+	}
+	return Revision{}, errs.Errorf(errs.CodeInvalidConfig,
+		"at '/%s/%s': is not a removed document; only a deleted document is restored", kind, name)
+}
+
+func editable(kind config.Kind) error {
+	if kind.Editable() {
+		return nil
+	}
+	return errs.Errorf(errs.CodeInvalidConfig,
+		"at '/%s': is Dafter's own default, kept in git as catalog.json and imported on start", kind)
+}
+
 func (e *Editor) write(ctx context.Context, kind config.Kind, name string, document json.RawMessage, actor, note string) (Revision, error) {
-	if !kind.Editable() {
-		return Revision{}, errs.Errorf(errs.CodeInvalidConfig,
-			"at '/%s': is Dafter's own default, kept in git as catalog.json and imported on start", kind)
+	if err := editable(kind); err != nil {
+		return Revision{}, err
 	}
 	if document != nil {
 		var err error
@@ -56,14 +82,18 @@ func (e *Editor) write(ctx context.Context, kind config.Kind, name string, docum
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	return e.apply(ctx, Write{Kind: kind, Name: name, Document: document, Actor: actor, Note: note})
+}
+
+func (e *Editor) apply(ctx context.Context, w Write) (Revision, error) {
 	_, draft, err := e.Draft(ctx)
 	if err != nil {
 		return Revision{}, err
 	}
-	if _, err := configcheck.Write(draft, configcheck.Change{Kind: kind, Name: name, Document: document}); err != nil {
+	if _, err := configcheck.Write(draft, configcheck.Change{Kind: w.Kind, Name: w.Name, Document: w.Document}); err != nil {
 		return Revision{}, err
 	}
-	return e.Store.Put(ctx, Write{Kind: kind, Name: name, Document: document, Actor: actor, Note: note})
+	return e.Store.Put(ctx, w)
 }
 
 func (e *Editor) Publish(ctx context.Context, actor, note string) (Release, error) {
