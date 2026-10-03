@@ -49,28 +49,9 @@ function pageHead(title, lede, ...buttons) {
     actions.length ? el('div', { class: 'actions' }, actions) : null);
 }
 
-async function showKind(kind) {
-  const info = kindInfo(kind);
-  const views = await adminCall('GET', adminPath(kind));
-  const create = info.editable ? el('a', { class: 'btn btn-primary', href: `#/${kind}/new` }, `New ${info.single}`) : null;
-  const card = el('section', { class: 'card', 'aria-label': info.label });
-  if (views.length === 0) {
-    card.append(el('p', { class: 'empty' }, `No ${info.label.toLowerCase()} yet.`));
-  } else {
-    card.append(el('ul', { class: 'doc-list' }, views.map((v) => {
-      const status = docStatus(v);
-      const title = kind === 'agents' && v.document && v.document.name ? `${v.document.name}` : v.name;
-      return el('li', {}, el('a', { class: 'doc-link', href: `#/${kind}/${encodeURIComponent(v.name)}` },
-        el('div', { class: 'doc-main' },
-          el('div', { class: 'doc-name' }, title, title !== v.name ? el('span', { class: 'doc-meta' }, ` (${v.name})`) : null),
-          el('div', { class: 'doc-meta' }, `revision ${v.revision}`, docSummary(kind, v.document) ? ` · ${docSummary(kind, v.document)}` : '')),
-        el('span', { class: `pill pill-${status.tone}` }, status.label)));
-    })));
-  }
-  showMain(
-    pageHead(info.label, KIND_LEDES[kind], create),
-    info.editable ? null : el('p', { class: 'note' }, GIT_KIND_NOTE),
-    card);
+async function agentHistory(name) {
+  const revisions = await adminCall('GET', adminPath('agents', name, 'revisions'));
+  return revisions.filter((r) => r.document).map((r) => r.document);
 }
 
 async function profileNames() {
@@ -102,7 +83,7 @@ async function showEditor(kind, name) {
   const view = isNew ? null : await adminCall('GET', adminPath(kind, name));
   const doc = view ? view.document : (kind === 'agents' ? { name: '' } : {});
   const isAgent = kind === 'agents' && info.editable;
-  const profiles = isAgent ? await profileNames() : [];
+  const [profiles, history] = isAgent ? await Promise.all([profileNames(), isNew ? [] : agentHistory(name)]) : [[], []];
 
   const problems = el('div', { id: 'doc-problems' });
   const keyInput = el('input', { type: 'text', id: 'doc-key', required: '', autocomplete: 'off', spellcheck: 'false', 'aria-describedby': 'doc-key-hint' });
@@ -111,7 +92,7 @@ async function showEditor(kind, name) {
     el('p', { class: 'hint', id: 'doc-key-hint' }, kind === 'agents' ? 'What a session asks for, e.g. maya. Lowercase letters, digits and hyphens, 2 to 32 characters. It cannot change later.' : 'The document name. It cannot change later.'),
     keyInput) : null;
   const jsonError = el('p', { class: 'field-error', id: 'doc-json-error', role: 'alert', hidden: '' });
-  let form = isAgent ? agentForm(doc, profiles) : null;
+  let form = isAgent ? agentForm(doc, profiles, history) : null;
   let raw = rawEditor(prettyJson(doc) || '{}', !info.editable);
   let mode = isAgent ? 'form' : 'raw';
   const panel = el('div', { id: 'editor-panel', role: isAgent ? 'tabpanel' : null }, isAgent ? form.node : el('div', { class: 'field' }, raw, jsonError));
@@ -134,7 +115,7 @@ async function showEditor(kind, name) {
         jsonError.hidden = false;
         return false;
       }
-      form = agentForm(parsed.doc, profiles);
+      form = agentForm(parsed.doc, profiles, history);
       panel.replaceChildren(form.node);
     }
     mode = which;
@@ -191,7 +172,7 @@ async function showEditor(kind, name) {
     remove.addEventListener('click', async () => {
       const answer = await confirmDialog({
         title: `Delete ${info.single} ${name}?`,
-        body: 'The deletion is a draft change: sessions keep using it until the next release is published.',
+        body: 'The deletion is a draft change: sessions keep using it until the next release is published. It stays under Removed, where it can be restored.',
         confirmLabel: 'Delete', danger: true, withNote: true,
       });
       if (!answer.ok) return;

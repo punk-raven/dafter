@@ -23,6 +23,23 @@ function agentValuesOf(doc) {
   };
 }
 
+const PREVIOUS_LIMIT = 12;
+
+function previouslyUsed(history, field, current) {
+  const taken = new Set(cleanWords(current).map((w) => w.toLowerCase()));
+  const out = [];
+  for (const doc of [...(history || [])].reverse()) {
+    const words = doc && Array.isArray(doc[field]) ? cleanWords(doc[field].map(String)) : [];
+    for (const word of words) {
+      const key = word.toLowerCase();
+      if (taken.has(key)) continue;
+      taken.add(key);
+      out.push(word);
+    }
+  }
+  return out.slice(0, PREVIOUS_LIMIT);
+}
+
 function setInvalid(node, invalid) {
   if (invalid) node.setAttribute('aria-invalid', 'true');
   else node.removeAttribute('aria-invalid');
@@ -37,21 +54,28 @@ function setFieldError(node, messages) {
   node.hidden = !messages || messages.length === 0;
 }
 
-function wordList(field, label, hint, words) {
+function wordList(field, label, hint, words, options = {}) {
   const items = el('ul', { class: 'word-list', 'aria-label': label });
   const error = fieldError(`agent-${field}-error`);
   const addInput = el('input', { type: 'text', id: `agent-${field}-add`, autocomplete: 'off', placeholder: 'Add a word' });
   const addButton = el('button', { type: 'button', class: 'btn btn-quiet' }, 'Add');
+  const previous = el('div', { class: 'previous', role: 'group', 'aria-label': `Previously used ${label.toLowerCase()}`, hidden: '' });
+  const changed = () => (options.onChange ? options.onChange() : null);
+  const currentWords = () => [...items.querySelectorAll('.word input')].map((i) => i.value);
 
   function row(word) {
     const input = el('input', { type: 'text', value: word, autocomplete: 'off', 'aria-describedby': `agent-${field}-error` });
     const remove = el('button', { type: 'button', class: 'btn btn-icon', 'aria-label': `Remove ${word || 'word'}` }, '×');
     const itemError = el('p', { class: 'field-error', role: 'alert', hidden: '' });
     const li = el('li', { class: 'word' }, el('div', { class: 'word-row' }, input, remove), itemError);
-    input.addEventListener('input', () => remove.setAttribute('aria-label', `Remove ${input.value || 'word'}`));
+    input.addEventListener('input', () => {
+      remove.setAttribute('aria-label', `Remove ${input.value || 'word'}`);
+      changed();
+    });
     remove.addEventListener('click', () => {
       li.remove();
       addInput.focus();
+      changed();
     });
     return li;
   }
@@ -60,6 +84,22 @@ function wordList(field, label, hint, words) {
     for (const word of cleanWords(addInput.value.split(','))) items.append(row(word));
     addInput.value = '';
     addInput.focus();
+    changed();
+  }
+
+  function suggest() {
+    const others = options.others ? options.others() : [];
+    const words = previouslyUsed(options.history, field, currentWords().concat(others));
+    previous.replaceChildren(el('span', { class: 'previous-label' }, 'Previously used:'), ...words.map((word) => {
+      const chip = el('button', { type: 'button', class: 'chip', 'aria-label': `Add ${word} back to ${label.toLowerCase()}` }, el('span', { 'aria-hidden': 'true' }, '+'), word);
+      chip.addEventListener('click', () => {
+        items.append(row(word));
+        addInput.focus();
+        changed();
+      });
+      return chip;
+    }));
+    previous.hidden = words.length === 0;
   }
   addButton.addEventListener('click', add);
   addInput.addEventListener('keydown', (e) => {
@@ -75,16 +115,18 @@ function wordList(field, label, hint, words) {
     el('p', { class: 'hint' }, hint),
     items,
     el('div', { class: 'word-add' }, addInput, addButton),
+    previous,
     error);
   return {
     node,
+    suggest,
     markClashes(words) {
       const taken = new Set(cleanWords(words).map((w) => w.toLowerCase()));
       for (const input of items.querySelectorAll('.word input')) {
         if (taken.has(input.value.trim().toLowerCase())) input.setAttribute('aria-invalid', 'true');
       }
     },
-    read: () => [...items.querySelectorAll('.word input')].map((i) => i.value).concat(addInput.value.split(',')),
+    read: () => currentWords().concat(addInput.value.split(',')),
     show(fieldMessages, itemMessages) {
       setFieldError(error, fieldMessages);
       let index = 0;
@@ -98,7 +140,7 @@ function wordList(field, label, hint, words) {
   };
 }
 
-function agentForm(doc, profiles) {
+function agentForm(doc, profiles, history) {
   const values = agentValuesOf(doc);
   const name = el('input', { type: 'text', id: 'agent-name', required: '', value: values.name, autocomplete: 'off', 'aria-describedby': 'agent-name-error' });
   const nameError = fieldError('agent-name-error');
@@ -108,8 +150,14 @@ function agentForm(doc, profiles) {
   if (values.profile && !profiles.includes(values.profile)) profile.append(el('option', { value: values.profile }, values.profile));
   profile.value = values.profile;
   const profileError = fieldError('agent-profile-error');
-  const aliases = wordList('aliases', 'Aliases', 'Other spellings of the name that should wake the agent.', values.aliases);
-  const nearMisses = wordList('nearMisses', 'Near misses', 'Words that sound close to the name but must never wake the agent.', values.nearMisses);
+  const lists = {};
+  const suggestAll = () => Object.values(lists).forEach((list) => list.suggest());
+  const aliases = wordList('aliases', 'Aliases', 'Other spellings of the name. Each one wakes the agent, just like the name.', values.aliases,
+    { history, onChange: suggestAll, others: () => lists.nearMisses.read() });
+  const nearMisses = wordList('nearMisses', 'Near misses', 'Words that sound like the name but must never wake the agent, such as other people\'s names. A word cannot be both an alias and a near miss.', values.nearMisses,
+    { history, onChange: suggestAll, others: () => lists.aliases.read() });
+  Object.assign(lists, { aliases, nearMisses });
+  suggestAll();
 
   const node = el('div', { class: 'agent-form' },
     el('div', { class: 'field' }, el('label', { for: 'agent-name' }, 'Display name'), name, nameError),

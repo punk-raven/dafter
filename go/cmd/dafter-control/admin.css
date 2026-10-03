@@ -20,6 +20,7 @@
   --del-bg: #fdeaea;
   --del-text: #8f1d22;
   --focus: #5b3fd6;
+  --chip-border: #b9c0ca;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -47,6 +48,7 @@
     --del-bg: #3a1a1d;
     --del-text: #f5a3a8;
     --focus: #a895ff;
+    --chip-border: #4b525c;
     --shadow: none;
   }
 }
@@ -73,6 +75,7 @@
   --del-bg: #3a1a1d;
   --del-text: #f5a3a8;
   --focus: #a895ff;
+  --chip-border: #4b525c;
   --shadow: none;
 }
 
@@ -160,6 +163,12 @@ fieldset.choice legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
 .word-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
 .word-row, .word-add { display: flex; gap: 6px; }
 .word-row input, .word-add input { flex: 1; min-width: 0; }
+.previous { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.previous-label { color: var(--muted); font-size: 13px; margin-right: 2px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 3px 11px; border: 1px dashed var(--chip-border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.chip > span { color: var(--muted); font-weight: 600; }
+.chip:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.chip:hover > span { color: var(--accent); }
 
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: -4px 0 16px; }
 .tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
@@ -167,10 +176,13 @@ fieldset.choice legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
 
 .doc-list { list-style: none; margin: 0; padding: 0; }
 .doc-list li + li { border-top: 1px solid var(--border); }
-.doc-link { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 4px; color: var(--text); text-decoration: none; }
-.doc-link:hover .doc-name { color: var(--accent); }
-.doc-main { flex: 1 1 200px; min-width: 0; }
-.doc-name { font-weight: 600; }
+.doc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px 12px; padding: 12px 4px; }
+.doc-main { min-width: 0; }
+.doc-name { font-weight: 600; color: var(--text); text-decoration: none; }
+a.doc-name:hover { color: var(--accent); text-decoration: underline; }
+.row-actions { display: flex; gap: 6px; }
+.btn-row svg { flex: none; }
+.section-lede { margin: -4px 0 8px; }
 .doc-meta { color: var(--muted); font-size: 13px; }
 
 .problems { border: 1px solid var(--danger); background: var(--danger-soft); color: var(--text); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
@@ -238,6 +250,11 @@ pre.json { margin: 0; padding: 12px; background: var(--surface-2); border-radius
   .card { padding: 14px; }
   .history li { grid-template-columns: minmax(0, 1fr) auto; }
   .history .what { grid-column: 1 / -1; }
+  .doc-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .doc-status { grid-row: 2; grid-column: 1; justify-self: start; }
+  .row-actions { grid-row: 1 / span 2; grid-column: 2; }
+  .btn-row { width: 36px; min-height: 36px; padding: 0; }
+  .btn-row .btn-label { display: none; }
   .actions { justify-content: stretch; }
   .actions .btn { flex: 1 1 auto; }
   .actions .spacer { margin-right: 0; }
@@ -249,8 +266,8 @@ pre.json { margin: 0; padding: 12px; background: var(--surface-2); border-radius
 .change > summary::before { content: "\25BE"; color: var(--muted); width: 1ch; }
 .change:not([open]) > summary::before { content: "\25B8"; }
 .page-head > .actions { flex: 0 0 auto; }
-.release:first-child, .doc-list li:first-child .doc-link { padding-top: 0; }
-.release:last-child, .doc-list li:last-child .doc-link { padding-bottom: 0; }
+.release:first-child, .doc-list li:first-child { padding-top: 0; }
+.release:last-child, .doc-list li:last-child { padding-bottom: 0; }
 .history .pill { justify-self: start; }
 :root { accent-color: var(--accent); }
 .diff-fold { padding: 2px 0 2px 7ch; font-family: system-ui, sans-serif; }

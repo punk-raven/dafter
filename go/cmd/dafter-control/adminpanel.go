@@ -6,7 +6,7 @@ import (
 )
 
 //go:embed admin.html admin.css
-//go:embed admin-api.js admin-fields.js admin-diff.js admin-agent.js admin-docs.js admin-publish.js admin-releases.js admin.js
+//go:embed admin-api.js admin-fields.js admin-diff.js admin-agent.js admin-list.js admin-docs.js admin-publish.js admin-releases.js admin.js
 var panelAssets embed.FS
 
 var panelAssetPaths = []string{
@@ -15,6 +15,7 @@ var panelAssetPaths = []string{
 	"admin-fields.js",
 	"admin-diff.js",
 	"admin-agent.js",
+	"admin-list.js",
 	"admin-docs.js",
 	"admin-publish.js",
 	"admin-releases.js",
