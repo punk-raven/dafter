@@ -418,6 +418,7 @@ func TestGeneratedEnumsMatchSchema(t *testing.T) {
 		{"SpeechNormalization", cfg, []string{"$defs", "Speech", "properties", "normalization", "enum"}, schema.Names(config.AllSpeechNormalizations)},
 		{"Situation", cfg, []string{"$defs", "Situation", "enum"}, schema.Names(config.AllSituations)},
 		{"PhoneGuests", tel, []string{"$defs", "Telephony", "properties", "phoneGuests", "enum"}, schema.Names(config.AllPhoneGuests)},
+		{"CallerCheck", tel, []string{"$defs", "DialIn", "properties", "callerCheck", "enum"}, schema.Names(config.AllCallerChecks)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

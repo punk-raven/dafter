@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from dafter_core.config import parse
-from dafter_core.enums import ErrorCode, RecordingNotice
+from dafter_core.enums import CallerCheck, ErrorCode, RecordingNotice
 from dafter_core.errors import DafterError
 
 VECTORS = Path(__file__).resolve().parents[3] / "testdata" / "telephony" / "rules.json"
@@ -26,6 +26,8 @@ def test_telephony_rules_match_the_shared_vectors(case: dict[str, Any]) -> None:
         cfg = parse(document(case))
         assert cfg.telephony.recording_notice is RecordingNotice(case["notice"])
         assert (cfg.telephony.trunk or "") == case["trunk"]
+        if "callerCheck" in case:
+            assert cfg.telephony.caller_check is CallerCheck(case["callerCheck"])
         return
     with pytest.raises(DafterError) as caught:
         parse(document(case))

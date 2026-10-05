@@ -188,7 +188,7 @@ func dropIdleTelephony(doc, overrides map[string]any, channel Channel) []string 
 	for _, k := range slices.Sorted(maps.Keys(stated)) {
 		if k != "phoneGuests" {
 			problems = append(problems, located("/telephony/"+pointerEscaper.Replace(k),
-				"tunes phone calls, but this session takes none, so it applies only with phoneGuests dial_out"))
+				"tunes phone calls, but this session takes none, so it applies only with phoneGuests dial_out, dial_in or both"))
 		}
 	}
 	return problems

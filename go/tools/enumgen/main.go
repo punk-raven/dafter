@@ -157,6 +157,11 @@ var targets = []target{
 		Package: "config", Type: "PhoneGuests", Prefix: "PhoneGuests",
 		Out: "internal/config/phoneguests_gen.go", AllName: "AllPhoneGuests",
 	},
+	{
+		Schema: "config/v1/telephony.schema.json", Pointer: []string{"$defs", "DialIn", "properties", "callerCheck", "enum"},
+		Package: "config", Type: "CallerCheck", Prefix: "CallerCheck",
+		Out: "internal/config/callercheck_gen.go", AllName: "AllCallerChecks",
+	},
 }
 
 var initialisms = map[string]string{

@@ -16,9 +16,12 @@
         },
         "phoneGuests": {
           "type": "string",
-          "description": "Whether people may join a session on another channel by phone, which the session creator decides, since each phone costs a call and hears the session. off: no phone joins. dial_out: the control plane may call phones into the session on the tenant's trunk. Must be off on the telephony channel, where the session is the call itself.",
-          "enum": ["off", "dial_out"],
+          "description": "Whether people may join a session on another channel by phone, which the session creator decides, since each phone costs a call and hears the session. off: no phone joins. dial_out: the control plane may call phones into the session on the tenant's trunk. dial_in: a person may phone one of the trunk's meeting numbers and join the running session, admitted by dialIn.callerCheck. both: dial_out and dial_in. Must be off on the telephony channel, where the session is the call itself.",
+          "enum": ["off", "dial_out", "dial_in", "both"],
           "default": "off"
+        },
+        "dialIn": {
+          "$ref": "#/$defs/DialIn"
         },
         "ringingTimeoutSeconds": {
           "type": "integer",
@@ -39,6 +42,19 @@
           "description": "What the agent says about recording each time a phone in the session is answered, before anything else and without being interruptible, because a person on a phone sees no recording indicator. always: it says the call is recorded when recording is on and that it is not when recording is off. when_recorded: it says so only when recording is on and says nothing about it otherwise. Whether the session is recorded is recording.enabled, which the session creator sets; recording still needs its consent artifact.",
           "enum": ["always", "when_recorded"],
           "default": "always"
+        }
+      }
+    },
+    "DialIn": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "How a person who phones one of the trunk's meeting numbers is admitted to a session whose phoneGuests is dial_in or both; stating it in any other session is a cross-field error. The meeting PIN is minted by the control plane, unique among running sessions and never part of this block or of any stored document, because the document is hashed, stored and handed to every joiner; the numbers a caller check allows are given to their own control plane route and stored only as keyed hashes.",
+      "properties": {
+        "callerCheck": {
+          "type": "string",
+          "description": "Who a dial-in call admits. pin: anyone who keys in the meeting PIN. pin_and_number: the meeting PIN and a calling number on the session's allowlist. number: a calling number on the session's allowlist, without a PIN; a number allowed in more than one running session is asked for the PIN rather than guessed. A withheld calling number fails every number check.",
+          "enum": ["pin", "pin_and_number", "number"],
+          "default": "pin"
         }
       }
     }

@@ -20,6 +20,7 @@ type telephonyCase struct {
 	Patch    map[string]json.RawMessage `json:"patch"`
 	Notice   string                     `json:"notice"`
 	Trunk    string                     `json:"trunk"`
+	Caller   string                     `json:"callerCheck"`
 	Rejected *struct {
 		Code     errs.ErrorCode `json:"code"`
 		Pointers []string       `json:"pointers"`
@@ -66,6 +67,9 @@ func TestTelephonyRulesMatchTheSharedVectors(t *testing.T) {
 				}
 				if string(notice) != c.Notice || cfg.TrunkName() != c.Trunk {
 					t.Errorf("notice %s trunk %q, want %s and %q", notice, cfg.TrunkName(), c.Notice, c.Trunk)
+				}
+				if c.Caller != "" && string(cfg.CallerCheck()) != c.Caller {
+					t.Errorf("caller check %s, want %s", cfg.CallerCheck(), c.Caller)
 				}
 				return
 			}

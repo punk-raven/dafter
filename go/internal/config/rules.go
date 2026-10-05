@@ -112,6 +112,12 @@ var crossFieldRules = []crossFieldRule{
 		because: "a phone guest sees no recording indicator and only the agent tells them the meeting is recorded, so a recorded session that takes phone calls needs the agent",
 	},
 	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.statesDialInWithoutIt() },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/telephony/dialIn",
+		because: "only a session whose phoneGuests is dial_in or both takes calls into its meeting numbers, so a caller check in any other session admits nobody",
+	},
+	{
 		broken: func(c *ResolvedSessionConfig) bool {
 			v := c.video()
 			return v != nil && v.ScalabilityMode != "" && !v.Codec.Layered()

@@ -13,7 +13,20 @@ type Telephony struct {
 	RingingTimeoutSeconds  int             `json:"ringingTimeoutSeconds,omitempty"`
 	MaxCallDurationSeconds int             `json:"maxCallDurationSeconds,omitempty"`
 	RecordingNotice        RecordingNotice `json:"recordingNotice,omitempty"`
+	DialIn                 *DialIn         `json:"dialIn,omitempty"`
 }
+
+type DialIn struct {
+	CallerCheck CallerCheck `json:"callerCheck,omitempty"`
+}
+
+func (g PhoneGuests) DialsOut() bool { return g == PhoneGuestsDialOut || g == PhoneGuestsBoth }
+
+func (g PhoneGuests) DialsIn() bool { return g == PhoneGuestsDialIn || g == PhoneGuestsBoth }
+
+func (c CallerCheck) AsksForPIN() bool { return c != CallerCheckNumber }
+
+func (c CallerCheck) ChecksNumber() bool { return c != CallerCheckPin }
 
 func (c *ResolvedSessionConfig) TrunkName() string {
 	if c.Telephony == nil {
@@ -29,6 +42,30 @@ func (c *ResolvedSessionConfig) TakesPhoneCalls() bool {
 func (c *ResolvedSessionConfig) phoneGuests() bool {
 	return c.Channel != ChannelTelephony && c.Telephony != nil &&
 		c.Telephony.PhoneGuests != "" && c.Telephony.PhoneGuests != PhoneGuestsOff
+}
+
+func (c *ResolvedSessionConfig) CallsGuestsOut() bool {
+	return c.TrunkName() != "" && c.phoneGuests() && c.Telephony.PhoneGuests.DialsOut()
+}
+
+func (c *ResolvedSessionConfig) TakesDialIn() bool {
+	return c.TrunkName() != "" && c.dialsIn() &&
+		c.EncryptionMode() != EncryptionE2EE && c.PrivacyMode == PrivacyOpen
+}
+
+func (c *ResolvedSessionConfig) CallerCheck() CallerCheck {
+	if c.Telephony == nil || c.Telephony.DialIn == nil || c.Telephony.DialIn.CallerCheck == "" {
+		return CallerCheckPin
+	}
+	return c.Telephony.DialIn.CallerCheck
+}
+
+func (c *ResolvedSessionConfig) statesDialInWithoutIt() bool {
+	return c.Telephony != nil && c.Telephony.DialIn != nil && !c.dialsIn()
+}
+
+func (c *ResolvedSessionConfig) dialsIn() bool {
+	return c.phoneGuests() && c.Telephony.PhoneGuests.DialsIn()
 }
 
 func (c *ResolvedSessionConfig) RingingTimeout() time.Duration {
