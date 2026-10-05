@@ -64,3 +64,6 @@ build/
 
 # Word error rate clips: real voices, consent-bound, never committed
 /testdata/wer/audio/
+
+# Public ASR sample audio: fetched by dafter-asr, never committed
+/testdata/asr/audio/

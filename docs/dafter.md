@@ -308,6 +308,26 @@ Tools carry two classifications. **`latency_class`** governs delay hiding: `fast
 
 **Evaluate on our audio, not public benchmarks.** Top providers cluster on clean English; differences appear on accented, noisy, code-mixed, and narrowband audio. Format-invariant accuracy (getting "4471", not "forty four seventy one") matters more than raw word error rate for agents that act on numbers.
 
+**Focus languages** (kn-IN, hi, en-IN, mr-IN, te-IN), checked 2026-09-28 against the installed packages and the providers' own documentation. Y covers, P preview, - does not.
+
+| Layer | kn | hi | en-IN | mr | te | Checked against |
+|---|---|---|---|---|---|---|
+| Sarvam `saaras:v3-realtime` streaming STT | Y | Y | Y | Y | Y | `SUPPORTED_LANGUAGES` in livekit-plugins-sarvam 1.8.3 `stt_streaming.py`; Sarvam's realtime reference (24 codes with `auto`) |
+| its `codemix` mode (English words kept in Latin script) | Y | Y | - | Y | Y | Sarvam: applied to finals only, partials are plain transcription |
+| its language identification (`language_code=auto`) | Y | Y | Y | Y | Y | Sarvam: `language` on every partial and final, `language_confidence` on finals; the plugin carries both on `SpeechData` |
+| Sarvam `bulbul:v3` TTS | Y | Y | Y | Y | Y | Sarvam: 11 languages, every speaker speaks every one; its picks: kn and te shubh or ratan, hi shubh, mr and en-IN ratan (male), priya or ishita (female); the catalog speaks priya in all five, one voice across a language switch, which livekit-plugins-sarvam 1.8.3 accepts |
+| Sarvam `sarvam-105b` LLM | Y | Y | Y | Y | Y | Sarvam's language list (23) |
+| LiveKit on-device turn detector `v1-mini` | - | Y | Y | - | - | `LOCAL_LANGUAGES` in livekit-agents 1.8.3 `inference/eot/languages.py` |
+| Deepgram Nova-3, ElevenLabs Scribe v2 Realtime, Soniox, Amazon Transcribe, Azure (streaming STT) | Y | Y | Y | Y | Y | vendor language tables; Deepgram's `multi` code-switching is Hindi and English only |
+| Google Chirp 3 (streaming STT, `us` and `eu` only) | P | Y | Y | P | P | Google's Chirp 3 language table |
+| AI4Bharat IndicConformer 600M (open, utterance-level) | Y | Y | - | Y | Y | model card |
+| NVIDIA Nemotron 3.5 ASR, Parakeet 1.1B multilingual | - | Y | - | - | - | model card, NIM support matrix |
+| ElevenLabs `eleven_v3_conversational`, Google Chirp 3 HD, Cartesia Sonic 3.6, AI4Bharat Indic Parler-TTS (TTS) | Y | Y | Y | Y | Y | vendor language tables, model card |
+
+**Live language switching** (`agent.languageSwitching`, off unless a session turns it on). The STT identifies the language of each utterance instead of being pinned to the session's (Sarvam `language_code=auto`); a final in a listed language, at least `minWords` long and at least `minConfidence` sure, switches the agent, and a language the caller asks for (the `switch_language` tool) holds until they ask for another. What follows the switch: the persona the LLM gets, the language the TTS speaks (the voice stays the session's), the spoken-text rules and the fillers. What does not: the pipeline's providers and the turn constants stay the session language's, and the on-device turn detector, where the session uses it, is skipped by the framework for an utterance in a language it does not cover. Identifying the language can cost accuracy on the utterances it gets wrong, which is why it is off by default until measured.
+
+Two gaps between Sarvam and livekit-plugins-sarvam 1.8.3: the plugin refuses every realtime model but `saaras:v3-realtime` (Sarvam also serves `saaras:v4` there), and it validates bulbul:v3 speakers against its own list of 30, so voices Sarvam lists since (anand, gokul, mani, mohit, niharika, rehan, soham, sunny, tarun, vijay; mani scores best in Sarvam's pronunciation ranking) are refused at construction.
+
 **Terminology service.** One Dafter component layers tenant glossary, session terms, and discovered entities, deduped and ranked by expected impact (providers cap the biasing list), and compiled per provider from the capability matrix, with a post-processing correction dictionary where a provider supports no biasing. It **feeds TTS pronunciation too**: one source, two consumers.
 
 ### Translation
@@ -520,6 +540,7 @@ A language specialist, and the reason the config model has a per-language axis a
 | Setting | Value | Why |
 |---|---|---|
 | STT class | Streaming class, not the legacy one | Legacy has no real partials and no live reconfiguration |
+| STT mode | `codemix` for every Indic language (`transcribe` for en-IN) | Callers mix English into every Indic language; transcribe mode writes those words in the Indic script, so the LLM and every word list read a transliteration. Applied to finals only |
 | Local VAD | **Interruptions only** | Sarvam's server VAD decides the end of the turn; a second detector deciding it would fight it. A local Silero VAD only detects the caller talking over the agent, which Sarvam reports no sooner than its first transcript |
 | Turn strategy | `provider_endpointing` | Trust Sarvam's own end-of-speech events for Indic. `semantic` is selectable: LiveKit's on-device audio turn detector (`v1-mini`, bundled with the framework) with dynamic endpointing, run only for the languages it was tuned on (Hindi and English among Sarvam's); every other language falls back to provider endpointing. Sarvam still holds each final until its own end of speech, so it can delay a turn the caller has not finished, not end one sooner |
 | End-of-turn silence | 350ms (`turn.silenceMs`, Sarvam's `silence_duration_ms`) | The only wait before the turn ends: the framework's endpointing delay is 0 because the recognizer has already waited, and the adapter releases end of speech with the final transcript |

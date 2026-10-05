@@ -81,7 +81,7 @@ def test_the_catalog_states_every_language_it_hears_acknowledgements_and_fillers
     assert {"हाँ", "ok", "ಹೌದು", "हो", "అవును"} <= set(every_phrase(backchannel.words))
     assert backchannel.answer_within_ms == 1500
     assert set(c.agent.speech.fillers.phrases) == {"hi", "en", "kn", "mr", "te"}
-    assert c.agent.speech.fillers.after_ms == 1000
+    assert c.agent.speech.fillers.after_ms == 600
 
 
 MASCULINE = {"hi": ("देखता", "सकता", "रहा हूँ", "बताता"), "mr": ("बघतो", "शकतो", "बोलतोय")}

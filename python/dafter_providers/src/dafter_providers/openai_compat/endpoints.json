@@ -3,6 +3,10 @@
     "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "credentialEnv": "GEMINI_API_KEY"
   },
+  "groq": {
+    "baseUrl": "https://api.groq.com/openai/v1",
+    "credentialEnv": "GROQ_API_KEY"
+  },
   "openrouter": {
     "baseUrl": "https://openrouter.ai/api/v1",
     "credentialEnv": "OPENROUTER_API_KEY"

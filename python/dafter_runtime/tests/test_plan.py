@@ -73,7 +73,7 @@ def test_the_catalog_agent_is_named_and_joins_without_a_greeting() -> None:
 def test_a_session_that_asks_for_the_greeting_hears_the_agent_introduce_itself() -> None:
     p = plan(load(variant(lambda d: d["agent"].update(greets=True))), POOL)
     assert p.opening == p.persona.greeting
-    assert p.opening is not None and "Nivya" in p.opening
+    assert p.opening is not None and "निव्या" in p.opening
 
 
 def test_a_document_that_does_not_match_its_hash_is_refused() -> None:

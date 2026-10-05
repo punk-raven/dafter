@@ -102,15 +102,24 @@ class ScriptedSTT(stt.STT[Any]):
         super().__init__(capabilities=stt.STTCapabilities(streaming=True, interim_results=True))
         self.script: asyncio.Queue[stt.SpeechEvent] = asyncio.Queue()
 
-    def says(self, *texts: str) -> None:
+    def says(
+        self, *texts: str, language: LanguageCode = HINDI, confidence: float | None = None
+    ) -> None:
         self.script.put_nowait(stt.SpeechEvent(type=stt.SpeechEventType.START_OF_SPEECH))
         for text in texts[:-1]:
-            self._text(stt.SpeechEventType.INTERIM_TRANSCRIPT, text)
-        self._text(stt.SpeechEventType.FINAL_TRANSCRIPT, texts[-1])
+            self._text(stt.SpeechEventType.INTERIM_TRANSCRIPT, text, language, None)
+        self._text(stt.SpeechEventType.FINAL_TRANSCRIPT, texts[-1], language, confidence)
         self.script.put_nowait(stt.SpeechEvent(type=stt.SpeechEventType.END_OF_SPEECH))
 
-    def _text(self, kind: stt.SpeechEventType, text: str) -> None:
-        data = stt.SpeechData(language=HINDI, text=text)
+    def _text(
+        self,
+        kind: stt.SpeechEventType,
+        text: str,
+        language: LanguageCode,
+        confidence: float | None,
+    ) -> None:
+        metadata = None if confidence is None else {"language_confidence": confidence}
+        data = stt.SpeechData(language=language, text=text, metadata=metadata)
         self.script.put_nowait(stt.SpeechEvent(type=kind, alternatives=[data]))
 
     async def _recognize_impl(

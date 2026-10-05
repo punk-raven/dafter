@@ -222,17 +222,9 @@ async function monitorICE() {
   poll();
 }
 
-function copyJoinLink() {
-  if (!lastRoomId) return;
-  const url = `${window.location.origin}?room=${lastRoomId}`;
-  navigator.clipboard.writeText(url).then(() => {
-    const btn = document.getElementById('btn-copy-link');
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = 'Copy join link'; }, 1500);
-  });
-}
-
 fillNoiseFilterChoices();
+fillLlmChoices();
+fillSpeechToggles();
 
 (function seedFromURL() {
   const roomParam = new URLSearchParams(window.location.search).get('room');

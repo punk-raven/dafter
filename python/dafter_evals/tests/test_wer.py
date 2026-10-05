@@ -24,6 +24,11 @@ TRANSCRIPT = WER / "example-transcript.json"
         ("क्‍ष", "क्ष"),
         ("Meeting-Room", "meeting room"),
         ("  कल   की  ", "कल की"),
+        ("೧೦ ರೂಪಾಯಿ", "10 ರೂಪಾಯಿ"),
+        ("౧౦ రూపాయలు", "10 రూపాయలు"),
+        ("ಫ಼ೋನ್", "ಫೋನ್"),
+        ("సఁగం", "సంగం"),
+        ("मराठी।", "मराठी"),
     ],
 )
 def test_spelling_a_recognizer_may_choose_is_normalised_away(spoken: str, written: str) -> None:
@@ -33,6 +38,9 @@ def test_spelling_a_recognizer_may_choose_is_normalised_away(spoken: str, writte
 def test_vowel_signs_and_the_virama_survive_normalisation() -> None:
     assert words("मीटिंग किताब क्या") == ["मीटिंग", "किताब", "क्या"]
     assert normalise("कि") != normalise("की")
+    assert words("ಕನ್ನಡ ಮಾತನಾಡಿ") == ["ಕನ್ನಡ", "ಮಾತನಾಡಿ"]
+    assert words("తెలుగు మాట్లాడండి") == ["తెలుగు", "మాట్లాడండి"]
+    assert normalise("ಕಿ") != normalise("ಕೀ")
 
 
 def test_the_three_kinds_of_error_are_counted_separately() -> None:

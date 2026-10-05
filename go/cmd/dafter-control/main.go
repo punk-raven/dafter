@@ -28,12 +28,14 @@ var embeddedCatalog []byte
 //go:embed testclient.html
 var testClientHTML []byte
 
-//go:embed agent.js agent-call.js agent-turns.js agent-metrics.js agent-refusal.js agent-addressing.js agent.css
-//go:embed client.js client-stats.js client-session.js client-media.js client-captions.js captions.css
+//go:embed agent.js agent-llm.js agent-speech.js agent-call.js agent-turns.js agent-metrics.js agent-refusal.js agent-addressing.js agent.css
+//go:embed client.js client-stats.js client-session.js client-call.js client-media.js client-captions.js captions.css
 var clientAssets embed.FS
 
 var clientAssetPaths = map[string]string{
 	"/agent.js":            "agent.js",
+	"/agent-llm.js":        "agent-llm.js",
+	"/agent-speech.js":     "agent-speech.js",
 	"/agent-call.js":       "agent-call.js",
 	"/agent-turns.js":      "agent-turns.js",
 	"/agent-metrics.js":    "agent-metrics.js",
@@ -43,6 +45,7 @@ var clientAssetPaths = map[string]string{
 	"/client.js":           "client.js",
 	"/client-stats.js":     "client-stats.js",
 	"/client-session.js":   "client-session.js",
+	"/client-call.js":      "client-call.js",
 	"/client-media.js":     "client-media.js",
 	"/client-captions.js":  "client-captions.js",
 	"/captions.css":        "captions.css",

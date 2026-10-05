@@ -1,0 +1,18 @@
+{
+  "eventId": "e_2c4e6a8b0d1f3a5c7e9b1d3f5a7c9e1b",
+  "type": "agent.configured",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 1,
+  "occurredAt": "2026-09-24T10:00:02.114Z",
+  "payload": {
+    "llm": {
+      "provider": "groq",
+      "model": "qwen/qwen3.8-27b"
+    },
+    "fillers": false,
+    "backchannel": true,
+    "normalization": "platform"
+  }
+}

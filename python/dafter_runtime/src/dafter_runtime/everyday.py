@@ -59,4 +59,29 @@ def go_quiet(sleep: Callable[[], None]) -> Tool:
     )
 
 
-__all__ = ["current_time", "go_quiet", "who_is_here"]
+def switch_language(languages: list[str], ask: Callable[[str], bool]) -> Tool:
+    async def run(arguments: dict[str, Any]) -> str:
+        language = str(arguments.get("language", ""))
+        if not ask(language):
+            return f"Not switched: speak one of {', '.join(languages)}."
+        return f"Switched. Reply only in {language} from now on, until you are asked for another."
+
+    return Tool(
+        name="switch_language",
+        description=(
+            "Switch the language you reply in when the person talking to you asks for "
+            "another one, for example 'English mein bolo'. The language is one of the "
+            "listed BCP 47 tags, whose first part is the ISO 639 language code."
+        ),
+        speed=Speed.FAST,
+        effect=Effect.READ,
+        run=run,
+        parameters={
+            "type": "object",
+            "properties": {"language": {"type": "string", "enum": languages}},
+            "required": ["language"],
+        },
+    )
+
+
+__all__ = ["current_time", "go_quiet", "switch_language", "who_is_here"]

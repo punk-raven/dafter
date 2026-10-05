@@ -30,13 +30,13 @@
         "normalization": "platform",
         "fillers": {
           "enabled": true,
-          "afterMs": 1000,
+          "afterMs": 600,
           "phrases": {
-            "hi": ["जी, एक पल।", "अच्छा, ज़रा देखती हूँ।", "हम्म, बस एक सेकंड।"],
-            "en": ["One moment.", "Let me check.", "Just a second."],
-            "kn": ["ಒಂದು ನಿಮಿಷ.", "ಸ್ವಲ್ಪ ನೋಡುತ್ತೇನೆ."],
-            "mr": ["एक क्षण हं.", "थांबा, बघते."],
-            "te": ["ఒక్క నిమిషం.", "చూస్తాను, ఒక్క క్షణం."]
+            "hi": ["हम्म, एक second।", "अच्छा, check करती हूँ।", "हाँ जी, बस एक second।", "जी, देखती हूँ।"],
+            "en": ["Hmm, one second.", "Okay, let me check.", "Just a second."],
+            "kn": ["ಹಾಂ, ಒಂದ್ second.", "ಸರಿ, check ಮಾಡ್ತೀನಿ.", "ಒಂದ್ ನಿಮಿಷ."],
+            "mr": ["हं, एक second.", "थांबा, check करते.", "हो, बघते हं."],
+            "te": ["హా, ఒక్క second.", "సరే, check చేస్తా.", "ఒక్క నిమిషం అండి."]
           }
         },
         "situations": {
@@ -59,14 +59,17 @@
           }
         },
         "expressive": false
+      },
+      "languageSwitching": {
+        "enabled": false,
+        "languages": ["hi", "en-IN", "kn-IN", "mr-IN", "te-IN"],
+        "minConfidence": 0.8,
+        "minWords": 3
       }
     },
     "turn": {
       "strategy": "auto",
-      "silenceMs": 350,
-      "minSpeechMs": 120,
       "endpointingDelayMs": 0,
-      "endpointingMaxDelayMs": 2500,
       "preemptiveGeneration": { "enabled": true, "tts": true },
       "interruption": {
         "enabled": true,
@@ -133,7 +136,10 @@
   "languages": {
     "hi": {
       "tuning": {
-        "turn": { "strategy": "provider_endpointing", "localVadEnabled": false }
+        "turn": {
+          "strategy": "provider_endpointing", "localVadEnabled": false,
+          "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
+        }
       },
       "overlay": {
         "transcription": {
@@ -151,7 +157,7 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
             },
             "llm": {
               "provider": "sarvam",
@@ -178,7 +184,10 @@
 
     "en-IN": {
       "tuning": {
-        "turn": { "strategy": "semantic", "localVadEnabled": true }
+        "turn": {
+          "strategy": "semantic", "localVadEnabled": true,
+          "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
+        }
       },
       "overlay": {
         "transcription": {
@@ -196,7 +205,151 @@
               "model": "saaras:v3-realtime",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500 }
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "transcribe" }
+            },
+            "llm": {
+              "provider": "sarvam",
+              "model": "sarvam-105b",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+            },
+            "tts": {
+              "provider": "sarvam",
+              "model": "bulbul:v3",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": {
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
+                "pace": 1.0, "temperature": 0.6,
+                "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "kn-IN": {
+      "tuning": {
+        "turn": {
+          "strategy": "provider_endpointing", "localVadEnabled": false,
+          "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
+        }
+      },
+      "overlay": {
+        "transcription": {
+          "batch": {
+            "provider": "sarvam",
+            "model": "saaras:v3",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          }
+        },
+        "agent": {
+          "pipeline": {
+            "stt": {
+              "provider": "sarvam",
+              "model": "saaras:v3-realtime",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
+            },
+            "llm": {
+              "provider": "sarvam",
+              "model": "sarvam-105b",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+            },
+            "tts": {
+              "provider": "sarvam",
+              "model": "bulbul:v3",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": {
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
+                "pace": 1.0, "temperature": 0.6,
+                "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "mr-IN": {
+      "tuning": {
+        "turn": {
+          "strategy": "provider_endpointing", "localVadEnabled": false,
+          "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
+        }
+      },
+      "overlay": {
+        "transcription": {
+          "batch": {
+            "provider": "sarvam",
+            "model": "saaras:v3",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          }
+        },
+        "agent": {
+          "pipeline": {
+            "stt": {
+              "provider": "sarvam",
+              "model": "saaras:v3-realtime",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
+            },
+            "llm": {
+              "provider": "sarvam",
+              "model": "sarvam-105b",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+            },
+            "tts": {
+              "provider": "sarvam",
+              "model": "bulbul:v3",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": {
+                "prewarm": true, "encoding": "pcm_s16le", "sampleRate": 24000, "voice": "priya", "minBufferSize": 30,
+                "pace": 1.0, "temperature": 0.6,
+                "styles": { "greeting": { "temperature": 0.8 }, "concern": { "pace": 0.9, "temperature": 0.4 } }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "te-IN": {
+      "tuning": {
+        "turn": {
+          "strategy": "provider_endpointing", "localVadEnabled": false,
+          "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
+        }
+      },
+      "overlay": {
+        "transcription": {
+          "batch": {
+            "provider": "sarvam",
+            "model": "saaras:v3",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          }
+        },
+        "agent": {
+          "pipeline": {
+            "stt": {
+              "provider": "sarvam",
+              "model": "saaras:v3-realtime",
+              "region": "ap-south-1",
+              "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+              "options": { "chunkMs": 500, "encoding": "pcm_s16le", "sampleRate": 16000, "finalGraceMs": 1500, "mode": "codemix" }
             },
             "llm": {
               "provider": "sarvam",
@@ -274,5 +427,17 @@
         }
       }
     }
+  },
+  "llms": {
+    "sarvam/sarvam-105b": {"provider": "sarvam", "model": "sarvam-105b", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key", "options": {"prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200}},
+    "groq/qwen/qwen3.8-27b": {"provider": "groq", "model": "qwen/qwen3.8-27b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "reasoningEffort": "none"}},
+    "groq/openai/gpt-oss-20b": {"provider": "groq", "model": "openai/gpt-oss-20b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "reasoningEffort": "low"}},
+    "groq/openai/gpt-oss-120b": {"provider": "groq", "model": "openai/gpt-oss-120b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "reasoningEffort": "low"}},
+    "google/gemma-4-26b-a4b-it": {"provider": "google", "model": "gemma-4-26b-a4b-it", "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"extra_body": {"google": {"thinking_config": {"thinking_level": "minimal"}}}}}},
+    "google/gemma-4-31b-it": {"provider": "google", "model": "gemma-4-31b-it", "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"extra_body": {"google": {"thinking_config": {"thinking_level": "minimal"}}}}}},
+    "openrouter/qwen/qwen3.8-flash": {"provider": "openrouter", "model": "qwen/qwen3.8-flash", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"reasoning": {"enabled": false}}}},
+    "openrouter/nvidia/nemotron-3-super-120b-a12b:free": {"provider": "openrouter", "model": "nvidia/nemotron-3-super-120b-a12b:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"reasoning": {"enabled": false}}}},
+    "openrouter/inclusionai/ling-3.0-flash-sante:free": {"provider": "openrouter", "model": "inclusionai/ling-3.0-flash-sante:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"reasoning": {"enabled": false}}}},
+    "openrouter/liquid/lfm-2.5-2.6b:free": {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 600, "extraBody": {"reasoning": {"effort": "low"}}}}
   }
 }

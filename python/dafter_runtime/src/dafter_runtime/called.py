@@ -22,6 +22,7 @@ from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
 from .stages import Stages, hearing
+from .switching import Switching
 
 log = logging.getLogger("dafter.runtime.called")
 
@@ -94,9 +95,13 @@ class Called:
         stages: Stages,
         session: AgentSession[Any],
         sample_rate: int,
+        switching: Switching | None = None,
+        hears: Callable[[AgentSession[Any]], None] = lambda _: None,
         captions: Captions | None = None,
     ) -> None:
         self._ctx = ctx
+        self._hears = hears
+        self._switching = switching if switching is not None and switching.enabled else None
         self._session = session
         self._captions = captions
         self.roster = Roster()
@@ -130,15 +135,20 @@ class Called:
 
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)
+        self._hears(session)
         if self._captions is not None:
             self._captions.follow(speaker, session)
 
     def _hearing(self, speaker: str) -> Filter:
-        return acknowledged(
+        sieve = acknowledged(
             self._acknowledgements,
             self._floor,
             lambda: self.barge_in.acknowledged(speaker),
         )
+        if self._switching is None:
+            return sieve
+        observe = self._switching.observe(speaker)
+        return lambda events: sieve(observe(events))
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.ensure_future(work)

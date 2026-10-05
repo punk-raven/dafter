@@ -41,7 +41,8 @@ transcript is not charged for spelling a recognizer is free to choose:
 Unicode NFC; the nukta dropped (ज़ and ज, क़ and क are one letter here,
 because recognizers are inconsistent about it); chandrabindu read as
 anusvara (हाँ and हां); zero-width joiners removed; Devanagari digits read
-as ASCII digits; punctuation and symbols, the danda and double danda
+as ASCII digits; the same three for Kannada and Telugu (their nukta dropped,
+candrabindu read as anusvara, digits read as ASCII digits); punctuation and symbols, the danda and double danda
 included, turned into spaces; Latin case folded. Numbers are not converted
 between words and digits: दस and 10 are different words, which is why the
 reference is compared with the verbatim rendering.

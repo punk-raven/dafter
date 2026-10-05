@@ -1,0 +1,173 @@
+{
+  "dataset": "kathbath",
+  "language": "kn-IN",
+  "source": {
+    "archive": "https://indicwhisper.objectstore.e2enetworks.net/vistaar_benchmarks/kathbath.zip",
+    "bytes": 3457654951,
+    "etag": "\"bab49044464c3d44b500ec4258894da7-207\"",
+    "license": "CC-BY-4.0"
+  },
+  "selection": "rows whose duration is 3 to 12 s, ordered by audio path; one clip per speaker, taken in turn from each gender group, until 20 are chosen",
+  "clips": [
+    {
+      "id": "844424930300326-217-f",
+      "member": "kathbath/kannada/wavs/844424930300326-217-f.wav",
+      "speaker": "217",
+      "durationS": 8.4056,
+      "sha256": "e69b1163ebd4da98b36077d7b5bb55e4849f88dfe6ca0fe5fe5c2d608b0adeb5",
+      "reference": "ನಂತರ ಆಕೆ ಯಾವುದೇ ಮೇಕಪ್ ಇಲ್ಲದೆ ತನ್ನ ರಿಯಲ್ ಫೋಟೋವನ್ನು ಕೂಡ ಪೋಸ್ಟ್ ಮಾಡಿದ್ದಳು"
+    },
+    {
+      "id": "844424933040654-385-m",
+      "member": "kathbath/kannada/wavs/844424933040654-385-m.wav",
+      "speaker": "385",
+      "durationS": 10.9366,
+      "sha256": "f0eb9eb709905726c0f76c5b98e5eb0d9ddc04c2b43a59c8e9206345f3cbff8b",
+      "reference": "ಕೆದಂಬಾಡಿ ವ್ಯಾಪ್ತಿಯ ಪ್ರದೇಶಕ್ಕೆ ಕುಡಿಯುವ ನೀರಿನ ಸಮರ್ಪಕ ವ್ಯವಸ್ಥೆ ಇಲ್ಲದಿರುವುದರಿಂದ ಆಕ್ರೋಶಿತ ಗ್ರಾಮಸ್ಥರು ಪಂಚಾಯಿತಿ ಕಚೇರಿಗೆ ತೆರಳಿ ಮನವಿ ಮಾಡಿದ್ದರು"
+    },
+    {
+      "id": "844424930346333-863-f",
+      "member": "kathbath/kannada/wavs/844424930346333-863-f.wav",
+      "speaker": "863",
+      "durationS": 10.9598,
+      "sha256": "9525fe61901c8ea4f298d5ac110d309b7e38437926dc8f3a228b56cc1c19b012",
+      "reference": "ಆದರೆ ನಿಮ್ಮ ಬಗ್ಗೆ ಕಾಳಜಿವಹಿಸುವವರಿಗೆ ಎರಡನೇ ಅವಕಾಶಗಳನ್ನು ನೀಡುವ ಜವಾಬ್ದಾರಿಯುತ ಆಯ್ಕೆ ಮಾಡಿ"
+    },
+    {
+      "id": "844424933107306-243-m",
+      "member": "kathbath/kannada/wavs/844424933107306-243-m.wav",
+      "speaker": "243",
+      "durationS": 10.7276,
+      "sha256": "ff44592decf90f0abc1135a7cd1302ae0de9e7e8d5e321987ace9ee88c7d6026",
+      "reference": "ಉತ್ತರ ಕೊರಿಯಾದ ಪುನರಾವರ್ತಿತ ಕ್ಷಿಪಣಿ ಮತ್ತು ಅಣ್ವಸ್ತ್ರಗಳ ಪ್ರಯೋಗದ ಆತಂಕದ ನಡುವೆಯೇ ಜಪಾನ್ನಲ್ಲಿ ಚುನಾವಣೆ ನಡೆದಿರುವುದು ಮಹತ್ವ ಪಡೆದುಕೊಂಡಿದೆ"
+    },
+    {
+      "id": "844424930348276-413-f",
+      "member": "kathbath/kannada/wavs/844424930348276-413-f.wav",
+      "speaker": "413",
+      "durationS": 9.6363,
+      "sha256": "6154cdf359b66bb1f59736680fb898b74415caf675e49ec3d95d33e56df48626",
+      "reference": "ಅಷ್ಟೇ ಅಲ್ಲದೆ ಇವರು ಆಕಾಶದಿಂದ ಬೀಳುವ ಕಾಯಗಳನ್ನು ಅನುಸರಿಸುವ ನಿಯಮಗಳಿಗೆ ಪ್ರಾಯೋಗಿಕ ದಾಖಲೆಗಳನ್ನು ನೀಡಿದರು"
+    },
+    {
+      "id": "844424933135754-168-m",
+      "member": "kathbath/kannada/wavs/844424933135754-168-m.wav",
+      "speaker": "168",
+      "durationS": 8.4289,
+      "sha256": "e064f4d7a2ab2470c8d1709612b54f832dc8efea332c2d96d7fc826fadd6e060",
+      "reference": "ನಿಕ್ ಗಾರ್ಡನ್ ತನ್ನ ಮಗಳು ವಿಟ್ನಿ ಹೂಸ್ಟನ್ ಅವರ ಸಾವಿನ ಜವಾಬ್ದಾರಿಯನ್ನು ಕಂಡುಕೊಂಡರು"
+    },
+    {
+      "id": "844424930358329-818-f",
+      "member": "kathbath/kannada/wavs/844424930358329-818-f.wav",
+      "speaker": "818",
+      "durationS": 7.0124,
+      "sha256": "62ae15b32de324c3b6fac8a7f8887c8202991de4f3db69bfcb1461ac30257cca",
+      "reference": "ಹೆಚ್ಚುವರಿ ಫೋರ್ಸ್ ಗಳನ್ನು ಪಶಿಮ ಉತ್ತರಪ್ರದೇಶದಲ್ಲಿ ನಿಯೋಜಿಸಲಾಗುತ್ತದೆ ಎಂದು ಪೋಲೀಸರು ತಿಳಿಸಿದ್ದಾರೆ"
+    },
+    {
+      "id": "844424933155898-1168-m",
+      "member": "kathbath/kannada/wavs/844424933155898-1168-m.wav",
+      "speaker": "1168",
+      "durationS": 7.0124,
+      "sha256": "a18059d8ee03109df405009afeed84699dc7087b26f6ce474d9fb41c3c5ed7e5",
+      "reference": "ಅಲ್ಲದೆ ಪರಿಹಾರ ಒಂದು ಸಮಯದಲ್ಲಿ ಮಿಶ್ರಣ ಒಬ್ಬನೆ ಎಣಿಕೆ ನಿಂತಿದೆ"
+    },
+    {
+      "id": "844424933005362-1017-f",
+      "member": "kathbath/kannada/wavs/844424933005362-1017-f.wav",
+      "speaker": "1017",
+      "durationS": 5.3174,
+      "sha256": "27596689d8b22c4e8bb329eedad68a8d80ce1ffc0f303cd002f39db9414f8301",
+      "reference": "ಗುಡಿಸಲ ಮೇಲೆ ಕಾರು ಹರಿಸಿದ ಮಾಜಿ ಎಸ್ಪಿ ಶಾಸಕನ ಮಗ"
+    },
+    {
+      "id": "844424933158003-640-m",
+      "member": "kathbath/kannada/wavs/844424933158003-640-m.wav",
+      "speaker": "640",
+      "durationS": 8.9629,
+      "sha256": "92aa6d12dcfe2dc939b869ef43479c453126c30467d7cf066d1954ed8a8b2d29",
+      "reference": "ಹಾಗೂ ಬುದ್ಧಿಮಾಂಧ್ಯ ಮಕ್ಕಳ ಪೋಷಕರ ಸಂಘ ಪರಿಹಾರ ಟ್ರಸ್ಟ್ಗೆ ಕೇಂದ್ರ ಸರಕಾರ ಅನುದಾನ ನೀಡಬೇಕು ಎಂದು ಮನವಿ ಮಾಡಿದರು"
+    },
+    {
+      "id": "844424933046865-418-f",
+      "member": "kathbath/kannada/wavs/844424933046865-418-f.wav",
+      "speaker": "418",
+      "durationS": 10.7509,
+      "sha256": "6f3344aebae6ccdd247435bfa63c2b313d9add148501b8dc7479df9ac4870166",
+      "reference": "ಕುಟುಂಬದಲ್ಲಿ ಹಿರಿಯ ಮಗನಾಗಿದ್ದ ಮಿಥುನ್ ಪದವಿ ಪೂರೈಸಿದ ಕೂಡಲೇ ಕುಟುಂಬ ನಿರ್ವಹಣೆ ಉದ್ದೇಶದಿಂದ ಸಾಫ್ಟ್ ವೇರ್ ಕ್ಷೇತ್ರದಲ್ಲಿ ಉದ್ಯೋಗಕ್ಕೆ ಸೇರಿಕೊಂಡಿದ್ದರು"
+    },
+    {
+      "id": "844424933163798-78-m",
+      "member": "kathbath/kannada/wavs/844424933163798-78-m.wav",
+      "speaker": "78",
+      "durationS": 8.3127,
+      "sha256": "e2f07c4154522809ad4a178b31ca15fb097cd2c5f6d747e990eccf939b91b21b",
+      "reference": "ಟ್ವಿಟರ್ ಖಾತೆ ತೆರೆಯದ ಹಲವಾರು ಜನರು ವಾಟ್ಸಾಪ್ ಮೂಲಕವೂ ಟ್ವೀಟಥಾನ್ಗೆ ಸ್ಪಂದಿಸಿದ್ದಾರೆ"
+    },
+    {
+      "id": "844424933065490-581-f",
+      "member": "kathbath/kannada/wavs/844424933065490-581-f.wav",
+      "speaker": "581",
+      "durationS": 8.0109,
+      "sha256": "a852945d74baf4fe923d5686e8481c4139dd932072d6780b97a314e0cd917ca6",
+      "reference": "ಜಿಲ್ಲೆಯಲ್ಲಿ ಒಣ ಪ್ರದೇಶ ಇರುವುದರಿಂದ ಅರಣ್ಯ ಪ್ರದೇಶವನ್ನು ಸಾಕಷ್ಟು ಸೂಕ್ಷ್ಮವಾಗಿ ನೋಡಿಕೊಳ್ಳಬೇಕಿದೆ"
+    },
+    {
+      "id": "844424933192136-808-m",
+      "member": "kathbath/kannada/wavs/844424933192136-808-m.wav",
+      "speaker": "808",
+      "durationS": 10.7973,
+      "sha256": "cbfc020a548c749549b5f3143e9c14cfafb0ef506d48947e1cddcfcbcefe6163",
+      "reference": "ಕತೆ ಹೇಳುವುದನ್ನು ನಿಲ್ಲಿಸಿ ಮಲಗಿದಲ್ಲೇ ಏನನ್ನೋ ಡೀಪಾಗಿ ಯೋಚಿಸುತ್ತಾ ಸುಮ್ಮನೆ ಇದ್ದು ಬಿಟ್ಟರು"
+    },
+    {
+      "id": "844424933067768-286-f",
+      "member": "kathbath/kannada/wavs/844424933067768-286-f.wav",
+      "speaker": "286",
+      "durationS": 5.5496,
+      "sha256": "95ff0c31debe0b1bdc50a06b36c661fb0f28511b93430885c3cdec8dc666f952",
+      "reference": "ಹುಲ್ಲನ್ನು ಹಾಕದೇ ಬರೀ ಹಿಂಡಿ ಮಿಶ್ರಣದಿಂದ ಯಾವ ಜಾನುವಾರುಗಳೂ ಬದುಕಲಾರವು"
+    },
+    {
+      "id": "844424933287314-206-m",
+      "member": "kathbath/kannada/wavs/844424933287314-206-m.wav",
+      "speaker": "206",
+      "durationS": 9.9846,
+      "sha256": "2557bdc3f8e5d3d09c07ddc8ddec9c670189548596a2ebc0e99e01425c0532fc",
+      "reference": "ಅವರಲ್ಲಿ ಲಭ್ಯವಿದ್ದ ಲೇಖನಗಳು ಪ್ರಪಂಚ ಸಂದರ್ಶನ ಸಚೇತನ ತಾಯಿನುಡಿ ಕಲ್ಯಾಣ ಜಯಂತಿ ಪತ್ರಿಕೆಗಳಲ್ಲಿ ಪ್ರಕಟವಾದ ಬರಹಗಳು"
+    },
+    {
+      "id": "844424933071399-1153-f",
+      "member": "kathbath/kannada/wavs/844424933071399-1153-f.wav",
+      "speaker": "1153",
+      "durationS": 6.966,
+      "sha256": "8b3d794188d760c8067b62ecfca0fa1d992596db9756a2d228a5dcf5ce974aad",
+      "reference": "ಬ್ರಿಟಿಷರ ಕಾಲ ದಲ್ಲಿ ಸಾಕಾನೆ ಶಿಬಿರವಾಗಿ ರೂಪುಗೊಂಡ ಈಗ ಅರಣ್ಯ ಇಲಾಖೆಯ ಸುಪರ್ದಿ ಯಲ್ಲಿದೆ"
+    },
+    {
+      "id": "844424933288312-157-m",
+      "member": "kathbath/kannada/wavs/844424933288312-157-m.wav",
+      "speaker": "157",
+      "durationS": 10.6115,
+      "sha256": "e5c9aa8772e526dc6e7df3493f77b5866843c878874cd7cdced43852ce3fc501",
+      "reference": "ನಾಟಕ ರಂಗ ಕೊಡುವ ವೈವಿಧ್ಯತೆಯನ್ನು ದುರದೃಷ್ಟವಶಾತ್ ಚಿತ್ರರಂಗ ಮತ್ತು ದೂರದರ್ಶನ ನೀಡಲು ಆಶಕ್ಯವಾಗಿವೆ"
+    },
+    {
+      "id": "844424933104979-629-f",
+      "member": "kathbath/kannada/wavs/844424933104979-629-f.wav",
+      "speaker": "629",
+      "durationS": 9.3809,
+      "sha256": "507244c4c3dc583a34866aac8e031842bc5106213e76a861a4f1263aece159a7",
+      "reference": "ಮುಖಬೆಲೆಯ ಹೊಸ ನೋಟುಗಳನ್ನು ಚಲಾವಣೆಗೆ ತರಲು ಸಕಲ ಸಿದ್ಧತೆಗಳನ್ನು ನಡೆಸಿಕೊಂಡಿದೆ ಎನ್ನಲಾಗಿರುವ ಮಾಹಿತಿ ಬಂದಿದೆ"
+    },
+    {
+      "id": "844424933351123-919-m",
+      "member": "kathbath/kannada/wavs/844424933351123-919-m.wav",
+      "speaker": "919",
+      "durationS": 9.8221,
+      "sha256": "ea1e44c02269f3e3337853a28b4f7c16680b96b9ffd3dc3f701dec24925c552f",
+      "reference": "ಸಮಾಲೋಚನೆಯು ನಕಾರಾತ್ಮಕವಾಗಿಯೂ ಕೂಡ ಪರಿಣಮಿಸಬಹುದು ಅದಕ್ಕೆ ಬದಲಾಗಿ ಜನಾಂಗೀಯ ಅಥವಾ ಲಿಂಗದ ಗುಂಪಿಗೆ ಕೊಚ್ಚಿಹೋದ ವೈಷಮ್ಯವನ್ನು ನೀಡಬಹುದು"
+    }
+  ]
+}

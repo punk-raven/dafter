@@ -62,7 +62,7 @@ def test_the_table_names_date_judge_and_every_candidate() -> None:
     assert lines[0] == (
         "Stage 4 LLM screen, 2026-09-27, languages: hi, kn, judge: judge_gemini_flash (a-model)"
     )
-    assert lines[4].startswith("| 1 | openai_mini | openai_compat/gpt-5.4-mini")
+    assert lines[4].startswith("| 1 | openai_mini | openai/gpt-5.4-mini")
     assert "| 150/150 |" in lines[4] and "| 0.9582 |" in lines[4] and "not stated" in lines[4]
     assert "skipped: authentication_failed: no key" in lines[-1]
 
