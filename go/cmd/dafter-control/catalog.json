@@ -113,6 +113,7 @@
       }
     },
     "recording": { "enabled": false },
+    "transcription": { "mode": "off" },
     "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 300 }
   },
 
@@ -135,6 +136,14 @@
         "turn": { "strategy": "provider_endpointing", "localVadEnabled": false }
       },
       "overlay": {
+        "transcription": {
+          "batch": {
+            "provider": "sarvam",
+            "model": "saaras:v3",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          }
+        },
         "agent": {
           "pipeline": {
             "stt": {
@@ -172,6 +181,14 @@
         "turn": { "strategy": "semantic", "localVadEnabled": true }
       },
       "overlay": {
+        "transcription": {
+          "batch": {
+            "provider": "sarvam",
+            "model": "saaras:v3",
+            "region": "ap-south-1",
+            "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key"
+          }
+        },
         "agent": {
           "pipeline": {
             "stt": {

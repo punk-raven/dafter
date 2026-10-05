@@ -1,0 +1,25 @@
+{
+  "job_state": "Completed",
+  "created_at": "2026-09-24T10:31:00Z",
+  "updated_at": "2026-09-24T10:31:09Z",
+  "job_id": "20260924_9f8b7c6d-5e4a-3b2c-1d0e-000000000001",
+  "storage_container_type": "Azure_V1",
+  "total_files": 2,
+  "successful_files_count": 2,
+  "failed_files_count": 0,
+  "error_message": "",
+  "job_details": [
+    {
+      "inputs": [{ "file_name": "EG_Kx9r2QmT4bZa.ogg", "file_id": "file-001" }],
+      "outputs": [{ "file_name": "0.json", "file_id": "file-out-001" }],
+      "state": "Success",
+      "error_message": null
+    },
+    {
+      "inputs": [{ "file_name": "EG_Lw3s8PnV6cYb.ogg", "file_id": "file-002" }],
+      "outputs": [{ "file_name": "1.json", "file_id": "file-out-002" }],
+      "state": "Success",
+      "error_message": null
+    }
+  ]
+}

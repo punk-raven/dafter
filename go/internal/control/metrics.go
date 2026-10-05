@@ -94,6 +94,10 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
+	mux.HandleFunc("POST /sessions/{sessionID}/transcripts", s.storeTranscript)
+	mux.HandleFunc("GET /sessions/{sessionID}/transcripts", s.listTranscripts)
+	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()
@@ -112,7 +116,10 @@ func normalizePath(p string) string {
 	if !strings.HasPrefix(p, "/sessions/") {
 		return p
 	}
-	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal"} {
+	if strings.Contains(p, "/transcripts/") {
+		return "/sessions/{id}/transcripts/{version}"
+	}
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/transcription/sources", "/transcripts"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
 		}

@@ -29,7 +29,7 @@ var embeddedCatalog []byte
 var testClientHTML []byte
 
 //go:embed agent.js agent-call.js agent-turns.js agent-metrics.js agent-refusal.js agent-addressing.js agent.css
-//go:embed client.js client-stats.js client-session.js client-media.js
+//go:embed client.js client-stats.js client-session.js client-media.js client-captions.js captions.css
 var clientAssets embed.FS
 
 var clientAssetPaths = map[string]string{
@@ -44,6 +44,8 @@ var clientAssetPaths = map[string]string{
 	"/client-stats.js":     "client-stats.js",
 	"/client-session.js":   "client-session.js",
 	"/client-media.js":     "client-media.js",
+	"/client-captions.js":  "client-captions.js",
+	"/captions.css":        "captions.css",
 }
 
 func main() {

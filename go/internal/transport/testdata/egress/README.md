@@ -17,3 +17,40 @@ and must be re-read from the proto, not remembered.
 - `stop.json`: `StopEgress`
 - `create-room.json`: `RoomService/CreateRoom` (from `livekit_room.proto`),
   sent before a room composite that starts at session creation
+
+Attributing a track recording and reading one back:
+
+- `list-participants.json`: `RoomService/ListParticipants`
+  (`ListParticipantsRequest` in `livekit_room.proto`), sent before a track
+  egress starts so the recording stores whose track it is: the publisher's
+  identity (a control-plane participant id, or the agent), and whether the
+  track is audio (`TrackInfo.type`, `ParticipantInfo.kind` in
+  `livekit_models.proto`, read as enum names or numbers). The server checks
+  `roomAdmin` on that one room.
+- `list-egress.json`: `Egress/ListEgress` (`ListEgressRequest`) naming one
+  egress id, under a token carrying `roomRecord` and nothing else (the
+  server's `EnsureRecordPermission`). A finished recording is
+  `EGRESS_COMPLETE` and its object key is `file_results[0].filename`, which
+  the egress service sets to the storage path after substituting `{utc}` and
+  appending the extension (`updateFilepath` in `livekit/egress`
+  `pkg/config/output_file.go`). The control plane hands that object out as an
+  S3 SigV4 presigned GET (`presign.go`), checked against the AWS example
+  signature and a botocore-signed MinIO URL.
+
+Answers the adapter reads, from the same protos (proto field names, int64
+as a decimal string, enums as names or numbers):
+
+- `list-egress-limit-reached.json`: a `ListEgress` item that ended at its
+  time limit. It still carries `file_results`, so it is read like
+  `EGRESS_COMPLETE`. `ended_at` is when the egress ended; the control plane
+  stores it as the recording's stop, because a track egress ends by itself
+  when its track is unpublished and nothing else tells the control plane.
+- `list-egress-failed.json`: a `ListEgress` item that ended as
+  `EGRESS_FAILED` with no file. `EGRESS_FAILED`, `EGRESS_ABORTED` and
+  `EGRESS_LIMIT_REACHED` are terminal (`EgressStatus` in
+  `livekit_egress.proto`); a terminal egress without a file is skipped,
+  never pending.
+- `stop-ended.json`: the Twirp error (HTTP 412) `StopEgress` answers for an
+  egress that is no longer starting or active (`EgressService.StopEgress` in
+  `livekit/livekit` `pkg/service/egress.go`). The control plane then reads
+  the egress with `ListEgress` and records the stop it already had.

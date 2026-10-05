@@ -36,6 +36,7 @@ def resolve(
     stage: Stage,
     allowed: Collection[str],
     env: Mapping[str, str] | None = None,
+    pointer: str | None = None,
 ) -> str:
     context = ProviderContext(ref.provider)
     if not ref.credential_ref:
@@ -54,7 +55,7 @@ def resolve(
             stage=stage,
             provider=context,
             details=(
-                f"at '/agent/pipeline/{stage}/credentialRef': "
+                f"at '{pointer or f'/agent/pipeline/{stage}'}/credentialRef': "
                 f"a reference to {' or '.join(readable) or 'a provider key'}",
             ),
         )

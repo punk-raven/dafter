@@ -29,13 +29,19 @@ from livekit.agents.voice.events import (
     ErrorEvent,
     SpeechCreatedEvent,
 )
-from livekit.agents.voice.room_io import AudioInputOptions, AudioOutputOptions, RoomOptions
+from livekit.agents.voice.room_io import (
+    AudioInputOptions,
+    AudioOutputOptions,
+    RoomOptions,
+    TextOutputOptions,
+)
 from opentelemetry import trace
 
 from . import telemetry
 from .answering import Roster
 from .backchannel import Acknowledgements
 from .called import Called
+from .captions import Captions, source_of
 from .control import ControlPlane, encryption
 from .cost import OutputTokens, load_prices, priced, usage_payload
 from .delivery import Delivery
@@ -46,6 +52,7 @@ from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
 from .timing import Turns, TurnTiming
 from .toolbox import Answering, follow, linked, registry_for
+from .transcribing import Transcribing
 
 POOL_ENV = "LIVEKIT_AGENT_NAME"
 DEFAULT_POOL = "dafter-py"
@@ -109,19 +116,28 @@ def stt_sample_rate(p: Plan) -> int:
     return int(p.pipeline.stt.options.get("sampleRate", 16000)) if p.pipeline.stt else 16000
 
 
-def room_options(p: Plan, tts_sample_rate: int) -> RoomOptions:
+def room_options(p: Plan, tts_sample_rate: int, captions: Captions | None = None) -> RoomOptions:
+    text_output = TextOutputOptions(next_in_chain=captions.agent) if captions else True
     if p.called_by_name:
         return RoomOptions(
             audio_input=False,
             text_input=False,
             audio_output=AudioOutputOptions(sample_rate=tts_sample_rate),
+            text_output=text_output,
             close_on_disconnect=False,
         )
     return RoomOptions(
         audio_input=AudioInputOptions(sample_rate=stt_sample_rate(p)),
         audio_output=AudioOutputOptions(sample_rate=tts_sample_rate),
+        text_output=text_output,
         close_on_disconnect=True,
     )
+
+
+def captions_for(p: Plan, events: SessionEvents) -> Captions | None:
+    if not p.config.transcription.live:
+        return None
+    return Captions(events.emit, source_of(p.pipeline.stt))
 
 
 def current_trace_id() -> str | None:
@@ -273,7 +289,15 @@ async def entrypoint(ctx: JobContext) -> None:
             provider.force_flush()
 
     ctx.add_shutdown_callback(flush)
-    called = Called(ctx, p, stages, session, stt_sample_rate(p)) if p.called_by_name else None
+    captions = captions_for(p, events)
+    called = (
+        Called(ctx, p, stages, session, stt_sample_rate(p), captions) if p.called_by_name else None
+    )
+    transcribing = (
+        Transcribing(ctx, p, stages, captions, stt_sample_rate(p))
+        if captions is not None and called is None
+        else None
+    )
     delivery = Delivery(p.config.agent.speech, p.config.language)
     caller: Callable[[], str | None]
     if called is not None:
@@ -291,7 +315,7 @@ async def entrypoint(ctx: JobContext) -> None:
         p,
         events,
         telemetry.tracer(provider),
-        usage=called.usage if called is not None else None,
+        usage=spent(session, called, transcribing),
         filled=lambda: delivery.filler.took(session.current_speech),
     )
     await session.start(
@@ -303,14 +327,27 @@ async def entrypoint(ctx: JobContext) -> None:
             delivery,
         ),
         room=ctx.room,
-        room_options=room_options(p, stages.tts.sample_rate),
+        room_options=room_options(p, stages.tts.sample_rate, captions),
         record=False,
     )
     delivery.filler.start(session, stages.tts)
     if called is not None:
         called.listen()
+    elif transcribing is not None:
+        transcribing.listen()
     if p.opening is not None:
         session.say(p.opening, allow_interruptions=True)
+
+
+def spent(
+    session: AgentSession[Any], called: Called | None, transcribing: Transcribing | None
+) -> Callable[[], AgentSessionUsage] | None:
+    if called is not None:
+        return called.usage
+    if transcribing is None:
+        return None
+    listening = transcribing
+    return lambda: AgentSessionUsage(model_usage=[*session.usage.model_usage, *listening.usage()])
 
 
 def prewarm(proc: JobProcess) -> None:

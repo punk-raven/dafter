@@ -54,6 +54,7 @@ installer_for_make() { package_installer build-essential make make; }
 installer_for_uv() { echo 'curl -LsSf https://astral.sh/uv/install.sh | sh'; }
 
 installer_for_cc() { package_installer build-essential gcc gcc; }
+installer_for_node() { if have brew; then echo 'brew install node'; fi; }
 
 installer_for_go() {
   if have brew; then
@@ -92,6 +93,7 @@ ensure make https://www.gnu.org/software/make/
 ensure cc https://go.dev/doc/install/source#environment
 ensure go https://go.dev/dl/
 ensure uv https://docs.astral.sh/uv/getting-started/installation/
+ensure node https://nodejs.org/en/download
 
 if [ -n "$checkout" ]; then
   cd "$checkout"
@@ -113,7 +115,12 @@ if [ "$(printf '1.21\n%s\n' "$go_version" | sort -V | head -1)" != "1.21" ]; the
   die "go $go_version is too old. go/go.mod pins a newer toolchain and needs 1.21+ to fetch it: https://go.dev/dl/"
 fi
 
-printf '==> go %s, uv %s\n' "$go_version" "$(uv --version | awk '{print $2}')"
+node_version=$(node --version | sed 's/^v//')
+if [ "$(printf '20\n%s\n' "$node_version" | sort -V | head -1)" != "20" ]; then
+  die "node $node_version is too old. make js-test needs Node 20 or newer: https://nodejs.org/en/download"
+fi
+
+printf '==> go %s, uv %s, node %s\n' "$go_version" "$(uv --version | awk '{print $2}')" "$node_version"
 
 echo '==> generating everything derived from schemas/'
 make generate
