@@ -31,6 +31,9 @@ exist yet. Steps marked *(pending)* name design requirements, not paths; fill th
 
 5. Credentials only as `secret://` references (`SecretRef` in
    `schemas/common/v1/ids.schema.json`), resolved at construction. Never a literal.
+   Resolve through `credentials.resolve` with the one variable the vendor binds, and add that
+   variable to `PROVIDER_CREDENTIALS`. A host the config chooses comes by name from an
+   operator-owned table binding it to one key (`openai_compat/endpoints.json`), never as a URL.
 
 6. `region` is an opaque provider-scoped token (why: commit body `fix(schemas): correct
    region, hash, closure and event id width`); declare the tokens served, residency filters

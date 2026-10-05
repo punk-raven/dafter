@@ -1,0 +1,18 @@
+{
+  "google": {
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "credentialEnv": "GEMINI_API_KEY"
+  },
+  "openrouter": {
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "credentialEnv": "OPENROUTER_API_KEY"
+  },
+  "opencode_zen": {
+    "baseUrl": "https://opencode.ai/zen/v1",
+    "credentialEnv": "OPENCODE_API_KEY"
+  },
+  "openai": {
+    "baseUrl": "https://api.openai.com/v1",
+    "credentialEnv": "OPENAI_API_KEY"
+  }
+}
