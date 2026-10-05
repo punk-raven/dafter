@@ -3,7 +3,13 @@ package transport
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
+)
+
+const (
+	DefaultPINAttempts = 3
+	maxPINAttempts     = 5
 )
 
 var (
@@ -21,6 +27,20 @@ type Inbound struct {
 	BridgeHost string
 	BridgeUser string
 	Session    InboundSession
+
+	MeetingNumbers []string
+	PINAttempts    int
+}
+
+func (in *Inbound) AnswersMeetings(number string) bool {
+	return slices.Contains(in.MeetingNumbers, number)
+}
+
+func (in *Inbound) Attempts() int {
+	if in.PINAttempts == 0 {
+		return DefaultPINAttempts
+	}
+	return in.PINAttempts
 }
 
 type InboundSession struct {
@@ -35,6 +55,9 @@ type inboundEntry struct {
 	BridgeHost    string         `json:"bridgeHost"`
 	BridgeUserRef string         `json:"bridgeUserRef"`
 	Session       InboundSession `json:"session"`
+
+	MeetingNumbersRef string `json:"meetingNumbersRef,omitempty"`
+	PINAttempts       int    `json:"pinAttempts,omitempty"`
 }
 
 func (e inboundEntry) resolve(outer *resolver, provider string, numbers []string) *Inbound {
@@ -45,6 +68,9 @@ func (e inboundEntry) resolve(outer *resolver, provider string, numbers []string
 		BridgeHost: e.BridgeHost,
 		BridgeUser: r.ref("bridgeUserRef", e.BridgeUserRef),
 		Session:    e.Session,
+
+		MeetingNumbers: numberList(r.optional("meetingNumbersRef", e.MeetingNumbersRef)),
+		PINAttempts:    e.PINAttempts,
 	}
 	if !inboundDialects[provider] {
 		r.add("provider", "no carrier webhook is built for this provider, so it takes no inbound calls")
@@ -68,12 +94,19 @@ func (e inboundEntry) resolve(outer *resolver, provider string, numbers []string
 	if in.BridgeUser != "" && !sipUserPattern.MatchString(in.BridgeUser) {
 		r.add("bridgeUserRef", "the user part of the carrier application's SIP address")
 	}
-	if !tenantPattern.MatchString(e.Session.TenantID) || !languagePattern.MatchString(e.Session.Language) ||
-		(e.Session.Profile != "" && !profilePattern.MatchString(e.Session.Profile)) {
+	if slices.ContainsFunc(numbers, func(n string) bool { return !in.AnswersMeetings(n) }) &&
+		(!tenantPattern.MatchString(e.Session.TenantID) || !languagePattern.MatchString(e.Session.Language) ||
+			(e.Session.Profile != "" && !profilePattern.MatchString(e.Session.Profile))) {
 		r.add("session", "the tenant, language and optional profile an inbound call's session resolves with")
 	}
 	if len(numbers) == 0 {
 		r.add("session", "an inbound trunk answers only its own numbers, and it has none")
+	}
+	if slices.ContainsFunc(in.MeetingNumbers, func(n string) bool { return !slices.Contains(numbers, n) }) {
+		r.add("meetingNumbersRef", "every meeting number is one of the trunk's own numbers")
+	}
+	if e.PINAttempts < 0 || e.PINAttempts > maxPINAttempts {
+		r.add("pinAttempts", "how many PINs a meeting caller may key in before the call ends, 1 to 5")
 	}
 	return in
 }

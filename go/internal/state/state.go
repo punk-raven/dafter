@@ -56,6 +56,15 @@ type SessionStore interface {
 	Transcript(ctx context.Context, sessionID string, version int) (Transcript, error)
 	AddMinutes(ctx context.Context, m Minutes) (Minutes, error)
 	LatestMinutes(ctx context.Context, sessionID string) (Minutes, error)
+	CreateDialIn(ctx context.Context, sessionID, pin string, at time.Time) error
+	DialInPIN(ctx context.Context, sessionID string) (string, error)
+	DialInByPIN(ctx context.Context, pin string) (DialIn, error)
+	DialInsAllowing(ctx context.Context, number string) ([]DialIn, error)
+	DialIns(ctx context.Context) ([]DialIn, error)
+	DialInAllows(ctx context.Context, sessionID, number string) (bool, error)
+	SetDialInNumbers(ctx context.Context, sessionID string, numbers []string) error
+	MarkDialInOpened(ctx context.Context, sessionID string, at time.Time) error
+	EndDialIn(ctx context.Context, sessionID string) error
 	Close() error
 }
 
@@ -131,7 +140,7 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 			return nil, closing(db, err)
 		}
 	}
-	for _, migration := range []string{transcriptsMigration, minutesMigration} {
+	for _, migration := range []string{transcriptsMigration, minutesMigration, dialInMigration} {
 		if _, err := db.ExecContext(ctx, migration); err != nil {
 			return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
 		}

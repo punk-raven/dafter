@@ -51,6 +51,9 @@ type stubTransport struct {
 	callErr error
 	people  map[string]string
 	hungUp  []string
+
+	closed  map[string]bool
+	roomErr error
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {

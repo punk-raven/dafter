@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response><Gather action="https://calls.example.com/telephony/vobiz/pin" method="POST" inputType="dtmf" numDigits="8" finishOnKey="#" executionTimeout="15" digitEndTimeout="5" redirect="true"><Speak voice="WOMAN" language="en-GB">Welcome. Please enter your meeting PIN, followed by the hash key.</Speak></Gather><Speak voice="WOMAN" language="en-GB">We did not receive a PIN. Goodbye.</Speak><Hangup></Hangup></Response>

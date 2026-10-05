@@ -11,6 +11,7 @@
       "signingKeyRef": "secret://operator/vobiz/sip-auth-token",
       "bridgeHost": "sip.vobiz.ai",
       "bridgeUserRef": "secret://operator/vobiz/sip-bridge-app",
+      "meetingNumbersRef": "secret://operator/vobiz/sip-meeting-numbers",
       "session": { "tenantId": "t_9c21a4be", "language": "hi" }
     }
   }

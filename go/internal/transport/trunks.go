@@ -86,6 +86,33 @@ func (r *resolver) ref(field, ref string) string {
 	return value
 }
 
+func (r *resolver) optional(field, ref string) string {
+	if ref == "" {
+		return ""
+	}
+	name, because := envName(r.provider, ref)
+	if because != "" {
+		r.add(field, because)
+		return ""
+	}
+	value := strings.TrimSpace(r.env(name))
+	if value != "" {
+		r.set++
+	}
+	return value
+}
+
+func numberList(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	numbers := strings.Split(raw, ",")
+	for i := range numbers {
+		numbers[i] = strings.TrimSpace(numbers[i])
+	}
+	return numbers
+}
+
 func (r *resolver) missing() {
 	for _, field := range r.unset {
 		r.add(field, "its variable is not in the control plane's environment while the trunk's others are")
@@ -151,10 +178,7 @@ func (e trunkEntry) resolve(env func(string) string) (Trunk, bool, []trunkProble
 		trunk.Address = address
 	}
 	if numbers := r.ref("numbersRef", e.NumbersRef); numbers != "" {
-		trunk.Numbers = strings.Split(numbers, ",")
-		for i := range trunk.Numbers {
-			trunk.Numbers[i] = strings.TrimSpace(trunk.Numbers[i])
-		}
+		trunk.Numbers = numberList(numbers)
 	}
 	trunk.AuthUsername = r.ref("authUsernameRef", e.AuthUsernameRef)
 	trunk.AuthPassword = r.ref("authPasswordRef", e.AuthPasswordRef)

@@ -96,45 +96,53 @@ func refused(problems []string) *errs.Error {
 }
 
 type conference struct {
-	StayAlone      bool   `xml:"stayAlone,attr"`
-	StartOnEnter   bool   `xml:"startConferenceOnEnter,attr"`
-	EndOnExit      bool   `xml:"endConferenceOnExit,attr"`
-	Beep           bool   `xml:"beep,attr"`
-	TimeLimit      int    `xml:"timeLimit,attr"`
-	CallbackURL    string `xml:"callbackUrl,attr,omitempty"`
-	CallbackMethod string `xml:"callbackMethod,attr,omitempty"`
-	Room           string `xml:",chardata"`
+	XMLName        xml.Name `xml:"Conference"`
+	StayAlone      bool     `xml:"stayAlone,attr"`
+	StartOnEnter   bool     `xml:"startConferenceOnEnter,attr"`
+	EndOnExit      bool     `xml:"endConferenceOnExit,attr"`
+	Beep           bool     `xml:"beep,attr"`
+	TimeLimit      int      `xml:"timeLimit,attr"`
+	CallbackURL    string   `xml:"callbackUrl,attr,omitempty"`
+	CallbackMethod string   `xml:"callbackMethod,attr,omitempty"`
+	Room           string   `xml:",chardata"`
+}
+
+type hangup struct {
+	XMLName xml.Name `xml:"Hangup"`
 }
 
 type response struct {
-	XMLName    xml.Name    `xml:"Response"`
-	Conference *conference `xml:"Conference,omitempty"`
-	Hangup     *struct{}   `xml:"Hangup,omitempty"`
+	XMLName xml.Name `xml:"Response"`
+	Verbs   []any
 }
 
 func Hold(room, callbackURL string, limit time.Duration) []byte {
-	c := join(room, limit)
-	c.CallbackURL, c.CallbackMethod = callbackURL, http.MethodPost
-	return render(response{Conference: c})
+	return render(hold(room, callbackURL, limit))
 }
 
 func Join(room string, limit time.Duration) []byte {
-	return render(response{Conference: join(room, limit)})
+	return render(join(room, limit))
 }
 
 func Hangup() []byte {
-	return render(response{Hangup: &struct{}{}})
+	return render(hangup{})
 }
 
-func join(room string, limit time.Duration) *conference {
-	return &conference{
+func hold(room, callbackURL string, limit time.Duration) conference {
+	c := join(room, limit)
+	c.CallbackURL, c.CallbackMethod = callbackURL, http.MethodPost
+	return c
+}
+
+func join(room string, limit time.Duration) conference {
+	return conference{
 		StayAlone: true, StartOnEnter: true, EndOnExit: true, Beep: false,
 		TimeLimit: int(limit / time.Second), Room: room,
 	}
 }
 
-func render(r response) []byte {
-	body, err := xml.Marshal(r)
+func render(verbs ...any) []byte {
+	body, err := xml.Marshal(response{Verbs: verbs})
 	if err != nil {
 		return []byte(xml.Header + "<Response><Hangup></Hangup></Response>")
 	}
