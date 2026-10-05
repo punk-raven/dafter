@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/telephony.schema.json",
+  "title": "Telephony",
+  "description": "How a session on the telephony channel reaches the phone network, referenced from the resolved session config's telephony property. Kept in its own file so the resolved config stays under its size cap.",
+  "$defs": {
+    "Telephony": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Read only on the telephony channel. The phone number a call goes to is never part of this block or of any stored document: it is given once, to the control plane route that places the call, and the person on the line joins under an opaque participant id the control plane mints. A phone call cannot be end-to-end encrypted, because the media server's SIP bridge decodes every frame between the phone network and the room, which is a cross-field rule.",
+      "properties": {
+        "trunk": {
+          "type": "string",
+          "description": "The operator's SIP trunk that carries the call, named by its key in the control plane's trunk table, which binds it to one provider's address, the numbers calls are placed from and the credentials, all of them secret:// references. A session never states an address or a credential, and a session override cannot name a trunk: which trunk a tenant or profile uses is operator configuration, the same rule as a stage's endpoint and credential. Absent: the session can take no outbound call.",
+          "pattern": "^[a-z][a-z0-9-]{1,31}$"
+        },
+        "ringingTimeoutSeconds": {
+          "type": "integer",
+          "description": "How long an outbound call rings before it is given up.",
+          "minimum": 5,
+          "maximum": 120,
+          "default": 30
+        },
+        "maxCallDurationSeconds": {
+          "type": "integer",
+          "description": "The longest a phone call in this session lasts before the media server hangs it up, so a call nobody ends does not run up the provider bill.",
+          "minimum": 60,
+          "maximum": 14400,
+          "default": 1800
+        },
+        "recordingNotice": {
+          "type": "string",
+          "description": "What the agent says about recording once the phone is answered, before anything else and without being interruptible, because a caller on a phone sees no recording indicator. always: it says the call is recorded when recording is on and that it is not when recording is off. when_recorded: it says so only when recording is on and says nothing about it otherwise. Whether the session is recorded is recording.enabled, which the session creator sets; recording still needs its consent artifact.",
+          "enum": ["always", "when_recorded"],
+          "default": "always"
+        }
+      }
+    }
+  }
+}

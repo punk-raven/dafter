@@ -1,0 +1,17 @@
+{
+  "trunk": {
+    "hostname": "app.vobiz.ai",
+    "transport": "SIP_TRANSPORT_UDP"
+  },
+  "sipCallTo": "12345678901234567",
+  "sipNumber": "+12025550100",
+  "roomName": "s_7f3a9c21",
+  "participantIdentity": "p_4b81e0d7",
+  "participantName": "Phone",
+  "participantAttributes": { "dafter.role": "participant" },
+  "hidePhoneNumber": true,
+  "headers": { "X-VH-Bridge": "0f1e2d3c4b5a69788796a5b4c3d2e1f0" },
+  "ringingTimeout": "30s",
+  "maxCallDuration": "1800s",
+  "waitUntilAnswered": false
+}

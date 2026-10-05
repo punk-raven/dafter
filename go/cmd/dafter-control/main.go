@@ -25,12 +25,16 @@ import (
 //go:embed catalog.json
 var embeddedCatalog []byte
 
+//go:embed trunks.json
+var embeddedTrunks []byte
+
 //go:embed testclient.html
 var testClientHTML []byte
 
 //go:embed agent.js agent-llm.js agent-speech.js agent-call.js agent-turns.js agent-metrics.js agent-refusal.js agent-addressing.js agent.css
 //go:embed client.js client-stats.js client-session.js client-call.js client-media.js client-captions.js captions.css
 //go:embed client-scribe.js scribe.css
+//go:embed client-phone.js phone.css
 var clientAssets embed.FS
 
 var clientAssetPaths = map[string]string{
@@ -52,6 +56,8 @@ var clientAssetPaths = map[string]string{
 	"/captions.css":        "captions.css",
 	"/client-scribe.js":    "client-scribe.js",
 	"/scribe.css":          "scribe.css",
+	"/client-phone.js":     "client-phone.js",
+	"/phone.css":           "phone.css",
 }
 
 func main() {
@@ -65,6 +71,7 @@ func run() error {
 	addr := flag.String("addr", envOr("DAFTER_ADDR", "127.0.0.1:8080"), "listen address")
 	dbPath := flag.String("db", envOr("DAFTER_DB", "dafter.db"), "SQLite path")
 	catalogPath := flag.String("catalog", os.Getenv("DAFTER_CATALOG"), "config catalog file; empty uses the embedded one")
+	trunksPath := flag.String("trunks", os.Getenv("DAFTER_TRUNKS"), "SIP trunk table file; empty uses the embedded one")
 	ttl := flag.Duration("token-ttl", transport.DefaultTTL, "join token lifetime")
 	flag.Parse()
 
@@ -78,7 +85,7 @@ func run() error {
 		return fmt.Errorf("media transport: %w", err)
 	}
 
-	raw, err := catalogBytes(*catalogPath)
+	raw, err := fileOr(*catalogPath, embeddedCatalog)
 	if err != nil {
 		return err
 	}
@@ -86,6 +93,15 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("config catalog: %w", err)
 	}
+	raw, err = fileOr(*trunksPath, embeddedTrunks)
+	if err != nil {
+		return err
+	}
+	trunks, skipped, err := transport.LoadTrunks(raw, os.Getenv)
+	if err != nil {
+		return fmt.Errorf("SIP trunk table: %w", err)
+	}
+	slog.Info("SIP trunks loaded", "trunks", len(trunks), "not configured here", skipped)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -110,7 +126,7 @@ func run() error {
 
 	svc := &control.Service{
 		Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl,
-		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"),
+		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"), Trunks: trunks,
 	}
 	if svc.WorkerSecret == "" {
 		slog.Info("worker calls disabled: DAFTER_WORKER_SECRET is not set, so no agent can join an end-to-end session")
@@ -174,13 +190,13 @@ func egressOptions() []transport.Option {
 	return []transport.Option{transport.WithEgressStorage(storage)}
 }
 
-func catalogBytes(path string) ([]byte, error) {
+func fileOr(path string, embedded []byte) ([]byte, error) {
 	if path == "" {
-		return embeddedCatalog, nil
+		return embedded, nil
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read config catalog: %w", err)
+		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	return raw, nil
 }

@@ -260,6 +260,30 @@ SCRIPTS: dict[tuple[str, str], Script] = {
 }
 
 
+RECORDING_NOTICES: dict[str, tuple[str, str]] = {
+    "hi": ("यह कॉल रिकॉर्ड की जा रही है।", "यह कॉल रिकॉर्ड नहीं की जा रही है।"),
+    "en": ("This call is being recorded.", "This call is not being recorded."),
+    "kn": ("ಈ ಕರೆಯನ್ನು ರೆಕಾರ್ಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ.", "ಈ ಕರೆಯನ್ನು ರೆಕಾರ್ಡ್ ಮಾಡಲಾಗುತ್ತಿಲ್ಲ."),
+    "mr": ("हा कॉल रेकॉर्ड केला जात आहे.", "हा कॉल रेकॉर्ड केला जात नाही."),
+    "te": ("ఈ కాల్ రికార్డ్ చేయబడుతోంది.", "ఈ కాల్ రికార్డ్ చేయబడటం లేదు."),
+}
+
+
+def recording_notice(language: str, recorded: bool, always: bool) -> str | None:
+    lines = RECORDING_NOTICES.get(base_language(language))
+    if lines is None:
+        raise DafterError(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "no recording notice is available for this language",
+            details=(
+                "at '/language': the worker cannot tell a caller whether the call is recorded",
+            ),
+        )
+    if recorded:
+        return lines[0]
+    return lines[1] if always else None
+
+
 def called_by_name(persona: Persona) -> Persona:
     return Persona(
         instructions=(

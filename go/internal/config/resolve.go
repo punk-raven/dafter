@@ -259,6 +259,11 @@ func operatorOnlyProblems(overrides map[string]any) []string {
 	for _, field := range []string{"llm", "judge"} {
 		problems = append(problems, redirections("/scribe/"+field, scribe[field])...)
 	}
+	telephony, _ := overrides["telephony"].(map[string]any)
+	if _, ok := telephony["trunk"]; ok {
+		problems = append(problems, located("/telephony/trunk",
+			"names the SIP trunk a call goes out on, which only the operator's configuration sets, never a session override"))
+	}
 	return problems
 }
 

@@ -20,12 +20,16 @@ import (
 )
 
 type Service struct {
-	Catalog      *config.Catalog
-	Store        state.SessionStore
-	Transport    transport.Transport
-	TURN         *turn.Fetcher
-	TokenTTL     time.Duration
-	Log          *slog.Logger
+	Catalog   *config.Catalog
+	Store     state.SessionStore
+	Transport transport.Transport
+	TURN      *turn.Fetcher
+	TokenTTL  time.Duration
+	Log       *slog.Logger
+	Trunks    transport.Trunks
+
+	held heldCalls
+
 	WorkerSecret string
 }
 
@@ -40,6 +44,10 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/stop", s.removeAgent)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/key", s.agentKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/agent/refusal", s.agentRefusal)
+	mux.HandleFunc("POST /sessions/{sessionID}/call/start", s.startCall)
+	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
+	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
+	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -104,65 +112,24 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		req.Role = config.RoleParticipant
 	}
 
-	sessionID, err := ids.NewID(ids.PrefixSession)
-	if err != nil {
-		s.fail(w, errs.Wrap(errs.CodeInternal, err, "mint session id"))
-		return
-	}
 	participantID, err := ids.NewID(ids.PrefixParticipant)
 	if err != nil {
 		s.fail(w, errs.Wrap(errs.CodeInternal, err, "mint participant id"))
 		return
 	}
-
-	resolved, err := s.Catalog.Resolve(config.Request{
-		SessionID: sessionID,
+	opened, err := s.openSession(r.Context(), config.Request{
 		TenantID:  req.TenantID,
 		Profile:   req.Profile,
 		Language:  req.Language,
 		Channel:   req.Channel,
 		LLM:       req.LLM,
 		Overrides: req.Overrides,
-	})
+	}, "")
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
-
-	sess := state.Session{
-		SessionID:  sessionID,
-		TenantID:   resolved.Config.TenantID,
-		Room:       sessionID,
-		ConfigHash: resolved.Hash,
-		Config:     resolved.Document,
-		CreatedAt:  time.Now().UTC(),
-	}
-	if resolved.Config.MintsSharedKey() {
-		key, err := mintEncryptionKey()
-		if err != nil {
-			s.fail(w, err)
-			return
-		}
-		sess.EncryptionKey = key
-	}
-	if err := s.Store.CreateSession(r.Context(), sess); err != nil {
-		s.fail(w, err)
-		return
-	}
-
-	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
-		if _, _, err := s.startEgress(r.Context(), sess, resolved.Config, startRecordingRequest{}, true, state.Egress{}); err != nil {
-			s.fail(w, err)
-			return
-		}
-	}
-
-	dispatchID, err := s.dispatchAgent(r.Context(), sess, resolved.Config)
-	if err != nil {
-		s.fail(w, err)
-		return
-	}
-	scribeDispatchID := s.dispatchScribe(r.Context(), sess, resolved.Config)
+	sess, resolved, sessionID := opened.sess, opened.resolved, opened.sess.SessionID
 
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sessionID,
@@ -196,9 +163,66 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:        token.ExpiresAt,
 		ICEServers:       iceServers,
 		EncryptionKey:    keyFor(resolved.Config, sess, req.Role),
-		AgentDispatchID:  dispatchID,
-		ScribeDispatchID: scribeDispatchID,
+		AgentDispatchID:  opened.dispatchID,
+		ScribeDispatchID: opened.scribeDispatchID,
 	})
+}
+
+type openedSession struct {
+	sess             state.Session
+	resolved         *config.Resolution
+	dispatchID       string
+	scribeDispatchID string
+}
+
+func (s *Service) openSession(ctx context.Context, req config.Request, trunk string) (openedSession, error) {
+	sessionID, err := ids.NewID(ids.PrefixSession)
+	if err != nil {
+		return openedSession{}, errs.Wrap(errs.CodeInternal, err, "mint session id")
+	}
+	req.SessionID = sessionID
+	resolved, err := s.Catalog.Resolve(req)
+	if err != nil {
+		return openedSession{}, err
+	}
+	if name := resolved.Config.TrunkName(); name != "" {
+		if _, err := s.knownTrunk(name); err != nil {
+			return openedSession{}, err
+		}
+	}
+	if trunk != "" && resolved.Config.TrunkName() != trunk {
+		return openedSession{}, located(errs.CodeInvalidConfig, "/telephony/trunk", "an inbound call's session names the trunk it arrived on")
+	}
+
+	sess := state.Session{
+		SessionID:  sessionID,
+		TenantID:   resolved.Config.TenantID,
+		Room:       sessionID,
+		ConfigHash: resolved.Hash,
+		Config:     resolved.Document,
+		CreatedAt:  time.Now().UTC(),
+	}
+	if resolved.Config.MintsSharedKey() {
+		if sess.EncryptionKey, err = mintEncryptionKey(); err != nil {
+			return openedSession{}, err
+		}
+	}
+	if err := s.Store.CreateSession(ctx, sess); err != nil {
+		return openedSession{}, err
+	}
+	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
+		if _, _, err := s.startEgress(ctx, sess, resolved.Config, startRecordingRequest{}, true, state.Egress{}); err != nil {
+			return openedSession{}, err
+		}
+	}
+	dispatchID, err := s.dispatchAgent(ctx, sess, resolved.Config)
+	if err != nil {
+		return openedSession{}, err
+	}
+	return openedSession{
+		sess: sess, resolved: resolved, dispatchID: dispatchID,
+		scribeDispatchID: s.dispatchScribe(ctx, sess, resolved.Config),
+	}, nil
 }
 
 func (s *Service) dispatchAgent(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig) (string, error) {

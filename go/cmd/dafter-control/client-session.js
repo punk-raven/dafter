@@ -1,49 +1,66 @@
+function sessionRequest() {
+  const body = {
+    tenantId: document.getElementById('tenant').value,
+    language: document.getElementById('language').value,
+    channel: document.getElementById('channel').value,
+    llm: chosenLlm(),
+  };
+  const profile = document.getElementById('profile').value.trim();
+  if (profile) body.profile = profile;
+
+  const overrides = {};
+  const resolution = document.getElementById('resolution').value;
+  if (resolution) overrides.media = { video: { resolution } };
+  const noise = document.getElementById('noise-cancellation').value;
+  if (noise) overrides.media = Object.assign(overrides.media || {}, { audio: { noiseCancellation: noise } });
+  const privacyMode = document.getElementById('privacy-mode').value;
+  if (privacyMode) {
+    overrides.privacyMode = privacyMode;
+    if (privacyMode === 'sealed') {
+      overrides.agent = { enabled: false };
+      log('sealed refuses an agent at the API, so the override disables it');
+    }
+  }
+  const agent = agentOverride();
+  if (agent && !overrides.agent) overrides.agent = agent;
+  const addressing = addressingOverride();
+  if (addressing && !(overrides.agent && overrides.agent.enabled === false)) {
+    overrides.agent = Object.assign(overrides.agent || {}, { addressing });
+  }
+  speechOverrides(overrides);
+  if (Object.keys(overrides).length) body.overrides = overrides;
+
+  const layout = document.getElementById('recording-layout').value;
+  if (layout) {
+    body.overrides = body.overrides || {};
+    body.overrides.recording = { enabled: true, layout, consentArtifactId: 'consent_testclient' };
+  }
+  const transcription = transcriptionOverride();
+  if (transcription) applyTranscriptionOverride(body, transcription);
+  if (scribeOverride()) applyScribeOverride(body);
+  return body;
+}
+
+function showCreatedSession(data) {
+  lastRoomId = data.room;
+  log(`Session created: ${data.sessionId}`, 'success');
+  log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
+  if (data.agentDispatchId) log(`Agent dispatched to ${data.config.agent.pool} (${data.agentDispatchId}); join to talk to it`, 'success');
+
+  const joinUrl = `${window.location.origin}?room=${data.room}`;
+  document.getElementById('created-room-id').textContent = data.room;
+  document.getElementById('join-link').value = joinUrl;
+  document.getElementById('session-created-info').style.display = 'block';
+  document.getElementById('room-id').value = data.room;
+}
+
 async function createSession() {
   const btn = document.getElementById('btn-create');
   btn.disabled = true;
 
   try {
     log('Creating session via POST /sessions...');
-    const body = {
-      tenantId: document.getElementById('tenant').value,
-      language: document.getElementById('language').value,
-      channel: document.getElementById('channel').value,
-      llm: chosenLlm(),
-    };
-    const profile = document.getElementById('profile').value.trim();
-    if (profile) body.profile = profile;
-
-    const overrides = {};
-    const resolution = document.getElementById('resolution').value;
-    if (resolution) overrides.media = { video: { resolution } };
-    const noise = document.getElementById('noise-cancellation').value;
-    if (noise) overrides.media = Object.assign(overrides.media || {}, { audio: { noiseCancellation: noise } });
-    const privacyMode = document.getElementById('privacy-mode').value;
-    if (privacyMode) {
-      overrides.privacyMode = privacyMode;
-      if (privacyMode === 'sealed') {
-        overrides.agent = { enabled: false };
-        log('sealed refuses an agent at the API, so the override disables it');
-      }
-    }
-    const agent = agentOverride();
-    if (agent && !overrides.agent) overrides.agent = agent;
-    const addressing = addressingOverride();
-    if (addressing && !(overrides.agent && overrides.agent.enabled === false)) {
-      overrides.agent = Object.assign(overrides.agent || {}, { addressing });
-    }
-    speechOverrides(overrides);
-    body.overrides = overrides;
-
-    const layout = document.getElementById('recording-layout').value;
-    if (layout) {
-      body.overrides = body.overrides || {};
-      body.overrides.recording = { enabled: true, layout, consentArtifactId: 'consent_testclient' };
-    }
-    const transcription = transcriptionOverride();
-    if (transcription) applyTranscriptionOverride(body, transcription);
-    if (scribeOverride()) applyScribeOverride(body);
-
+    const body = sessionRequest();
     const resp = await fetch('/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -58,15 +75,7 @@ async function createSession() {
       return null;
     }
 
-    lastRoomId = data.room;
-    log(`Session created: ${data.sessionId}`, 'success');
-    log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
-    if (data.agentDispatchId) log(`Agent dispatched to ${data.config.agent.pool} (${data.agentDispatchId}); join to talk to it`, 'success');
-
-    document.getElementById('created-room-id').textContent = data.room;
-    document.getElementById('join-link').value = joinLink(data.room);
-    document.getElementById('session-created-info').style.display = 'block';
-    document.getElementById('room-id').value = data.room;
+    showCreatedSession(data);
     btn.disabled = false;
     return data.room;
   } catch (err) {
@@ -134,6 +143,7 @@ async function joinRoom() {
     watchAgent(room, data);
     watchCaptions(room, data);
     watchScribe(data);
+    watchPhone(room, data);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
@@ -266,6 +276,7 @@ function cleanup() {
   stopAgent();
   stopCaptions();
   stopScribe();
+  stopPhone();
   stopStats();
   syntheticVideo = false;
   if (syntheticIntervalId != null) {

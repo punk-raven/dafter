@@ -1,0 +1,27 @@
+{
+  "base": {
+    "apiVersion": "dafter.dev/v1",
+    "sessionId": "s_7f3a9c21",
+    "tenantId": "t_9c21a4be",
+    "privacyMode": "open",
+    "language": "hi",
+    "channel": "telephony",
+    "agent": { "enabled": true, "pool": "dafter-py" },
+    "turn": { "strategy": "auto" },
+    "media": { "video": { "enabled": false }, "encryption": { "mode": "transport" } },
+    "recording": { "enabled": false },
+    "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500 }
+  },
+  "cases": [
+    { "name": "no telephony block", "patch": {}, "notice": "always", "trunk": "", "rejected": null },
+    { "name": "a trunk and a notice only when recorded", "patch": { "telephony": { "trunk": "carrier-in", "recordingNotice": "when_recorded", "ringingTimeoutSeconds": 20, "maxCallDurationSeconds": 600 } }, "notice": "when_recorded", "trunk": "carrier-in", "rejected": null },
+    { "name": "recorded with the agent to say so", "patch": { "recording": { "enabled": true, "layout": "room_composite", "startAt": "session_create", "consentArtifactId": "consent_rec" } }, "notice": "always", "trunk": "", "rejected": null },
+    { "name": "recorded with nobody to say so", "patch": { "agent": { "enabled": false, "pool": "dafter-py" }, "recording": { "enabled": true, "consentArtifactId": "consent_rec" } }, "rejected": { "code": "invalid_config", "pointers": ["/agent/enabled"] } },
+    { "name": "not recorded and no agent", "patch": { "agent": { "enabled": false, "pool": "dafter-py" } }, "notice": "always", "trunk": "", "rejected": null },
+    { "name": "recorded without consent and nobody to say so", "patch": { "agent": { "enabled": false, "pool": "dafter-py" }, "recording": { "enabled": true } }, "rejected": { "code": "consent_required", "pointers": ["/recording/consentArtifactId", "/agent/enabled"] } },
+    { "name": "trusted_agent on a phone line", "patch": { "privacyMode": "trusted_agent", "media": { "video": { "enabled": false }, "encryption": { "mode": "e2ee", "keyModel": "server_shared" } } }, "rejected": { "code": "privacy_mode_forbids", "pointers": ["/channel"] } },
+    { "name": "sealed on a phone line", "patch": { "privacyMode": "sealed", "agent": { "enabled": false, "pool": "dafter-py" }, "media": { "video": { "enabled": false }, "encryption": { "mode": "e2ee", "keyModel": "server_shared" } } }, "rejected": { "code": "privacy_mode_forbids", "pointers": ["/channel"] } },
+    { "name": "open privacy stating end-to-end encryption", "patch": { "media": { "video": { "enabled": false }, "encryption": { "mode": "e2ee", "keyModel": "server_shared" } } }, "rejected": { "code": "privacy_mode_forbids", "pointers": ["/channel", "/media/encryption/mode"] } },
+    { "name": "trusted_agent on webrtc is not a phone call", "patch": { "channel": "webrtc", "privacyMode": "trusted_agent", "media": { "encryption": { "mode": "e2ee", "keyModel": "server_shared" } } }, "notice": "always", "trunk": "", "rejected": null }
+  ]
+}

@@ -27,6 +27,7 @@ from .errors import DafterError
 from .rules import CROSS_FIELD_RULES
 from .speech import Backchannel, Speech
 from .switching import LanguageSwitching
+from .telephony import Telephony
 from .validation import validate_document
 
 
@@ -447,6 +448,7 @@ class ResolvedSessionConfig:
     media: Media = field(default_factory=Media)
     transcription: Transcription = field(default_factory=Transcription)
     scribe: Scribe = field(default_factory=Scribe)
+    telephony: Telephony = field(default_factory=Telephony)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
     llm: str | None = None
@@ -481,6 +483,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         media=Media.from_dict(doc.get("media") or {}),
         transcription=Transcription.from_dict(doc.get("transcription") or {}),
         scribe=Scribe.from_dict(doc.get("scribe") or {}),
+        telephony=Telephony.from_dict(doc.get("telephony") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
         llm=doc.get("llm"),

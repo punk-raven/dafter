@@ -64,6 +64,22 @@ var crossFieldRules = []crossFieldRule{
 	},
 	{
 		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Channel == ChannelTelephony && c.EncryptionMode() == EncryptionE2EE
+		},
+		code:    errs.CodePrivacyModeForbids,
+		pointer: "/channel",
+		because: "a phone call cannot be end-to-end encrypted, because the media server's SIP bridge decodes every frame between the phone network and the room, so telephony needs privacy mode open",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
+			return c.Channel == ChannelTelephony && c.Recording.Enabled && !c.Agent.Enabled
+		},
+		code:    errs.CodeInvalidConfig,
+		pointer: "/agent/enabled",
+		because: "a person on a phone sees no recording indicator and only the agent tells them the call is recorded, so a recorded telephony session needs the agent",
+	},
+	{
+		broken: func(c *ResolvedSessionConfig) bool {
 			v := c.video()
 			return v != nil && v.ScalabilityMode != "" && !v.Codec.Layered()
 		},

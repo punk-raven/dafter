@@ -45,6 +45,7 @@ type createRoomRequest struct {
 type serviceClaims struct {
 	jwt.RegisteredClaims
 	Video serviceGrant `json:"video"`
+	SIP   *sipGrant    `json:"sip,omitempty"`
 }
 
 type s3Upload struct {
@@ -297,6 +298,10 @@ func (l *LiveKit) upload() *s3Upload {
 }
 
 func (l *LiveKit) serviceToken(grant serviceGrant) (string, error) {
+	return l.signService(grant, nil)
+}
+
+func (l *LiveKit) signService(grant serviceGrant, sip *sipGrant) (string, error) {
 	issued := l.now()
 	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &serviceClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -306,6 +311,7 @@ func (l *LiveKit) serviceToken(grant serviceGrant) (string, error) {
 			ExpiresAt: jwt.NewNumericDate(issued.Add(serviceTokenTTL)),
 		},
 		Video: grant,
+		SIP:   sip,
 	}).SignedString([]byte(l.secret))
 	if err != nil {
 		return "", errs.Wrap(errs.CodeInternal, err, "mint service token")
