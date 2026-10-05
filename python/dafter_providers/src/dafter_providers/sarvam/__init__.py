@@ -13,6 +13,7 @@ from ..options import Options
 from .llm import SarvamLLM
 from .realtime import FinalFirstSTT
 from .sentences import SentenceTTS
+from .voices import voices
 
 NAME = "sarvam"
 STT_MODELS = frozenset({"saaras:v3-realtime"})
@@ -165,7 +166,17 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         Stage.TTS,
         NAME,
         ref.options,
-        ("prewarm", "encoding", "sampleRate", "voice", "pace", "minBufferSize"),
+        (
+            "prewarm",
+            "encoding",
+            "sampleRate",
+            "voice",
+            "pace",
+            "temperature",
+            "styles",
+            "dictionaryId",
+            "minBufferSize",
+        ),
     )
     code = language_code(language, Stage.TTS)
     min_buffer = opts.get("minBufferSize", int, 50)
@@ -177,20 +188,23 @@ def build_tts(ref: ProviderRef, language: str) -> tts.TTS[Any]:
         )
     encoding = opts.choice("encoding", TTS_ENCODINGS, "pcm_s16le")
     sample_rate = opts.choice("sampleRate", TTS_SAMPLE_RATES, 24000)
-    voice = opts.get("voice", str, "priya")
-    pace = opts.get("pace", float, 1.0)
+    speaker = opts.get("voice", str, "priya")
+    voice, styles = voices(opts)
+    dictionary = opts.optional("dictionaryId", str)
     opts.get("prewarm", bool, True)
     key = credentials.resolve(ref, Stage.TTS, {CREDENTIAL})
     model = ref.model or ""
     return _construct(
         Stage.TTS,
         lambda: SentenceTTS(
+            voice=voice,
+            styles=styles,
             target_language_code=code,
             model=model,
-            speaker=voice,
+            speaker=speaker,
             speech_sample_rate=sample_rate,
-            pace=pace,
             min_buffer_size=min_buffer,
+            dict_id=dictionary,
             api_key=key,
             output_audio_codec=encoding,
         ),

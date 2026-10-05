@@ -146,6 +146,7 @@ MUTATIONS: list[tuple[str, str, Callable[[dict[str, Any]], object]]] = [
     ("unknown layer", "agent-turn-metrics.json", lambda p: p.update(vadDelayMs=10)),
     ("missing turn", "agent-turn-metrics.json", lambda p: p.pop("turn")),
     ("serial not a boolean", "agent-turn-metrics.json", lambda p: p.update(serial="yes")),
+    ("filler not a boolean", "agent-turn-metrics.json", lambda p: p.update(filler="yes")),
     ("serial without its layers", "agent-turn-metrics.json", lambda p: p.pop("llmNodeTtfsMs")),
     ("unpriced item with a cost", "session-usage.json", lambda p: _item(p, 1).update(costInr=0)),
     ("priced item without a cost", "session-usage.json", lambda p: _item(p, 0).pop("costInr")),
