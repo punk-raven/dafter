@@ -470,6 +470,31 @@ Its notes and minutes carry call content like captions: published only to the
 call's own participants, never logged, and the stored minutes read back only
 with the worker credential.
 
+**A meeting number lets anyone who knows the way in hear the meeting, so the
+session states who it admits.** `telephony.phoneGuests` is `dial_out` (the
+control plane calls a phone in), `dial_in` (a person phones one of the
+operator's meeting numbers), or `both`, and every phone guest rule holds for
+each: a trunk, privacy mode `open` (the SIP bridge decodes every frame, so
+end-to-end and sealed sessions are refused), never on the telephony channel,
+and the agent in a recorded session, which says the recording notice to every
+phone the moment it answers. `telephony.dialIn.callerCheck` picks the door:
+`pin` (anyone with the meeting PIN, the default), `pin_and_number` (the PIN
+from a number on the session's allowlist) or `number` (an allowed number, no
+PIN; one allowed in two running meetings is asked for the PIN, never
+guessed). The control plane mints an 8-digit PIN per dial-in session, unique
+among running sessions, and returns it beside the token to participants and
+presenters only, like `encryptionKey` never inside the hashed document. It is
+stored as an HMAC index and an AES-GCM seal under keys derived from
+`DAFTER_STATE_KEY`; allowed numbers arrive on their own route and are stored
+only as HMAC indexes. Both are deleted when the session's room closes after
+having opened, or after a day if it never opened. A caller is admitted only
+into a room that is open, and every failure (wrong PIN, ended meeting, number
+not allowed, withheld number) gets the same retry prompt until the operator's
+`pinAttempts` (default 3) run out. Which numbers answer meetings and which
+open a new session with the agent is the operator's trunk configuration
+(`inbound.meetingNumbersRef`), never a session's. Prompts are English, because
+Vobiz documents no `Speak` voice for an Indic language.
+
 **Envelope encryption.** Each recording gets a unique data key (fast, local); the data key is wrapped by the tenant master key and stored beside the object. This buys per-object isolation, cheap bulk crypto, revocation by disabling the master key, and rotation without re-encrypting media.
 
 **The seal stage.** Egress writes to object storage directly and cannot apply the envelope itself, so sealing is an explicit stage in the processing plane:
