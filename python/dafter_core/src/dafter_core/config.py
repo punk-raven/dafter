@@ -387,6 +387,34 @@ class Transcription:
         )
 
 
+DEFAULT_SCRIBE_POOL = "dafter-scribe"
+
+
+@dataclass(frozen=True, slots=True)
+class Scribe:
+    enabled: bool = False
+    pool: str = DEFAULT_SCRIBE_POOL
+    consent_artifact_id: str | None = None
+    llm: ProviderRef | None = None
+    judge: ProviderRef | None = None
+    summary_interval_ms: int = 60000
+    after_call_timeout_seconds: int = 900
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Scribe:
+        llm = d.get("llm")
+        judge = d.get("judge")
+        return cls(
+            enabled=d.get("enabled", False),
+            pool=d.get("pool", DEFAULT_SCRIBE_POOL),
+            consent_artifact_id=d.get("consentArtifactId"),
+            llm=ProviderRef.from_dict(llm) if llm else None,
+            judge=ProviderRef.from_dict(judge) if judge else None,
+            summary_interval_ms=d.get("summaryIntervalMs", 60000),
+            after_call_timeout_seconds=d.get("afterCallTimeoutSeconds", 900),
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class Budgets:
     turn_gap_p50_ms: int
@@ -418,6 +446,7 @@ class ResolvedSessionConfig:
     budgets: Budgets
     media: Media = field(default_factory=Media)
     transcription: Transcription = field(default_factory=Transcription)
+    scribe: Scribe = field(default_factory=Scribe)
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
     llm: str | None = None
@@ -451,6 +480,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         budgets=Budgets.from_dict(doc["budgets"]),
         media=Media.from_dict(doc.get("media") or {}),
         transcription=Transcription.from_dict(doc.get("transcription") or {}),
+        scribe=Scribe.from_dict(doc.get("scribe") or {}),
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
         llm=doc.get("llm"),

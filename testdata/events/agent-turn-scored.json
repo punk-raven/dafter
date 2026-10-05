@@ -1,0 +1,15 @@
+{
+  "eventId": "e_8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a",
+  "type": "agent.turn_scored",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 5,
+  "occurredAt": "2026-09-24T10:00:09.800Z",
+  "payload": {
+    "segmentId": "sg_07c3a9e15b2d4f68",
+    "score": 0.875,
+    "criteria": { "correctness": "pass", "language": "pass", "register": "maybe", "speakability": "pass" },
+    "source": { "provider": "sarvam", "model": "sarvam-105b" }
+  }
+}

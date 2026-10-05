@@ -13,9 +13,17 @@ dafter-providers = { workspace = true }
 dafter-runtime = { workspace = true }
 dafter-evals = { workspace = true }
 dafter-batch = { workspace = true }
+dafter-scribe = { workspace = true }
 
 [tool.uv.workspace]
-members = ["dafter_core", "dafter_providers", "dafter_runtime", "dafter_evals", "dafter_batch"]
+members = [
+    "dafter_core",
+    "dafter_providers",
+    "dafter_runtime",
+    "dafter_evals",
+    "dafter_batch",
+    "dafter_scribe",
+]
 
 [dependency-groups]
 dev = [
@@ -24,6 +32,7 @@ dev = [
     "dafter-runtime",
     "dafter-evals",
     "dafter-batch",
+    "dafter-scribe",
     "pytest>=8",
     "ruff>=0.9",
     "mypy>=1.11",
@@ -39,7 +48,14 @@ extend-exclude = ["**/enums.py", "**/_schemas/**"]
 select = ["E", "F", "I", "B", "UP", "RUF"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["dafter_core", "dafter_providers", "dafter_runtime", "dafter_evals", "dafter_batch"]
+known-third-party = [
+    "dafter_core",
+    "dafter_providers",
+    "dafter_runtime",
+    "dafter_evals",
+    "dafter_batch",
+    "dafter_scribe",
+]
 
 [tool.pytest.ini_options]
 addopts = "-m 'not llm_judge'"
@@ -55,6 +71,7 @@ testpaths = [
     "dafter_runtime/tests",
     "dafter_evals/tests",
     "dafter_batch/tests",
+    "dafter_scribe/tests",
 ]
 pythonpath = [
     "dafter_core/src",
@@ -62,6 +79,7 @@ pythonpath = [
     "dafter_runtime/src",
     "dafter_evals/src",
     "dafter_batch/src",
+    "dafter_scribe/src",
 ]
 
 [tool.mypy]
@@ -77,8 +95,10 @@ files = [
     "dafter_evals/tests",
     "dafter_batch/src",
     "dafter_batch/tests",
+    "dafter_scribe/src",
+    "dafter_scribe/tests",
 ]
-mypy_path = "dafter_core/src:dafter_providers/src:dafter_runtime/src:dafter_evals/src:dafter_batch/src"
+mypy_path = "dafter_core/src:dafter_providers/src:dafter_runtime/src:dafter_evals/src:dafter_batch/src:dafter_scribe/src"
 
 [[tool.mypy.overrides]]
 module = "referencing.*"

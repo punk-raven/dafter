@@ -1,0 +1,23 @@
+{
+  "eventId": "e_5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d",
+  "type": "scribe.notes",
+  "version": 1,
+  "sessionId": "s_7f3a9c21",
+  "tenantId": "t_9c21a4be",
+  "sequence": 3,
+  "occurredAt": "2026-09-24T10:03:00.120Z",
+  "payload": {
+    "revision": 3,
+    "summary": "रवि और आशा ने तिमाही रिपोर्ट की समय-सीमा पर बात की और शुक्रवार तय किया।",
+    "decisions": ["रिपोर्ट शुक्रवार तक जमा होगी"],
+    "actionItems": [{ "task": "तिमाही रिपोर्ट भेजना", "owner": "रवि", "due": "शुक्रवार" }],
+    "openQuestions": ["बजट का आंकड़ा किसके पास है?"],
+    "mentions": { "names": ["रवि", "आशा"], "numbers": ["शुक्रवार", "12 लाख"] },
+    "speakers": [
+      { "speaker": { "kind": "human", "participantId": "p_4b81e0d7" }, "points": ["रिपोर्ट शुक्रवार तक भेजने का वादा किया"] },
+      { "speaker": { "kind": "agent" }, "points": ["नोट लिया"] }
+    ],
+    "notes": [{ "noteId": "n_3f9a1c07b2e4d856", "text": "रवि शुक्रवार तक रिपोर्ट भेजेगा", "takenBy": "p_9c2e11aa" }],
+    "source": { "provider": "sarvam", "model": "sarvam-105b" }
+  }
+}

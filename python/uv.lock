@@ -16,6 +16,7 @@ members = [
     "dafter-evals",
     "dafter-providers",
     "dafter-runtime",
+    "dafter-scribe",
     "dafter-workspace",
 ]
 
@@ -677,6 +678,31 @@ requires-dist = [
 ]
 
 [[package]]
+name = "dafter-scribe"
+version = "0.0.0"
+source = { editable = "dafter_scribe" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "dafter-batch" },
+    { name = "dafter-core" },
+    { name = "dafter-evals" },
+    { name = "dafter-providers" },
+    { name = "dafter-runtime" },
+    { name = "livekit-agents" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
+    { name = "dafter-batch", editable = "dafter_batch" },
+    { name = "dafter-core", editable = "dafter_core" },
+    { name = "dafter-evals", editable = "dafter_evals" },
+    { name = "dafter-providers", editable = "dafter_providers" },
+    { name = "dafter-runtime", editable = "dafter_runtime" },
+    { name = "livekit-agents", specifier = "==1.8.3" },
+]
+
+[[package]]
 name = "dafter-workspace"
 version = "0.0.0"
 source = { virtual = "." }
@@ -688,6 +714,7 @@ dev = [
     { name = "dafter-evals" },
     { name = "dafter-providers" },
     { name = "dafter-runtime" },
+    { name = "dafter-scribe" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -703,6 +730,7 @@ dev = [
     { name = "dafter-evals", editable = "dafter_evals" },
     { name = "dafter-providers", editable = "dafter_providers" },
     { name = "dafter-runtime", editable = "dafter_runtime" },
+    { name = "dafter-scribe", editable = "dafter_scribe" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.9" },

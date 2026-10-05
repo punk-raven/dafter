@@ -146,6 +146,36 @@ var crossFieldRules = []crossFieldRule{
 		because: "the transcript after the call is made by a batch provider, and the session pins none",
 	},
 	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.PrivacyMode == PrivacySealed && c.ScribeEnabled() },
+		code:    errs.CodePrivacyModeForbids,
+		pointer: "/scribe/enabled",
+		because: "a sealed session never has a scribe, because it reads what everyone said and sends it to its LLM provider",
+	},
+	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.ScribeEnabled() && c.scribeConsent() == "" },
+		code:    errs.CodeConsentRequired,
+		pointer: "/scribe/consentArtifactId",
+		because: "the scribe cannot read the call and keep its minutes without a consent artifact",
+	},
+	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.ScribeEnabled() && !c.TranscriptionMode().Live() },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/transcription/mode",
+		because: "the scribe reads the live captions the agent worker publishes rather than transcribing again, so it needs transcription live or both",
+	},
+	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.ScribeEnabled() && c.scribeLLM() == nil },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/scribe/llm",
+		because: "the scribe writes its notes and minutes with an LLM, and the session pins none",
+	},
+	{
+		broken:  func(c *ResolvedSessionConfig) bool { return c.ScribeEnabled() && c.ScribePool() == c.Agent.Pool },
+		code:    errs.CodeInvalidConfig,
+		pointer: "/scribe/pool",
+		because: "the scribe runs a different program from the agent, so a pool serving both would hand the agent's job to the scribe or the scribe's to the agent",
+	},
+	{
 		broken: func(c *ResolvedSessionConfig) bool {
 			return c.Turn.Strategy == TurnProviderEndpointing && c.Turn.LocalVADDecidesTurn()
 		},

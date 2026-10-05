@@ -38,6 +38,7 @@ type stubTransport struct {
 	nextID      int
 	dispatched  []transport.AgentDispatch
 	dispatchErr error
+	failPool    string
 	recalled    []string
 	live        []string
 	recallErr   error
@@ -67,6 +68,9 @@ func (s *stubTransport) DispatchAgent(_ context.Context, d transport.AgentDispat
 	defer s.mu.Unlock()
 	if s.dispatchErr != nil {
 		return transport.DispatchInfo{}, s.dispatchErr
+	}
+	if d.Pool == s.failPool {
+		return transport.DispatchInfo{}, errs.Errorf(errs.CodeProviderUnavailable, "no worker of pool %s answered", d.Pool)
 	}
 	s.dispatched = append(s.dispatched, d)
 	id := fmt.Sprintf("AD_stub%d", len(s.dispatched))

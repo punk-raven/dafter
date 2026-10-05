@@ -89,18 +89,19 @@ def encryption(key: bytes) -> rtc.E2EEOptions:
 class ControlPlane:
     url: str
     secret: str
+    role: str = "agent"
 
     @classmethod
-    def from_env(cls) -> ControlPlane | None:
+    def from_env(cls, role: str = "agent") -> ControlPlane | None:
         url = os.environ.get(CONTROL_URL_ENV, "").rstrip("/")
         secret = os.environ.get(WORKER_SECRET_ENV, "")
-        return cls(url, secret) if url and secret else None
+        return cls(url, secret, role) if url and secret else None
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.secret}"}
 
     async def session_key(self, cfg: ResolvedSessionConfig) -> bytes:
-        url = f"{self.url}/sessions/{cfg.session_id}/agent/key"
+        url = f"{self.url}/sessions/{cfg.session_id}/{self.role}/key"
         try:
             async with (
                 aiohttp.ClientSession(timeout=TIMEOUT) as http,
@@ -115,7 +116,7 @@ class ControlPlane:
         return session_key(body, cfg.session_id)
 
     async def report_refusal(self, session_id: str, refusal: DafterError) -> None:
-        url = f"{self.url}/sessions/{session_id}/agent/refusal"
+        url = f"{self.url}/sessions/{session_id}/{self.role}/refusal"
         try:
             async with (
                 aiohttp.ClientSession(timeout=TIMEOUT) as http,

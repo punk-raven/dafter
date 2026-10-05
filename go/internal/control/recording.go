@@ -77,13 +77,14 @@ type recordingResponse struct {
 }
 
 type sessionView struct {
-	SessionID    string          `json:"sessionId"`
-	Room         string          `json:"room"`
-	ConfigHash   string          `json:"configHash"`
-	Config       json.RawMessage `json:"config"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	Recordings   []recordingView `json:"recordings"`
-	AgentRefusal json.RawMessage `json:"agentRefusal,omitempty"`
+	SessionID     string          `json:"sessionId"`
+	Room          string          `json:"room"`
+	ConfigHash    string          `json:"configHash"`
+	Config        json.RawMessage `json:"config"`
+	CreatedAt     time.Time       `json:"createdAt"`
+	Recordings    []recordingView `json:"recordings"`
+	AgentRefusal  json.RawMessage `json:"agentRefusal,omitempty"`
+	ScribeRefusal json.RawMessage `json:"scribeRefusal,omitempty"`
 }
 
 func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
@@ -242,7 +243,7 @@ func (s *Service) readSession(w http.ResponseWriter, r *http.Request) {
 	s.write(w, http.StatusOK, sessionView{
 		SessionID: sess.SessionID, Room: sess.Room, ConfigHash: sess.ConfigHash,
 		Config: sess.Config, CreatedAt: sess.CreatedAt, Recordings: views,
-		AgentRefusal: sess.AgentRefusal,
+		AgentRefusal: sess.AgentRefusal, ScribeRefusal: sess.ScribeRefusal,
 	})
 }
 

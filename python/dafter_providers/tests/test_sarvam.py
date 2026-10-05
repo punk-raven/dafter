@@ -202,6 +202,7 @@ def test_an_unregistered_provider_is_named_in_the_refusal() -> None:
         "google",
         "opencode_zen",
         "openai",
+        "nvidia",
     }
     assert "deepgram" in caught.value.message
 

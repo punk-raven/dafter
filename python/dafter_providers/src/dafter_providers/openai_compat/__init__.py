@@ -35,6 +35,7 @@ QUOTA_CODES = frozenset(
 TIMEOUT_STATUSES = frozenset({408, 504})
 CONFIG_STATUSES = frozenset({400, 404, 422})
 OPTIONS = ("temperature", "maxTokens", "reasoningEffort", "extraBody")
+AGENT_LLM = "/agent/pipeline/llm"
 
 __all__ = [
     "ENDPOINTS",
@@ -56,13 +57,13 @@ def _refuse(name: str, code: ErrorCode, message: str, pointer: str, because: str
     )
 
 
-def _model(name: str, ref: ProviderRef) -> str:
+def _model(name: str, ref: ProviderRef, at: str) -> str:
     if not ref.model:
         raise _refuse(
             name,
             ErrorCode.INVALID_CONFIG,
             f"{name} llm names no model",
-            "/agent/pipeline/llm/model",
+            f"{at}/model",
             "the endpoint's model id, pinned",
         )
     if ref.region is not None:
@@ -70,7 +71,7 @@ def _model(name: str, ref: ProviderRef) -> str:
             name,
             ErrorCode.RESIDENCY_VIOLATION,
             f"{name} cannot vouch for where it serves, so it takes no region pin",
-            "/agent/pipeline/llm/region",
+            f"{at}/region",
             "must be absent",
         )
     return ref.model
@@ -82,15 +83,15 @@ def _effort(opts: Options, raw: dict[str, Any]) -> NotGivenOr[Effort]:
     return opts.choice("reasoningEffort", EFFORTS, None)
 
 
-def builder(endpoint: Endpoint) -> Callable[[ProviderRef], llm.LLM[Any]]:
-    def build_llm(ref: ProviderRef) -> llm.LLM[Any]:
-        model = _model(endpoint.name, ref)
-        opts = Options(Stage.LLM, endpoint.name, ref.options, OPTIONS)
+def builder(endpoint: Endpoint) -> Callable[..., llm.LLM[Any]]:
+    def build_llm(ref: ProviderRef, at: str = AGENT_LLM) -> llm.LLM[Any]:
+        model = _model(endpoint.name, ref, at)
+        opts = Options(Stage.LLM, endpoint.name, ref.options, OPTIONS, base=at)
         temperature = opts.get("temperature", float, 0.4)
         max_tokens = opts.get("maxTokens", int, 200)
         effort = _effort(opts, ref.options)
         extra_body: dict[str, Any] = opts.get("extraBody", dict, {})
-        key = credentials.resolve(ref, Stage.LLM, {endpoint.credential_env})
+        key = credentials.resolve(ref, Stage.LLM, {endpoint.credential_env}, pointer=at)
         try:
             return CompatLLM(
                 vendor=endpoint.name,

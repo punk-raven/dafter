@@ -251,14 +251,24 @@ func reservedProblems(overrides json.RawMessage) []string {
 func operatorOnlyProblems(overrides map[string]any) []string {
 	agent, _ := overrides["agent"].(map[string]any)
 	pipeline, _ := agent["pipeline"].(map[string]any)
+	scribe, _ := overrides["scribe"].(map[string]any)
 	var problems []string
 	for _, stage := range slices.Sorted(maps.Keys(pipeline)) {
-		ref, _ := pipeline[stage].(map[string]any)
-		for _, path := range operatorOnlyStageFields {
-			if present(ref, path) {
-				problems = append(problems, located("/agent/pipeline/"+stage+"/"+strings.Join(path, "/"),
-					"names the endpoint or credential a stage uses, which only the operator's configuration sets, never a session override"))
-			}
+		problems = append(problems, redirections("/agent/pipeline/"+stage, pipeline[stage])...)
+	}
+	for _, field := range []string{"llm", "judge"} {
+		problems = append(problems, redirections("/scribe/"+field, scribe[field])...)
+	}
+	return problems
+}
+
+func redirections(at string, stage any) []string {
+	ref, _ := stage.(map[string]any)
+	var problems []string
+	for _, path := range operatorOnlyStageFields {
+		if present(ref, path) {
+			problems = append(problems, located(at+"/"+strings.Join(path, "/"),
+				"names the endpoint or credential a stage uses, which only the operator's configuration sets, never a session override"))
 		}
 	}
 	return problems

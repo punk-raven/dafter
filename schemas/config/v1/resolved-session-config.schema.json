@@ -87,6 +87,7 @@
     "media": { "$ref": "#/$defs/Media" },
     "recording": { "$ref": "#/$defs/Recording" },
     "transcription": { "$ref": "#/$defs/Transcription" },
+    "scribe": { "$ref": "https://schemas.dafter.dev/config/v1/scribe.schema.json" },
     "budgets": { "$ref": "#/$defs/Budgets" }
   },
   "$defs": {

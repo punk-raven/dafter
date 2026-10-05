@@ -88,7 +88,8 @@
       "if": { "properties": { "type": { "const": "provider.degraded" } }, "required": ["type"] },
       "then": { "properties": { "payload": { "$ref": "#/$defs/ProviderDegradedPayload" } }, "required": ["payload"] }
     },
-    { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/Payloads" }
+    { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/Payloads" },
+    { "$ref": "https://schemas.dafter.dev/events/v1/scribe.schema.json#/$defs/Payloads" }
   ],
 
   "$defs": {
@@ -107,10 +108,12 @@
         "agent.configured",
         "agent.state_changed",
         "agent.turn_metrics",
+        "agent.turn_scored", "agent.note_taken",
         "agent.handoff_requested",
         "transcript.partial",
         "transcript.final",
         "transcript.version_created",
+        "scribe.notes", "scribe.minutes",
         "translation.final",
         "recording.started",
         "recording.completed",

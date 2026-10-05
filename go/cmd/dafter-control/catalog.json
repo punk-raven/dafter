@@ -117,6 +117,24 @@
     },
     "recording": { "enabled": false },
     "transcription": { "mode": "off" },
+    "scribe": {
+      "enabled": false,
+      "pool": "dafter-scribe",
+      "llm": {
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+        "options": { "temperature": 0.2, "maxTokens": 1500 }
+      },
+      "judge": {
+        "provider": "sarvam",
+        "model": "sarvam-105b",
+        "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
+        "options": { "temperature": 0, "maxTokens": 400 }
+      },
+      "summaryIntervalMs": 60000,
+      "afterCallTimeoutSeconds": 900
+    },
     "budgets": { "turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 300 }
   },
 
@@ -130,6 +148,36 @@
   "profiles": {
     "support": {
       "agent": { "personaRef": "persona://support/v3" }
+    },
+    "scribe-gemini": {
+      "scribe": {
+        "llm": {
+          "provider": "google",
+          "model": "gemini-3.5-flash-lite",
+          "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key"
+        },
+        "judge": {
+          "provider": "google",
+          "model": "gemini-3.6-flash",
+          "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key"
+        }
+      }
+    },
+    "scribe-nvidia": {
+      "scribe": {
+        "llm": {
+          "provider": "nvidia",
+          "model": "openai/gpt-oss-120b",
+          "credentialRef": "secret://tenants/t_9c21a4be/nvidia/api-key",
+          "options": { "reasoningEffort": "low" }
+        },
+        "judge": {
+          "provider": "nvidia",
+          "model": "openai/gpt-oss-120b",
+          "credentialRef": "secret://tenants/t_9c21a4be/nvidia/api-key",
+          "options": { "reasoningEffort": "low" }
+        }
+      }
     }
   },
 

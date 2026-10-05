@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterable, Callable
 from typing import Any
@@ -20,6 +21,7 @@ from .labels import unlabeled
 from .listeners import is_human
 from .naming import words
 from .plan import Plan
+from .scribing import Scribing
 from .switching import Switching
 from .tools import NO_FILLING, Filling, Registry, Tool
 
@@ -39,10 +41,22 @@ class Answering(Agent):
         super().__init__(instructions=instructions, tools=registry.function_tools())
         self._registry = registry
         self._caller = caller
+        self._persona = instructions
+        self._context = ""
+        self._briefing: set[asyncio.Task[None]] = set()
         self._acknowledgements = acknowledgements
         self._delivery = delivery
         self._switching = switching if switching is not None and switching.enabled else None
         self._floor: SessionFloor | None = None
+
+    def brief(self, context: str) -> None:
+        self._context = context
+        task = asyncio.ensure_future(self.update_instructions(self._briefed(self._persona)))
+        self._briefing.add(task)
+        task.add_done_callback(self._briefing.discard)
+
+    def _briefed(self, persona: str) -> str:
+        return f"{persona}\n\n{self._context}" if self._context else persona
 
     def stt_node(
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
@@ -62,7 +76,7 @@ class Answering(Agent):
             self._delivery.filler.generating()
         if self._switching is not None:
             chat_ctx = chat_ctx.copy()
-            instructions = self._switching.persona.instructions
+            instructions = self._briefed(self._switching.persona.instructions)
             update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
         return unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
 
@@ -147,10 +161,14 @@ def registry_for(
     sleep: Callable[[], None] | None,
     delivery: Delivery | None = None,
     switching: Switching | None = None,
+    scribing: Scribing | None = None,
 ) -> Registry:
     filler = delivery.filler if delivery is not None else None
+    tools = everyday(roster, sleep, switching)
+    if scribing is not None:
+        tools.extend(scribing.tools(caller))
     return Registry(
-        everyday(roster, sleep, switching),
+        tools,
         caller=caller,
         role_of=unattested,
         confirmations=Confirmations(name_words(p)),

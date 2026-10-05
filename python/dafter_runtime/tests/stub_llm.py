@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from typing import Any
 
 from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions, llm
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 
 REPLY = "नमस्ते! बताइए, मैं क्या मदद करूँ?"
+Call = str | tuple[str, dict[str, Any]]
 PROMPT_TOKENS = 50
 COMPLETION_TOKENS = 7
 
@@ -26,7 +29,10 @@ class StubStream(llm.LLMStream):
     async def _run(self) -> None:
         delta = llm.ChoiceDelta(role="assistant", content=self._reply)
         if self._call is not None:
-            call = llm.FunctionToolCall(name=self._call, arguments="{}", call_id=f"c_{self._call}")
+            name, arguments = self._call if isinstance(self._call, tuple) else (self._call, {})
+            call = llm.FunctionToolCall(
+                name=name, arguments=json.dumps(arguments), call_id=f"c_{name}"
+            )
             delta = llm.ChoiceDelta(role="assistant", tool_calls=[call])
         usage = llm.CompletionUsage(
             completion_tokens=COMPLETION_TOKENS,
@@ -38,10 +44,10 @@ class StubStream(llm.LLMStream):
 
 
 class StubLLM(llm.LLM[Any]):
-    def __init__(self, reply: str = REPLY, calls: list[str] | None = None) -> None:
+    def __init__(self, reply: str = REPLY, calls: Sequence[Call] | None = None) -> None:
         super().__init__()
         self.reply = reply
-        self.calls = list(calls or [])
+        self.calls: list[Call] = list(calls or [])
         self.requests: list[llm.ChatContext] = []
         self.offered: list[list[str]] = []
 
