@@ -126,7 +126,7 @@ func TestAHeldCallerIsReachedThroughTheCarriersApplicationWithItsBridgeToken(t *
 	bridge := transport.PhoneCall{
 		Room: sessionID, Identity: phoneIdentity, SIPUser: "12345678901234567",
 		Headers:        map[string]string{"X-VH-Bridge": "0f1e2d3c4b5a69788796a5b4c3d2e1f0"},
-		Trunk:          transport.Trunk{Provider: "vobiz", Address: "app.vobiz.ai", Transport: "udp", Numbers: []string{"+12025550100"}},
+		Trunk:          transport.Trunk{Provider: "vobiz", Address: "sip.vobiz.ai", Transport: "udp", Numbers: []string{"+12025550100"}},
 		RingingTimeout: 30 * time.Second, MaxCallDuration: 30 * time.Minute,
 	}
 	if _, err := recorder(t, srv).PlaceCall(t.Context(), bridge); err != nil {

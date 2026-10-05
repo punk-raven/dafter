@@ -41,3 +41,17 @@ The server checks `sip.call` (`EnsureSIPCallPermission` in livekit/livekit
 `pkg/service/auth.go`), which is not scoped to a room, so the per-call service
 token states `{"admin": false, "call": true}` and an empty video grant, lives
 one minute and never leaves the control plane.
+
+Hanging up one phone (`HangUp`, behind
+`POST /sessions/{id}/call/{participantId}/stop`) asks whether the room is
+open (`list-rooms.json` in `../dispatch/`, under a `roomList`-only token),
+then lists the room's participants (`list-participants.json` in
+`../egress/`) and removes the one named only when its `ParticipantInfo.kind`
+is `SIP`, so a person in the browser or the agent is never hung up here:
+
+- `remove-participant.json`: `RoomService/RemoveParticipant`
+  (`RoomParticipantIdentity` in `livekit_room.proto`), the room and the
+  phone's minted `p_` identity. The media server ends the SIP leg with the
+  participant. The list and the removal run under one per-call service token
+  carrying `roomAdmin` on that one room and nothing else, which never leaves
+  the control plane.

@@ -1,6 +1,6 @@
 {
   "trunk": {
-    "hostname": "app.vobiz.ai",
+    "hostname": "sip.vobiz.ai",
     "transport": "SIP_TRANSPORT_UDP"
   },
   "sipCallTo": "12345678901234567",

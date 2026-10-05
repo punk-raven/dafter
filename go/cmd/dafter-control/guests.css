@@ -1,0 +1,28 @@
+.guests-call { border-bottom: 1px solid #1c1c1c; }
+.guests-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; }
+.guests-bar strong { font-size: 12px; font-weight: 600; }
+.guests-count { margin-left: auto; font-size: 11px; font-family: monospace; color: #4ade80; }
+.guests-dial { display: flex; align-items: stretch; gap: 8px; padding: 6px 12px 8px; }
+.guests-dial input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; }
+.guests-dial input:disabled { color: #555; cursor: not-allowed; }
+.guests-btn { width: auto; margin: 0; padding: 4px 12px; font-size: 11px; background: #059669; color: white; flex-shrink: 0; }
+.guests-btn:hover { background: #047857; }
+.guests-btn:disabled { background: #262626; color: #666; cursor: not-allowed; }
+.guests-problem { font-size: 11px; line-height: 1.5; color: #fbbf24; padding: 0 12px 8px; overflow-wrap: anywhere; }
+.guests-problem:empty { display: none; }
+
+.video-tile.guest-tile { display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, #0f2a22 0%, #0b0b12 70%); }
+.guest-face { position: relative; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; }
+.guest-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid #1f6f55; transition: border-color 120ms, box-shadow 120ms; }
+.guest-glyph { width: 72px; height: 72px; border-radius: 50%; background: #123d30; color: #a7f3d0; display: flex; align-items: center; justify-content: center; }
+.guest-tile-state { position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.guest-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.guest-tile[data-state="dialing"] .guest-dot, .guest-tile[data-state="ringing"] .guest-dot { background: #fbbf24; animation: guest-blink 0.8s ease-in-out infinite; }
+.guest-tile[data-state="active"] .guest-dot { background: #4ade80; }
+.guest-tile[data-state="active"] .guest-ring { border-color: #4ade80; box-shadow: 0 0 16px rgba(74, 222, 128, 0.35); }
+.guest-tile[data-state="hangup"] .guest-glyph { background: #1a1f1d; color: #4b5563; }
+.guest-tile[data-state="hangup"] .guest-ring { border-color: #2a2f2d; border-style: dashed; }
+.guest-hangup { position: absolute; top: 8px; right: 8px; width: auto; margin: 0; padding: 4px 12px; font-size: 11px; background: #374151; color: #fca5a5; }
+.guest-hangup:hover { background: #4b5563; }
+.guest-hangup:disabled { background: #262626; color: #666; cursor: not-allowed; }
+@keyframes guest-blink { 50% { opacity: 0.3; } }

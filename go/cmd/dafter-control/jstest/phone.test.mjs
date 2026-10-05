@@ -43,6 +43,12 @@ test('an E.164 number passes, written with spaces, dashes or brackets', () => {
   }
 });
 
+test('a phone call session never carries the meeting\'s phone guests choice', () => {
+  const p = page([]);
+  p.run('globalThis').sessionRequest = () => ({ tenantId: 't_9c21a4be', language: 'hi', channel: 'webrtc', overrides: { telephony: { phoneGuests: 'dial_out' } } });
+  assert.deepEqual(p.run('phoneSessionRequest()'), { tenantId: 't_9c21a4be', language: 'hi', channel: 'telephony' });
+});
+
 test('a number that is not E.164 is refused by pointer without a request', async () => {
   const p = page([]);
   p.element('phone-to').value = '12345';
@@ -54,7 +60,7 @@ test('a number that is not E.164 is refused by pointer without a request', async
   assert.equal(p.element('btn-call').disabled, false);
 });
 
-test('Call creates a telephony session on the trunk profile, then dials it, never logging the number', async () => {
+test('Call creates a telephony session on the tenant\'s phone line, then dials it, never logging the number', async () => {
   const p = page([
     [201, { sessionId: 's_7a1c9e20', room: 's_7a1c9e20', configHash: 'a'.repeat(64) }],
     [201, { sessionId: 's_7a1c9e20', participantId: 'p_3d5f7a90', callId: 'SCL_x1' }],
@@ -62,7 +68,7 @@ test('Call creates a telephony session on the trunk profile, then dials it, neve
   p.element('phone-to').value = '+91 98765 43210';
   await p.run('placePhoneCall()');
   assert.deepEqual(p.requests.map((r) => r.path), ['/sessions', '/sessions/s_7a1c9e20/call/start']);
-  assert.deepEqual(p.requests[0].body, { tenantId: 't_9c21a4be', language: 'hi', channel: 'telephony', profile: 'telephony-vobiz' });
+  assert.deepEqual(p.requests[0].body, { tenantId: 't_9c21a4be', language: 'hi', channel: 'telephony', profile: 'support' });
   assert.deepEqual(p.requests[1].body, { to: NUMBER });
   assert.equal(p.run('phoneView').state, 'placed');
   assert.equal(p.element('phone-state').textContent, 'call placed');

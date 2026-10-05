@@ -152,6 +152,11 @@ var targets = []target{
 		Package: "config", Type: "Situation", Prefix: "Situation",
 		Out: "internal/config/situations_gen.go", AllName: "AllSituations",
 	},
+	{
+		Schema: "config/v1/telephony.schema.json", Pointer: []string{"$defs", "Telephony", "properties", "phoneGuests", "enum"},
+		Package: "config", Type: "PhoneGuests", Prefix: "PhoneGuests",
+		Out: "internal/config/phoneguests_gen.go", AllName: "AllPhoneGuests",
+	},
 }
 
 var initialisms = map[string]string{

@@ -115,9 +115,43 @@ func TestResolveRefusesAnOverrideThatPicksTheTrunk(t *testing.T) {
 		t.Errorf("want only the trunk refused, the operator's to choose: %v", de.Details)
 	}
 
-	req.Overrides = json.RawMessage(`{"telephony": {"ringingTimeoutSeconds": 15, "recordingNotice": "when_recorded"}}`)
+	req.Overrides = json.RawMessage(`{"telephony": {"phoneGuests": "dial_out", "ringingTimeoutSeconds": 15, "recordingNotice": "when_recorded"}}`)
 	tel := resolve(t, req).Config.Telephony
-	if tel == nil || tel.RingingTimeoutSeconds != 15 || tel.RecordingNotice != config.NoticeWhenRecorded {
-		t.Errorf("a session override that names no trunk was not applied: %+v", tel)
+	if tel == nil || tel.RingingTimeoutSeconds != 15 || tel.RecordingNotice != config.NoticeWhenRecorded || tel.Trunk != "vobiz" {
+		t.Errorf("a session override that names no trunk was not applied over the tenant's trunk: %+v", tel)
+	}
+}
+
+func TestASessionThatTakesNoPhoneKeepsNoTelephonyBlock(t *testing.T) {
+	t.Parallel()
+	plain := resolve(t, request())
+	if plain.Config.Telephony != nil || strings.Contains(string(plain.Document), "telephony") {
+		t.Errorf("the tenant's phone line reached a session that takes no phone: %s", plain.Document)
+	}
+	off := request()
+	off.Overrides = json.RawMessage(`{"telephony": {"phoneGuests": "off"}}`)
+	if got := resolve(t, off); got.Hash != plain.Hash {
+		t.Errorf("phoneGuests off changed the document: %s", got.Document)
+	}
+
+	guests := request()
+	guests.Overrides = json.RawMessage(`{"telephony": {"phoneGuests": "dial_out"}}`)
+	cfg := resolve(t, guests).Config
+	if !cfg.TakesPhoneCalls() || cfg.TrunkName() != "vobiz" {
+		t.Errorf("a meeting that asked for phone guests did not get the tenant's trunk: %+v", cfg.Telephony)
+	}
+
+	phone := request()
+	phone.Channel = config.ChannelTelephony
+	phone.Language = "hi"
+	if cfg := resolve(t, phone).Config; !cfg.TakesPhoneCalls() || cfg.TrunkName() != "vobiz" {
+		t.Errorf("a telephony session did not get the tenant's trunk: %+v", cfg.Telephony)
+	}
+
+	idle := request()
+	idle.Overrides = json.RawMessage(`{"telephony": {"ringingTimeoutSeconds": 15}}`)
+	de := resolveError(t, idle)
+	if de.Code != errs.CodeInvalidConfig || !strings.Contains(strings.Join(de.Details, "\n"), "/telephony/ringingTimeoutSeconds") {
+		t.Errorf("tuning phone calls in a session that takes none was not refused by pointer: %+v", de)
 	}
 }

@@ -55,7 +55,7 @@ from .scribing import Scribing
 from .speech_plan import SpeechPlan
 from .stages import Stages, build, hearing
 from .switching import Switching
-from .telephony import ANSWER_GRACE_SECONDS, answered
+from .telephony import PhoneLines, Relink, phone_lines
 from .timing import Turns, TurnTiming
 from .toolbox import Answering, follow, linked, registry_for
 from .transcribing import Transcribing
@@ -136,7 +136,7 @@ def room_options(p: Plan, tts_sample_rate: int, captions: Captions | None = None
         audio_input=AudioInputOptions(sample_rate=stt_sample_rate(p)),
         audio_output=AudioOutputOptions(sample_rate=tts_sample_rate),
         text_output=text_output,
-        close_on_disconnect=True,
+        close_on_disconnect=not p.takes_phone_calls,
     )
 
 
@@ -403,23 +403,18 @@ async def entrypoint(ctx: JobContext) -> None:
     log.info("agent configured", extra={"session": p.config.session_id, **flat(effective)})
     if called is not None:
         called.listen()
-    elif transcribing is not None:
-        transcribing.listen()
-    await speak_first(p, session, ctx.room)
+    else:
+        if p.takes_phone_calls:
+            Relink(ctx.room, session.room_io).listen()
+        if transcribing is not None:
+            transcribing.listen()
+    speak_first(p, session, ctx.room)
 
 
-async def speak_first(p: Plan, session: AgentSession[Any], room: rtc.Room) -> None:
-    if p.on_a_phone:
-        within = p.config.telephony.ringing_timeout_seconds + ANSWER_GRACE_SECONDS
-        caller = await answered(room, within)
-        if caller is None:
-            log.info("nobody picked up", extra={"session": p.config.session_id})
-            return
-        log.info("phone answered", extra={"session": p.config.session_id, "participant": caller})
-    if p.disclosure is not None:
-        session.say(p.disclosure, allow_interruptions=False)
-    if p.opening is not None:
+def speak_first(p: Plan, session: AgentSession[Any], room: rtc.Room) -> PhoneLines | None:
+    if not p.on_a_phone and p.opening is not None:
         session.say(p.opening, allow_interruptions=True)
+    return phone_lines(p, room, session)
 
 
 def follow_language(

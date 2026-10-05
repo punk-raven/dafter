@@ -37,7 +37,7 @@ func catalog() *config.Catalog {
 			"budgets": {"turnGapP50Ms": 800, "turnGapP95Ms": 1500}
 		}`),
 		Tenants: map[string]json.RawMessage{
-			tenantID: json.RawMessage(`{"budgets": {"turnGapP95Ms": 1200}}`),
+			tenantID: json.RawMessage(`{"budgets": {"turnGapP95Ms": 1200}, "telephony": {"trunk": "vobiz"}}`),
 		},
 		Profiles: map[string]json.RawMessage{
 			"support": json.RawMessage(`{"agent": {"personaRef": "persona://support/v3"}}`),

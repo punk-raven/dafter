@@ -141,16 +141,14 @@
   "tenants": {
     "t_9c21a4be": {
       "residency": { "allowedRegions": ["ap-south-1"] },
-      "budgets": { "maxSessionCostUsd": 2.5 }
+      "budgets": { "maxSessionCostUsd": 2.5 },
+      "telephony": { "trunk": "vobiz" }
     }
   },
 
   "profiles": {
     "support": {
       "agent": { "personaRef": "persona://support/v3" }
-    },
-    "telephony-vobiz": {
-      "telephony": { "trunk": "vobiz" }
     },
     "scribe-gemini": {
       "scribe": {

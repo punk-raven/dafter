@@ -1,7 +1,6 @@
 const PHONE_NUMBER = /^\+[1-9][0-9]{6,14}$/;
 const PHONE_SEPARATORS = /[\s().-]/g;
 const PHONE_CHANNEL = 'telephony';
-const PHONE_PROFILE = 'telephony-vobiz';
 const PHONE_STATUS_ATTRIBUTE = 'sip.callStatus';
 
 const PHONE_STATES = {
@@ -93,7 +92,10 @@ function refusePhone(during, doc) {
 }
 
 function phoneSessionRequest() {
-  return Object.assign(sessionRequest(), { channel: PHONE_CHANNEL, profile: PHONE_PROFILE });
+  const body = Object.assign(sessionRequest(), { channel: PHONE_CHANNEL });
+  if (body.overrides) delete body.overrides.telephony;
+  if (body.overrides && !Object.keys(body.overrides).length) delete body.overrides;
+  return body;
 }
 
 async function postPhoneJSON(path, body) {
@@ -118,7 +120,7 @@ async function placePhoneCall() {
   phoneView.busy = true;
   setPhoneState('creating');
   try {
-    log(`Creating a ${PHONE_CHANNEL} session on profile ${PHONE_PROFILE} for a phone call...`);
+    log(`Creating a ${PHONE_CHANNEL} session for a phone call...`);
     const session = await postPhoneJSON('/sessions', phoneSessionRequest());
     if (!session.ok) {
       refusePhone('Session', session.data);

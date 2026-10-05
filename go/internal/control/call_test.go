@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -35,7 +36,26 @@ func (s *stubTransport) PlaceCall(_ context.Context, c transport.PhoneCall) (tra
 		return transport.CallInfo{}, s.callErr
 	}
 	s.calls = append(s.calls, c)
+	if s.people == nil {
+		s.people = map[string]string{}
+	}
+	s.people[c.Identity] = c.Room
 	return transport.CallInfo{ParticipantID: "PA_stub", Identity: c.Identity, Room: c.Room, CallID: "SCL_stub"}, nil
+}
+
+func (s *stubTransport) HangUp(_ context.Context, room, identity string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	placedIn, placed := s.people[identity]
+	switch {
+	case !placed || placedIn != room:
+		return transport.ErrNoSuchParticipant
+	case !slices.ContainsFunc(s.calls, func(c transport.PhoneCall) bool { return c.Identity == identity }):
+		return transport.ErrNotAPhone
+	}
+	delete(s.people, identity)
+	s.hungUp = append(s.hungUp, room+"/"+identity)
+	return nil
 }
 
 type lockedBuffer struct {
@@ -66,13 +86,28 @@ func servePhone(t *testing.T) (*harness, *lockedBuffer) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	var profiles map[string]json.RawMessage
-	if err := json.Unmarshal(doc["profiles"], &profiles); err != nil {
+	var tenants map[string]json.RawMessage
+	if err := json.Unmarshal(doc["tenants"], &tenants); err != nil {
 		t.Fatal(err)
 	}
-	profiles["phone"] = json.RawMessage(`{"telephony": {"trunk": "carrier-out", "ringingTimeoutSeconds": 20}}`)
-	profiles["elsewhere"] = json.RawMessage(`{"telephony": {"trunk": "not-in-the-table"}}`)
-	if doc["profiles"], err = json.Marshal(profiles); err != nil {
+	var tenant map[string]any
+	if err := json.Unmarshal(tenants[tenantID], &tenant); err != nil {
+		t.Fatal(err)
+	}
+	for id, telephony := range map[string]any{
+		tenantID:           map[string]any{"trunk": "carrier-out", "ringingTimeoutSeconds": 20},
+		tenantElsewhere:    map[string]any{"trunk": "not-in-the-table"},
+		tenantWithoutPhone: nil,
+	} {
+		tenant["telephony"] = telephony
+		if telephony == nil {
+			delete(tenant, "telephony")
+		}
+		if tenants[id], err = json.Marshal(tenant); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if doc["tenants"], err = json.Marshal(tenants); err != nil {
 		t.Fatal(err)
 	}
 	if raw, err = json.Marshal(doc); err != nil {
@@ -87,8 +122,25 @@ func servePhone(t *testing.T) (*harness, *lockedBuffer) {
 	return h, logs
 }
 
-func phoneSession(profile, channel string) string {
-	return `{"tenantId":"` + tenantID + `","profile":"` + profile + `","language":"hi","channel":"` + channel + `"}`
+const (
+	tenantElsewhere    = "t_0e1f2a3b"
+	tenantWithoutPhone = "t_5a6b7c8d"
+)
+
+func phoneSession(tenant, channel string) string {
+	return `{"tenantId":"` + tenant + `","language":"hi","channel":"` + channel + `"}`
+}
+
+func guestSession(overrides string) string {
+	return `{"tenantId":"` + tenantID + `","language":"hi","channel":"webrtc","overrides":` + withGuests(overrides) + `}`
+}
+
+func withGuests(overrides string) string {
+	guests := `"telephony":{"phoneGuests":"dial_out"}`
+	if overrides == "" || overrides == "{}" {
+		return "{" + guests + "}"
+	}
+	return "{" + guests + "," + strings.TrimPrefix(overrides, "{")
 }
 
 func (h *harness) dial(t *testing.T, sessionID, body string) (int, []byte) {
@@ -99,7 +151,7 @@ func (h *harness) dial(t *testing.T, sessionID, body string) (int, []byte) {
 func TestAPhoneCallIsPlacedIntoTheStoredSessionUnderAMintedIdentity(t *testing.T) {
 	t.Parallel()
 	h, logs := servePhone(t)
-	created := h.create(t, phoneSession("phone", "telephony"))
+	created := h.create(t, phoneSession(tenantID, "telephony"))
 	if len(h.transport.dispatched) != 1 {
 		t.Fatalf("the agent was not dispatched before the call: %+v", h.transport.dispatched)
 	}
@@ -150,15 +202,15 @@ func TestAPhoneCallIsPlacedIntoTheStoredSessionUnderAMintedIdentity(t *testing.T
 func TestACallIsRefusedUnlessTheStoredSessionCanPlaceIt(t *testing.T) {
 	t.Parallel()
 	h, logs := servePhone(t)
-	phone := h.create(t, phoneSession("phone", "telephony"))
-	web := h.create(t, phoneSession("phone", "webrtc"))
-	trunkless := h.create(t, phoneSession("support", "telephony"))
+	phone := h.create(t, phoneSession(tenantID, "telephony"))
+	meeting := h.create(t, phoneSession(tenantID, "webrtc"))
+	trunkless := h.create(t, phoneSession(tenantWithoutPhone, "telephony"))
 
 	for _, tc := range []struct {
 		name, session, body, pointer string
 	}{
-		{"a webrtc session", web.SessionID, `{"to":"` + callee + `"}`, "/channel"},
-		{"a session with no trunk", trunkless.SessionID, `{"to":"` + callee + `"}`, "/telephony/trunk"},
+		{"a meeting without phone guests", meeting.SessionID, `{"to":"` + callee + `"}`, "/telephony/phoneGuests"},
+		{"a tenant with no trunk", trunkless.SessionID, `{"to":"` + callee + `"}`, "/telephony/trunk"},
 		{"a local number", phone.SessionID, `{"to":"0` + calleeTail + `"}`, "/to"},
 		{"no number", phone.SessionID, `{}`, "/to"},
 	} {
@@ -189,7 +241,7 @@ func TestACallIsRefusedUnlessTheStoredSessionCanPlaceIt(t *testing.T) {
 func TestASessionNamingAnUnknownTrunkIsNeverStored(t *testing.T) {
 	t.Parallel()
 	h, _ := servePhone(t)
-	de := h.reject(t, phoneSession("elsewhere", "telephony"), http.StatusBadRequest)
+	de := h.reject(t, phoneSession(tenantElsewhere, "telephony"), http.StatusBadRequest)
 	if de.Code != errs.CodeInvalidConfig || !strings.Contains(strings.Join(de.Details, "\n"), "/telephony/trunk") {
 		t.Errorf("want %s at /telephony/trunk, got %+v", errs.CodeInvalidConfig, de)
 	}
@@ -201,7 +253,7 @@ func TestASessionNamingAnUnknownTrunkIsNeverStored(t *testing.T) {
 func TestAMediaServerRefusalOfTheCallReachesTheCallerWithoutTheNumber(t *testing.T) {
 	t.Parallel()
 	h, _ := servePhone(t)
-	phone := h.create(t, phoneSession("phone", "telephony"))
+	phone := h.create(t, phoneSession(tenantID, "telephony"))
 	h.transport.callErr = errs.Errorf(errs.CodeProviderUnavailable, "media server unreachable for CreateSIPParticipant")
 	status, raw := h.dial(t, phone.SessionID, `{"to":"`+callee+`"}`)
 	if status != http.StatusServiceUnavailable || strings.Contains(string(raw), calleeTail) {
