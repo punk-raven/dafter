@@ -26,5 +26,8 @@ func LoadCatalog(raw []byte) (*Catalog, error) {
 	if err := c.checkLLMRoutes(); err != nil {
 		return nil, err
 	}
+	if err := c.checkAgents(); err != nil {
+		return nil, err
+	}
 	return &c, nil
 }

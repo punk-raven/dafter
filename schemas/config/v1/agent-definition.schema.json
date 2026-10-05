@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/agent-definition.schema.json",
+  "title": "AgentDefinition",
+  "description": "One named agent an install offers, stored in the config store's agents kind under a slug and selected per session by the session request's agent field. Resolution lands it over the defaults layer as the resolved document's agent.name, agent.addressing.aliases and agent.addressing.nearMisses, before the tenant, profile and session layers, so a session that names no agent resolves exactly as the defaults state. The name and aliases replace the defaults' own, because they are this agent's spellings; the near misses add to every list below them, because a near miss of one name stays a near miss of the next, so the resolved list is the union of the defaults', the agent's, the tenant's, the profile's and the session's, each word once, in that order. A near miss that is also the agent's name or an alias contradicts itself, which is a cross-field rule on the resolved document.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/properties/agent/properties/name" },
+    "aliases": { "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/Addressing/properties/aliases" },
+    "nearMisses": { "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/Addressing/properties/nearMisses" },
+    "profile": {
+      "type": "string",
+      "description": "The profile a session naming this agent resolves with when its request names none, which is how an agent carries its persona: the profile states agent.personaRef. A session that names a profile uses that profile instead.",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    }
+  }
+}

@@ -19,8 +19,12 @@ import (
 	"github.com/punk-raven/dafter/go/internal/turn"
 )
 
+type CatalogSource interface {
+	Snapshot() config.Snapshot
+}
+
 type Service struct {
-	Catalog   *config.Catalog
+	Catalog   CatalogSource
 	Store     state.SessionStore
 	Transport transport.Transport
 	TURN      *turn.Fetcher
@@ -62,6 +66,7 @@ func (s *Service) Handler() http.Handler {
 
 type createSessionRequest struct {
 	TenantID  string          `json:"tenantId"`
+	Agent     string          `json:"agent,omitempty"`
 	Profile   string          `json:"profile,omitempty"`
 	Language  string          `json:"language"`
 	Channel   config.Channel  `json:"channel"`
@@ -75,6 +80,7 @@ type createSessionResponse struct {
 	ParticipantID string           `json:"participantId"`
 	Room          string           `json:"room"`
 	ConfigHash    string           `json:"configHash"`
+	ReleaseID     int64            `json:"releaseId,omitempty"`
 	Config        json.RawMessage  `json:"config"`
 	Token         string           `json:"token"`
 	URL           string           `json:"url"`
@@ -120,6 +126,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 	opened, err := s.openSession(r.Context(), config.Request{
 		TenantID:  req.TenantID,
+		Agent:     req.Agent,
 		Profile:   req.Profile,
 		Language:  req.Language,
 		Channel:   req.Channel,
@@ -158,6 +165,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ParticipantID:    participantID,
 		Room:             sessionID,
 		ConfigHash:       resolved.Hash,
+		ReleaseID:        sess.ReleaseID,
 		Config:           resolved.Document,
 		Token:            token.JWT,
 		URL:              token.URL,
@@ -182,7 +190,8 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 		return openedSession{}, errs.Wrap(errs.CodeInternal, err, "mint session id")
 	}
 	req.SessionID = sessionID
-	resolved, err := s.Catalog.Resolve(req)
+	snapshot := s.Catalog.Snapshot()
+	resolved, err := snapshot.Catalog.Resolve(req)
 	if err != nil {
 		return openedSession{}, err
 	}
@@ -200,6 +209,7 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 		TenantID:   resolved.Config.TenantID,
 		Room:       sessionID,
 		ConfigHash: resolved.Hash,
+		ReleaseID:  snapshot.Release,
 		Config:     resolved.Document,
 		CreatedAt:  time.Now().UTC(),
 	}
@@ -309,6 +319,7 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 		ParticipantID: participantID,
 		Room:          sess.Room,
 		ConfigHash:    sess.ConfigHash,
+		ReleaseID:     sess.ReleaseID,
 		Config:        sess.Config,
 		Token:         token.JWT,
 		URL:           token.URL,

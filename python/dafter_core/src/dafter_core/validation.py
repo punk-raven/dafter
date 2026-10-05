@@ -18,6 +18,7 @@ _FILES = (
     schemas.BACKCHANNEL,
     schemas.SCRIBE_CONFIG,
     schemas.RESOLVED_SESSION_CONFIG,
+    schemas.AGENT_DEFINITION,
     schemas.TELEPHONY,
     schemas.EVENT_ENVELOPE,
     schemas.TRANSCRIPT_EVENTS,

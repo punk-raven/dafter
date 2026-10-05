@@ -73,7 +73,10 @@ func main() {
 func run() error {
 	addr := flag.String("addr", envOr("DAFTER_ADDR", "127.0.0.1:8080"), "listen address")
 	dbPath := flag.String("db", envOr("DAFTER_DB", "dafter.db"), "SQLite path")
-	catalogPath := flag.String("catalog", os.Getenv("DAFTER_CATALOG"), "config catalog file; empty uses the embedded one")
+	catalogPath := flag.String("catalog", os.Getenv("DAFTER_CATALOG"),
+		"config catalog file: seeds an empty config store, and its defaults and LLM routes are imported on every start; empty uses the embedded one")
+	adminAddr := flag.String("admin-addr", envOr("DAFTER_ADMIN_ADDR", "127.0.0.1:8081"), "admin API listen address; served only when DAFTER_ADMIN_TOKEN is set")
+	poll := flag.Duration("config-poll", durationOr("DAFTER_CONFIG_POLL", 2*time.Second), "how often a newly published config release is looked for")
 	trunksPath := flag.String("trunks", os.Getenv("DAFTER_TRUNKS"), "SIP trunk table file; empty uses the embedded one")
 	ttl := flag.Duration("token-ttl", transport.DefaultTTL, "join token lifetime")
 	flag.Parse()
@@ -109,7 +112,11 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	store, err := state.Open(ctx, *dbPath)
+	keys, err := sessionKeyCipher()
+	if err != nil {
+		return err
+	}
+	store, err := state.Open(ctx, *dbPath, state.WithKeyCipher(keys))
 	if err != nil {
 		return fmt.Errorf("session store: %w", err)
 	}
@@ -127,8 +134,14 @@ func run() error {
 		slog.Info("cloudflare TURN credentials enabled")
 	}
 
+	configs, err := openConfigStore(ctx, *dbPath, catalog, *poll, *adminAddr)
+	if err != nil {
+		return err
+	}
+	defer configs.close()
+
 	svc := &control.Service{
-		Catalog: catalog, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl,
+		Catalog: configs.live, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl,
 		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"), Trunks: trunks,
 	}
 	if svc.WorkerSecret == "" {
@@ -168,6 +181,7 @@ func run() error {
 		}
 	}()
 
+	configs.serveAdmin(ctx)
 	slog.Info("dafter-control listening", "addr", *addr, "db", *dbPath)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
@@ -202,6 +216,13 @@ func fileOr(path string, embedded []byte) ([]byte, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	return raw, nil
+}
+
+func durationOr(key string, fallback time.Duration) time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(key)); err == nil && d > 0 {
+		return d
+	}
+	return fallback
 }
 
 func envOr(key, fallback string) string {
