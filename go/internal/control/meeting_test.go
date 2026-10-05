@@ -61,7 +61,8 @@ func admittedTo(t *testing.T, h *harness, xml, room, callUUID string) {
 		t.Fatal("the admitted caller was not dialed back")
 	}
 	c := h.transport.calls[before]
-	if c.Room != room || c.To != "" || c.Headers[vobiz.BridgeHeader] != m[1] || ids.ValidateID(ids.PrefixParticipant, c.Identity) != nil {
+	if c.Room != room || c.To != "" || c.Headers[vobiz.BridgeHeader] != m[1] || c.Trunk.Address != bridgeHost ||
+		c.Trunk.AuthUsername != endpoint || c.Trunk.AuthPassword != endpointKey || ids.ValidateID(ids.PrefixParticipant, c.Identity) != nil {
 		t.Errorf("dial-back %+v, want the meeting's own room %s", c, room)
 	}
 }

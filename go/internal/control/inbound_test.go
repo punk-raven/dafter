@@ -24,6 +24,9 @@ const (
 	publicURL   = "https://calls.example.com"
 	signingKey  = "not-a-real-token"
 	bridgeApp   = "12345678901234567"
+	bridgeHost  = "registrar.vobiz.ai:5060"
+	endpoint    = "dafter_bridge"
+	endpointKey = "not-a-real-endpoint-password"
 	callerTail  = "2025550143"
 	bridgeUUID  = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 	vobizForms  = "../carrier/vobiz/testdata/"
@@ -43,8 +46,9 @@ func serveInbound(t *testing.T) (*harness, *lockedBuffer) {
 	h, logs := servePhone(t)
 	trunk := carrierTrunk
 	trunk.Inbound = &transport.Inbound{
-		PublicURL: publicURL, SigningKey: signingKey, BridgeHost: "sip.vobiz.ai", BridgeUser: bridgeApp,
-		Session: transport.InboundSession{TenantID: tenantID, Language: "hi"},
+		PublicURL: publicURL, SigningKey: signingKey, BridgeHost: bridgeHost, BridgeUser: bridgeApp,
+		Session:        transport.InboundSession{TenantID: tenantID, Language: "hi"},
+		BridgeUsername: endpoint, BridgePassword: endpointKey,
 	}
 	h.svc.Trunks = transport.Trunks{"carrier-out": trunk, "outbound-only": carrierTrunk}
 	return h, logs
@@ -139,7 +143,8 @@ func TestAnInboundCallIsStoredHeldDialedBackAndBridged(t *testing.T) {
 	}
 	c := h.transport.calls[0]
 	if c.Room != room || c.SIPUser != bridgeApp || c.To != "" || c.Headers[vobiz.BridgeHeader] != token ||
-		c.Trunk.Address != "sip.vobiz.ai" || c.Trunk.Transport != carrierTrunk.Transport || c.Trunk.AuthPassword != "" || ids.ValidateID(ids.PrefixParticipant, c.Identity) != nil {
+		c.Trunk.Address != bridgeHost || c.Trunk.Transport != carrierTrunk.Transport ||
+		c.Trunk.AuthUsername != endpoint || c.Trunk.AuthPassword != endpointKey || ids.ValidateID(ids.PrefixParticipant, c.Identity) != nil {
 		t.Errorf("dial-back %+v", c)
 	}
 

@@ -68,7 +68,8 @@ func TestAMeetingNumberIsTheTrunksOwnAndAMeetingsOnlyTrunkNeedsNoAgentSession(t 
 		return []byte(`{"vobiz": {"provider": "vobiz", "addressRef": "secret://operator/vobiz/sip-domain",
 			"numbersRef": "secret://operator/vobiz/sip-numbers",
 			"inbound": {"publicUrlRef": "secret://operator/vobiz/sip-webhook-url", "signingKeyRef": "secret://operator/vobiz/sip-auth-token",
-				"bridgeHost": "sip.vobiz.ai", "bridgeUserRef": "secret://operator/vobiz/sip-bridge-app",
+				"bridgeHost": "registrar.vobiz.ai:5060", "bridgeUserRef": "secret://operator/vobiz/sip-bridge-app",
+				"bridgeUsernameRef": "secret://operator/vobiz/sip-bridge-username", "bridgePasswordRef": "secret://operator/vobiz/sip-bridge-password",
 				"meetingNumbersRef": "secret://operator/vobiz/sip-meeting-numbers", "pinAttempts": ` + strconv.Itoa(attempts) + `}}}`)
 	}
 	every := vobizWith(map[string]string{"VOBIZ_SIP_MEETING_NUMBERS": "+12025550100,+12025550101"})

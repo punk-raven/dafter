@@ -9,8 +9,10 @@
     "inbound": {
       "publicUrlRef": "secret://operator/vobiz/sip-webhook-url",
       "signingKeyRef": "secret://operator/vobiz/sip-auth-token",
-      "bridgeHost": "sip.vobiz.ai",
+      "bridgeHost": "registrar.vobiz.ai:5060",
       "bridgeUserRef": "secret://operator/vobiz/sip-bridge-app",
+      "bridgeUsernameRef": "secret://operator/vobiz/sip-bridge-username",
+      "bridgePasswordRef": "secret://operator/vobiz/sip-bridge-password",
       "meetingNumbersRef": "secret://operator/vobiz/sip-meeting-numbers",
       "session": { "tenantId": "t_9c21a4be", "language": "hi" }
     }

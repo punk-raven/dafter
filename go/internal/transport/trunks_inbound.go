@@ -28,6 +28,9 @@ type Inbound struct {
 	BridgeUser string
 	Session    InboundSession
 
+	BridgeUsername string
+	BridgePassword string
+
 	MeetingNumbers []string
 	PINAttempts    int
 }
@@ -50,11 +53,15 @@ type InboundSession struct {
 }
 
 type inboundEntry struct {
-	PublicURLRef  string         `json:"publicUrlRef"`
-	SigningKeyRef string         `json:"signingKeyRef"`
-	BridgeHost    string         `json:"bridgeHost"`
-	BridgeUserRef string         `json:"bridgeUserRef"`
-	Session       InboundSession `json:"session"`
+	PublicURLRef  string `json:"publicUrlRef"`
+	SigningKeyRef string `json:"signingKeyRef"`
+	BridgeHost    string `json:"bridgeHost"`
+	BridgeUserRef string `json:"bridgeUserRef"`
+
+	BridgeUsernameRef string `json:"bridgeUsernameRef"`
+	BridgePasswordRef string `json:"bridgePasswordRef"`
+
+	Session InboundSession `json:"session"`
 
 	MeetingNumbersRef string `json:"meetingNumbersRef,omitempty"`
 	PINAttempts       int    `json:"pinAttempts,omitempty"`
@@ -69,13 +76,19 @@ func (e inboundEntry) resolve(outer *resolver, provider string, numbers []string
 		BridgeUser: r.ref("bridgeUserRef", e.BridgeUserRef),
 		Session:    e.Session,
 
+		BridgeUsername: r.ref("bridgeUsernameRef", e.BridgeUsernameRef),
+		BridgePassword: r.ref("bridgePasswordRef", e.BridgePasswordRef),
+
 		MeetingNumbers: numberList(r.optional("meetingNumbersRef", e.MeetingNumbersRef)),
 		PINAttempts:    e.PINAttempts,
 	}
 	if !inboundDialects[provider] {
 		r.add("provider", "no carrier webhook is built for this provider, so it takes no inbound calls")
 	}
-	for _, ref := range [][2]string{{"publicUrlRef", e.PublicURLRef}, {"signingKeyRef", e.SigningKeyRef}, {"bridgeUserRef", e.BridgeUserRef}} {
+	for _, ref := range [][2]string{
+		{"publicUrlRef", e.PublicURLRef}, {"signingKeyRef", e.SigningKeyRef}, {"bridgeUserRef", e.BridgeUserRef},
+		{"bridgeUsernameRef", e.BridgeUsernameRef}, {"bridgePasswordRef", e.BridgePasswordRef},
+	} {
 		if ref[1] == "" {
 			r.add(ref[0], "an inbound trunk needs it")
 		}
@@ -89,10 +102,13 @@ func (e inboundEntry) resolve(outer *resolver, provider string, numbers []string
 		r.add("publicUrlRef", "the https address the carrier reaches the control plane at, with no query")
 	}
 	if !addressPattern.MatchString(e.BridgeHost) {
-		r.add("bridgeHost", "the carrier's host name that answers a call into its application")
+		r.add("bridgeHost", "the carrier's registrar, with an optional port, that takes the bridge leg from its SIP endpoint")
 	}
 	if in.BridgeUser != "" && !sipUserPattern.MatchString(in.BridgeUser) {
-		r.add("bridgeUserRef", "the user part of the carrier application's SIP address")
+		r.add("bridgeUserRef", "the carrier application's id, the user the bridge leg dials at the registrar")
+	}
+	if in.BridgeUsername != "" && !sipUserPattern.MatchString(in.BridgeUsername) {
+		r.add("bridgeUsernameRef", "the username of the carrier's SIP endpoint attached to the bridge application")
 	}
 	if slices.ContainsFunc(numbers, func(n string) bool { return !in.AnswersMeetings(n) }) &&
 		(!tenantPattern.MatchString(e.Session.TenantID) || !languagePattern.MatchString(e.Session.Language) ||
