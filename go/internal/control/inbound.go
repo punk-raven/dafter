@@ -35,6 +35,10 @@ func (s *Service) answerCall(w http.ResponseWriter, r *http.Request) {
 		s.writeXML(w, vobiz.Hold(call.token, s.heldURL(trunk, name, call.token), call.limit))
 		return
 	}
+	if trunk.Inbound.AnswersMeetings(answer.To) {
+		s.answerMeeting(w, r, name, trunk, answer)
+		return
+	}
 
 	session := trunk.Inbound.Session
 	opened, err := s.openSession(r.Context(), config.Request{

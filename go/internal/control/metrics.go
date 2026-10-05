@@ -64,7 +64,7 @@ var (
 
 	inboundCallsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_inbound_calls_total",
-		Help: "Carrier webhooks for inbound calls by outcome: held, dialed, bridged, failed, hung_up or refused.",
+		Help: "Carrier webhooks for inbound calls by outcome: held, dialed, bridged, failed, hung_up or refused; for meeting dial-in also asked_pin, wrong_pin, admitted and dial_in_ended.",
 	}, []string{"outcome"})
 
 	errorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -139,6 +139,8 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
 	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
 	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)
+	mux.HandleFunc("POST /telephony/{trunk}/pin", s.meetingPIN)
+	mux.HandleFunc("PUT /sessions/{sessionID}/dial-in/numbers", s.setAllowedNumbers)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -163,7 +165,7 @@ func normalizePath(p string) string {
 		return "/sessions"
 	}
 	if strings.HasPrefix(p, "/telephony/") {
-		if parts := strings.Split(p, "/"); len(parts) > 3 && slices.Contains([]string{"answer", "held", "bridge"}, parts[3]) {
+		if parts := strings.Split(p, "/"); len(parts) > 3 && slices.Contains([]string{"answer", "held", "bridge", "pin"}, parts[3]) {
 			return "/telephony/{trunk}/" + parts[3]
 		}
 		return "/telephony"
@@ -177,7 +179,7 @@ func normalizePath(p string) string {
 	if strings.Contains(p, "/transcripts/") {
 		return "/sessions/{id}/transcripts/{version}"
 	}
-	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/call/start", "/scribe/key", "/scribe/refusal", "/transcription/sources", "/transcripts", "/minutes"} {
+	for _, suffix := range []string{"/join", "/recording/start", "/recording/stop", "/agent/start", "/agent/stop", "/agent/key", "/agent/refusal", "/call/start", "/scribe/key", "/scribe/refusal", "/transcription/sources", "/transcripts", "/minutes", "/dial-in/numbers"} {
 		if strings.HasSuffix(p, suffix) {
 			return "/sessions/{id}" + suffix
 		}

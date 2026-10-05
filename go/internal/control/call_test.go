@@ -73,6 +73,15 @@ func (s *stubTransport) OpenRooms(_ context.Context, rooms []string) (map[string
 	return open, nil
 }
 
+func (s *stubTransport) closeRoom(room string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed == nil {
+		s.closed = map[string]bool{}
+	}
+	s.closed[room] = true
+}
+
 type lockedBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer

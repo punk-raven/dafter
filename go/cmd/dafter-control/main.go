@@ -63,6 +63,8 @@ var clientAssetPaths = map[string]string{
 	"/guests.css":          "guests.css",
 }
 
+const dialInSweep = 30 * time.Second
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("dafter-control stopped", "error", err)
@@ -181,6 +183,7 @@ func run() error {
 		}
 	}()
 
+	go svc.SweepDialInsEvery(ctx, dialInSweep)
 	configs.serveAdmin(ctx)
 	slog.Info("dafter-control listening", "addr", *addr, "db", *dbPath)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

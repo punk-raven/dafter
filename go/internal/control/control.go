@@ -32,7 +32,8 @@ type Service struct {
 	Log       *slog.Logger
 	Trunks    transport.Trunks
 
-	held heldCalls
+	held    heldCalls
+	prompts pinPrompts
 
 	WorkerSecret string
 }
@@ -53,6 +54,8 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
 	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
 	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)
+	mux.HandleFunc("POST /telephony/{trunk}/pin", s.meetingPIN)
+	mux.HandleFunc("PUT /sessions/{sessionID}/dial-in/numbers", s.setAllowedNumbers)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -87,9 +90,10 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	EncryptionKey    string `json:"encryptionKey,omitempty"`
-	AgentDispatchID  string `json:"agentDispatchId,omitempty"`
-	ScribeDispatchID string `json:"scribeDispatchId,omitempty"`
+	EncryptionKey    string         `json:"encryptionKey,omitempty"`
+	DialIn           *dialInDetails `json:"dialIn,omitempty"`
+	AgentDispatchID  string         `json:"agentDispatchId,omitempty"`
+	ScribeDispatchID string         `json:"scribeDispatchId,omitempty"`
 }
 
 func mintEncryptionKey() (string, error) {
@@ -172,6 +176,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:        token.ExpiresAt,
 		ICEServers:       iceServers,
 		EncryptionKey:    keyFor(resolved.Config, sess, req.Role),
+		DialIn:           s.dialInFor(r.Context(), resolved.Config, sessionID, req.Role),
 		AgentDispatchID:  opened.dispatchID,
 		ScribeDispatchID: opened.scribeDispatchID,
 	})
@@ -203,6 +208,11 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 	if trunk != "" && resolved.Config.TrunkName() != trunk {
 		return openedSession{}, located(errs.CodeInvalidConfig, "/telephony/trunk", "an inbound call's session names the trunk it arrived on")
 	}
+	if resolved.Config.TakesDialIn() {
+		if _, err := s.meetingNumbers(resolved.Config); err != nil {
+			return openedSession{}, err
+		}
+	}
 
 	sess := state.Session{
 		SessionID:  sessionID,
@@ -220,6 +230,11 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 	}
 	if err := s.Store.CreateSession(ctx, sess); err != nil {
 		return openedSession{}, err
+	}
+	if resolved.Config.TakesDialIn() {
+		if err := s.openDialIn(ctx, sess); err != nil {
+			return openedSession{}, err
+		}
 	}
 	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
 		if _, _, err := s.startEgress(ctx, sess, resolved.Config, startRecordingRequest{}, true, state.Egress{}); err != nil {
@@ -326,6 +341,7 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:     token.ExpiresAt,
 		ICEServers:    iceServers,
 		EncryptionKey: keyFor(cfg, sess, req.Role),
+		DialIn:        s.dialInFor(r.Context(), cfg, sessionID, req.Role),
 	})
 }
 

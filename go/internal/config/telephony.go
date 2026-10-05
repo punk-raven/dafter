@@ -53,6 +53,10 @@ func (c *ResolvedSessionConfig) TakesDialIn() bool {
 		c.EncryptionMode() != EncryptionE2EE && c.PrivacyMode == PrivacyOpen
 }
 
+func (c *ResolvedSessionConfig) DisclosesDialInTo(role Role) bool {
+	return c.TakesDialIn() && (role == RoleParticipant || role == RolePresenter)
+}
+
 func (c *ResolvedSessionConfig) CallerCheck() CallerCheck {
 	if c.Telephony == nil || c.Telephony.DialIn == nil || c.Telephony.DialIn.CallerCheck == "" {
 		return CallerCheckPin

@@ -71,11 +71,11 @@ func (s *Service) startCall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) trunkFor(cfg *config.ResolvedSessionConfig) (transport.Trunk, error) {
-	if !cfg.TakesPhoneCalls() {
-		if cfg.Channel == config.ChannelTelephony {
-			return transport.Trunk{}, located(errs.CodeInvalidConfig, "/telephony/trunk", "the tenant has no SIP trunk to place a call on")
-		}
-		return transport.Trunk{}, located(errs.CodeInvalidConfig, "/telephony/phoneGuests", "the session takes no phone guests, so no phone can be called into it")
+	switch {
+	case cfg.Channel == config.ChannelTelephony && !cfg.TakesPhoneCalls():
+		return transport.Trunk{}, located(errs.CodeInvalidConfig, "/telephony/trunk", "the tenant has no SIP trunk to place a call on")
+	case cfg.Channel != config.ChannelTelephony && !cfg.CallsGuestsOut():
+		return transport.Trunk{}, located(errs.CodeInvalidConfig, "/telephony/phoneGuests", "the session does not call phone guests in, so no phone can be called into it")
 	}
 	return s.knownTrunk(cfg.TrunkName())
 }
