@@ -62,6 +62,7 @@ from .transcribing import Transcribing
 
 POOL_ENV = "LIVEKIT_AGENT_NAME"
 DEFAULT_POOL = "dafter-py"
+HTTP_PORT_ENV = "DAFTER_AGENT_HTTP_PORT"
 
 PII_PREFIX = "lk.pii."
 FRAMEWORK_LOGGER = "livekit.agents"
@@ -461,6 +462,7 @@ def server() -> AgentServer:
     exposed = exposition()
     agent_server = AgentServer(
         setup_fnc=prewarm,
+        port=int(os.environ.get(HTTP_PORT_ENV) or 0),
         prometheus_port=exposed.port if exposed else None,
         prometheus_multiproc_dir=exposed.multiproc_dir if exposed else None,
     )

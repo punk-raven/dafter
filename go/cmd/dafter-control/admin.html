@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Dafter Config Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%235b3fd6%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-family=%22system-ui,sans-serif%22 font-size=%2218%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3ED%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark" aria-hidden="true">D</span><span class="brand-name">Dafter</span><span class="brand-sub">config store</span></div>
+  <span id="live-release" class="pill pill-live signed-only"></span>
+  <div class="topbar-actions">
+    <span id="who" class="who signed-only"></span>
+    <button id="theme" type="button" class="btn btn-quiet btn-small">Theme</button>
+    <button id="signout" type="button" class="btn btn-quiet btn-small signed-only">Sign out</button>
+  </div>
+</header>
+<div class="shell">
+  <nav id="nav" class="nav signed-only" aria-label="Sections">
+    <p class="nav-group" id="nav-docs">Documents</p>
+    <ul aria-labelledby="nav-docs">
+      <li><a href="#/agents" data-view="agents">Agents</a></li>
+      <li><a href="#/profiles" data-view="profiles">Profiles</a></li>
+      <li><a href="#/tenants" data-view="tenants">Tenants</a></li>
+      <li><a href="#/languages" data-view="languages">Languages</a></li>
+      <li><a href="#/channels" data-view="channels">Channels</a></li>
+      <li><a href="#/defaults" data-view="defaults">Defaults</a></li>
+      <li><a href="#/llms" data-view="llms">LLMs</a></li>
+    </ul>
+    <p class="nav-group" id="nav-ship">Ship</p>
+    <ul aria-labelledby="nav-ship">
+      <li><a href="#/changes" data-view="changes">Changes <span id="pending-count" class="count" hidden></span></a></li>
+      <li><a href="#/preview" data-view="preview">Preview</a></li>
+      <li><a href="#/releases" data-view="releases">Releases</a></li>
+      <li><a href="#/history" data-view="history">History</a></li>
+    </ul>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<dialog id="confirm" class="dialog"></dialog>
+<script src="/admin-api.js"></script>
+<script src="/admin-fields.js"></script>
+<script src="/admin-diff.js"></script>
+<script src="/admin-agent.js"></script>
+<script src="/admin-list.js"></script>
+<script src="/admin-summary.js"></script>
+<script src="/admin-docs.js"></script>
+<script src="/admin-publish.js"></script>
+<script src="/admin-releases.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>
