@@ -21,7 +21,7 @@ function element(id) {
 }
 
 function page(responses, config = MEETING) {
-  const run = load('client-phone.js', 'client-guests.js');
+  const run = load('client-phone.js', 'client-guests.js', 'client-dialin.js');
   const g = run('globalThis');
   const elements = new Map();
   const byId = (id) => {
@@ -52,6 +52,8 @@ test('only an open session that asked for phone guests takes them', () => {
   const reason = run('guestsBlockedReason');
   assert.equal(reason(MEETING), '');
   assert.match(reason({ privacyMode: 'open', channel: 'webrtc' }), /takes no phone guests.*dial out/);
+  assert.equal(reason({ privacyMode: 'open', channel: 'webrtc', telephony: { trunk: 'vobiz', phoneGuests: 'both' } }), '');
+  assert.match(reason({ privacyMode: 'open', channel: 'webrtc', telephony: { trunk: 'vobiz', phoneGuests: 'dial_in' } }), /dial-in only.*dial out or both/);
   assert.match(reason({ privacyMode: 'open', channel: 'webrtc', telephony: { trunk: 'vobiz', phoneGuests: 'off' } }), /takes no phone guests/);
   assert.match(reason({ privacyMode: 'open', channel: 'webrtc', telephony: { phoneGuests: 'dial_out' } }), /no phone line/);
   assert.match(reason({ privacyMode: 'trusted_agent', telephony: { trunk: 'vobiz', phoneGuests: 'dial_out' } }), /end-to-end encrypted/);
@@ -144,4 +146,20 @@ test('leaving the meeting forgets the guests and clears the number field', () =>
   assert.equal(p.view.sessionId, null);
   assert.equal(p.byId('guests-to').value, '');
   assert.equal(p.byId('guests-call').style.display, 'none');
+});
+
+test('a dial-in meeting shows its number and PIN, and hides the dial row when it calls nobody out', () => {
+  const p = page([], { ...MEETING, telephony: { trunk: 'vobiz', phoneGuests: 'dial_in' } });
+  p.run('showDialIn')({ numbers: ['+912250001234'], pin: '48151623' }, 'dial_in');
+  assert.equal(p.byId('guests-dial-in').textContent, 'Dial in: +912250001234 · PIN 4815 1623');
+  assert.equal(p.byId('guests-dial-in').style.display, '');
+  assert.equal(p.byId('guests-dial-out').style.display, 'none');
+  p.run('showDialIn')({ numbers: ['+912250001234', '+912250005678'], pin: '00420017' }, 'both');
+  assert.equal(p.byId('guests-dial-in').textContent, 'Dial in: +912250001234 or +912250005678 · PIN 0042 0017');
+  assert.equal(p.byId('guests-dial-out').style.display, '');
+  p.run('showDialIn')(undefined, 'dial_out');
+  assert.equal(p.byId('guests-dial-in').style.display, 'none');
+  p.run('showDialIn')({ numbers: ['+912250001234'], pin: '48151623' }, 'both');
+  p.run('stopGuests()');
+  assert.equal(p.byId('guests-dial-in').textContent, '');
 });

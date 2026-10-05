@@ -43,7 +43,7 @@ function sessionRequest() {
   const phoneGuests = document.getElementById('phone-guests').value;
   if (phoneGuests && body.channel !== 'telephony') {
     body.overrides = body.overrides || {};
-    body.overrides.telephony = { phoneGuests };
+    body.overrides.telephony = telephonyOverride(phoneGuests);
   }
   return body;
 }
@@ -83,6 +83,7 @@ async function createSession() {
     }
 
     showCreatedSession(data);
+    await allowDialInNumbers(data);
     btn.disabled = false;
     return data.room;
   } catch (err) {

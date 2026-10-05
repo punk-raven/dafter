@@ -14,7 +14,9 @@ const guestView = {
 function guestsBlockedReason(config) {
   if (!config) return 'no session config';
   if (config.privacyMode && config.privacyMode !== 'open') return 'an end-to-end encrypted session takes no phone guests, because the SIP bridge decodes every frame';
-  if (!config.telephony || config.telephony.phoneGuests !== 'dial_out') return 'this session takes no phone guests; create it with Phone guests set to dial out';
+  const guests = config.telephony && config.telephony.phoneGuests;
+  if (guests === 'dial_in') return 'this session takes phone guests by dial-in only; create it with Phone guests set to dial out or both to call one';
+  if (!callsGuestsOut(guests)) return 'this session takes no phone guests; create it with Phone guests set to dial out or both';
   if (!config.telephony.trunk) return 'this tenant has no phone line to call guests in on';
   return '';
 }
@@ -108,7 +110,8 @@ function guestsSection() {
       <strong>Phone guests</strong>
       <span id="guests-count" class="guests-count"></span>
     </div>
-    <div class="guests-dial">
+    <div id="guests-dial-in" class="guests-dial-in" style="display:none"></div>
+    <div id="guests-dial-out" class="guests-dial">
       <input id="guests-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX" aria-label="Number to call (E.164)">
       <button id="guests-call-btn" class="guests-btn" type="button">Call</button>
     </div>
@@ -196,6 +199,7 @@ function watchGuests(room, data) {
   const { RoomEvent } = LivekitClient;
   Object.assign(guestView, { room, sessionId: data.sessionId, reason: guestsBlockedReason(data.config), busy: false, problem: '' });
   guestsSection().style.display = '';
+  showDialIn(data.dialIn, data.config && data.config.telephony && data.config.telephony.phoneGuests);
   const refresh = (participant) => { onGuestParticipant(participant); renderGuestControls(); };
   room.on(RoomEvent.ParticipantConnected, refresh);
   room.on(RoomEvent.ParticipantAttributesChanged, (changed, participant) => refresh(participant));
@@ -215,4 +219,5 @@ function stopGuests() {
   if (!section) return;
   section.style.display = 'none';
   document.getElementById('guests-to').value = '';
+  showDialIn(null, null);
 }

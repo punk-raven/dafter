@@ -23,7 +23,7 @@ function element(id, form) {
 function page({ search = '', answers, form = FORM }) {
   const elements = new Map();
   const calls = [];
-  const run = load('agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js', 'client-scribe.js');
+  const run = load('agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js', 'client-scribe.js', 'client-dialin.js');
   const global = run('globalThis');
   Object.assign(global, {
     document: {

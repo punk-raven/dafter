@@ -261,10 +261,24 @@
             <option value="on">on - live notes, scores and minutes</option>
           </select>
           <label>Phone guests</label>
-          <select id="phone-guests">
+          <select id="phone-guests" onchange="renderDialInFields()">
             <option value="" selected>off</option>
             <option value="dial_out">dial out - call phones into the meeting</option>
+            <option value="dial_in">dial in - phones call a meeting number</option>
+            <option value="both">both - call out and take dial-in</option>
           </select>
+          <div id="dial-in-fields" style="display:none">
+            <label>Caller check</label>
+            <select id="dial-in-check" onchange="renderDialInFields()">
+              <option value="pin" selected>pin - anyone with the meeting PIN</option>
+              <option value="pin_and_number">pin_and_number - the PIN from an allowed number</option>
+              <option value="number">number - an allowed number, no PIN</option>
+            </select>
+            <div id="dial-in-numbers-field" style="display:none">
+              <label>Allowed numbers</label>
+              <input id="dial-in-numbers" type="text" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX, +91XXXXXXXXXX" aria-label="Calling numbers allowed to dial in (E.164, comma separated)">
+            </div>
+          </div>
         </fieldset>
         <button id="btn-create" class="btn-create" onclick="createSession()">Create session only</button>
       </div>
@@ -380,6 +394,6 @@
 </div>
 
 <script src="/agent-llm.js"></script><script src="/agent-speech.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script>
+<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script><script src="/client-dialin.js"></script>
 </body>
 </html>

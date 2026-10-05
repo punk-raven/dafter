@@ -10,7 +10,7 @@ const advancedAt = html.indexOf('<details id="advanced"');
 const MAIN_SCREEN = ['language', 'llm', 'speech-toggles', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave'];
 const ADVANCED = [
   'tenant', 'channel', 'profile', 'privacy-mode', 'resolution', 'noise-cancellation', 'agent-mode',
-  'addressing-mode', 'agent-greeting', 'recording-layout', 'btn-create', 'room-id', 'role', 'ice-policy',
+  'addressing-mode', 'agent-greeting', 'recording-layout', 'phone-guests', 'dial-in-check', 'dial-in-numbers', 'btn-create', 'room-id', 'role', 'ice-policy',
   'btn-join', 'my-resolution', 'btn-record-start', 'btn-record-stop', 'agent-toggle', 'stats-panel', 'log',
 ];
 
