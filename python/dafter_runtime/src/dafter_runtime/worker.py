@@ -346,9 +346,7 @@ async def entrypoint(ctx: JobContext) -> None:
     delivery = Delivery(p.config.agent.speech, p.config.language)
     follow_language(switching, speech_plan, delivery, stages)
     called = (
-        Called(
-            ctx, p, stages, session, stt_sample_rate(p), switching, delivery.filler.hears, captions
-        )
+        Called(ctx, p, stages, session, stt_sample_rate(p), switching, delivery, captions)
         if p.called_by_name
         else None
     )
@@ -396,7 +394,7 @@ async def entrypoint(ctx: JobContext) -> None:
         room_options=room_options(p, stages.tts.sample_rate, captions),
         record=False,
     )
-    delivery.filler.start(session, stages.tts)
+    delivery.start(session, stages.tts)
     effective = configured(
         stages.llm, speech_plan, delivery.filler.enabled, p.config.turn.interruption.backchannel
     )

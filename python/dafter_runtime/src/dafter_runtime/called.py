@@ -5,6 +5,7 @@ import json
 import logging
 import time
 from collections.abc import Callable, Coroutine
+from functools import partial
 from typing import Any
 
 from livekit import rtc
@@ -15,9 +16,10 @@ from livekit.agents.voice.events import AgentStateChangedEvent
 
 from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
-from .backchannel import Acknowledgements, Filter, SessionFloor, acknowledged
+from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged
 from .barge_in import BargeIn, Resume, follow
 from .captions import Captions
+from .delivery import Delivery
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
@@ -76,6 +78,15 @@ def listening(p: Plan, stages: Stages) -> Callable[[], AgentSession[Any]]:
     return new_session
 
 
+def through(sieves: list[Filter]) -> Filter:
+    def apply(events: Events) -> Events:
+        for sieve in sieves:
+            events = sieve(events)
+        return events
+
+    return apply
+
+
 def command(data: bytes) -> str | None:
     try:
         message = json.loads(data)
@@ -96,11 +107,11 @@ class Called:
         session: AgentSession[Any],
         sample_rate: int,
         switching: Switching | None = None,
-        hears: Callable[[AgentSession[Any]], None] = lambda _: None,
+        delivery: Delivery | None = None,
         captions: Captions | None = None,
     ) -> None:
         self._ctx = ctx
-        self._hears = hears
+        self._delivery = delivery
         self._switching = switching if switching is not None and switching.enabled else None
         self._session = session
         self._captions = captions
@@ -135,20 +146,26 @@ class Called:
 
     def _listening(self, speaker: str, session: AgentSession[Any]) -> None:
         follow(self.barge_in, speaker, session)
-        self._hears(session)
+        if self._delivery is not None:
+            self._delivery.filler.hears(session)
         if self._captions is not None:
             self._captions.follow(speaker, session)
 
-    def _hearing(self, speaker: str) -> Filter:
-        sieve = acknowledged(
-            self._acknowledgements,
-            self._floor,
-            lambda: self.barge_in.acknowledged(speaker),
+    def _hearing(self, speaker: str, session: AgentSession[Any]) -> Filter:
+        sieves: list[Filter] = []
+        if self._delivery is not None:
+            echoed = partial(self.barge_in.echoing, speaker)
+            sieves.append(self._delivery.own_voice.hearing(session, echoed))
+        if self._switching is not None:
+            sieves.append(self._switching.observe(speaker))
+        sieves.append(
+            acknowledged(
+                self._acknowledgements,
+                self._floor,
+                lambda: self.barge_in.acknowledged(speaker),
+            )
         )
-        if self._switching is None:
-            return sieve
-        observe = self._switching.observe(speaker)
-        return lambda events: sieve(observe(events))
+        return through(sieves)
 
     def _spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.ensure_future(work)
@@ -207,4 +224,5 @@ __all__ = [
     "gate_for",
     "listening",
     "resume_for",
+    "through",
 ]

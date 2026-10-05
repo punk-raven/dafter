@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterable, Callable
+from functools import partial
 from typing import Any
 
 from dafter_core.enums import Role
@@ -13,13 +14,14 @@ from livekit.agents import llm as lk_llm
 from livekit.agents.voice.generation import update_instructions
 
 from .answering import Roster
-from .backchannel import Acknowledgements, Events, SessionFloor, acknowledged
+from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
 from .labels import unlabeled
 from .listeners import is_human
 from .naming import words
+from .own_voice import wait_for_words
 from .plan import Plan
 from .scribing import Scribing
 from .switching import Switching
@@ -48,6 +50,7 @@ class Answering(Agent):
         self._delivery = delivery
         self._switching = switching if switching is not None and switching.enabled else None
         self._floor: SessionFloor | None = None
+        self._ear: Filter | None = None
 
     def brief(self, context: str) -> None:
         self._context = context
@@ -62,6 +65,11 @@ class Answering(Agent):
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
     ) -> Events:
         events: Events = Agent.default.stt_node(self, audio, model_settings)
+        if self._delivery is not None:
+            if self._ear is None:
+                own_voice = self._delivery.own_voice
+                self._ear = own_voice.hearing(self.session, partial(wait_for_words, self.session))
+            events = self._ear(events)
         if self._switching is not None:
             events = self._switching.observe()(events)
         if self._floor is None:
@@ -85,6 +93,8 @@ class Answering(Agent):
     ) -> AsyncIterable[rtc.AudioFrame]:
         if self._delivery is not None and isinstance(voice := self.session.tts, Styled):
             voice.style(str(self._delivery.situation))
+        if self._delivery is not None:
+            text = self._delivery.own_voice.saying(text)
         reply = Agent.default.tts_node(self, text, model_settings)
         if self._delivery is None or not self._delivery.filler.enabled:
             return reply

@@ -148,6 +148,7 @@ def test_the_endpoint_and_the_gap_to_the_reply_are_layers_and_filler_turns_are_c
     assert by_worker["layers"]["endpointMs"] == {"n": 2, "p50": 675, "p95": 698}
     assert by_worker["layers"]["replyGapMs"] == {"n": 2, "p50": 1525, "p95": 1592}
     assert by_worker["fillerTurns"] == 1
+    assert by_worker["turns"] == 2
 
 
 def test_a_report_from_before_the_endpoint_layer_still_compares() -> None:
