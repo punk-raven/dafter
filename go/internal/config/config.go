@@ -236,6 +236,7 @@ type Recording struct {
 	Enabled           bool           `json:"enabled"`
 	Layout            EgressLayout   `json:"layout,omitempty"`
 	StartAt           RecordingStart `json:"startAt,omitempty"`
+	Tracks            bool           `json:"tracks,omitempty"`
 	RetentionClass    string         `json:"retentionClass,omitempty"`
 	ConsentArtifactID string         `json:"consentArtifactId,omitempty"`
 }

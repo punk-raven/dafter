@@ -53,3 +53,21 @@ func TestNewIDIsUnique(t *testing.T) {
 		seen[id] = struct{}{}
 	}
 }
+
+func TestFromDigestKeepsTheOpaqueShape(t *testing.T) {
+	t.Parallel()
+	digest := []byte{0x4b, 0x81, 0xe0, 0xd7, 0xff, 0x00}
+	id, err := ids.FromDigest(ids.PrefixParticipant, digest)
+	if err != nil {
+		t.Fatalf("FromDigest: %v", err)
+	}
+	if id != "p_4b81e0d7" {
+		t.Errorf("FromDigest = %q, want p_4b81e0d7", id)
+	}
+	if err := ids.ValidateID(ids.PrefixParticipant, id); err != nil {
+		t.Errorf("FromDigest produced %q which fails its own validator: %v", id, err)
+	}
+	if _, err := ids.FromDigest(ids.PrefixEvent, digest); err == nil {
+		t.Error("a digest shorter than the id was accepted")
+	}
+}

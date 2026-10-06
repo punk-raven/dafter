@@ -149,6 +149,7 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
 	mux.HandleFunc("POST /sessions/{sessionID}/minutes", s.storeMinutes)
 	mux.HandleFunc("GET /sessions/{sessionID}/minutes", s.readMinutes)
+	mux.HandleFunc("POST /livekit/webhook", s.mediaServerWebhook)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()

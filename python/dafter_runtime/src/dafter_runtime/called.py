@@ -8,6 +8,7 @@ from collections.abc import Callable, Coroutine
 from functools import partial
 from typing import Any
 
+from dafter_core.enums import AddressingMode
 from livekit import rtc
 from livekit.agents import AgentSession, JobContext
 from livekit.agents.llm import MetricsReport
@@ -45,6 +46,7 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         clock=loop.time,
         schedule=schedule,
         name=agent.name or "",
+        by_name=agent.addressing.mode is not AddressingMode.MANUAL,
     )
 
 

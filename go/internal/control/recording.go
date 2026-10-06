@@ -111,7 +111,7 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 		track = attributed(req.TrackID, owner)
 	}
 
-	stored, info, err := s.startEgress(r.Context(), sess, cfg, req, false, track)
+	stored, info, err := s.startEgress(r.Context(), sess, cfg, cfg.Recording.EffectiveLayout(), req, false, track)
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -122,8 +122,7 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, req startRecordingRequest, beforeFirstJoin bool, track state.Egress) (state.Egress, transport.EgressInfo, error) {
-	layout := cfg.Recording.EffectiveLayout()
+func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, layout config.EgressLayout, req startRecordingRequest, beforeFirstJoin bool, track state.Egress) (state.Egress, transport.EgressInfo, error) {
 	info, err := s.Transport.StartEgress(ctx, transport.EgressRequest{
 		Room:         sess.Room,
 		SessionID:    sess.SessionID,

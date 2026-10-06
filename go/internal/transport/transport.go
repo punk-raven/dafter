@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/config"
@@ -94,4 +95,5 @@ type Transport interface {
 	PlaceCall(context.Context, PhoneCall) (CallInfo, error)
 	HangUp(ctx context.Context, room, identity string) error
 	OpenRooms(ctx context.Context, rooms []string) (map[string]bool, error)
+	ReadWebhook(r *http.Request) (Webhook, error)
 }

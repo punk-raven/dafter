@@ -113,8 +113,8 @@
       "properties": {
         "mode": {
           "type": "string",
-          "description": "always: the agent is linked to one participant and answers every turn of theirs. transcript: every human in the call is transcribed separately by the session's STT provider, the agent stays dormant and silent until one of them says its name, answers that person, and goes dormant again after the follow-up window; this sends every human's speech to the STT provider, not only the speech meant for the agent. on_device: the name is spotted locally before any audio leaves the worker; declared so a document can ask for it, and refused by the worker as an unsupported capability until a spotter is built.",
-          "enum": ["always", "transcript", "on_device"],
+          "description": "always: the agent is linked to one participant and answers every turn of theirs. transcript: every human in the call is transcribed separately by the session's STT provider, the agent stays dormant and silent until one of them says its name, answers that person, and goes dormant again after the follow-up window; this sends every human's speech to the STT provider, not only the speech meant for the agent. manual: everyone is transcribed as in transcript and the agent stays dormant, but only the wake control wakes it, never a word it hears, so a name the recognizer mistakes never sets off a reply and the LLM runs only for someone who asked for it. on_device: the name is spotted locally before any audio leaves the worker; declared so a document can ask for it, and refused by the worker as an unsupported capability until a spotter is built.",
+          "enum": ["always", "transcript", "manual", "on_device"],
           "default": "always"
         },
         "aliases": {
@@ -432,6 +432,11 @@
           "type": "string",
           "enum": ["session_create", "first_publish"],
           "default": "first_publish"
+        },
+        "tracks": {
+          "type": "boolean",
+          "description": "Also record each voice in the call, every published audio track, to its own file beside the layout's recording, because one person's voice alone is what a transcript or an evaluation is made from. The control plane starts each one when the media server reports the track published, copying the published audio without transcoding, and keeps who it belongs to. Video stays in the layout's recording only: a separate file per camera costs the egress host a process per track.",
+          "default": false
         },
         "retentionClass": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
         "consentArtifactId": {

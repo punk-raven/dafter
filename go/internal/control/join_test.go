@@ -178,3 +178,50 @@ func TestAReturningJoinerRestartsTheRecordingOfAClosedRoom(t *testing.T) {
 		t.Errorf("want the ended recording settled and a new one running: %+v", view.Recordings)
 	}
 }
+
+func joinedAs(t *testing.T, h *harness, sessionID, body string) string {
+	t.Helper()
+	status, raw := h.join(t, sessionID, body)
+	if status != http.StatusOK {
+		t.Fatalf("join %s returned %d: %s", body, status, raw)
+	}
+	var joined sessionResponse
+	if err := json.Unmarshal(raw, &joined); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return joined.ParticipantID
+}
+
+func TestADeviceRejoinsUnderTheSameParticipant(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	first := h.create(t, request("en-IN", "webrtc"))
+	second := h.create(t, request("en-IN", "webrtc"))
+	const phone, laptop = `{"device":"dv_4b81e0d7a1c2f3e4b5a6c7d8"}`, `{"device":"dv_9c2e11aa0b1c2d3e4f5a6b7c"}`
+
+	again := joinedAs(t, h, first.SessionID, phone)
+	if got := joinedAs(t, h, first.SessionID, phone); got != again {
+		t.Errorf("the same device rejoined as %q, then %q; the media server keeps both", again, got)
+	}
+	if got := joinedAs(t, h, first.SessionID, laptop); got == again {
+		t.Errorf("two devices share participant %q", got)
+	}
+	if got := joinedAs(t, h, second.SessionID, phone); got == again {
+		t.Errorf("one device is %q in two sessions, so its participant id links them", got)
+	}
+	if h.transport.grant.Identity != joinedAs(t, h, first.SessionID, phone) {
+		t.Errorf("the token was minted for %q, not the device's participant", h.transport.grant.Identity)
+	}
+}
+
+func TestADeviceKeyThatCouldCarryAnythingIsRefused(t *testing.T) {
+	t.Parallel()
+	h := serve(t)
+	created := h.create(t, request("en-IN", "webrtc"))
+	for _, device := range []string{"short", "jane@example.com-and-more-text", strings.Repeat("a", 65)} {
+		status, raw := h.join(t, created.SessionID, `{"device":"`+device+`"}`)
+		if status != http.StatusBadRequest || !bytes.Contains(raw, []byte("/device")) {
+			t.Errorf("device %q: %d %s, want a 400 located at /device", device, status, raw)
+		}
+	}
+}

@@ -37,7 +37,7 @@ func (s *Service) resumeRecording(ctx context.Context, sess state.Session, cfg *
 			s.log().Warn("ended egress not settled", "session", sess.SessionID, "egress", e.EgressID, "error", err)
 		}
 	}
-	stored, _, err := s.startEgress(ctx, sess, cfg, startRecordingRequest{}, true, state.Egress{})
+	stored, _, err := s.startEgress(ctx, sess, cfg, cfg.Recording.EffectiveLayout(), startRecordingRequest{}, true, state.Egress{})
 	if err != nil {
 		s.log().Warn("recording not resumed for a returning joiner", "session", sess.SessionID, "error", err)
 		return

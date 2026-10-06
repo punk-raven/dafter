@@ -346,6 +346,7 @@ class Recording:
     enabled: bool
     layout: EgressLayout = EgressLayout.TRACK
     start_at: RecordingStart = RecordingStart.FIRST_PUBLISH
+    tracks: bool = False
     retention_class: str | None = None
     consent_artifact_id: str | None = None
 
@@ -355,6 +356,7 @@ class Recording:
             enabled=d["enabled"],
             layout=EgressLayout(d.get("layout", EgressLayout.TRACK)),
             start_at=RecordingStart(d.get("startAt", RecordingStart.FIRST_PUBLISH)),
+            tracks=d.get("tracks", False),
             retention_class=d.get("retentionClass"),
             consent_artifact_id=d.get("consentArtifactId"),
         )

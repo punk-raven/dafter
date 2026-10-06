@@ -1,0 +1,45 @@
+{
+  "event": "track_published",
+  "room": {
+    "sid": "RM_Fstxiwhrfrgj",
+    "name": "s_7f3a9c21",
+    "emptyTimeout": 300,
+    "departureTimeout": 20,
+    "maxParticipants": 10,
+    "creationTime": "1791310400",
+    "creationTimeMs": "1791310400123",
+    "numParticipants": 2,
+    "numPublishers": 2
+  },
+  "participant": {
+    "sid": "PA_7Gk3yQ2mVbLx",
+    "identity": "p_4b81e0d7",
+    "state": "ACTIVE",
+    "joinedAt": "1791310402",
+    "joinedAtMs": "1791310402456",
+    "version": 4,
+    "permission": {
+      "canSubscribe": true,
+      "canPublish": true,
+      "canPublishData": true
+    },
+    "isPublisher": true
+  },
+  "track": {
+    "sid": "TR_AMabc123",
+    "name": "microphone",
+    "source": "MICROPHONE",
+    "mimeType": "audio/red",
+    "mid": "1",
+    "stream": "camera",
+    "version": {
+      "unixMicro": "1791310403789000"
+    },
+    "audioFeatures": [
+      "TF_ECHO_CANCELLATION",
+      "TF_NOISE_SUPPRESSION"
+    ]
+  },
+  "id": "EV_9hWm2cTqZ4nP",
+  "createdAt": "1791310403"
+}

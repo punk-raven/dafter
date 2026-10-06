@@ -54,6 +54,8 @@ type stubTransport struct {
 
 	closed  map[string]bool
 	roomErr error
+
+	hook transport.Webhook
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {
@@ -165,6 +167,7 @@ func serve(t *testing.T) *harness {
 	svc := &control.Service{
 		Catalog: catalog, Store: store, Transport: tport, TokenTTL: 15 * time.Minute,
 		WorkerSecret: workerSecret, Trunks: transport.Trunks{"vobiz": carrierTrunk},
+		IdentityKey: []byte("identity-key-for-tests-only-32by"),
 	}
 	server := httptest.NewServer(svc.MetricsHandler())
 	t.Cleanup(server.Close)
