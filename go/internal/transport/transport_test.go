@@ -235,3 +235,23 @@ func TestTheAdapterRefusesAnUnusableConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestAPublicURLIsWhereJoinersAreSentWhileTheAPIStaysInternal(t *testing.T) {
+	t.Parallel()
+	lk, err := transport.NewLiveKit("ws://livekit:7880", apiKey, apiSecret, transport.WithPublicURL("wss://sfu.example.com"))
+	if err != nil {
+		t.Fatalf("construct adapter: %v", err)
+	}
+	tok, err := lk.MintToken(transport.Grant{Room: room, Identity: identity, Role: config.RoleParticipant})
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if tok.URL != "wss://sfu.example.com" {
+		t.Errorf("token carries url %q, want the public one", tok.URL)
+	}
+	for _, bad := range []string{"https://sfu.example.com", "sfu.example.com", "wss://"} {
+		if _, err := transport.NewLiveKit("ws://livekit:7880", apiKey, apiSecret, transport.WithPublicURL(bad)); err == nil {
+			t.Errorf("accepted public url %q", bad)
+		}
+	}
+}

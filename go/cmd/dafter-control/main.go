@@ -88,7 +88,7 @@ func run() error {
 		envOr("DAFTER_LIVEKIT_URL", "ws://127.0.0.1:7880"),
 		os.Getenv("DAFTER_LIVEKIT_API_KEY"),
 		os.Getenv("DAFTER_LIVEKIT_API_SECRET"),
-		egressOptions()...,
+		transportOptions()...,
 	)
 	if err != nil {
 		return fmt.Errorf("media transport: %w", err)
@@ -191,6 +191,15 @@ func run() error {
 		return err
 	}
 	return nil
+}
+
+func transportOptions() []transport.Option {
+	var opts []transport.Option
+	if public := os.Getenv("DAFTER_LIVEKIT_PUBLIC_URL"); public != "" {
+		slog.Info("joiners are sent to the public media server url", "url", public)
+		opts = append(opts, transport.WithPublicURL(public))
+	}
+	return append(opts, egressOptions()...)
 }
 
 func egressOptions() []transport.Option {
