@@ -13,7 +13,7 @@ services:
     profiles: ["minio"]
 
   livekit:
-    command: --config /etc/livekit.yaml --node-ip ${LIVEKIT_NODE_IP:?set LIVEKIT_NODE_IP to the Elastic IP}
+    command: --node-ip ${LIVEKIT_NODE_IP:?set LIVEKIT_NODE_IP to the Elastic IP}
     ports: !override
       - "127.0.0.1:7880:7880"
       - "7881:7881"
@@ -21,8 +21,28 @@ services:
       - "127.0.0.1:6789:6789"
     environment:
       LIVEKIT_KEYS: "${DAFTER_LIVEKIT_API_KEY:?}: ${DAFTER_LIVEKIT_API_SECRET:?}"
-    volumes: !override
-      - ./deploy/aws/livekit.yaml:/etc/livekit.yaml:ro
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          udp_port: 7882
+          tcp_port: 7881
+          use_external_ip: false
+        redis:
+          address: redis:6379
+        prometheus:
+          port: 6789
+        logging:
+          level: info
+          json: false
+        room:
+          empty_timeout: 300
+          departure_timeout: 20
+          max_participants: 10
+        webhook:
+          api_key: ${DAFTER_LIVEKIT_API_KEY:?}
+          urls:
+            - http://control:8080/livekit/webhook
+    volumes: !reset []
     restart: *restart
 
   control:
@@ -56,13 +76,13 @@ services:
         log_level: info
         cpu_cost:
           max_cpu_utilization: 0.9
-          room_composite_cpu_cost: 1.5
+          room_composite_cpu_cost: 1.0
           audio_room_composite_cpu_cost: 0.5
           web_cpu_cost: 1.5
           audio_web_cpu_cost: 0.5
           participant_cpu_cost: 1.0
           track_composite_cpu_cost: 1.0
-          track_cpu_cost: 0.5
+          track_cpu_cost: 0.1
     volumes: !reset []
     depends_on: !override
       livekit:
@@ -87,14 +107,13 @@ services:
     volumes: !reset []
 
   agent:
-    profiles: ["agents"]
     environment:
       LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
       DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:?}
 
   scribe:
-    profiles: ["agents"]
+    profiles: ["scribe"]
     environment:
       LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}

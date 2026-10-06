@@ -8,6 +8,11 @@
   "telephony": {
     "trunk": "vobiz"
   },
+  "agent": {
+    "addressing": {
+      "mode": "manual"
+    }
+  },
   "media": {
     "audio": {
       "noiseCancellation": "rnnoise"
@@ -17,6 +22,11 @@
     "enabled": true,
     "layout": "room_composite",
     "startAt": "session_create",
-    "consentArtifactId": "consent_recording_notice_v1"
+    "tracks": true,
+    "consentArtifactId": "consent_recording_notice_v2"
+  },
+  "transcription": {
+    "mode": "live",
+    "consentArtifactId": "consent_transcription_notice_v1"
   }
 }

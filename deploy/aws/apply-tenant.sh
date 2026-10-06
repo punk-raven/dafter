@@ -12,5 +12,6 @@ call() {
 }
 
 call -X PUT -H 'Content-Type: application/json' --data-binary "@${document}" "${admin}/admin/v1/tenants/${tenant}" >/dev/null
-call -X POST -H "X-Dafter-Note: deploy/aws tenant defaults from ${document}" "${admin}/admin/v1/releases"
+call -X PUT -H 'Content-Type: application/json' --data-binary @deploy/aws/channel-webrtc.json "${admin}/admin/v1/channels/webrtc" >/dev/null
+call -X POST -H "X-Dafter-Note: deploy/aws tenant defaults from ${document} and the web channel overlay" "${admin}/admin/v1/releases"
 echo
