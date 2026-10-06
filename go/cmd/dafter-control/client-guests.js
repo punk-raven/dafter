@@ -58,7 +58,7 @@ function renderGuest(guest) {
   const tile = guestTile(guest);
   tile.dataset.state = guest.state;
   tile.querySelector('.guest-state-text').textContent = GUEST_STATES[guest.state];
-  tile.querySelector('.label').textContent = `Phone guest ${guest.number} · ${guest.identity}`;
+  tile.querySelector('.label').textContent = `Phone guest ${guest.number}`;
   const button = tile.querySelector('.guest-hangup');
   button.style.display = guest.state === 'hangup' ? 'none' : '';
   button.disabled = guest.busy;

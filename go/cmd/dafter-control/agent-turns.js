@@ -104,7 +104,7 @@ function transcriptSpeaker(room, identity) {
   if (identity === room.localParticipant.identity) return { who: 'you', label: 'You' };
   const p = room.remoteParticipants.get(identity);
   if (p && p.isAgent) return { who: 'agent', label: p.name || 'Agent' };
-  return { who: 'peer', label: identity };
+  return { who: 'peer', label: nameOf(identity, room), identity };
 }
 
 function transcriptLine(segmentId, speaker) {
@@ -117,6 +117,7 @@ function transcriptLine(segmentId, speaker) {
   line.className = `agent-line agent-line-${speaker.who} agent-interim`;
   line.innerHTML = '<span class="agent-who"></span><span class="agent-text"></span><span class="agent-tag">interim</span>';
   line.querySelector('.agent-who').textContent = speaker.label;
+  if (speaker.who === 'peer') line.querySelector('.agent-who').dataset.speaker = speaker.identity;
   box.appendChild(line);
   agentTurns.lines.set(segmentId, line);
   return line;

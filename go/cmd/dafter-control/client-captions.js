@@ -33,6 +33,11 @@ function transcriptionModeOf(config) {
   return (config && config.transcription && config.transcription.mode) || 'off';
 }
 
+function captionsLive(config) {
+  const mode = transcriptionModeOf(config);
+  return mode === 'live' || mode === 'both';
+}
+
 function transcriptionBadge() {
   let badge = document.getElementById('transcription-badge');
   if (badge) return badge;
@@ -63,7 +68,7 @@ function captionPanel() {
   panel.id = 'caption-panel';
   panel.className = 'caption-panel';
   panel.innerHTML = `
-    <div class="caption-head"><strong>Captions</strong><span class="caption-hint">live, not the record · interim in italics</span></div>
+    <div class="caption-head"><strong>Live transcript</strong><span class="caption-hint">everyone, as it is spoken · interim in italics</span></div>
     <div id="caption-lines" class="caption-lines"><div class="caption-empty">what anyone says shows here, labelled by who said it</div></div>`;
   document.getElementById('transcripts').prepend(panel);
   return panel;
@@ -75,7 +80,7 @@ function captionSpeaker(speaker) {
     return { who: 'agent', label: (agent && agent.name) || 'Agent', identity: null };
   }
   const local = captionView.room && captionView.room.localParticipant.identity === speaker.participantId;
-  return { who: local ? 'you' : 'peer', label: local ? 'You' : speaker.participantId, identity: speaker.participantId };
+  return { who: local ? 'you' : 'peer', label: local ? 'You' : nameOf(speaker.participantId, captionView.room), identity: speaker.participantId };
 }
 
 function captionLine(segmentId, speaker) {
@@ -89,6 +94,7 @@ function captionLine(segmentId, speaker) {
   line.innerHTML = '<span class="caption-who"></span><span class="caption-text"></span>';
   line.querySelector('.caption-who').textContent = speaker.label;
   line.querySelector('.caption-who').title = speaker.identity || 'the session\'s agent';
+  if (speaker.who === 'peer') line.querySelector('.caption-who').dataset.speaker = speaker.identity;
   box.appendChild(line);
   captionView.lines.set(segmentId, line);
   return line;
@@ -141,9 +147,8 @@ function watchCaptions(room, data) {
   captionView.room = room;
   captionView.mode = transcriptionModeOf(data.config);
   renderTranscriptionBadge(captionView.mode);
-  const live = captionView.mode === 'live' || captionView.mode === 'both';
   const panel = captionPanel();
-  panel.style.display = live ? '' : 'none';
+  panel.style.display = captionsLive(data.config) ? '' : 'none';
   if (captionView.mode !== 'off') log(`This call is transcribed: ${TRANSCRIPTION_LABELS[captionView.mode]}`, 'warn');
 }
 

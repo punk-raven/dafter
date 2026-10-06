@@ -1,9 +1,28 @@
-const NAME_TOPIC = 'dafter.name';
 const NAME_KEY = 'dafter.displayName';
-const MAX_NAME = 40;
+const DEVICE_KEY = 'dafter.device';
+const DUPLICATE_IDENTITY = 2;
 
 let lobbyConsent = null;
-const displayNames = new Map();
+let pageDevice = null;
+
+function freshDevice() {
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function deviceKey() {
+  try {
+    let key = localStorage.getItem(DEVICE_KEY);
+    if (!key || !/^[A-Za-z0-9_-]{22,64}$/.test(key)) {
+      key = freshDevice();
+      localStorage.setItem(DEVICE_KEY, key);
+    }
+    return key;
+  } catch (err) {
+    pageDevice = pageDevice || freshDevice();
+    return pageDevice;
+  }
+}
 
 function storedName() {
   try {
@@ -21,10 +40,6 @@ function rememberName(name) {
   }
 }
 
-function cleanName(value) {
-  return String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_NAME);
-}
-
 function myName() {
   return cleanName(document.getElementById('display-name').value);
 }
@@ -33,12 +48,26 @@ function recordingOf(config) {
   return (config && config.recording) || {};
 }
 
+function noticeText(transcribed) {
+  return transcribed
+    ? ['This call is recorded and transcribed.', 'Everyone\'s voice and video is recorded and kept, the whole call and each person on their own, and what everyone says is written down as it is spoken.']
+    : ['This call is being recorded.', 'Everyone\'s voice and video is recorded and kept, the whole call and each person on their own.'];
+}
+
 function showLobby(view) {
   const recorded = Boolean(view.recorded);
   lastRoomId = view.room || null;
   lobbyConsent = recorded ? view.consentArtifactId : null;
   document.getElementById('lobby-title').textContent = view.room ? 'Join the call' : 'Start a call';
+  const [what, detail] = noticeText(Boolean(view.transcribed));
+  document.getElementById('notice-what').textContent = what;
+  document.getElementById('notice-detail').textContent = detail;
   document.getElementById('recording-notice').hidden = !recorded;
+  const language = document.getElementById('language');
+  if (view.language) language.value = view.language;
+  language.disabled = Boolean(view.room);
+  language.title = view.room ? 'The call\'s language is chosen by whoever started it' : '';
+  document.getElementById('lobby-create').hidden = Boolean(view.room);
   document.getElementById('lobby-share').hidden = !view.room;
   if (view.room) document.getElementById('lobby-link').value = joinLink(view.room);
   document.getElementById('btn-start').textContent = view.room ? 'Join call' : 'Start a call';
@@ -47,7 +76,11 @@ function showLobby(view) {
 
 function lobbyForSession(room, config) {
   const rec = recordingOf(config);
-  showLobby({ room, recorded: rec.enabled, consentArtifactId: rec.consentArtifactId });
+  const transcription = (config && config.transcription && config.transcription.mode) || 'off';
+  showLobby({
+    room, recorded: rec.enabled, consentArtifactId: rec.consentArtifactId,
+    transcribed: transcription !== 'off', language: config && config.language,
+  });
   if (window.history && window.history.replaceState) window.history.replaceState(null, '', `?room=${room}`);
 }
 
@@ -71,6 +104,7 @@ async function openRoomLobby(room) {
 async function lobbyAction() {
   const btn = document.getElementById('btn-start');
   rememberName(myName());
+  document.getElementById('lobby-error').textContent = '';
   btn.disabled = true;
   try {
     if (lastRoomId) {
@@ -90,54 +124,16 @@ function showRecordingIndicator(config) {
   document.getElementById('rec-banner').hidden = !on;
 }
 
-function nameOf(identity) {
-  return displayNames.get(identity) || 'Guest';
-}
-
-function relabel(identity) {
-  const tile = document.getElementById(`tile-${identity}-video`);
-  const label = tile && tile.querySelector('.label');
-  if (label) label.textContent = tileLabel(identity, room && identity === room.localParticipant.identity);
-}
-
-function tileLabel(identity, isLocal) {
-  return `${nameOf(identity)}${isLocal ? ' (you)' : ''}`;
-}
-
-function announceName(target, to) {
-  const name = myName();
-  if (!target || !name) return;
-  const payload = new TextEncoder().encode(JSON.stringify({ name }));
-  const options = { reliable: true, topic: NAME_TOPIC };
-  if (to) options.destinationIdentities = to;
-  target.localParticipant.publishData(payload, options).catch((err) => log(`Name not shared: ${err.message}`, 'warn'));
-}
-
-function watchNames(target) {
-  displayNames.clear();
-  target.on(RoomEvent.DataReceived, (payload, participant, kind, topic) => {
-    if (topic !== NAME_TOPIC || !participant) return;
-    try {
-      const name = cleanName(JSON.parse(new TextDecoder().decode(payload)).name);
-      if (!name) return;
-      displayNames.set(participant.identity, name);
-      relabel(participant.identity);
-    } catch (err) {
-      log(`Unreadable name from ${participant.identity}`, 'warn');
-    }
-  });
-  target.on(RoomEvent.ParticipantConnected, (participant) => announceName(target, [participant.identity]));
-}
-
-function nameJoined(target) {
-  const name = myName();
-  if (name) displayNames.set(target.localParticipant.identity, name);
-  relabel(target.localParticipant.identity);
-  announceName(target);
+function leftForAnotherTab(reason) {
+  if (reason !== DUPLICATE_IDENTITY) return false;
+  document.getElementById('lobby-error').textContent = 'You joined this call again from another tab or window, so it carries on there.';
+  return true;
 }
 
 (function seedLobby() {
   document.getElementById('display-name').value = storedName();
+  renderDialInFields();
+  watchTileLayout();
   const roomParam = new URLSearchParams(window.location.search).get('room');
   if (!roomParam) {
     showLobby({});

@@ -5,10 +5,12 @@ import { load } from './harness.mjs';
 
 const ORIGIN = 'http://127.0.0.1:8080';
 const ROOM = 's_1a2b3c4d';
+const DEVICE = 'dv_4b81e0d7a1c2f3e4b5a6c7d8';
 
 const FORM = {
   tenant: 't_9c21a4be', language: 'hi', llm: 'groq/qwen/qwen3.8-27b', channel: 'webrtc', profile: '',
   resolution: '', 'noise-cancellation': '', 'privacy-mode': '', 'agent-mode': '',
+  'agent-on': true, 'phone-guests': '', 'dial-in-check': 'pin',
   'addressing-mode': '', 'agent-greeting': '', 'recording-layout': '', 'transcription-mode': '', 'scribe-mode': '', role: 'participant',
   'speech-fillers': false, 'speech-backchannel': true, 'speech-normalization': true,
 };
@@ -23,7 +25,7 @@ function element(id, form) {
 function page({ search = '', answers, form = FORM }) {
   const elements = new Map();
   const calls = [];
-  const run = load('agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js', 'client-scribe.js', 'client-dialin.js');
+  const run = load('client-names.js', 'agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js', 'client-scribe.js', 'client-dialin.js');
   const global = run('globalThis');
   Object.assign(global, {
     document: {
@@ -35,9 +37,11 @@ function page({ search = '', answers, form = FORM }) {
     },
     window: { location: { origin: ORIGIN, search, hostname: '127.0.0.1' } },
     URLSearchParams,
+    localStorage: { getItem: (key) => (key === 'dafter.device' ? DEVICE : null), setItem() {} },
     log: () => {},
     showResponse: () => {},
     fillNoiseFilterChoices: () => {},
+    watchTileLayout: () => {},
     async fetch(url, init) {
       calls.push(init ? { url, body: JSON.parse(init.body) } : { url });
       const [status, data] = answers[url];
@@ -61,12 +65,13 @@ test('Start a call creates an unrecorded session and joins it in one click', asy
   assert.deepEqual(calls.map((c) => c.url), ['/sessions', `/sessions/${ROOM}/join`]);
   assert.equal(calls[0].body.language, 'hi');
   assert.equal(calls[0].body.llm, 'groq/qwen/qwen3.8-27b');
+  assert.equal(calls[0].body.device, DEVICE);
   assert.deepEqual(calls[0].body.overrides, {
-    agent: { speech: { fillers: { enabled: false }, normalization: 'platform' } },
+    agent: { enabled: true, speech: { fillers: { enabled: false }, normalization: 'platform' } },
     turn: { interruption: { backchannel: { enabled: true } } },
   });
   assert.equal(calls[0].body.profile, undefined);
-  assert.deepEqual(calls[1].body, { role: 'participant' });
+  assert.deepEqual(calls[1].body, { role: 'participant', device: DEVICE });
   assert.equal(elements.get('btn-start').disabled, false);
 });
 
@@ -98,7 +103,7 @@ test('a recorded session stops at its notice, and joining sends the consent arti
   assert.equal(elements.get('btn-start').textContent, 'Join call');
   assert.equal(elements.get('lobby-link').value, `${ORIGIN}/?room=${ROOM}`);
   await run('lobbyAction()');
-  assert.deepEqual(calls[1], { url: `/sessions/${ROOM}/join`, body: { role: 'participant', recordingConsent: 'consent_notice_v1' } });
+  assert.deepEqual(calls[1], { url: `/sessions/${ROOM}/join`, body: { role: 'participant', device: DEVICE, recordingConsent: 'consent_notice_v1' } });
 });
 
 test('the join link opens that room at its notice and never creates a session', async () => {
@@ -140,4 +145,30 @@ test('a call without an agent hides the agent panel unless phone guests need it'
   assert.equal(run("agentQuiet({ agent: { enabled: false } })"), true);
   assert.equal(run("agentQuiet({ agent: { enabled: false }, telephony: { phoneGuests: 'dial_in' } })"), false);
   assert.equal(run("agentQuiet({ agent: { enabled: true } })"), false);
+});
+
+test('a join link shows the call\'s own language and what is kept, and hides the choices only its starter makes', async () => {
+  const config = { ...RECORDED, language: 'kn-IN', transcription: { mode: 'live', consentArtifactId: 'consent_transcription_v1' } };
+  const answers = { [`/sessions/${ROOM}`]: [200, { sessionId: ROOM, room: ROOM, config }] };
+  const { elements } = page({ search: `?room=${ROOM}`, answers });
+  await settled();
+  assert.equal(elements.get('language').value, 'kn-IN');
+  assert.equal(elements.get('language').disabled, true);
+  assert.equal(elements.get('lobby-create').hidden, true);
+  assert.equal(elements.get('notice-what').textContent, 'This call is recorded and transcribed.');
+  assert.match(elements.get('notice-detail').textContent, /each person on their own/);
+});
+
+test('a new call offers its language and choices, and an unrecorded one shows no notice', () => {
+  const { elements } = page({ answers: {} });
+  assert.equal(elements.get('language').disabled, false);
+  assert.equal(elements.get('lobby-create').hidden, false);
+  assert.equal(elements.get('recording-notice').hidden, true);
+});
+
+test('a call started without the agent asks for no transcription, because only the agent transcribes', async () => {
+  const { run, calls } = page({ form: { ...FORM, 'agent-on': false }, answers: { '/sessions': [400, { code: 'invalid_config', message: 'bad' }] } });
+  await run('startCall()');
+  assert.equal(calls[0].body.overrides.agent.enabled, false);
+  assert.deepEqual(calls[0].body.overrides.transcription, { mode: 'off' });
 });

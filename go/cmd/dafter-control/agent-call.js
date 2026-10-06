@@ -25,7 +25,7 @@ function showAgentTile(participant) {
     <div class="agent-tile-state"><span class="agent-dot"></span><span class="agent-state-text">joining</span></div>
     <button class="agent-unlock" type="button" style="display:none">Click to hear the agent</button>
     <span class="label"></span>`;
-  tile.querySelector('.label').textContent = `${participant.name || 'Agent'} · ${participant.identity}`;
+  tile.querySelector('.label').textContent = participant.name || 'Agent';
   tile.querySelector('.agent-unlock').addEventListener('click', unlockAgentAudio);
   const grid = document.getElementById('video-grid');
   grid.insertBefore(tile, grid.firstChild);

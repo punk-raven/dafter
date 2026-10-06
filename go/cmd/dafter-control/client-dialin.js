@@ -21,8 +21,7 @@ function renderDialInFields() {
   const guests = document.getElementById('phone-guests').value;
   const check = document.getElementById('dial-in-check').value;
   document.getElementById('dial-in-fields').style.display = takesDialIn(guests) ? '' : 'none';
-  const agent = document.getElementById('agent-mode');
-  if (guests && agent.value === 'off') agent.value = '';
+  if (guests) document.getElementById('agent-on').checked = true;
   document.getElementById('dial-in-numbers-field').style.display = takesDialIn(guests) && NUMBER_CHECKS.includes(check) ? '' : 'none';
 }
 

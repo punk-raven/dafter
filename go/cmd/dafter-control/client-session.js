@@ -4,6 +4,7 @@ function sessionRequest() {
     language: document.getElementById('language').value,
     channel: document.getElementById('channel').value,
     llm: chosenLlm(),
+    device: deviceKey(),
   };
   const profile = document.getElementById('profile').value.trim();
   if (profile) body.profile = profile;
@@ -37,7 +38,7 @@ function sessionRequest() {
     body.overrides = body.overrides || {};
     body.overrides.recording = { enabled: true, layout, consentArtifactId: 'consent_testclient' };
   }
-  const transcription = transcriptionOverride();
+  const transcription = transcriptionOverride() || (agent && !agent.enabled ? 'off' : null);
   if (transcription) applyTranscriptionOverride(body, transcription);
   if (scribeOverride()) applyScribeOverride(body);
   const phoneGuests = document.getElementById('phone-guests').value;
@@ -77,7 +78,9 @@ async function createSession() {
     showResponse(data);
 
     if (!resp.ok) {
-      log(`Create failed: ${data.code} - ${data.message}`, 'error');
+      const details = (data.details || []).join('; ');
+      log(`Create failed: ${data.code} - ${data.message}${details ? ` (${details})` : ''}`, 'error');
+      document.getElementById('lobby-error').textContent = `Could not start the call: ${details || data.message}`;
       btn.disabled = false;
       return null;
     }
@@ -105,7 +108,7 @@ async function joinRoom() {
 
   try {
     log(`Joining room ${roomId}...`);
-    const joinBody = { role: document.getElementById('role').value };
+    const joinBody = { role: document.getElementById('role').value, device: deviceKey() };
     if (lobbyConsent && roomId === lastRoomId) joinBody.recordingConsent = lobbyConsent;
     const resp = await fetch(`/sessions/${roomId}/join`, {
       method: 'POST',
@@ -202,6 +205,7 @@ async function joinRoom() {
       log(`Disconnected: ${reason || 'unknown'}`, 'warn');
       setBadge('disconnected');
       cleanup();
+      leftForAnotherTab(reason);
     });
 
     const rtcConfig = { iceTransportPolicy: icePolicy };

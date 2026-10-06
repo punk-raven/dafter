@@ -7,10 +7,12 @@ const html = readFileSync(new URL('testclient.html', dir), 'utf8');
 const scripts = readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8'));
 const advancedAt = html.indexOf('<details id="advanced"');
 
-const MAIN_SCREEN = ['display-name', 'recording-notice', 'lobby-link', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave'];
+const MAIN_SCREEN = [
+  'display-name', 'language', 'phone-guests', 'agent-on', 'recording-notice', 'lobby-link', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave',
+];
 const ADVANCED = [
-  'language', 'llm', 'speech-toggles', 'phone-to', 'btn-call', 'tenant', 'channel', 'profile', 'privacy-mode', 'resolution', 'noise-cancellation', 'agent-mode',
-  'addressing-mode', 'agent-greeting', 'recording-layout', 'phone-guests', 'dial-in-check', 'dial-in-numbers', 'btn-create', 'room-id', 'role', 'ice-policy',
+  'llm', 'speech-toggles', 'phone-to', 'btn-call', 'tenant', 'channel', 'profile', 'privacy-mode', 'resolution', 'noise-cancellation',
+  'addressing-mode', 'agent-greeting', 'recording-layout', 'dial-in-check', 'dial-in-numbers', 'btn-create', 'room-id', 'role', 'ice-policy',
   'btn-join', 'my-resolution', 'btn-record-start', 'btn-record-stop', 'agent-toggle', 'stats-panel', 'log',
 ];
 
@@ -32,14 +34,15 @@ test('the main screen holds only the call, everything else sits under Advanced',
   assert.ok(html.indexOf('onclick="copyJoinLink(this)"') < advancedAt, 'Copy join link belongs on the main screen');
 });
 
-test('a session without an agent is the default, so a plain call has no one listening in', () => {
-  const select = html.slice(position('agent-mode'), html.indexOf('</select>', position('agent-mode')));
-  assert.match(select, /<option value="off" selected>/);
+test('a new call has the agent in it and takes phones both ways unless the starter says otherwise', () => {
+  assert.match(html, /<input id="agent-on" type="checkbox" checked>/);
+  const select = html.slice(position('phone-guests'), html.indexOf('</select>', position('phone-guests')));
+  assert.match(select, /<option value="both" selected>/);
   assert.equal(select.split(' selected').length, 2);
 });
 
 test('the recording notice is shown on the join screen and as a banner during the call', () => {
-  assert.match(html, /id="recording-notice"[^>]*hidden>.*This call is being recorded\..*By joining you agree to be recorded\./);
+  assert.match(html, /id="recording-notice"[^>]*hidden>.*This call is being recorded\..*By joining you agree to this\./);
   assert.match(html, /id="rec-banner"[^>]*hidden>.*This call is being recorded</);
   assert.match(html, /id="rec-badge"[^>]*hidden>/);
 });

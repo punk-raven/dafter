@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/admin"
@@ -89,4 +94,25 @@ func sessionKeyCipher() (*state.KeyCipher, error) {
 		return nil, fmt.Errorf("DAFTER_STATE_KEY: %w", err)
 	}
 	return keys, nil
+}
+
+const identityKeyLabel = "dafter participant identity v1"
+
+func participantIdentityKey() ([]byte, error) {
+	encoded := os.Getenv("DAFTER_STATE_KEY")
+	if encoded == "" {
+		slog.Warn("DAFTER_STATE_KEY is not set: a device is given a new participant id after every restart")
+		key := make([]byte, sha256.Size)
+		if _, err := rand.Read(key); err != nil {
+			return nil, fmt.Errorf("mint participant identity key: %w", err)
+		}
+		return key, nil
+	}
+	secret, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("DAFTER_STATE_KEY: %w", err)
+	}
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(identityKeyLabel))
+	return mac.Sum(nil), nil
 }

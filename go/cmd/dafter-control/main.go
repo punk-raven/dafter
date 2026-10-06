@@ -36,7 +36,7 @@ var testClientHTML []byte
 //go:embed client-scribe.js scribe.css
 //go:embed client-phone.js phone.css
 //go:embed client-guests.js client-dialin.js guests.css
-//go:embed client-lobby.js
+//go:embed client-lobby.js client-names.js client-layout.js favicon.svg
 var clientAssets embed.FS
 
 var clientAssetPaths = map[string]string{
@@ -64,6 +64,10 @@ var clientAssetPaths = map[string]string{
 	"/client-dialin.js":    "client-dialin.js",
 	"/guests.css":          "guests.css",
 	"/client-lobby.js":     "client-lobby.js",
+	"/client-names.js":     "client-names.js",
+	"/client-layout.js":    "client-layout.js",
+	"/favicon.svg":         "favicon.svg",
+	"/favicon.ico":         "favicon.svg",
 }
 
 const dialInSweep = 30 * time.Second
@@ -145,27 +149,28 @@ func run() error {
 	}
 	defer configs.close()
 
+	identityKey, err := participantIdentityKey()
+	if err != nil {
+		return err
+	}
 	svc := &control.Service{
 		Catalog: configs.live, Store: store, Transport: lk, TURN: turnFetcher, TokenTTL: *ttl,
-		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"), Trunks: trunks,
+		WorkerSecret: os.Getenv("DAFTER_WORKER_SECRET"), Trunks: trunks, IdentityKey: identityKey,
 	}
 	if svc.WorkerSecret == "" {
 		slog.Info("worker calls disabled: DAFTER_WORKER_SECRET is not set, so no agent can join an end-to-end session")
 	}
+	page, err := versionedClientPage()
+	if err != nil {
+		return err
+	}
+	client := serveClient(page)
 	handler := svc.MetricsHandler()
 	metricsHandler := promhttp.Handler()
 	server := &http.Server{
 		Addr: *addr,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodGet && r.URL.Path == "/" {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				if _, err := w.Write(testClientHTML); err != nil {
-					slog.Error("write test client", "error", err)
-				}
-				return
-			}
-			if name, ok := clientAssetPaths[r.URL.Path]; ok && r.Method == http.MethodGet {
-				http.ServeFileFS(w, r, clientAssets, name)
+			if client(w, r) {
 				return
 			}
 			if r.Method == http.MethodGet && r.URL.Path == "/metrics" {
