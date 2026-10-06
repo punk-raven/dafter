@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/config"
@@ -32,8 +33,9 @@ type Service struct {
 	Log       *slog.Logger
 	Trunks    transport.Trunks
 
-	held    heldCalls
-	prompts pinPrompts
+	held        heldCalls
+	prompts     pinPrompts
+	recordingMu sync.Mutex
 
 	WorkerSecret string
 }
@@ -270,7 +272,16 @@ func (s *Service) dispatchAgent(ctx context.Context, sess state.Session, cfg *co
 }
 
 type joinSessionRequest struct {
-	Role config.Role `json:"role,omitempty"`
+	Role             config.Role `json:"role,omitempty"`
+	RecordingConsent string      `json:"recordingConsent,omitempty"`
+}
+
+func consentToRecording(cfg *config.ResolvedSessionConfig, given string) error {
+	if !cfg.Recording.Enabled || given == cfg.Recording.ConsentArtifactID {
+		return nil
+	}
+	return located(errs.CodeConsentRequired, "/recordingConsent",
+		"this session is recorded; a joiner names the consent artifact it was shown before it is let in")
 }
 
 func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
@@ -301,6 +312,11 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = config.RoleParticipant
 	}
+	if err := consentToRecording(cfg, req.RecordingConsent); err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.resumeRecording(r.Context(), sess, cfg)
 
 	participantID, err := ids.NewID(ids.PrefixParticipant)
 	if err != nil {
