@@ -1,13 +1,16 @@
 async function startCall() {
   const btn = document.getElementById('btn-start');
   btn.disabled = true;
-  const roomId = await createSession();
-  if (roomId) await joinRoom();
+  const created = await createSession();
+  if (created) {
+    lobbyForSession(created.room, created.config);
+    if (!recordingOf(created.config).enabled) await joinRoom();
+  }
   btn.disabled = false;
 }
 
 function joinLink(roomId) {
-  return `${window.location.origin}?room=${roomId}`;
+  return `${window.location.origin}/?room=${roomId}`;
 }
 
 function copyJoinLink(btn) {

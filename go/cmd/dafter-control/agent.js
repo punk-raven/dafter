@@ -78,6 +78,11 @@ function agentPanel() {
   return panel;
 }
 
+function agentQuiet(config) {
+  const guests = config && config.telephony && config.telephony.phoneGuests;
+  return agentBlockedReason(config) !== '' && !guests;
+}
+
 function agentBlockedReason(config) {
   if (!config) return 'no session config';
   if (config.privacyMode === 'sealed') return 'sealed sessions never have an agent';
@@ -200,9 +205,10 @@ function watchAgent(room, data) {
   agentView.config = data.config;
   agentView.state = null;
   resetAgentAddressing();
-  agentPanel().style.display = '';
+  const quiet = agentQuiet(data.config);
+  agentPanel().style.display = quiet ? 'none' : '';
   document.getElementById('agent-title').textContent = (data.config && data.config.agent && data.config.agent.name) || 'Agent';
-  document.getElementById('agent-transcript').style.display = '';
+  document.getElementById('agent-transcript').style.display = quiet ? 'none' : '';
   resetAgentTurns();
   agentView.effective = null;
   renderAgentLlm(data.config, []);

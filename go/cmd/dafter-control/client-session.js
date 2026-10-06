@@ -54,7 +54,7 @@ function showCreatedSession(data) {
   log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
   if (data.agentDispatchId) log(`Agent dispatched to ${data.config.agent.pool} (${data.agentDispatchId}); join to talk to it`, 'success');
 
-  const joinUrl = `${window.location.origin}?room=${data.room}`;
+  const joinUrl = joinLink(data.room);
   document.getElementById('created-room-id').textContent = data.room;
   document.getElementById('join-link').value = joinUrl;
   document.getElementById('session-created-info').style.display = 'block';
@@ -85,7 +85,7 @@ async function createSession() {
     showCreatedSession(data);
     await allowDialInNumbers(data);
     btn.disabled = false;
-    return data.room;
+    return data;
   } catch (err) {
     log(`Error: ${err.message}`, 'error');
   }
@@ -105,10 +105,12 @@ async function joinRoom() {
 
   try {
     log(`Joining room ${roomId}...`);
+    const joinBody = { role: document.getElementById('role').value };
+    if (lobbyConsent && roomId === lastRoomId) joinBody.recordingConsent = lobbyConsent;
     const resp = await fetch(`/sessions/${roomId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: document.getElementById('role').value }),
+      body: JSON.stringify(joinBody),
     });
     const data = await resp.json();
     showResponse(data);
@@ -116,6 +118,8 @@ async function joinRoom() {
     if (!resp.ok) {
       log(`Join failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
+      if (data.code === 'consent_required') await openRoomLobby(roomId);
+      else document.getElementById('lobby-error').textContent = 'Could not join this call. Try again in a moment.';
       return false;
     }
 
@@ -148,6 +152,7 @@ async function joinRoom() {
     if (e2ee) roomOptions.encryption = e2ee;
 
     room = new Room(roomOptions);
+    watchNames(room);
     watchAgent(room, data);
     watchCaptions(room, data);
     watchScribe(data);
@@ -205,7 +210,9 @@ async function joinRoom() {
     }
 
     let connectUrl;
-    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+    if (data.url && data.url.startsWith('wss://')) {
+      connectUrl = data.url;
+    } else if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
       const lkUrl = new URL(data.url);
       lkUrl.hostname = window.location.hostname;
       connectUrl = lkUrl.toString();
@@ -225,6 +232,7 @@ async function joinRoom() {
     }
 
     log('Connected! Publishing tracks...', 'success');
+    nameJoined(room);
 
     let micPublished = false;
     try {
@@ -261,6 +269,7 @@ async function joinRoom() {
     document.getElementById('session-created-info').style.display = 'none';
     setInCall(true);
     showRecordingPanel(data);
+    showRecordingIndicator(data.config);
 
     startStats(data);
     monitorICE();
@@ -316,4 +325,5 @@ function cleanup() {
   setInCall(false);
   document.getElementById('ice-info').style.display = 'none';
   document.getElementById('panel-recording').style.display = 'none';
+  showRecordingIndicator(null);
 }

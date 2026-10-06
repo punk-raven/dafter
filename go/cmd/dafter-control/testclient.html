@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dafter POC - Test Client</title>
+<title>Dafter call</title>
 <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
 <link rel="stylesheet" href="/agent.css">
 <link rel="stylesheet" href="/captions.css">
@@ -128,6 +128,22 @@
   .advanced .log-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
   .lobby-hint { margin: auto; color: #555; font-size: 14px; }
 
+  .lobby-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; color: #f3f4f6; }
+  .start input#display-name { padding: 10px; font-size: 15px; }
+  .recording-notice { margin-top: 14px; padding: 10px 12px; border: 1px solid #7f1d1d; background: #2a1212; color: #fecaca; border-radius: 6px; font-size: 13px; line-height: 1.5; }
+  .recording-notice strong { color: #fca5a5; }
+  .rec-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 6px; vertical-align: 1px; animation: rec-pulse 1.6s ease-in-out infinite; }
+  @keyframes rec-pulse { 50% { opacity: 0.35; } }
+  .badge-rec { background: #3a1c1c; color: #fca5a5; }
+  .rec-banner { flex-shrink: 0; padding: 8px 12px; background: #2a1212; color: #fecaca; border-bottom: 1px solid #7f1d1d; font-size: 13px; text-align: center; }
+  .lobby-share { margin-top: 14px; }
+  .link-row { display: flex; gap: 6px; }
+  .link-row input { flex: 1; min-width: 0; font-family: monospace; font-size: 12px; color: #4ade80; background: #0f1f0f; border-color: #2d5a2d; }
+  .link-row button { width: auto; margin: 0; padding: 6px 12px; }
+  .lobby-error { margin-top: 10px; color: #f87171; font-size: 13px; }
+  .lobby-error:empty { display: none; }
+  [hidden] { display: none !important; }
+
   @media (max-width: 640px) {
     .header { padding: 12px 16px; }
     .layout { flex-direction: column; height: auto; min-height: calc(100vh - 49px); }
@@ -140,26 +156,28 @@
 <body>
 
 <div class="header">
-  <h1>Dafter POC</h1>
+  <h1>Dafter</h1>
   <span id="status-badge" class="badge badge-disconnected">disconnected</span>
+  <span id="rec-badge" class="badge badge-rec" hidden><span class="rec-dot"></span>Recording</span>
   <span id="e2ee-badge" class="badge" style="display:none" title="Room.isE2EEEnabled"></span>
 </div>
 
 <div class="layout">
   <div class="sidebar">
     <div id="panel-start" class="start">
-      <label for="language">Language</label>
-      <select id="language">
-        <option value="kn-IN">Kannada</option>
-        <option value="hi" selected>Hindi</option>
-        <option value="en-IN">English</option>
-        <option value="mr-IN">Marathi</option>
-        <option value="te-IN">Telugu</option>
-      </select>
-      <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
-      <select id="llm" onchange="rememberLlm()"></select>
-      <div id="speech-toggles" class="speech-toggles"></div>
-      <button id="btn-start" class="btn-start" onclick="startCall()">Start call</button>
+      <h2 id="lobby-title" class="lobby-title">Start a call</h2>
+      <label for="display-name">Your name</label>
+      <input id="display-name" type="text" maxlength="40" autocomplete="name" spellcheck="false" placeholder="How others see you">
+      <div id="recording-notice" class="recording-notice" role="alert" hidden><strong><span class="rec-dot"></span>This call is being recorded.</strong> Everyone's voice and video in it is recorded and kept. By joining you agree to be recorded.</div>
+      <div id="lobby-share" class="lobby-share" hidden>
+        <label for="lobby-link">Invite link</label>
+        <div class="link-row">
+          <input id="lobby-link" readonly onclick="this.select()">
+          <button class="btn-copy" type="button" onclick="copyJoinLink(this)">Copy</button>
+        </div>
+      </div>
+      <button id="btn-start" class="btn-start" onclick="lobbyAction()">Start a call</button>
+      <div id="lobby-error" class="lobby-error"></div>
     </div>
 
     <div id="panel-call" class="call-controls">
@@ -170,22 +188,38 @@
       <button id="btn-leave" class="btn-leave wide" type="button" onclick="leaveSession()">Leave</button>
     </div>
 
-    <hr id="phone-divider" class="divider">
-
-    <div id="panel-phone">
-      <fieldset>
-        <legend>Phone call</legend>
-        <label for="phone-to">Number to call (E.164)</label>
-        <input id="phone-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX">
-        <button id="btn-call" class="btn-call" onclick="placePhoneCall()">Call</button>
-        <div class="phone-status"><span id="phone-state" class="phone-pill phone-pill-idle">no call</span><span id="phone-detail" class="phone-detail"></span></div>
-        <div id="phone-problem" class="phone-problem"></div>
-        <div id="phone-hint" class="phone-hint"></div>
-      </fieldset>
-    </div>
-
     <details id="advanced" class="advanced">
       <summary>Advanced</summary>
+
+      <fieldset class="start">
+        <legend>Agent call</legend>
+        <label for="language">Language</label>
+        <select id="language">
+          <option value="kn-IN">Kannada</option>
+          <option value="hi" selected>Hindi</option>
+          <option value="en-IN">English</option>
+          <option value="mr-IN">Marathi</option>
+          <option value="te-IN">Telugu</option>
+        </select>
+        <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
+        <select id="llm" onchange="rememberLlm()"></select>
+        <div id="speech-toggles" class="speech-toggles"></div>
+      </fieldset>
+
+      <hr id="phone-divider" class="divider">
+
+      <div id="panel-phone">
+        <fieldset>
+          <legend>Phone call</legend>
+          <label for="phone-to">Number to call (E.164)</label>
+          <input id="phone-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX">
+          <button id="btn-call" class="btn-call" onclick="placePhoneCall()">Call</button>
+          <div class="phone-status"><span id="phone-state" class="phone-pill phone-pill-idle">no call</span><span id="phone-detail" class="phone-detail"></span></div>
+          <div id="phone-problem" class="phone-problem"></div>
+          <div id="phone-hint" class="phone-hint"></div>
+        </fieldset>
+      </div>
+
 
       <div id="panel-create">
         <fieldset>
@@ -223,9 +257,9 @@
           </select>
           <label>Agent</label>
           <select id="agent-mode">
-            <option value="" selected>follow the catalog</option>
+            <option value="">follow the catalog</option>
             <option value="on">on - dispatch the worker pool</option>
-            <option value="off">off - no agent</option>
+            <option value="off" selected>off - no agent</option>
           </select>
           <label>Agent answers</label>
           <select id="addressing-mode">
@@ -387,13 +421,14 @@
   </div>
 
   <div class="main">
+    <div id="rec-banner" class="rec-banner" role="status" hidden><span class="rec-dot"></span>This call is being recorded</div>
     <div id="video-grid" class="video-grid"></div>
     <div id="transcripts" class="transcripts"></div>
-    <div class="lobby-hint">Pick a language and an LLM, then Start call</div>
+    <div class="lobby-hint">Enter your name, then start or join a call</div>
   </div>
 </div>
 
 <script src="/agent-llm.js"></script><script src="/agent-speech.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script><script src="/client-dialin.js"></script>
+<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script><script src="/client-dialin.js"></script><script src="/client-lobby.js"></script>
 </body>
 </html>

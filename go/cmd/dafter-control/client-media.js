@@ -82,7 +82,10 @@ function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
       tile = document.createElement('div');
       tile.id = tileId;
       tile.className = 'video-tile';
-      tile.innerHTML = `<span class="label">${participant.identity}${isLocal ? ' (you)' : ''}</span>`;
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = tileLabel(participant.identity, isLocal);
+      tile.appendChild(label);
       document.getElementById('video-grid').appendChild(tile);
     }
     const el = track.attach();
@@ -175,7 +178,7 @@ async function publishTestPattern(room) {
   tile.appendChild(vid);
   const label = document.createElement('span');
   label.className = 'label';
-  label.textContent = `${room.localParticipant.identity} (you - synthetic)`;
+  label.textContent = `${tileLabel(room.localParticipant.identity, true)} - test pattern`;
   tile.appendChild(label);
   document.getElementById('video-grid').appendChild(tile);
 }
@@ -225,11 +228,3 @@ async function monitorICE() {
 fillNoiseFilterChoices();
 fillLlmChoices();
 fillSpeechToggles();
-
-(function seedFromURL() {
-  const roomParam = new URLSearchParams(window.location.search).get('room');
-  if (!roomParam) return;
-  document.getElementById('room-id').value = roomParam;
-  log(`Join link for ${roomParam}`);
-  joinRoom();
-})();
