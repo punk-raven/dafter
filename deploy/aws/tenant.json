@@ -1,0 +1,22 @@
+{
+  "residency": {
+    "allowedRegions": ["ap-south-1"]
+  },
+  "budgets": {
+    "maxSessionCostUsd": 2.5
+  },
+  "telephony": {
+    "trunk": "vobiz"
+  },
+  "media": {
+    "audio": {
+      "noiseCancellation": "rnnoise"
+    }
+  },
+  "recording": {
+    "enabled": true,
+    "layout": "room_composite",
+    "startAt": "session_create",
+    "consentArtifactId": "consent_recording_notice_v1"
+  }
+}

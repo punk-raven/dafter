@@ -1,0 +1,10 @@
+{$DAFTER_PUBLIC_HOST} {
+	encode gzip
+	@internal path /metrics /metrics/*
+	respond @internal 404
+	reverse_proxy 127.0.0.1:8080
+}
+
+{$DAFTER_SFU_HOST} {
+	reverse_proxy 127.0.0.1:7880
+}

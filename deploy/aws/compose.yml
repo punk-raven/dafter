@@ -1,0 +1,144 @@
+x-restart: &restart unless-stopped
+
+services:
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+    restart: *restart
+
+  minio:
+    profiles: ["minio"]
+
+  minio-setup:
+    profiles: ["minio"]
+
+  livekit:
+    command: --config /etc/livekit.yaml --node-ip ${LIVEKIT_NODE_IP:?set LIVEKIT_NODE_IP to the Elastic IP}
+    ports: !override
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "127.0.0.1:6789:6789"
+    environment:
+      LIVEKIT_KEYS: "${DAFTER_LIVEKIT_API_KEY:?}: ${DAFTER_LIVEKIT_API_SECRET:?}"
+    volumes: !override
+      - ./deploy/aws/livekit.yaml:/etc/livekit.yaml:ro
+    restart: *restart
+
+  control:
+    ports: !override
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
+    environment:
+      DAFTER_ADMIN_TOKEN: ${DAFTER_ADMIN_TOKEN:?}
+      DAFTER_STATE_KEY: ${DAFTER_STATE_KEY:?}
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:?}
+      DAFTER_LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
+      DAFTER_LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
+      DAFTER_LIVEKIT_PUBLIC_URL: ${DAFTER_LIVEKIT_PUBLIC_URL:?}
+      DAFTER_EGRESS_S3_BUCKET: ${DAFTER_EGRESS_S3_BUCKET:?}
+      DAFTER_EGRESS_S3_ENDPOINT: ""
+      DAFTER_EGRESS_S3_REGION: ${DAFTER_EGRESS_S3_REGION:?}
+      DAFTER_EGRESS_S3_ACCESS_KEY: ${DAFTER_EGRESS_S3_ACCESS_KEY:?}
+      DAFTER_EGRESS_S3_SECRET: ${DAFTER_EGRESS_S3_SECRET:?}
+      DAFTER_EGRESS_S3_FORCE_PATH_STYLE: "false"
+
+  egress:
+    environment: !override
+      EGRESS_CONFIG_BODY: |
+        api_key: ${DAFTER_LIVEKIT_API_KEY:?}
+        api_secret: ${DAFTER_LIVEKIT_API_SECRET:?}
+        ws_url: ws://127.0.0.1:7880
+        insecure: true
+        redis:
+          address: 127.0.0.1:6379
+        health_port: 9095
+        log_level: info
+        cpu_cost:
+          max_cpu_utilization: 0.9
+          room_composite_cpu_cost: 1.5
+          audio_room_composite_cpu_cost: 0.5
+          web_cpu_cost: 1.5
+          audio_web_cpu_cost: 0.5
+          participant_cpu_cost: 1.0
+          track_composite_cpu_cost: 1.0
+          track_cpu_cost: 0.5
+    volumes: !reset []
+    depends_on: !override
+      livekit:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: *restart
+
+  sip:
+    environment:
+      SIP_CONFIG_BODY: |
+        api_key: ${DAFTER_LIVEKIT_API_KEY:?}
+        api_secret: ${DAFTER_LIVEKIT_API_SECRET:?}
+        ws_url: ws://127.0.0.1:7880
+        redis:
+          address: 127.0.0.1:6379
+        sip_port: 5060
+        rtp_port: 10000-10100
+        use_external_ip: true
+        logging:
+          level: warn
+    volumes: !reset []
+
+  agent:
+    environment:
+      LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
+      LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:?}
+
+  scribe:
+    environment:
+      LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
+      LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
+      DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:?}
+
+  jaeger:
+    ports: !override
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4318:4318"
+    restart: *restart
+
+  prometheus:
+    ports: !override
+      - "127.0.0.1:9090:9090"
+    restart: *restart
+
+  grafana:
+    ports: !override
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    restart: *restart
+
+  caddy:
+    image: caddy:2-alpine
+    network_mode: host
+    environment:
+      DAFTER_PUBLIC_HOST: ${DAFTER_PUBLIC_HOST:?}
+      DAFTER_SFU_HOST: ${DAFTER_SFU_HOST:?}
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      control:
+        condition: service_started
+      livekit:
+        condition: service_started
+    restart: *restart
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "2"
+
+volumes:
+  caddy-data:
+  caddy-config:
