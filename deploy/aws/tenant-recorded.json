@@ -12,5 +12,11 @@
     "audio": {
       "noiseCancellation": "rnnoise"
     }
+  },
+  "recording": {
+    "enabled": true,
+    "layout": "room_composite",
+    "startAt": "session_create",
+    "consentArtifactId": "consent_recording_notice_v1"
   }
 }

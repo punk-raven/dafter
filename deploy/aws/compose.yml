@@ -36,11 +36,11 @@ services:
       DAFTER_LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
       DAFTER_LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
       DAFTER_LIVEKIT_PUBLIC_URL: ${DAFTER_LIVEKIT_PUBLIC_URL:?}
-      DAFTER_EGRESS_S3_BUCKET: ${DAFTER_EGRESS_S3_BUCKET:?}
+      DAFTER_EGRESS_S3_BUCKET: ${DAFTER_EGRESS_S3_ACCESS_KEY:+${DAFTER_EGRESS_S3_BUCKET:?}}
       DAFTER_EGRESS_S3_ENDPOINT: ""
       DAFTER_EGRESS_S3_REGION: ${DAFTER_EGRESS_S3_REGION:?}
-      DAFTER_EGRESS_S3_ACCESS_KEY: ${DAFTER_EGRESS_S3_ACCESS_KEY:?}
-      DAFTER_EGRESS_S3_SECRET: ${DAFTER_EGRESS_S3_SECRET:?}
+      DAFTER_EGRESS_S3_ACCESS_KEY: ${DAFTER_EGRESS_S3_ACCESS_KEY:-}
+      DAFTER_EGRESS_S3_SECRET: ${DAFTER_EGRESS_S3_SECRET:-}
       DAFTER_EGRESS_S3_FORCE_PATH_STYLE: "false"
 
   egress:
@@ -87,12 +87,14 @@ services:
     volumes: !reset []
 
   agent:
+    profiles: ["agents"]
     environment:
       LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
       DAFTER_WORKER_SECRET: ${DAFTER_WORKER_SECRET:?}
 
   scribe:
+    profiles: ["agents"]
     environment:
       LIVEKIT_API_KEY: ${DAFTER_LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${DAFTER_LIVEKIT_API_SECRET:?}
@@ -117,16 +119,16 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     restart: *restart
 
-  caddy:
-    image: caddy:2-alpine
+  cloudflared:
+    image: cloudflare/cloudflared:latest
     network_mode: host
-    environment:
-      DAFTER_PUBLIC_HOST: ${DAFTER_PUBLIC_HOST:?}
-      DAFTER_SFU_HOST: ${DAFTER_SFU_HOST:?}
-    volumes:
-      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+    command: tunnel --no-autoupdate --metrics 127.0.0.1:20241 --config /etc/cloudflared/config.yml run
+    configs:
+      - source: cloudflared
+        target: /etc/cloudflared/config.yml
+    secrets:
+      - source: tunnel-credentials
+        target: /etc/cloudflared/credentials.json
     depends_on:
       control:
         condition: service_started
@@ -139,6 +141,21 @@ services:
         max-size: 10m
         max-file: "2"
 
-volumes:
-  caddy-data:
-  caddy-config:
+configs:
+  cloudflared:
+    content: |
+      tunnel: ${DAFTER_CF_TUNNEL_ID:?}
+      credentials-file: /etc/cloudflared/credentials.json
+      ingress:
+        - hostname: ${DAFTER_PUBLIC_HOST:?}
+          path: ^/metrics
+          service: http_status:404
+        - hostname: ${DAFTER_PUBLIC_HOST:?}
+          service: http://127.0.0.1:8080
+        - hostname: ${DAFTER_SFU_HOST:?}
+          service: http://127.0.0.1:7880
+        - service: http_status:404
+
+secrets:
+  tunnel-credentials:
+    file: ${DAFTER_CF_TUNNEL_CREDENTIALS:?}
