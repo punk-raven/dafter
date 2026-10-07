@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from dafter_core.enums import WakeSource
 
 from .naming import Heard, Matcher
+from .noise import Meaning
 
 CONTEXT_SECONDS = 90.0
 CONTEXT_LINES = 12
@@ -50,9 +51,13 @@ class Gate:
         clock: Clock,
         schedule: Schedule,
         name: str = "",
+        meaning: Meaning | None = None,
+        busy_words: int = 1,
     ) -> None:
         self._matcher = matcher
         self._name = name
+        self._meaning = meaning
+        self._busy_words = max(busy_words, 1)
         self._follow_up_s = follow_up_s
         self._responder = responder
         self._clock = clock
@@ -81,10 +86,20 @@ class Gate:
             self._wake(speaker, WakeSource.NAME)
             self._answer(speaker, text, timing)
             return
+        if self._idle(text):
+            return
         if speaker == self._addressee:
             self._answer(speaker, text, timing)
             return
         self._said.append(Said(speaker, text, self._clock()))
+
+    def _idle(self, text: str) -> bool:
+        if self._meaning is None:
+            return False
+        said = len(self._meaning.words(text))
+        if self._busy:
+            return said < self._busy_words
+        return said == 0 and not self._meaning.acknowledges(text)
 
     def wake(self, speaker: str) -> None:
         self._wake(speaker, WakeSource.MANUAL)

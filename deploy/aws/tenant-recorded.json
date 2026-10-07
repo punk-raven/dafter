@@ -8,6 +8,23 @@
   "telephony": {
     "trunk": "vobiz"
   },
+  "agent": {
+    "pipeline": {
+      "vad": {
+        "options": {
+          "activationThreshold": 0.6,
+          "minSpeechMs": 250
+        }
+      }
+    }
+  },
+  "turn": {
+    "interruption": {
+      "minWords": 2,
+      "minDurationMs": 500,
+      "resumeFalseInterruption": false
+    }
+  },
   "media": {
     "audio": {
       "noiseCancellation": "rnnoise"

@@ -10,6 +10,7 @@ from livekit.agents.tokenize.basic import split_words
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 
 from .addressing import Clock, Schedule, Timer
+from .noise import Meaning
 
 log = logging.getLogger("dafter.runtime.barge_in")
 
@@ -49,8 +50,10 @@ class BargeIn:
         schedule: Schedule,
         resume: Resume | None = None,
         waits_for_words: bool = False,
+        meaning: Meaning | None = None,
     ) -> None:
         self._min_duration = min_duration
+        self._meaning = meaning
         self._min_words = max(min_words, 1 if waits_for_words or resume else 0)
         self._caller = caller
         self._stop = stop
@@ -143,13 +146,19 @@ class BargeIn:
     def _try(self, speaker: str, hearing: Hearing) -> None:
         if speaker != self._caller():
             return
+        transcript = hearing.transcript()
         needed = max(self._min_words, 1) if speaker in self._echoing else self._min_words
-        if needed > 0:
-            if len(split_words(hearing.transcript(), split_character=True)) < needed:
-                return
+        stopped = self._meaning is not None and self._meaning.stop(transcript)
+        if needed > 0 and not stopped and self._said(transcript) < needed:
+            return
         self._hold_resume()
         self._paused = False
         self._stop()
+
+    def _said(self, transcript: str) -> int:
+        if self._meaning is not None:
+            return len(self._meaning.words(transcript))
+        return len(split_words(transcript, split_character=True))
 
 
 def follow(barge_in: BargeIn, speaker: str, session: AgentSession[Any]) -> None:

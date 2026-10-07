@@ -8,6 +8,7 @@ from collections.abc import Callable, Coroutine
 from functools import partial
 from typing import Any
 
+from dafter_core.speech import every_phrase
 from livekit import rtc
 from livekit.agents import AgentSession, JobContext
 from livekit.agents.llm import MetricsReport
@@ -22,6 +23,7 @@ from .captions import Captions
 from .delivery import Delivery
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
+from .noise import Meaning
 from .plan import Plan
 from .presence import ALONE_GRACE_S, Alone
 from .stages import Stages, hearing
@@ -46,7 +48,13 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         clock=loop.time,
         schedule=schedule,
         name=agent.name or "",
+        meaning=meaning_for(p),
+        busy_words=p.config.turn.interruption.min_words,
     )
+
+
+def meaning_for(p: Plan) -> Meaning:
+    return Meaning(every_phrase(p.config.turn.interruption.backchannel.words))
 
 
 def resume_for(p: Plan, voice: Voice) -> Resume | None:
@@ -67,6 +75,7 @@ def barge_in_for(p: Plan, gate: Gate, voice: Voice, loop: asyncio.AbstractEventL
         schedule=loop.call_later,
         resume=resume_for(p, voice),
         waits_for_words=Acknowledgements.of(interruption.backchannel) is not None,
+        meaning=meaning_for(p),
     )
 
 
