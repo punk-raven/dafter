@@ -18,6 +18,7 @@ from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowl
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
+from .history import REPEATED, instructions_of, replies, tidy, unrepeated
 from .labels import unlabeled
 from .listeners import is_human
 from .naming import words
@@ -83,11 +84,19 @@ class Answering(Agent):
         if self._delivery is not None:
             self._delivery.heard(chat_ctx)
             self._delivery.filler.generating()
+        chat_ctx = tidy(chat_ctx)
         if self._switching is not None:
-            chat_ctx = chat_ctx.copy()
             instructions = self._briefed(self._switching.persona.instructions)
             update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
-        return unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
+
+        def again() -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
+            asked = chat_ctx.copy()
+            reminder = f"{instructions_of(asked)}\n\n{REPEATED}"
+            update_instructions(asked, instructions=reminder, add_if_missing=True)
+            return unlabeled(Agent.default.llm_node(self, asked, tools, model_settings))
+
+        first = unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
+        return unrepeated(first, again, replies(chat_ctx))
 
     def tts_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
