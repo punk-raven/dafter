@@ -58,5 +58,8 @@
   {"language": "te", "text": "నవ్య, ఇక్కడికి రా", "heard": "aside", "why": "a declared near miss"},
   {"language": "te", "text": "దివ్య మరియు నిత్య వస్తున్నారు", "heard": "aside", "why": "declared near misses"},
   {"language": "te", "text": "నివ్య, ఆపు", "heard": "stopped", "why": "called and told to stop"},
-  {"language": "te", "text": "చాలు", "heard": "stop", "why": "a bare stop word"}
+  {"language": "te", "text": "చాలు", "heard": "stop", "why": "a bare stop word"},
+  {"language": "hi", "text": "स्टॉप।", "heard": "stop", "why": "stop said in English and written in Devanagari by a code-mixed recognizer"},
+  {"language": "kn", "text": "ಸ್ಟಾಪ್", "heard": "stop", "why": "stop said in English and written in Kannada script"},
+  {"language": "te", "text": "స్టాప్", "heard": "stop", "why": "stop said in English and written in Telugu script"}
 ]

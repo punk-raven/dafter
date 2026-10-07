@@ -358,7 +358,7 @@ async def entrypoint(ctx: JobContext) -> None:
     caller: Callable[[], str | None]
     sleep: Callable[[], None] | None = None
     if called is not None:
-        caller, roster, sleep = called.addressee, called.roster, called.gate.sleep
+        caller, roster, sleep = called.addressee, called.roster, called.gate.go_quiet
     else:
         roster = Roster()
         follow(ctx.room, roster)

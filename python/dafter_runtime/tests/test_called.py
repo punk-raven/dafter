@@ -90,7 +90,7 @@ class Call:
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
         self.registry = registry_for(
-            p, session, self.roster, lambda: self.gate.addressee, self.gate.sleep
+            p, session, self.roster, lambda: self.gate.addressee, self.gate.go_quiet
         )
         self.voice.before_answer = self.registry.heard
         self.agent = Answering(p.persona.instructions, self.registry, lambda: self.gate.addressee)

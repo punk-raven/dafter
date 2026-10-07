@@ -59,6 +59,7 @@ class Gate:
         self._schedule = schedule
         self._addressee: str | None = None
         self._busy = False
+        self._quiet_after_reply = False
         self._timer: Timer | None = None
         self._said: deque[Said] = deque(maxlen=CONTEXT_LINES)
 
@@ -89,8 +90,15 @@ class Gate:
         self._wake(speaker, WakeSource.MANUAL)
         self._answer(speaker, self._name, None)
 
+    def go_quiet(self) -> None:
+        if self._busy and not self.dormant:
+            self._quiet_after_reply = True
+            return
+        self.sleep()
+
     def sleep(self) -> None:
         self._stop_timer()
+        self._quiet_after_reply = False
         if self._addressee is None:
             return
         self._addressee = None
@@ -104,6 +112,8 @@ class Gate:
         self._busy = state in BUSY_STATES
         if self._busy:
             self._stop_timer()
+        elif self._quiet_after_reply:
+            self.sleep()
         elif not self.dormant:
             self._start_timer()
 
@@ -117,6 +127,7 @@ class Gate:
         since = self._clock() - CONTEXT_SECONDS
         overheard = [s for s in self._said if s.at >= since]
         self._said.clear()
+        self._quiet_after_reply = False
         self._start_timer()
         self._responder.answer(speaker, text, overheard, timing)
 
