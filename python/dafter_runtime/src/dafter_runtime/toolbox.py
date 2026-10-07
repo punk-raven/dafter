@@ -19,7 +19,7 @@ from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
 from .history import REPEATED, instructions_of, replies, tidy, unrepeated
-from .labels import unlabeled
+from .labels import unlabeled, unquoted
 from .listeners import is_human
 from .naming import words
 from .own_voice import wait_for_words
@@ -103,6 +103,7 @@ class Answering(Agent):
     ) -> AsyncIterable[rtc.AudioFrame]:
         if self._delivery is not None and isinstance(voice := self.session.tts, Styled):
             voice.style(str(self._delivery.situation))
+        text = unquoted(text)
         if self._delivery is not None:
             text = self._delivery.own_voice.saying(text)
         reply: AsyncIterable[rtc.AudioFrame] = Agent.default.tts_node(self, text, model_settings)

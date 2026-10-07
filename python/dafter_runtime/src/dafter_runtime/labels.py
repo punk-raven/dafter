@@ -7,6 +7,7 @@ from typing import Any
 from livekit.agents import llm as lk_llm
 
 LABEL = re.compile(r"^\s*\[[^\]\n]{1,80}\]\s*")
+UNSPOKEN = str.maketrans("", "", '"\u201c\u201d\u201e\u00ab\u00bb')
 LONGEST_LABEL = 84
 
 
@@ -81,3 +82,9 @@ async def unlabeled(reply: AsyncIterable[Any]) -> AsyncIterator[Any]:
             yield _with_text(piece, spoken)
     if last is not None and (rest := lines.rest()):
         yield _with_text(last, rest)
+
+
+async def unquoted(text: AsyncIterable[str]) -> AsyncIterator[str]:
+    async for chunk in text:
+        if said := chunk.translate(UNSPOKEN):
+            yield said
