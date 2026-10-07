@@ -24,7 +24,7 @@
           "ನವ್ಯ", "ದಿವ್ಯ", "ಕಾವ್ಯ", "ಭವ್ಯ", "ನಿತ್ಯ", "ನೀವ್ಯಾರು",
           "నవ్య", "దివ్య", "కావ్య", "భవ్య", "నిత్య"
         ],
-        "followUpWindowMs": 8000
+        "followUpWindowMs": 15000
       },
       "speech": {
         "normalization": "platform",
