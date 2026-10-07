@@ -315,7 +315,7 @@ def test_the_agent_can_send_itself_to_sleep_with_go_quiet() -> None:
         call.gate.heard(ASHA, "and tomorrow?")
 
     stub = run_call(script, calls=["go_quiet"])
-    assert len(stub.requests) == 2
+    assert len(stub.requests) == 1
     assert stub.offered[0] == ["current_time", "go_quiet", "who_is_here"]
 
 

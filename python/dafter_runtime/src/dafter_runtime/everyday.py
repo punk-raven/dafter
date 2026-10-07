@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from livekit.agents import StopResponse
+
 from .tools import Effect, Speed, Tool
 
 INDIA = ZoneInfo("Asia/Kolkata")
@@ -45,7 +47,7 @@ def who_is_here(present: Callable[[], list[str]]) -> Tool:
 def go_quiet(sleep: Callable[[], None]) -> Tool:
     async def run(arguments: dict[str, Any]) -> str:
         sleep()
-        return "You are quiet now and will not hear anyone until you are called by name again."
+        raise StopResponse()
 
     return Tool(
         name="go_quiet",
