@@ -162,6 +162,7 @@ async function joinRoom() {
     watchScribe(data);
     watchPhone(room, data);
     watchGuests(room, data);
+    watchTiles(room);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');

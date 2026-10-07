@@ -3,7 +3,7 @@ import test from 'node:test';
 import { load } from './harness.mjs';
 
 function call(myName) {
-  const run = load('client-names.js');
+  const run = load('client-tiles.js', 'client-names.js');
   const g = run('globalThis');
   const handlers = new Map();
   const sent = [];

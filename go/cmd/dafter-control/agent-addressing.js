@@ -26,7 +26,7 @@ function whoWokeAgent() {
   const room = agentView.room;
   const id = agentAddressing.wokenBy;
   if (room && room.localParticipant && room.localParticipant.identity === id) return 'you';
-  return id;
+  return typeof nameOf === 'function' ? nameOf(id, room) : id;
 }
 
 function addressingText(state) {

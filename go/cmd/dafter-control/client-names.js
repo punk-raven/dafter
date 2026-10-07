@@ -18,10 +18,7 @@ function currentRoom() {
 }
 
 function relabel(identity) {
-  const tile = document.getElementById(`tile-${identity}-video`);
-  const label = tile && tile.querySelector('.label');
-  const call = currentRoom();
-  if (label) label.textContent = tileLabel(identity, Boolean(call) && identity === call.localParticipant.identity);
+  nameTile(identity);
   for (const who of document.querySelectorAll('[data-speaker]')) {
     if (who.dataset.speaker === identity) who.textContent = nameOf(identity);
   }

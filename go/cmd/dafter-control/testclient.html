@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="/scribe.css">
 <link rel="stylesheet" href="/phone.css">
 <link rel="stylesheet" href="/guests.css">
+<link rel="stylesheet" href="/tiles.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
@@ -30,7 +31,7 @@
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; --transcript-h: 160px; }
 
   .video-grid { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; grid-template-columns: repeat(var(--tile-cols, 1), var(--tile-w, minmax(0, 1fr))); gap: 8px; padding: 8px; justify-content: center; align-content: center; overflow: hidden; }
-  .video-tile { position: relative; min-width: 0; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: var(--tile-aspect, 16/9); }
+  .video-tile { position: relative; min-width: 0; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
   .video-tile video { display: block; width: 100%; height: 100%; object-fit: contain; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
@@ -444,6 +445,6 @@
 </div>
 
 <script src="/agent-llm.js"></script><script src="/agent-speech.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-names.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script><script src="/client-dialin.js"></script><script src="/client-layout.js"></script><script src="/client-lobby.js"></script>
+<script src="/client.js"></script><script src="/client-names.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script><script src="/client-dialin.js"></script><script src="/client-layout.js"></script><script src="/client-tiles.js"></script><script src="/client-lobby.js"></script>
 </body>
 </html>

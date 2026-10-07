@@ -74,26 +74,7 @@ async function stopRecording() {
 }
 
 function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
-  const tileId = `tile-${participant.identity}-${track.kind}`;
-  let tile = document.getElementById(tileId);
-
-  if (track.kind === 'video') {
-    if (!tile) {
-      tile = document.createElement('div');
-      tile.id = tileId;
-      tile.className = 'video-tile';
-      const label = document.createElement('span');
-      label.className = 'label';
-      label.textContent = tileLabel(participant.identity, isLocal);
-      tile.appendChild(label);
-      document.getElementById('video-grid').appendChild(tile);
-    }
-    const el = track.attach();
-    el.style.width = '100%';
-    el.style.height = '100%';
-    if (mirror) el.style.transform = 'scaleX(-1)';
-    tile.insertBefore(el, tile.firstChild);
-  }
+  if (track.kind === 'video') showCamera(track, participant, mirror);
 
   if (track.kind === 'audio' && !isLocal) {
     const el = track.attach();
@@ -104,12 +85,12 @@ function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
 }
 
 function detachTrack(track, participant) {
+  if (track.kind === 'video') {
+    hideCamera(track, participant);
+    return;
+  }
   track.detach().forEach(el => el.remove());
   if (track.kind === 'audio') forgetFarEnd(track.sid);
-  if (track.kind === 'video') {
-    const tile = document.getElementById(`tile-${participant.identity}-video`);
-    if (tile) tile.remove();
-  }
 }
 
 function removeTile(identity) {
@@ -169,20 +150,14 @@ async function publishTestPattern(room) {
   await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
   log('Synthetic audio track published (440Hz tone)', 'success');
 
-  const tile = document.createElement('div');
-  tile.id = `tile-${room.localParticipant.identity}-video`;
-  tile.className = 'video-tile';
+  const tile = personTile(room.localParticipant);
   const vid = document.createElement('video');
+  vid.className = 'tile-video';
   vid.srcObject = videoStream;
   vid.autoplay = true;
   vid.muted = true;
-  vid.style.cssText = 'width:100%;height:100%';
-  tile.appendChild(vid);
-  const label = document.createElement('span');
-  label.className = 'label';
-  label.textContent = `${tileLabel(room.localParticipant.identity, true)} - test pattern`;
-  tile.appendChild(label);
-  document.getElementById('video-grid').appendChild(tile);
+  tile.insertBefore(vid, tile.firstChild);
+  renderPerson(room.localParticipant);
 }
 
 async function monitorICE() {

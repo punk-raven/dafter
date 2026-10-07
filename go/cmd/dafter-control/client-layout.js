@@ -1,13 +1,6 @@
 const TILE_GAP = 8;
 const TILE_MIN_WIDTH = 160;
-const DEFAULT_ASPECT = 16 / 9;
-
-function tileAspect(grid) {
-  for (const video of grid.querySelectorAll('.video-tile video')) {
-    if (video.videoWidth && video.videoHeight) return video.videoWidth / video.videoHeight;
-  }
-  return DEFAULT_ASPECT;
-}
+const TILE_ASPECT = 16 / 9;
 
 function bestColumns(count, width, height, aspect, gap) {
   let best = { cols: 1, width: 0 };
@@ -28,17 +21,13 @@ function fitTiles() {
   const style = getComputedStyle(grid);
   const width = grid.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const height = grid.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-  const aspect = tileAspect(grid);
-  const { cols, width: tile } = bestColumns(count, width, height, aspect, TILE_GAP);
+  const { cols, width: tile } = bestColumns(count, width, height, TILE_ASPECT, TILE_GAP);
   grid.style.setProperty('--tile-cols', String(cols));
   grid.style.setProperty('--tile-w', `${Math.max(Math.floor(tile), TILE_MIN_WIDTH)}px`);
-  grid.style.setProperty('--tile-aspect', String(aspect));
 }
 
 function watchTileLayout() {
   const grid = document.getElementById('video-grid');
   new ResizeObserver(fitTiles).observe(grid);
   new MutationObserver(fitTiles).observe(grid, { childList: true });
-  grid.addEventListener('resize', fitTiles, true);
-  grid.addEventListener('loadedmetadata', fitTiles, true);
 }

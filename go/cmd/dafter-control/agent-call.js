@@ -19,6 +19,7 @@ function showAgentTile(participant) {
   const tile = document.createElement('div');
   tile.id = id;
   tile.className = 'video-tile agent-tile';
+  tile.dataset.identity = participant.identity;
   tile.dataset.state = 'initializing';
   tile.innerHTML = `
     <div class="agent-face"><div class="agent-ring"></div><div class="agent-glyph">AI</div></div>

@@ -106,6 +106,15 @@ function captionTiles(speaker) {
   return tile ? [tile] : [];
 }
 
+const TILE_CAPTION_CHARS = 110;
+
+function captionTail(text) {
+  if (text.length <= TILE_CAPTION_CHARS) return text;
+  const tail = text.slice(-TILE_CAPTION_CHARS);
+  const space = tail.indexOf(' ');
+  return `\u2026${space >= 0 ? tail.slice(space + 1) : tail}`;
+}
+
 function showOnTiles(speaker, text, final) {
   const key = speaker.identity || 'agent';
   clearTimeout(captionView.timers.get(key));
@@ -116,7 +125,7 @@ function showOnTiles(speaker, text, final) {
       caption.className = 'tile-caption';
       tile.appendChild(caption);
     }
-    caption.textContent = text;
+    caption.textContent = captionTail(text);
     caption.classList.toggle('tile-caption-interim', !final);
   }
   if (final) {
