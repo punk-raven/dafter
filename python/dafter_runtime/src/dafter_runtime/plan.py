@@ -44,6 +44,7 @@ class Plan:
     turn_detection: TurnDetection
     turn_handling: dict[str, Any]
     persona: Persona
+    stt_prompt: str | None = None
     disclosure: str | None = None
     personas: dict[str, Persona] = field(default_factory=dict)
 
@@ -315,8 +316,12 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
     llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
     tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
     detection = turn_detection(cfg.turn, stt, cfg.language)
+    addressing = cfg.agent.addressing
     persona = voiced(cfg.agent, cfg.language)
     personas = _switchable(cfg, (stt, llm, tts)) or {cfg.language: persona}
+    prompt = None
+    if addressing.waits_to_be_called:
+        prompt = ", ".join(dict.fromkeys((cfg.agent.name or "", *addressing.aliases)))
     return Plan(
         config=cfg,
         pipeline=pipeline,
@@ -327,6 +332,7 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         turn_detection=detection,
         turn_handling=turn_handling(cfg.turn, detection),
         persona=persona,
+        stt_prompt=prompt,
         disclosure=disclosure(cfg),
         personas=personas,
     )

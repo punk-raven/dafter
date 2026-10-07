@@ -123,11 +123,12 @@ def run_call(script: Callable[[Call, StubLLM], Any], calls: list[str] | None = N
     return stub
 
 
-def test_the_called_plan_names_the_agent() -> None:
+def test_the_called_plan_names_the_agent_and_prompts_the_recognizer() -> None:
     p = called_plan()
     assert p.called_by_name
     assert p.persona.instructions.startswith("You are Nivya, ")
     assert "calls you by your name" in p.persona.instructions
+    assert p.stt_prompt == "Nivya, निव्या, ನಿವ್ಯ, ನಿವ್ಯಾ, నివ్య, నివ్యా"
     assert p.voice_turn_handling["turn_detection"] == "manual"
     assert p.turn_handling["turn_detection"] == "stt"
 
