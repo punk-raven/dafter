@@ -135,6 +135,8 @@
   .start label { margin-top: 12px; }
   .start select:disabled { color: #9ca3af; cursor: not-allowed; opacity: 1; }
   .lobby-create { margin-top: 4px; }
+  .noise-filter { font-size: 12px; color: #86efac; margin: -2px 0 2px; }
+  .noise-filter.noise-filter-off { color: #fbbf24; }
   .lobby-left { margin: 0 0 4px; font-size: 14px; line-height: 1.5; color: #9ca3af; }
   .btn-new-call { background: transparent; color: #c4b5fd; border: 1px solid #3f3a5a; padding: 11px 16px; font-size: 15px; margin-top: 10px; }
   .btn-new-call:hover { background: #1c1830; border-color: #6d5fb0; }
@@ -216,6 +218,7 @@
     <div id="panel-call" class="call-controls">
       <button id="btn-mic" class="btn-toggle" type="button" onclick="toggleMic()">Mic on</button>
       <button id="btn-camera" class="btn-toggle" type="button" onclick="toggleCamera()">Camera on</button>
+      <div id="noise-filter" class="noise-filter wide" role="status" hidden></div>
       <button id="agent-wake" class="btn-wake wide" type="button" onclick="wakeAgent()" style="display:none">Wake the agent</button>
       <button class="btn-copy wide" type="button" onclick="copyJoinLink(this)">Copy join link</button>
       <button id="btn-leave" class="btn-leave wide" type="button" onclick="leaveSession()">Leave</button>

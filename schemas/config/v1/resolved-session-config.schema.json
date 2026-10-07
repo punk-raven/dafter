@@ -410,8 +410,8 @@
         },
         "noiseCancellation": {
           "type": "string",
-          "description": "Which filter the publishing client puts in front of its microphone. off asks for no suppression at all; native is the browser's own suppression, applied as a capture constraint; rnnoise is the RNNoise WASM filter attached to the track as a processor, with the browser's own suppression turned off, because two suppressors in series fight each other. Echo cancellation is separate and stays on in every mode. Every member has something implementing it: a member with no mechanism behind it is a guarantee nobody enforces.",
-          "enum": ["off", "native", "rnnoise"],
+          "description": "Which filter the publishing client puts in front of its microphone. off asks for no suppression at all; native is the browser's own suppression, applied as a capture constraint; rnnoise is the RNNoise WASM filter attached to the track as a processor, with the browser's own suppression turned off, because two suppressors in series fight each other. rnnoise_gated is rnnoise followed by a near-voice gate that keeps the loudest voice close to the microphone, the caller's, and holds back sound far below it, such as a television or people across the room; a voice as loud as the caller's still passes, since telling two voices apart needs speaker isolation. Echo cancellation and automatic gain are separate and stay on in every mode. Every member has something implementing it: a member with no mechanism behind it is a guarantee nobody enforces.",
+          "enum": ["off", "native", "rnnoise", "rnnoise_gated"],
           "default": "native"
         }
       }

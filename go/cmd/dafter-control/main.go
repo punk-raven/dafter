@@ -36,7 +36,7 @@ var testClientHTML []byte
 //go:embed client-scribe.js scribe.css
 //go:embed client-phone.js phone.css
 //go:embed client-guests.js client-dialin.js guests.css
-//go:embed client-lobby.js client-names.js client-layout.js favicon.svg
+//go:embed client-lobby.js client-names.js client-layout.js favicon.svg voice-gate.js
 var clientAssets embed.FS
 
 var clientAssetPaths = map[string]string{
@@ -68,6 +68,7 @@ var clientAssetPaths = map[string]string{
 	"/client-layout.js":    "client-layout.js",
 	"/favicon.svg":         "favicon.svg",
 	"/favicon.ico":         "favicon.svg",
+	"/voice-gate.js":       "voice-gate.js",
 }
 
 const dialInSweep = 30 * time.Second

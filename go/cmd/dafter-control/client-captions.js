@@ -132,6 +132,7 @@ function showOnTiles(speaker, text, final) {
 function onCaption(event) {
   if (captionView.mode === 'off') return;
   const { segmentId, speaker, text } = event.payload;
+  if (!/[\p{L}\p{N}]/u.test(text || '')) return;
   const final = event.type === 'transcript.final';
   const who = captionSpeaker(speaker);
   const box = document.getElementById('caption-lines');

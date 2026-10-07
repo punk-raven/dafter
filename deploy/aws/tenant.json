@@ -10,7 +10,7 @@
   },
   "media": {
     "audio": {
-      "noiseCancellation": "rnnoise"
+      "noiseCancellation": "rnnoise_gated"
     }
   }
 }

@@ -254,6 +254,7 @@ async function joinRoom() {
     } catch (micErr) {
       log(`No microphone (${micErr.message})`, publishesVideo ? 'warn' : 'error');
       activeNoiseFilter = null;
+      showNoiseFilter('', true);
     }
 
     if (publishesVideo) {
@@ -325,6 +326,7 @@ function cleanup() {
     noiseAudioCtx = null;
   }
   activeNoiseFilter = null;
+  showNoiseFilter('', true);
   room = null;
   if (e2eeWorker) {
     e2eeWorker.terminate();
