@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -9,6 +10,8 @@ from dafter_core.enums import WakeSource
 
 from .naming import Heard, Matcher
 from .noise import Meaning
+
+log = logging.getLogger("dafter.runtime.addressing")
 
 CONTEXT_SECONDS = 90.0
 CONTEXT_LINES = 12
@@ -92,6 +95,12 @@ class Gate:
             self._answer(speaker, text, timing)
             return
         self._said.append(Said(speaker, text, self._clock()))
+        if not self.dormant and self._says_something(text):
+            log.info("someone else spoke, the follow-up window closes")
+            self.go_quiet()
+
+    def _says_something(self, text: str) -> bool:
+        return self._meaning is None or bool(self._meaning.words(text))
 
     def _idle(self, text: str) -> bool:
         if self._meaning is None:

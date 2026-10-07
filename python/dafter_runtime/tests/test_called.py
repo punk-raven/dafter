@@ -10,7 +10,7 @@ from dafter_core.events import parse_event
 from dafter_core.hashing import seal
 from dafter_runtime.addressing import Gate
 from dafter_runtime.answering import Roster, Voice
-from dafter_runtime.called import command
+from dafter_runtime.called import command, meaning_for
 from dafter_runtime.events import SessionEvents
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
@@ -86,6 +86,7 @@ class Call:
             clock=self.clock,
             schedule=self.scheduler,
             name=p.config.agent.name or "",
+            meaning=meaning_for(p),
         )
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
@@ -167,12 +168,10 @@ def test_the_agent_stays_silent_until_called_then_answers_with_what_others_said(
     ]
 
 
-def test_the_caller_follows_up_without_the_name_and_others_do_not_reach_it() -> None:
+def test_the_caller_follows_up_without_the_name() -> None:
     async def script(call: Call, stub: StubLLM) -> None:
         call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
         await call.answered()
-        call.gate.heard(RAVI, "मुझे भी जानना है")
-        assert len(stub.requests) == 1
         call.gate.heard(ASHA, "और कहाँ है?")
         await call.answered()
 
@@ -181,8 +180,42 @@ def test_the_caller_follows_up_without_the_name_and_others_do_not_reach_it() -> 
     assert said(stub.requests[1])[1:] == [
         ("user", "[Speaker 1, to you] निव्या, मीटिंग कितने बजे है?"),
         ("assistant", REPLY),
-        ("user", "[Speaker 2, not to you] मुझे भी जानना है\n[Speaker 1, to you] और कहाँ है?"),
+        ("user", "[Speaker 1, to you] और कहाँ है?"),
     ]
+
+
+def test_someone_else_speaking_closes_the_follow_up_so_the_caller_names_her_again() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
+        await call.answered()
+        call.gate.heard(RAVI, "मुझे भी जानना है")
+        assert call.gate.dormant
+        call.gate.heard(ASHA, "और कहाँ है?")
+        assert len(stub.requests) == 1
+        call.gate.heard(ASHA, "निव्या, और कहाँ है?")
+        await call.answered()
+
+    stub = run_call(script)
+    assert len(stub.requests) == 2
+    assert said(stub.requests[1])[-1] == (
+        "user",
+        "[Speaker 2, not to you] मुझे भी जानना है\n"
+        "[Speaker 1, not to you] और कहाँ है?\n"
+        "[Speaker 1, to you] निव्या, और कहाँ है?",
+    )
+
+
+def test_a_backchannel_from_someone_else_keeps_the_follow_up_open() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
+        await call.answered()
+        call.gate.heard(RAVI, "हम्म")
+        assert not call.gate.dormant
+        call.gate.heard(ASHA, "और कहाँ है?")
+        await call.answered()
+
+    stub = run_call(script)
+    assert len(stub.requests) == 2
 
 
 def test_the_window_runs_from_the_end_of_the_reply_then_it_sleeps() -> None:
