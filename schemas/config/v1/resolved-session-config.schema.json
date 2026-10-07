@@ -137,6 +137,11 @@
           "minimum": 1000,
           "maximum": 120000,
           "default": 20000
+        },
+        "staysAwake": {
+          "type": "boolean",
+          "description": "Once called by name or woken, the agent stays awake until someone tells it to go to sleep or be quiet, instead of sleeping when the follow-up window ends. While awake it hears every line in the call and decides for each one whether it is meant for it, answering only those; a line with its name is always answered. followUpWindowMs does not apply.",
+          "default": false
         }
       }
     },

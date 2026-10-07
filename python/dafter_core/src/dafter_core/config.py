@@ -141,6 +141,7 @@ class Addressing:
     aliases: tuple[str, ...] = ()
     near_misses: tuple[str, ...] = ()
     follow_up_window_ms: int = 20000
+    stays_awake: bool = False
 
     @property
     def waits_to_be_called(self) -> bool:
@@ -153,6 +154,7 @@ class Addressing:
             aliases=tuple(d.get("aliases", ())),
             near_misses=tuple(d.get("nearMisses", ())),
             follow_up_window_ms=d.get("followUpWindowMs", 20000),
+            stays_awake=d.get("staysAwake", False),
         )
 
 

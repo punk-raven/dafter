@@ -57,6 +57,7 @@ type Addressing struct {
 	Aliases          []string       `json:"aliases,omitempty"`
 	NearMisses       []string       `json:"nearMisses,omitempty"`
 	FollowUpWindowMs int            `json:"followUpWindowMs,omitempty"`
+	StaysAwake       bool           `json:"staysAwake,omitempty"`
 }
 
 func (a *Addressing) WaitsToBeCalled() bool {
