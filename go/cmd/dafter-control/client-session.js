@@ -237,6 +237,12 @@ async function joinRoom() {
 
     log('Connected! Publishing tracks...', 'success');
     nameJoined(room);
+    document.getElementById('panel-create').style.display = 'none';
+    document.getElementById('panel-join').style.display = 'none';
+    document.getElementById('session-created-info').style.display = 'none';
+    setInCall(true);
+    showRecordingPanel(data);
+    showRecordingIndicator(data.config);
 
     let micPublished = false;
     try {
@@ -267,13 +273,7 @@ async function joinRoom() {
     if (localVideoTrack && localVideoTrack.track) {
       attachTrack(localVideoTrack.track, room.localParticipant, true, !syntheticVideo);
     }
-
-    document.getElementById('panel-create').style.display = 'none';
-    document.getElementById('panel-join').style.display = 'none';
-    document.getElementById('session-created-info').style.display = 'none';
-    setInCall(true);
-    showRecordingPanel(data);
-    showRecordingIndicator(data.config);
+    renderMediaToggles();
 
     startStats(data);
     monitorICE();
@@ -282,6 +282,11 @@ async function joinRoom() {
     log(`Error: ${err.message}`, 'error');
     btn.disabled = false;
     setBadge('disconnected');
+    if (room && room.state !== ConnectionState.Connected) {
+      room.disconnect();
+      cleanup();
+    }
+    document.getElementById('lobby-error').textContent = `Could not connect to the call (${err.message}). Try again.`;
     return false;
   }
 }

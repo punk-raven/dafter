@@ -9,7 +9,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/config"
@@ -33,12 +32,14 @@ type Service struct {
 	Log       *slog.Logger
 	Trunks    transport.Trunks
 
-	held        heldCalls
-	prompts     pinPrompts
-	recordingMu sync.Mutex
+	held     heldCalls
+	prompts  pinPrompts
+	sessions sessionLocks
+	voices   claims
 
 	WorkerSecret string
 	IdentityKey  []byte
+	Background   func(func())
 }
 
 func (s *Service) Handler() http.Handler {

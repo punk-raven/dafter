@@ -86,6 +86,8 @@ function lobbyForSession(room, config) {
 
 async function openRoomLobby(room) {
   document.getElementById('room-id').value = room;
+  const btn = document.getElementById('btn-start');
+  btn.disabled = true;
   try {
     const resp = await fetch(`/sessions/${encodeURIComponent(room)}`);
     const data = await resp.json();
@@ -98,6 +100,8 @@ async function openRoomLobby(room) {
     lobbyForSession(room, data.config);
   } catch (err) {
     showLobby({ room, error: `Could not reach the call: ${err.message}` });
+  } finally {
+    btn.disabled = false;
   }
 }
 

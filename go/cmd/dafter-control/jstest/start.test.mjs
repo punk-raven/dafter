@@ -172,3 +172,17 @@ test('a call started without the agent asks for no transcription, because only t
   assert.equal(calls[0].body.overrides.agent.enabled, false);
   assert.deepEqual(calls[0].body.overrides.transcription, { mode: 'off' });
 });
+
+test('a call link cannot start a new call while it is still being opened', async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const { run, elements } = page({ search: `?room=${ROOM}`, answers: {} });
+  run('globalThis').fetch = async () => { await pending; return { ok: true, json: async () => ({ sessionId: ROOM, room: ROOM, config: RECORDED }) }; };
+  run(`openRoomLobby('${ROOM}')`);
+  assert.equal(elements.get('btn-start').disabled, true);
+  release();
+  await settled();
+  await settled();
+  assert.equal(elements.get('btn-start').disabled, false);
+  assert.equal(elements.get('btn-start').textContent, 'Join call');
+});

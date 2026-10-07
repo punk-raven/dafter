@@ -13,15 +13,15 @@ func (s *Service) resumeRecording(ctx context.Context, sess state.Session, cfg *
 	if rec := cfg.Recording; !rec.Enabled || rec.StartAt != config.StartAtSessionCreate {
 		return
 	}
-	s.recordingMu.Lock()
-	defer s.recordingMu.Unlock()
+	defer s.sessions.lock(sess.SessionID)()
 	egresses, err := s.Store.Egresses(ctx, sess.SessionID)
 	if err != nil {
 		s.log().Warn("recording not resumed: egresses unreadable", "session", sess.SessionID, "error", err)
 		return
 	}
+	layout := string(cfg.Recording.EffectiveLayout())
 	for _, e := range egresses {
-		if !e.Active() {
+		if !e.Active() || e.Layout != layout {
 			continue
 		}
 		file, err := s.Transport.RecordingFile(ctx, e.EgressID, sourceURLTTL)

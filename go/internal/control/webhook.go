@@ -3,11 +3,14 @@ package control
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/ids"
 	"github.com/punk-raven/dafter/go/internal/transport"
 )
+
+const hookWorkTimeout = 2 * time.Minute
 
 func (s *Service) mediaServerWebhook(w http.ResponseWriter, r *http.Request) {
 	hook, err := s.Transport.ReadWebhook(r)
@@ -15,16 +18,36 @@ func (s *Service) mediaServerWebhook(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	if hook.Event == transport.EventTrackPublished {
-		s.recordVoice(r.Context(), hook.Room, hook.TrackID)
+	if ids.ValidateID(ids.PrefixSession, hook.Room) == nil {
+		s.background(func(ctx context.Context) { s.handleHook(ctx, hook) })
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Service) recordVoice(ctx context.Context, room, trackID string) {
-	if ids.ValidateID(ids.PrefixSession, room) != nil || !trackIDPattern.MatchString(trackID) {
+func (s *Service) background(work func(context.Context)) {
+	run := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), hookWorkTimeout)
+		defer cancel()
+		work(ctx)
+	}
+	if s.Background != nil {
+		s.Background(run)
 		return
 	}
+	go run()
+}
+
+func (s *Service) handleHook(ctx context.Context, hook transport.Webhook) {
+	if hook.Event == transport.EventTrackPublished {
+		s.recordVoice(ctx, hook.Room, hook.TrackID)
+	}
+}
+
+func (s *Service) recordVoice(ctx context.Context, room, trackID string) {
+	if !trackIDPattern.MatchString(trackID) || !s.voices.claim(trackID) {
+		return
+	}
+	defer s.voices.release(trackID)
 	sess, err := s.Store.Session(ctx, room)
 	if err != nil {
 		return
@@ -33,17 +56,15 @@ func (s *Service) recordVoice(ctx context.Context, room, trackID string) {
 	if err != nil || !cfg.Recording.Enabled || !cfg.Recording.Tracks || cfg.Recording.ConsentArtifactID == "" {
 		return
 	}
+	if s.alreadyRecording(ctx, sess.SessionID, trackID) {
+		return
+	}
 	owner, err := s.Transport.TrackOwner(ctx, sess.Room, trackID)
 	if err != nil {
 		s.log().Warn("voice not recorded: publisher unknown", "session", sess.SessionID, "track", trackID, "error", err)
 		return
 	}
 	if !owner.Audio {
-		return
-	}
-	s.recordingMu.Lock()
-	defer s.recordingMu.Unlock()
-	if s.alreadyRecording(ctx, sess.SessionID, trackID) {
 		return
 	}
 	stored, _, err := s.startEgress(ctx, sess, cfg, config.LayoutTrack, startRecordingRequest{TrackID: trackID}, false, attributed(trackID, owner))
