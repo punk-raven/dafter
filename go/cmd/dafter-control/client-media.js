@@ -99,11 +99,13 @@ function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
     const el = track.attach();
     el.id = `audio-${participant.identity}`;
     document.body.appendChild(el);
+    hearFarEnd(track.sid, track.mediaStreamTrack);
   }
 }
 
 function detachTrack(track, participant) {
   track.detach().forEach(el => el.remove());
+  if (track.kind === 'audio') forgetFarEnd(track.sid);
   if (track.kind === 'video') {
     const tile = document.getElementById(`tile-${participant.identity}-video`);
     if (tile) tile.remove();

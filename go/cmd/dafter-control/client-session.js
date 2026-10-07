@@ -321,6 +321,8 @@ function cleanup() {
     syntheticAudioCtx.close();
     syntheticAudioCtx = null;
   }
+  playFarEndInto(null);
+  farEndTracks.clear();
   if (noiseAudioCtx) {
     noiseAudioCtx.close();
     noiseAudioCtx = null;

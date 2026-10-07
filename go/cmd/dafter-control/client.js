@@ -116,6 +116,41 @@ const NOISE_FILTERS = {
 
 const VOICE_GATE_URL = '/voice-gate.js';
 
+const farEndTracks = new Map();
+const farEndSources = new Map();
+let farEndGate = null;
+
+function hearFarEnd(id, mediaStreamTrack) {
+  farEndTracks.set(id, mediaStreamTrack);
+  feedFarEnd(id);
+}
+
+function forgetFarEnd(id) {
+  farEndTracks.delete(id);
+  unfeedFarEnd(id);
+}
+
+function playFarEndInto(gate) {
+  for (const id of [...farEndSources.keys()]) unfeedFarEnd(id);
+  farEndGate = gate;
+  for (const id of farEndTracks.keys()) feedFarEnd(id);
+}
+
+function feedFarEnd(id) {
+  const track = farEndTracks.get(id);
+  if (!farEndGate || !track || farEndSources.has(id)) return;
+  const source = farEndGate.context.createMediaStreamSource(new MediaStream([track]));
+  source.connect(farEndGate, 0, 1);
+  farEndSources.set(id, source);
+}
+
+function unfeedFarEnd(id) {
+  const source = farEndSources.get(id);
+  if (!source) return;
+  source.disconnect();
+  farEndSources.delete(id);
+}
+
 function fillNoiseFilterChoices() {
   const el = document.getElementById('noise-cancellation');
   for (const [value, entry] of Object.entries(NOISE_FILTERS)) {
@@ -159,9 +194,10 @@ async function createRnnoiseProcessor(gated) {
       sink = ctx.createMediaStreamDestination();
       source.connect(node);
       if (gated) {
-        gate = new AudioWorkletNode(ctx, 'near-voice-gate');
-        node.connect(gate);
+        gate = new AudioWorkletNode(ctx, 'near-voice-gate', { numberOfInputs: 2, outputChannelCount: [1] });
+        node.connect(gate, 0, 0);
         gate.connect(sink);
+        playFarEndInto(gate);
       } else {
         node.connect(sink);
       }
@@ -172,7 +208,7 @@ async function createRnnoiseProcessor(gated) {
       await this.init(opts);
     },
     async destroy() {
-      if (gate) { gate.disconnect(); gate = null; }
+      if (gate) { playFarEndInto(null); gate.disconnect(); gate = null; }
       if (node) { node.destroy(); node.disconnect(); node = null; }
       if (source) { source.disconnect(); source = null; }
       sink = null;
