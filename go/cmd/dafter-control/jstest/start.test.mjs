@@ -25,6 +25,7 @@ function element(id, form) {
 function page({ search = '', answers, form = FORM }) {
   const elements = new Map();
   const calls = [];
+  const urls = [];
   const run = load('client-names.js', 'agent-llm.js', 'agent-speech.js', 'agent-addressing.js', 'agent.js', 'client-session.js', 'client-call.js', 'client-captions.js', 'client-scribe.js', 'client-dialin.js');
   const global = run('globalThis');
   Object.assign(global, {
@@ -35,7 +36,7 @@ function page({ search = '', answers, form = FORM }) {
       },
       createElement: () => element('', form),
     },
-    window: { location: { origin: ORIGIN, search, hostname: '127.0.0.1' } },
+    window: { location: { origin: ORIGIN, search, hostname: '127.0.0.1' }, history: { replaceState: (state, title, url) => urls.push(url) } },
     URLSearchParams,
     localStorage: { getItem: (key) => (key === 'dafter.device' ? DEVICE : null), setItem() {} },
     log: () => {},
@@ -49,7 +50,7 @@ function page({ search = '', answers, form = FORM }) {
     },
   });
   run(readFileSync(new URL('../client-lobby.js', import.meta.url), 'utf8'));
-  return { run, calls, elements };
+  return { run, calls, elements, urls };
 }
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -203,4 +204,60 @@ test('a call link cannot start a new call while it is still being opened', async
   await settled();
   assert.equal(elements.get('btn-start').disabled, false);
   assert.equal(elements.get('btn-start').textContent, 'Join call');
+});
+
+const LIVE = [200, { sessionId: ROOM, room: ROOM, config: { ...RECORDED, language: 'kn-IN' } }];
+
+test('leaving a call that is still going offers to rejoin it or start a new one', async () => {
+  const { run, calls, elements } = page({ answers: { [`/sessions/${ROOM}`]: LIVE } });
+  Object.assign(run('globalThis'), { room: null, cleanup: () => {} });
+  run(`lastRoomId = '${ROOM}'`);
+  await run('leaveSession()');
+  assert.deepEqual(calls.map((c) => c.url), [`/sessions/${ROOM}`]);
+  assert.equal(elements.get('lobby-title').textContent, 'You left the call');
+  assert.equal(elements.get('lobby-left').hidden, false);
+  assert.equal(elements.get('lobby-identity').hidden, true);
+  assert.equal(elements.get('lobby-share').hidden, true);
+  assert.equal(elements.get('btn-start').textContent, 'Rejoin');
+  assert.equal(elements.get('btn-new-call').hidden, false);
+  assert.equal(elements.get('recording-notice').hidden, false, 'a rejoin is a join, so the notice it consents to is shown again');
+});
+
+test('a new call after leaving clears the old call from the address and offers every start option again', async () => {
+  const { run, elements, urls } = page({ answers: { [`/sessions/${ROOM}`]: LIVE } });
+  Object.assign(run('globalThis'), { room: null, cleanup: () => {} });
+  run(`lastRoomId = '${ROOM}'`);
+  await run('leaveSession()');
+  run('startNewCall()');
+  assert.equal(urls.at(-1), '/');
+  assert.equal(run('lastRoomId'), null);
+  assert.equal(elements.get('lobby-title').textContent, 'Start a call');
+  assert.equal(elements.get('language').disabled, false);
+  assert.equal(elements.get('lobby-identity').hidden, false);
+  assert.equal(elements.get('lobby-create').hidden, false);
+  assert.equal(elements.get('lobby-left').hidden, true);
+  assert.equal(elements.get('btn-new-call').hidden, true);
+  assert.equal(elements.get('btn-start').textContent, 'Start a call');
+  assert.equal(elements.get('recording-notice').hidden, true);
+});
+
+test('leaving a call that has since ended says so and offers only a new call', async () => {
+  const ended = [200, { sessionId: ROOM, room: ROOM, config: RECORDED, endedAt: '2026-10-07T07:00:00Z' }];
+  const { run, elements, urls } = page({ answers: { [`/sessions/${ROOM}`]: ended } });
+  Object.assign(run('globalThis'), { room: null, cleanup: () => {} });
+  run(`lastRoomId = '${ROOM}'`);
+  await run('leaveSession()');
+  assert.match(elements.get('lobby-error').textContent, /has ended/);
+  assert.equal(elements.get('btn-start').textContent, 'Start a call');
+  assert.equal(elements.get('btn-new-call').hidden, true);
+  assert.equal(elements.get('language').disabled, false);
+  assert.equal(urls.at(-1), '/');
+});
+
+test('a join link also offers to start a new call instead', async () => {
+  const { elements } = page({ search: `?room=${ROOM}`, answers: { [`/sessions/${ROOM}`]: LIVE } });
+  await settled();
+  assert.equal(elements.get('lobby-title').textContent, 'Join the call');
+  assert.equal(elements.get('btn-new-call').hidden, false);
+  assert.equal(elements.get('lobby-identity').hidden, false);
 });

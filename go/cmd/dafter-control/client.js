@@ -1,4 +1,4 @@
-const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
+const { Room, RoomEvent, Track, ConnectionState, DisconnectReason, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
 const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.e2ee.worker.mjs';
 

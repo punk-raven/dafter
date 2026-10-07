@@ -135,6 +135,9 @@
   .start label { margin-top: 12px; }
   .start select:disabled { color: #9ca3af; cursor: not-allowed; opacity: 1; }
   .lobby-create { margin-top: 4px; }
+  .lobby-left { margin: 0 0 4px; font-size: 14px; line-height: 1.5; color: #9ca3af; }
+  .btn-new-call { background: transparent; color: #c4b5fd; border: 1px solid #3f3a5a; padding: 11px 16px; font-size: 15px; margin-top: 10px; }
+  .btn-new-call:hover { background: #1c1830; border-color: #6d5fb0; }
   .start .lobby-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; font-size: 13px; line-height: 1.4; color: #cbd5e1; cursor: pointer; }
   .lobby-check input { width: auto; margin: 2px 0 0; accent-color: #7c3aed; flex-shrink: 0; }
   .recording-notice { margin-top: 14px; padding: 10px 12px; border: 1px solid #7f1d1d; background: #2a1212; color: #fecaca; border-radius: 6px; font-size: 13px; line-height: 1.5; }
@@ -174,16 +177,19 @@
   <div class="sidebar">
     <div id="panel-start" class="start">
       <h2 id="lobby-title" class="lobby-title">Start a call</h2>
-      <label for="display-name">Your name</label>
-      <input id="display-name" type="text" maxlength="40" autocomplete="name" spellcheck="false" placeholder="How others see you">
-      <label for="language">Language</label>
-      <select id="language">
-        <option value="kn-IN">Kannada</option>
-        <option value="hi" selected>Hindi</option>
-        <option value="en-IN">English</option>
-        <option value="mr-IN">Marathi</option>
-        <option value="te-IN">Telugu</option>
-      </select>
+      <p id="lobby-left" class="lobby-left" hidden></p>
+      <div id="lobby-identity">
+        <label for="display-name">Your name</label>
+        <input id="display-name" type="text" maxlength="40" autocomplete="name" spellcheck="false" placeholder="How others see you">
+        <label for="language">Language</label>
+        <select id="language">
+          <option value="kn-IN">Kannada</option>
+          <option value="hi" selected>Hindi</option>
+          <option value="en-IN">English</option>
+          <option value="mr-IN">Marathi</option>
+          <option value="te-IN">Telugu</option>
+        </select>
+      </div>
       <div id="lobby-create" class="lobby-create">
         <label for="phone-guests">Phone guests</label>
         <select id="phone-guests" onchange="renderDialInFields()">
@@ -203,6 +209,7 @@
         </div>
       </div>
       <button id="btn-start" class="btn-start" onclick="lobbyAction()">Start a call</button>
+      <button id="btn-new-call" class="btn-new-call" type="button" onclick="startNewCall()" hidden>Start a new call</button>
       <div id="lobby-error" class="lobby-error"></div>
     </div>
 
@@ -429,7 +436,7 @@
     <div id="rec-banner" class="rec-banner" role="status" hidden><span class="rec-dot"></span>This call is being recorded</div>
     <div id="video-grid" class="video-grid"></div>
     <div id="transcripts" class="transcripts"></div>
-    <div class="lobby-hint">Enter your name, then start or join a call</div>
+    <div id="lobby-hint" class="lobby-hint">Enter your name, then start or join a call</div>
   </div>
 </div>
 

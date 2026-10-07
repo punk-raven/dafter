@@ -206,7 +206,9 @@ async function joinRoom() {
       log(`Disconnected: ${reason || 'unknown'}`, 'warn');
       setBadge('disconnected');
       cleanup();
-      leftForAnotherTab(reason);
+      if (reason !== DisconnectReason.CLIENT_INITIATED) {
+        afterCall(roomId, reason === DisconnectReason.DUPLICATE_IDENTITY ? 'moved' : 'dropped');
+      }
     });
 
     const rtcConfig = { iceTransportPolicy: icePolicy };
@@ -293,11 +295,13 @@ async function joinRoom() {
 }
 
 async function leaveSession() {
+  const left = lastRoomId;
   if (room) {
     await requestMinutes(room);
     await room.disconnect();
   }
   cleanup();
+  await afterCall(left, 'left');
 }
 
 function cleanup() {
