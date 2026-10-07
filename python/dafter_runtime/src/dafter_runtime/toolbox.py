@@ -95,10 +95,12 @@ class Answering(Agent):
             voice.style(str(self._delivery.situation))
         if self._delivery is not None:
             text = self._delivery.own_voice.saying(text)
-        reply = Agent.default.tts_node(self, text, model_settings)
-        if self._delivery is None or not self._delivery.filler.enabled:
+        reply: AsyncIterable[rtc.AudioFrame] = Agent.default.tts_node(self, text, model_settings)
+        if self._delivery is None:
             return reply
-        return self._delivery.filler.ahead(reply, lambda: self.session.current_speech)
+        if self._delivery.filler.enabled:
+            reply = self._delivery.filler.ahead(reply, lambda: self.session.current_speech)
+        return self._delivery.loudness.leveled(reply)
 
     async def on_user_turn_completed(
         self, turn_ctx: lk_llm.ChatContext, new_message: lk_llm.ChatMessage

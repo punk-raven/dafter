@@ -17,6 +17,7 @@ from livekit.agents import tts as lk_tts
 from livekit.agents.types import USERDATA_TTS_STARTED_TIME
 from livekit.agents.voice.events import AgentStateChangedEvent, CloseEvent, UserStateChangedEvent
 
+from .loudness import Loudness
 from .naming import words
 from .own_voice import OwnVoice
 from .personas import base_language
@@ -242,6 +243,7 @@ class Delivery:
         self._situational = Situational(speech.situations)
         cancels_echo = audio is None or audio.echo_cancellation is not False
         self.own_voice = OwnVoice(cancels_echo=cancels_echo)
+        self.loudness = Loudness()
         self.filler = Filler(speech.fillers, language, self.own_voice.said)
         self.situation = self._situational.opening()
 
