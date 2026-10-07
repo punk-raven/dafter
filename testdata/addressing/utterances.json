@@ -60,6 +60,9 @@
   {"language": "te", "text": "నివ్య, ఆపు", "heard": "stopped", "why": "called and told to stop"},
   {"language": "te", "text": "చాలు", "heard": "stop", "why": "a bare stop word"},
   {"language": "hi", "text": "स्टॉप।", "heard": "stop", "why": "stop said in English and written in Devanagari by a code-mixed recognizer"},
+  {"language": "hi", "text": "हाय निव्या, कैसी हो?", "heard": "called", "why": "the name after a spoken hi"},
   {"language": "kn", "text": "ಸ್ಟಾಪ್", "heard": "stop", "why": "stop said in English and written in Kannada script"},
-  {"language": "te", "text": "స్టాప్", "heard": "stop", "why": "stop said in English and written in Telugu script"}
+  {"language": "kn", "text": "ಹಾಯ್ ನಿವ್ಯ, ಹೇಗಿದ್ದೀಯ?", "heard": "called", "why": "the name after a spoken hi"},
+  {"language": "te", "text": "స్టాప్", "heard": "stop", "why": "stop said in English and written in Telugu script"},
+  {"language": "te", "text": "హాయ్ నివ్య, ఎలా ఉన్నావు?", "heard": "called", "why": "the name after a spoken hi"}
 ]

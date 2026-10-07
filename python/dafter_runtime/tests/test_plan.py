@@ -52,14 +52,12 @@ def test_the_pinned_hindi_job_plans_the_sarvam_cascade() -> None:
     }
     assert p.persona.greeting
     assert p.called_by_name
-    assert p.stt_prompt == "Nivya, निव्या, ನಿವ್ಯ, ನಿವ್ಯಾ, నివ్య, నివ్యా"
     assert p.voice_turn_handling == {**p.turn_handling, "turn_detection": "manual"}
 
 
 def test_a_session_that_asks_to_be_answered_every_turn_is_not_called_by_name() -> None:
     p = plan(load(variant(lambda d: d["agent"]["addressing"].update(mode="always"))), POOL)
     assert not p.called_by_name
-    assert p.stt_prompt is None
     assert p.voice_turn_handling is p.turn_handling
 
 

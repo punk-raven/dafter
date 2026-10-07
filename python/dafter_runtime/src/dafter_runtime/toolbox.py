@@ -23,6 +23,7 @@ from .listeners import is_human
 from .naming import words
 from .own_voice import wait_for_words
 from .plan import Plan
+from .plausible import Plausible
 from .scribing import Scribing
 from .switching import Switching
 from .tools import NO_FILLING, Filling, Registry, Tool
@@ -64,7 +65,7 @@ class Answering(Agent):
     def stt_node(
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
     ) -> Events:
-        events: Events = Agent.default.stt_node(self, audio, model_settings)
+        events: Events = Plausible()(Agent.default.stt_node(self, audio, model_settings))
         if self._delivery is not None:
             if self._ear is None:
                 own_voice = self._delivery.own_voice

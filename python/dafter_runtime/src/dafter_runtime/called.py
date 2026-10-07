@@ -25,6 +25,7 @@ from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .noise import Meaning
 from .plan import Plan
+from .plausible import Plausible
 from .presence import ALONE_GRACE_S, Alone
 from .stages import Stages, hearing
 from .switching import Switching
@@ -163,7 +164,7 @@ class Called:
             self._captions.follow(speaker, session)
 
     def _hearing(self, speaker: str, session: AgentSession[Any]) -> Filter:
-        sieves: list[Filter] = []
+        sieves: list[Filter] = [Plausible()]
         if self._delivery is not None:
             echoed = partial(self.barge_in.echoing, speaker)
             sieves.append(self._delivery.own_voice.hearing(session, echoed))
