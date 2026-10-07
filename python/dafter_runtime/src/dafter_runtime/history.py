@@ -7,11 +7,11 @@ from difflib import SequenceMatcher
 from livekit.agents import APIStatusError, FlushSentinel
 from livekit.agents import llm as lk_llm
 
+from .answering import TO_THE_ROOM
 from .naming import words
 
 log = logging.getLogger("dafter.runtime.history")
 
-HISTORY_ITEMS = 16
 CUT_SHORT_WORDS = 5
 RECENT_REPLIES = 3
 OPENING_WORDS = 8
@@ -24,12 +24,6 @@ REPEATED = (
 STOPPED_TOOL = "done"
 
 Chunk = lk_llm.ChatChunk | str | FlushSentinel
-
-
-def tidy(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
-    kept = chat_ctx.copy()
-    kept.items[:] = [item for item in kept.items if not cut_short(item)]
-    return well_formed(kept.truncate(max_items=HISTORY_ITEMS))
 
 
 def well_formed(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
@@ -55,6 +49,18 @@ def well_formed(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
         kept.append(item)
     chat_ctx.items[:] = kept
     return chat_ctx
+
+
+def judged(chat_ctx: lk_llm.ChatContext) -> bool:
+    asked = [
+        item
+        for item in chat_ctx.items
+        if isinstance(item, lk_llm.ChatMessage) and item.role == "user"
+    ]
+    if not asked:
+        return False
+    lines = (asked[-1].text_content or "").strip().splitlines()
+    return bool(lines) and f", {TO_THE_ROOM}]" in lines[-1]
 
 
 def last_turn(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
@@ -169,11 +175,11 @@ __all__ = [
     "REPEATED",
     "cut_short",
     "instructions_of",
+    "judged",
     "last_turn",
     "recovering",
     "repeats",
     "replies",
-    "tidy",
     "unrepeated",
     "well_formed",
 ]

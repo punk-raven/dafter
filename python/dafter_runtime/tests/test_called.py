@@ -16,7 +16,7 @@ from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.toolbox import Answering, registry_for
 from dafter_runtime.worker import room_options
-from livekit.agents import AgentSession
+from livekit.agents import AgentSession, llm
 from stub_llm import REPLY, StubLLM, said
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
@@ -25,9 +25,10 @@ RAVI = "p_9d02c3aa"
 WINDOW_S = 20.0
 
 
-def called_plan() -> Plan:
+def called_plan(stays_awake: bool = False) -> Plan:
     doc = json.loads(JOB.read_bytes())
     doc["agent"]["addressing"]["mode"] = "transcript"
+    doc["agent"]["addressing"]["staysAwake"] = stays_awake
     sealed, _ = seal(json.dumps(doc))
     return plan(load(sealed), "dafter-py")
 
@@ -87,6 +88,7 @@ class Call:
             schedule=self.scheduler,
             name=p.config.agent.name or "",
             meaning=meaning_for(p),
+            stays_awake=p.config.agent.addressing.stays_awake,
         )
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
@@ -109,8 +111,12 @@ class Call:
         await asyncio.sleep(0)
 
 
-def run_call(script: Callable[[Call, StubLLM], Any], calls: list[str] | None = None) -> StubLLM:
-    p = called_plan()
+def run_call(
+    script: Callable[[Call, StubLLM], Any],
+    calls: list[str] | None = None,
+    stays_awake: bool = False,
+) -> StubLLM:
+    p = called_plan(stays_awake)
     stub = StubLLM(calls=calls)
 
     async def run() -> None:
@@ -280,10 +286,10 @@ def test_the_caller_leaving_sends_it_to_sleep() -> None:
     run_call(script)
 
 
-def test_what_was_said_long_ago_is_not_context() -> None:
+def test_everything_said_before_she_was_called_is_context_however_long_ago() -> None:
     async def script(call: Call, stub: StubLLM) -> None:
         call.gate.heard(RAVI, "old news")
-        call.clock.now += 91
+        call.clock.now += 3600
         call.gate.heard(RAVI, "fresh news")
         call.gate.heard(ASHA, "Nivya, what time is it?")
         await call.answered()
@@ -291,7 +297,9 @@ def test_what_was_said_long_ago_is_not_context() -> None:
     stub = run_call(script)
     assert said(stub.requests[0])[-1] == (
         "user",
-        "[Speaker 2, not to you] fresh news\n[Speaker 1, to you] Nivya, what time is it?",
+        "[Speaker 2, not to you] old news\n"
+        "[Speaker 2, not to you] fresh news\n"
+        "[Speaker 1, to you] Nivya, what time is it?",
     )
 
 
@@ -358,3 +366,28 @@ def test_only_a_well_formed_wake_command_is_read() -> None:
     assert command(b'{"action": "wake"}') == "wake"
     for data in (b"wake", b'{"action": "sleep"}', b'{"action": "wake", "as": "p_1"}', b"[]"):
         assert command(data) is None
+
+
+def test_an_awake_agent_may_stay_silent_on_a_line_to_the_room_but_never_on_her_name() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "Nivya, what time is it?")
+        await call.answered()
+        call.gate.heard(RAVI, "Asha, are you coming on Saturday?")
+        await call.answered()
+        assert not call.gate.dormant
+        call.gate.heard(ASHA, "what time does it start?")
+        await call.answered()
+
+    stub = run_call(script, calls=["", "stay_silent"], stays_awake=True)
+    assert len(stub.requests) == 3
+    assert "stay_silent" not in stub.offered[0]
+    assert "stay_silent" in stub.offered[1]
+    asked = said(stub.requests[2])
+    assert asked[-2:] == [
+        ("user", "[Speaker 2, to the room] Asha, are you coming on Saturday?"),
+        ("user", "[Speaker 1, to the room] what time does it start?"),
+    ]
+    assert not any(
+        isinstance(item, llm.FunctionCall | llm.FunctionCallOutput)
+        for item in stub.requests[2].items
+    ), "a silence leaves no tool call or empty answer behind"

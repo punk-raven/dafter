@@ -51,6 +51,7 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         name=agent.name or "",
         meaning=meaning_for(p),
         busy_words=p.config.turn.interruption.min_words,
+        stays_awake=agent.addressing.stays_awake,
     )
 
 

@@ -17,18 +17,26 @@ from .answering import Roster
 from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
-from .everyday import current_time, go_quiet, switch_language, who_is_here
+from .everyday import (
+    STAY_SILENT,
+    current_time,
+    go_quiet,
+    stay_silent,
+    switch_language,
+    who_is_here,
+)
 from .history import (
     REPEATED,
     instructions_of,
+    judged,
     last_turn,
     recovering,
     replies,
-    tidy,
     unrepeated,
 )
 from .labels import unlabeled, unquoted
 from .listeners import is_human
+from .memory import Memory, summarised
 from .naming import words
 from .own_voice import wait_for_words
 from .plan import Plan
@@ -61,6 +69,7 @@ class Answering(Agent):
         self._switching = switching if switching is not None and switching.enabled else None
         self._floor: SessionFloor | None = None
         self._ear: Filter | None = None
+        self._memory: Memory | None = None
 
     def brief(self, context: str) -> None:
         self._context = context
@@ -86,13 +95,26 @@ class Answering(Agent):
             self._floor = SessionFloor(self.session)
         return acknowledged(self._acknowledgements, self._floor)(events)
 
+    def _remembered(self, chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
+        if self._memory is None:
+            model = self.session.llm
+            summarise = (
+                (lambda prompt: summarised(model, prompt))
+                if isinstance(model, lk_llm.LLM)
+                else None
+            )
+            self._memory = Memory(summarise, agent="the agent")
+        return self._memory.context(chat_ctx)
+
     def llm_node(
         self, chat_ctx: lk_llm.ChatContext, tools: list[lk_llm.Tool], model_settings: ModelSettings
     ) -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
         if self._delivery is not None:
             self._delivery.heard(chat_ctx)
             self._delivery.filler.generating()
-        chat_ctx = tidy(chat_ctx)
+        chat_ctx = self._remembered(chat_ctx)
+        if not judged(chat_ctx):
+            tools = [tool for tool in tools if getattr(tool, "id", None) != STAY_SILENT]
         if self._switching is not None:
             instructions = self._briefed(self._switching.persona.instructions)
             update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
@@ -179,11 +201,16 @@ def follow(room: rtc.Room, roster: Roster) -> None:
 
 
 def everyday(
-    roster: Roster, sleep: Callable[[], None] | None, switching: Switching | None = None
+    roster: Roster,
+    sleep: Callable[[], None] | None,
+    switching: Switching | None = None,
+    judges: bool = False,
 ) -> list[Tool]:
     tools = [current_time(), who_is_here(roster.present)]
     if sleep is not None:
         tools.append(go_quiet(sleep))
+    if judges:
+        tools.append(stay_silent())
     if switching is not None and switching.enabled:
         tools.append(switch_language(switching.languages, switching.ask))
     return tools
@@ -200,7 +227,8 @@ def registry_for(
     scribing: Scribing | None = None,
 ) -> Registry:
     filler = delivery.filler if delivery is not None else None
-    tools = everyday(roster, sleep, switching)
+    judges = sleep is not None and p.config.agent.addressing.stays_awake
+    tools = everyday(roster, sleep, switching, judges)
     if scribing is not None:
         tools.extend(scribing.tools(caller))
     return Registry(

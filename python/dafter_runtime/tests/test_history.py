@@ -5,17 +5,21 @@ from collections.abc import AsyncIterable, AsyncIterator
 
 import pytest
 from dafter_runtime.history import (
-    HISTORY_ITEMS,
     instructions_of,
     last_turn,
     recovering,
     repeats,
     replies,
-    tidy,
     unrepeated,
     well_formed,
 )
+from dafter_runtime.memory import HARD_TOKENS, Memory
 from livekit.agents import APIStatusError, llm
+
+
+def tidy(ctx: llm.ChatContext) -> llm.ChatContext:
+    return Memory(None).context(ctx)
+
 
 CLASS_ANSWER = "అరె సారీ అండి నేను ఒక AIని నాకు డైరెక్ట్గా క్లాస్ ఎత్తే ఆప్షన్ ఉండదు, మీ ప్రొఫెసర్ని కానీ అడ్మిన్ని కానీ కాంటాక్ట్ చేయండి."
 STORY_ONE = "Sure, here it goes. There was once a king who loved his garden."
@@ -54,12 +58,13 @@ def test_replies_cut_off_after_a_word_or_two_are_left_out_of_what_she_reads() ->
     assert len(ctx.items) == 5
 
 
-def test_a_long_call_is_read_from_its_latest_turns_with_her_instructions_kept() -> None:
-    ctx = call(*((("user", f"question {n}", False)) for n in range(40)))
+def test_a_call_too_long_for_any_summary_keeps_her_instructions_and_its_latest_turns() -> None:
+    line = "question " + "x" * 600
+    ctx = call(*(("user", f"{n} {line}", False) for n in range(200)))
     kept = tidy(ctx)
-    assert len(kept.items) == HISTORY_ITEMS + 1
     assert instructions_of(kept) == "You are Nivya."
-    assert said(kept)[-1] == ("user", "question 39")
+    assert said(kept)[-1] == ("user", f"199 {line}")
+    assert sum(len(text) for _, text in said(kept)) // 3 <= HARD_TOKENS + 400
 
 
 def test_a_reply_that_opens_like_one_of_her_last_three_is_a_repeat() -> None:

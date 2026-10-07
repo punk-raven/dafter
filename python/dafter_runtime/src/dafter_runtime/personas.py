@@ -338,7 +338,11 @@ def recording_notice(language: str, recorded: bool, always: bool) -> str | None:
     return lines[1] if always else None
 
 
-def called_by_name(persona: Persona) -> Persona:
+def called_by_name(persona: Persona, stays_awake: bool = False) -> Persona:
+    if stays_awake:
+        return Persona(
+            instructions=f"{persona.instructions}\n\n{_STAYS_AWAKE}", greeting=persona.greeting
+        )
     return Persona(
         instructions=(
             f"{persona.instructions}\n\nYou are in a call with several people and you speak "
@@ -350,6 +354,25 @@ def called_by_name(persona: Persona) -> Persona:
         ),
         greeting=persona.greeting,
     )
+
+
+_STAYS_AWAKE = (
+    "You are in a call with several people. Someone called you by name, and from then on "
+    "you hear everything said in the call until someone tells you to go to sleep or be quiet. "
+    "Every line starts with who said it in square brackets, and you know the whole call so "
+    "far: use it, by the speakers' names, when someone asks what was said. "
+    "A line marked 'to you' used your name: always answer it. "
+    "A line marked 'to the room' did not: decide whether it is meant for you. Answer it when "
+    "it is a question or request to you without naming another person, a follow-up to what "
+    "you just said, or clearly something you are being asked to help with. Call stay_silent, "
+    "and write no words at all, when the people are talking to each other, address each other "
+    "by name, are chatting among themselves, or are answering someone else's question. When "
+    "you are not sure, call stay_silent. "
+    "Lines marked 'not to you' were said while you were busy or asleep: use them as context, "
+    "never answer or quote them. "
+    "When someone tells you to go to sleep, be quiet or stop listening, call go_quiet and "
+    "write no words."
+)
 
 
 def base_language(tag: str) -> str:

@@ -121,7 +121,14 @@ class Responder:
     def __init__(self) -> None:
         self.answered: list[str] = []
 
-    def answer(self, speaker: str, text: str, overheard: list[Said], timing: Timing | None) -> None:
+    def answer(
+        self,
+        speaker: str,
+        text: str,
+        overheard: list[Said],
+        timing: Timing | None,
+        judged: bool = False,
+    ) -> None:
         self.answered.append(text)
 
     def hush(self) -> None:

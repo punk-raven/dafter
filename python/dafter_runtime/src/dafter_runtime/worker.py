@@ -367,6 +367,7 @@ async def entrypoint(ctx: JobContext) -> None:
     registry = registry_for(p, session, roster, caller, sleep, delivery, switching, scribing)
     if called is not None:
         called.voice.before_answer = answering(switching, registry.heard)
+        called.voice.judging = delivery.filler.hold
         called.voice.announce = events.addressed
     agent = Answering(
         p.persona.instructions,

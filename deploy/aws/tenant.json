@@ -8,6 +8,11 @@
   "telephony": {
     "trunk": "vobiz"
   },
+  "agent": {
+    "addressing": {
+      "staysAwake": true
+    }
+  },
   "media": {
     "audio": {
       "noiseCancellation": "rnnoise_gated"

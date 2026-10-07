@@ -61,6 +61,26 @@ def go_quiet(sleep: Callable[[], None]) -> Tool:
     )
 
 
+STAY_SILENT = "stay_silent"
+
+
+def stay_silent() -> Tool:
+    async def run(arguments: dict[str, Any]) -> str:
+        raise StopResponse()
+
+    return Tool(
+        name=STAY_SILENT,
+        description=(
+            "Say nothing to the latest line, because it was not meant for you: the people in "
+            "the call are talking to each other, chatting, or answering someone else. Call it "
+            "on its own and do not write any words."
+        ),
+        speed=Speed.FAST,
+        effect=Effect.READ,
+        run=run,
+    )
+
+
 def switch_language(languages: list[str], ask: Callable[[str], bool]) -> Tool:
     async def run(arguments: dict[str, Any]) -> str:
         language = str(arguments.get("language", ""))
@@ -86,4 +106,11 @@ def switch_language(languages: list[str], ask: Callable[[str], bool]) -> Tool:
     )
 
 
-__all__ = ["current_time", "go_quiet", "switch_language", "who_is_here"]
+__all__ = [
+    "STAY_SILENT",
+    "current_time",
+    "go_quiet",
+    "stay_silent",
+    "switch_language",
+    "who_is_here",
+]

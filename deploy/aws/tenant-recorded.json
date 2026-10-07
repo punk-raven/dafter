@@ -9,6 +9,9 @@
     "trunk": "vobiz"
   },
   "agent": {
+    "addressing": {
+      "staysAwake": true
+    },
     "pipeline": {
       "vad": {
         "options": {

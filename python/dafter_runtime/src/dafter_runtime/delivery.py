@@ -87,6 +87,7 @@ class Filler:
         self._preparing: asyncio.Future[None] | None = None
         self._speaking: set[int] = set()
         self._generating_since: float | None = None
+        self._held = False
 
     def _of(self, language: str) -> tuple[str, ...]:
         if not self._fillers.enabled:
@@ -133,7 +134,12 @@ class Filler:
 
         def state_changed(ev: AgentStateChangedEvent) -> None:
             self._hush()
-            if ev.new_state == "thinking" and self.enabled and not self._speaking:
+            if (
+                ev.new_state == "thinking"
+                and self.enabled
+                and not self._speaking
+                and not self._held
+            ):
                 self._timer = loop.call_later(self.after, self._due.set)
 
         session.on("agent_state_changed", state_changed)
@@ -153,6 +159,9 @@ class Filler:
 
         session.on("user_state_changed", state_changed)
         session.on("close", closed)
+
+    def hold(self, held: bool) -> None:
+        self._held = held
 
     def generating(self) -> None:
         self._generating_since = time.perf_counter()

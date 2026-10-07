@@ -28,7 +28,7 @@ class StubStream(llm.LLMStream):
 
     async def _run(self) -> None:
         delta = llm.ChoiceDelta(role="assistant", content=self._reply)
-        if self._call is not None:
+        if self._call:
             name, arguments = self._call if isinstance(self._call, tuple) else (self._call, {})
             call = llm.FunctionToolCall(
                 name=name, arguments=json.dumps(arguments), call_id=f"c_{name}"
