@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import logging
-import time
 from collections import Counter
 from collections.abc import AsyncIterator
 
 from livekit.agents import stt
 
-from .addressing import Clock
 from .backchannel import TRANSCRIPTS, Events, text_of
 from .naming import words
 
@@ -31,25 +29,21 @@ def too_fast(text: str, seconds: float) -> bool:
     return seconds > 0 and chars >= JUDGED_CHARS and chars / seconds > FASTEST_CHARS_PER_S
 
 
-def spoken_for(event: stt.SpeechEvent, began: float | None, now: float) -> float:
+def spoken_for(event: stt.SpeechEvent) -> float:
     if event.alternatives:
         timed = event.alternatives[0]
         if timed.end_time > timed.start_time > 0:
             return timed.end_time - timed.start_time
-    return now - began if began is not None else 0.0
+    return 0.0
 
 
 class Plausible:
-    def __init__(self, clock: Clock = time.monotonic) -> None:
-        self._clock = clock
-        self._began: float | None = None
-
     def __call__(self, events: Events) -> Events:
         return self._sieve(events)
 
     def impossible(self, event: stt.SpeechEvent) -> bool:
         text = text_of(event)
-        seconds = spoken_for(event, self._began, self._clock())
+        seconds = spoken_for(event)
         if not (looped(text) or too_fast(text, seconds)):
             return False
         log.info(
@@ -60,11 +54,12 @@ class Plausible:
 
     async def _sieve(self, events: Events) -> AsyncIterator[stt.SpeechEvent | str]:
         async for event in events:
-            if isinstance(event, stt.SpeechEvent):
-                if event.type is stt.SpeechEventType.START_OF_SPEECH:
-                    self._began = self._clock()
-                if event.type in TRANSCRIPTS and self.impossible(event):
-                    continue
+            if (
+                isinstance(event, stt.SpeechEvent)
+                and event.type in TRANSCRIPTS
+                and self.impossible(event)
+            ):
+                continue
             yield event
 
 
