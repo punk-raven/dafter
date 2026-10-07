@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
-from dafter_runtime.backchannel import Events
+from dafter_runtime.backchannel import Events, Filter
 from dafter_runtime.naming import words
 from dafter_runtime.own_voice import OwnVoice, missed, recognized_as
 from livekit.agents import AgentSession, LanguageCode, stt
@@ -157,4 +157,70 @@ def test_the_ear_drops_the_echo_and_reports_the_line_once() -> None:
         return [e async for e in heard]
 
     assert asyncio.run(hear()) == [sent[0], sent[3]]
+    assert echoed == [True]
+
+
+def test_a_fragment_of_one_or_two_letters_is_not_a_word_cut_short() -> None:
+    assert not recognized_as("a", "agreement")
+    assert not recognized_as("re", "rental")
+    assert recognized_as("ren", "rental")
+    assert recognized_as("is", "is")
+
+
+def test_a_stop_the_agent_never_said_is_never_its_echo() -> None:
+    clock = Clock()
+    voice = speaking(clock, REPLY)
+    clock.now += 1
+    onset = clock.now - 0.2
+    assert not voice.echoes("stop", onset, echoing=True)
+    assert not voice.echoes("रुको", onset, echoing=True)
+    said_it = speaking(clock, "बस एक second, मैं check करती हूँ")
+    clock.now += 1
+    assert said_it.echoes("बस", clock.now - 0.2, echoing=True)
+
+
+def ear_hears(ear: Filter, *texts: str) -> list[str]:
+    async def hear() -> list[str]:
+        async def events() -> AsyncIterator[stt.SpeechEvent | str]:
+            for text in texts:
+                yield transcript(stt.SpeechEventType.FINAL_TRANSCRIPT, text)
+
+        return [text_of_event(e) async for e in ear(events())]
+
+    return asyncio.run(hear())
+
+
+def text_of_event(event: stt.SpeechEvent | str) -> str:
+    return event if isinstance(event, str) else event.alternatives[0].text
+
+
+def test_one_word_like_the_agents_is_dropped_without_marking_the_line() -> None:
+    clock = Clock()
+    voice = speaking(clock, REPLY)
+    listening = Listening()
+    echoed: list[bool] = []
+    ear = voice.hearing(cast(AgentSession[Any], listening), lambda: echoed.append(True))
+    listening.starts_speaking()
+    assert ear_hears(ear, "notice", "wait wait") == ["wait wait"]
+    assert echoed == []
+
+
+def test_an_echo_is_ignored_for_the_reply_it_was_heard_in_not_for_the_whole_call() -> None:
+    clock = Clock()
+    voice = speaking(clock, REPLY)
+    listening = Listening()
+    echoed: list[bool] = []
+    ear = voice.hearing(cast(AgentSession[Any], listening), lambda: echoed.append(True))
+    listening.starts_speaking()
+    assert ear_hears(ear, "Keep your rental agreement", "complete") == []
+    assert echoed == [True]
+
+    clock.now += 2
+    voice.quiet()
+    clock.now += 5
+    voice.speaking()
+    voice.said("The legal notice is due on Monday.")
+    clock.now += 1
+    listening.starts_speaking()
+    assert ear_hears(ear, "wait wait") == ["wait wait"]
     assert echoed == [True]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -9,6 +10,8 @@ from livekit.agents.tokenize.basic import split_words
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 
 from .addressing import Clock, Schedule, Timer
+
+log = logging.getLogger("dafter.runtime.barge_in")
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +126,7 @@ class BargeIn:
             return
         if self._resume is not None and self._resume.pause():
             self._paused = True
+            log.info("the agent paused for a voice over it", extra={"participant": speaker})
 
     def _hold_resume(self) -> None:
         if self._resuming is not None:
@@ -134,6 +138,7 @@ class BargeIn:
         if self._paused and self._resume is not None:
             self._paused = False
             self._resume.resume()
+            log.info("the agent resumed: no words came")
 
     def _try(self, speaker: str, hearing: Hearing) -> None:
         if speaker != self._caller():

@@ -109,7 +109,7 @@ class Room:
         return None
 
 
-def echoed_called(*heard: tuple[str, ...]) -> Outcome:
+def echoed_called(*heard: tuple[str, ...], then: tuple[tuple[str, ...], ...] = ()) -> Outcome:
     p = planned("transcript")
 
     async def run() -> Outcome:
@@ -156,6 +156,15 @@ def echoed_called(*heard: tuple[str, ...]) -> Outcome:
             await hears(recognizer, detector, says, speaker)
         await asyncio.wait_for(asyncio.ensure_future(_done(reply)), 10)
         await asyncio.sleep(0.6)
+        if then:
+            called.gate.wake(ASHA)
+            reply = called.voice.reply
+            assert reply is not None
+            await until(lambda: voice_session.agent_state == "speaking")
+            for says in then:
+                await hears(recognizer, detector, says, speaker)
+            await asyncio.wait_for(asyncio.ensure_future(_done(reply)), 10)
+            await asyncio.sleep(0.6)
         outcome = Outcome(reply.interrupted, turns, speaker.pauses)
         await listening.aclose()
         await voice_session.aclose()
@@ -188,3 +197,13 @@ def test_a_called_agent_on_an_echoing_line_is_still_cut_by_the_caller() -> None:
     outcome = echoed_called(REPLY_ECHO, CALLER)
     assert outcome.interrupted
     assert outcome.turns == [CALLER[-1]]
+
+
+def test_on_an_echoing_line_the_caller_still_stops_the_agent_with_a_short_stop() -> None:
+    outcome = echoed_called(REPLY_ECHO, ("रुको",))
+    assert outcome.interrupted
+
+
+def test_an_echo_on_one_reply_does_not_deafen_the_caller_on_the_next() -> None:
+    outcome = echoed_called(REPLY_ECHO, then=(("सुनो", "सुनो ज़रा"),))
+    assert outcome.interrupted
