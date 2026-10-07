@@ -3,15 +3,19 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterable, AsyncIterator
 
+import pytest
 from dafter_runtime.history import (
     HISTORY_ITEMS,
     instructions_of,
+    last_turn,
+    recovering,
     repeats,
     replies,
     tidy,
     unrepeated,
+    well_formed,
 )
-from livekit.agents import llm
+from livekit.agents import APIStatusError, llm
 
 CLASS_ANSWER = "అరె సారీ అండి నేను ఒక AIని నాకు డైరెక్ట్గా క్లాస్ ఎత్తే ఆప్షన్ ఉండదు, మీ ప్రొఫెసర్ని కానీ అడ్మిన్ని కానీ కాంటాక్ట్ చేయండి."
 STORY_ONE = "Sure, here it goes. There was once a king who loved his garden."
@@ -97,3 +101,70 @@ def test_a_new_reply_is_spoken_whole_and_never_asked_for_again() -> None:
     chunks = ("Sure, here's ", "another one. ", "A clever fox ", "lived near a big river.")
     assert spoken(unrepeated(stream(*chunks), again, [STORY_ONE])) == "".join(chunks)
     assert spoken(unrepeated(stream("సరే."), again, ["సరే."])) == "సరే."
+
+
+def went_quiet_then_called_again() -> llm.ChatContext:
+    ctx = call(
+        ("user", "[Speaker 1, to you] Nivya, that is all, be quiet now", False),
+        ("assistant", "Okay, talk later.", False),
+    )
+    ctx.items.append(llm.FunctionCall(call_id="call_1", name="go_quiet", arguments="{}"))
+    ctx.items.append(
+        llm.FunctionCallOutput(call_id="call_1", name="go_quiet", output="", is_error=False)
+    )
+    ctx.add_message(role="user", content="[Speaker 1, to you] Nivya, are you there?")
+    return ctx
+
+
+def test_a_tool_that_ended_the_turn_is_sent_with_an_answer_sarvam_accepts() -> None:
+    kept = tidy(went_quiet_then_called_again())
+    [answer] = [item for item in kept.items if isinstance(item, llm.FunctionCallOutput)]
+    assert answer.output == "done"
+    assert said(kept)[-1] == ("user", "[Speaker 1, to you] Nivya, are you there?")
+
+
+def test_a_call_without_its_answer_an_answer_without_its_call_and_empty_turns_are_left_out() -> (
+    None
+):
+    ctx = call(("user", "Nivya, what time is it?", False), ("assistant", "  ", False))
+    ctx.items.append(llm.FunctionCall(call_id="lost", name="current_time", arguments="{}"))
+    ctx.items.append(
+        llm.FunctionCallOutput(
+            call_id="orphan", name="current_time", output="10:30", is_error=False
+        )
+    )
+    kept = well_formed(ctx)
+    assert [item.type for item in kept.items] == ["message", "message"]
+    assert said(kept) == [("system", "You are Nivya."), ("user", "Nivya, what time is it?")]
+
+
+def test_the_last_turn_alone_is_her_instructions_and_the_latest_question() -> None:
+    minimal = last_turn(went_quiet_then_called_again())
+    assert said(minimal) == [
+        ("system", "You are Nivya."),
+        ("user", "[Speaker 1, to you] Nivya, are you there?"),
+    ]
+
+
+def refused() -> APIStatusError:
+    return APIStatusError("tool content empty", status_code=400, retryable=False)
+
+
+async def failing(after: int) -> AsyncIterator[str]:
+    for n in range(after):
+        yield f"part {n} "
+    raise refused()
+
+
+def test_a_refused_request_is_asked_again_with_only_the_last_turn() -> None:
+    assert (
+        spoken(recovering(failing(0), lambda: stream("Yes, ", "I am here."))) == "Yes, I am here."
+    )
+
+
+def test_a_reply_that_fails_after_it_started_is_not_asked_again() -> None:
+    def again() -> AsyncIterator[str]:
+        raise AssertionError("a started reply is never sent again")
+
+    with pytest.raises(APIStatusError):
+        spoken(recovering(failing(1), again))

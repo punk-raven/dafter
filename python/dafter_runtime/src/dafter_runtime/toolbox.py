@@ -18,7 +18,15 @@ from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowl
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
-from .history import REPEATED, instructions_of, replies, tidy, unrepeated
+from .history import (
+    REPEATED,
+    instructions_of,
+    last_turn,
+    recovering,
+    replies,
+    tidy,
+    unrepeated,
+)
 from .labels import unlabeled, unquoted
 from .listeners import is_human
 from .naming import words
@@ -95,8 +103,13 @@ class Answering(Agent):
             update_instructions(asked, instructions=reminder, add_if_missing=True)
             return unlabeled(Agent.default.llm_node(self, asked, tools, model_settings))
 
+        def plain() -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
+            return unlabeled(
+                Agent.default.llm_node(self, last_turn(chat_ctx), tools, model_settings)
+            )
+
         first = unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
-        return unrepeated(first, again, replies(chat_ctx))
+        return unrepeated(recovering(first, plain), again, replies(chat_ctx))
 
     def tts_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings

@@ -4,7 +4,7 @@ import logging
 from collections.abc import AsyncIterable, AsyncIterator, Callable
 from difflib import SequenceMatcher
 
-from livekit.agents import FlushSentinel
+from livekit.agents import APIStatusError, FlushSentinel
 from livekit.agents import llm as lk_llm
 
 from .naming import words
@@ -21,13 +21,72 @@ REPEATED = (
     "it. If you are not sure what they mean, ask them in a few words to say it again."
 )
 
+STOPPED_TOOL = "done"
+
 Chunk = lk_llm.ChatChunk | str | FlushSentinel
 
 
 def tidy(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
     kept = chat_ctx.copy()
     kept.items[:] = [item for item in kept.items if not cut_short(item)]
-    return kept.truncate(max_items=HISTORY_ITEMS)
+    return well_formed(kept.truncate(max_items=HISTORY_ITEMS))
+
+
+def well_formed(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
+    called = {item.call_id for item in chat_ctx.items if isinstance(item, lk_llm.FunctionCall)}
+    answered = {
+        item.call_id for item in chat_ctx.items if isinstance(item, lk_llm.FunctionCallOutput)
+    }
+    kept: list[lk_llm.ChatItem] = []
+    for item in chat_ctx.items:
+        if isinstance(item, lk_llm.FunctionCall) and item.call_id not in answered:
+            continue
+        if isinstance(item, lk_llm.FunctionCallOutput):
+            if item.call_id not in called:
+                continue
+            if not item.output.strip():
+                item = item.model_copy(update={"output": STOPPED_TOOL})
+        if (
+            isinstance(item, lk_llm.ChatMessage)
+            and item.role in ("user", "assistant")
+            and not (item.text_content or "").strip()
+        ):
+            continue
+        kept.append(item)
+    chat_ctx.items[:] = kept
+    return chat_ctx
+
+
+def last_turn(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
+    minimal = lk_llm.ChatContext()
+    asked = [
+        item
+        for item in chat_ctx.items
+        if isinstance(item, lk_llm.ChatMessage) and (item.text_content or "").strip()
+    ]
+    instructions = [m for m in asked if m.role in ("system", "developer")][:1]
+    users = [m for m in asked if m.role == "user"][-1:]
+    minimal.items[:] = [*instructions, *users]
+    return minimal
+
+
+async def recovering(
+    first: AsyncIterable[Chunk], fallback: Callable[[], AsyncIterable[Chunk]]
+) -> AsyncIterator[Chunk]:
+    started = False
+    try:
+        async for chunk in first:
+            started = True
+            yield chunk
+    except APIStatusError as exc:
+        if started or exc.retryable:
+            raise
+        log.warning(
+            "the model refused the request, it is asked again with only the last turn",
+            extra={"status": exc.status_code},
+        )
+        async for chunk in fallback():
+            yield chunk
 
 
 def cut_short(item: lk_llm.ChatItem) -> bool:
@@ -110,8 +169,11 @@ __all__ = [
     "REPEATED",
     "cut_short",
     "instructions_of",
+    "last_turn",
+    "recovering",
     "repeats",
     "replies",
     "tidy",
     "unrepeated",
+    "well_formed",
 ]
