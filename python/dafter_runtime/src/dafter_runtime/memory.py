@@ -8,7 +8,6 @@ from typing import Any
 from livekit.agents import llm as lk_llm
 from livekit.agents.voice.generation import update_instructions
 
-from .everyday import STAY_SILENT
 from .history import cut_short, instructions_of, well_formed
 
 log = logging.getLogger("dafter.runtime.memory")
@@ -32,12 +31,6 @@ Summarise = Callable[[str], Awaitable[str]]
 
 def is_instructions(item: lk_llm.ChatItem) -> bool:
     return isinstance(item, lk_llm.ChatMessage) and item.role in ("system", "developer")
-
-
-def silent(item: lk_llm.ChatItem) -> bool:
-    if isinstance(item, (lk_llm.FunctionCall, lk_llm.FunctionCallOutput)):
-        return item.name == STAY_SILENT
-    return False
 
 
 def tokens(item: lk_llm.ChatItem) -> int:
@@ -84,11 +77,7 @@ class Memory:
 
     def context(self, chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
         kept = chat_ctx.copy()
-        items = [
-            item
-            for item in kept.items
-            if not cut_short(item) and not silent(item) and item.id not in self._folded
-        ]
+        items = [item for item in kept.items if not cut_short(item) and item.id not in self._folded]
         head = [item for item in items if is_instructions(item)][:1]
         body = [item for item in items if not is_instructions(item)]
         size = sum(tokens(item) for item in body)
@@ -139,4 +128,4 @@ class Memory:
         log.info("earlier turns were folded into the summary", extra={"turns": len(oldest)})
 
 
-__all__ = ["EARLIER", "Memory", "minutes_of", "silent", "summarised", "tokens"]
+__all__ = ["EARLIER", "Memory", "is_instructions", "minutes_of", "summarised", "tokens"]

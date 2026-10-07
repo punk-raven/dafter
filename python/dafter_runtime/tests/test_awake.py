@@ -141,25 +141,6 @@ def test_a_line_said_to_the_room_is_judged_and_one_said_to_her_is_not() -> None:
     assert not judged(ctx)
 
 
-def silent_turn(ctx: llm.ChatContext, n: int) -> None:
-    ctx.add_message(role="user", content=f"[Ravi, to the room] chat {n}")
-    ctx.items.append(llm.FunctionCall(call_id=f"s{n}", name="stay_silent", arguments="{}"))
-    ctx.items.append(
-        llm.FunctionCallOutput(call_id=f"s{n}", name="stay_silent", output="", is_error=False)
-    )
-
-
-def test_her_silences_leave_no_trace_in_what_she_reads_but_the_lines_stay() -> None:
-    ctx = llm.ChatContext()
-    ctx.add_message(role="system", content="You are Nivya.")
-    for n in range(3):
-        silent_turn(ctx, n)
-    ctx.add_message(role="user", content="[Asha, to you] Nivya, what did Ravi say?")
-    kept = Memory(None).context(ctx)
-    assert [type(i).__name__ for i in kept.items] == ["ChatMessage"] * 5
-    assert text_of(kept.items[1]) == "[Ravi, to the room] chat 0"
-
-
 def test_a_long_call_is_folded_into_running_minutes_she_reads_with_her_instructions() -> None:
     prompts: list[str] = []
 

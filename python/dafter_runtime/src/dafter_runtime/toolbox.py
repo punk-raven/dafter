@@ -17,14 +17,7 @@ from .answering import Roster
 from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
-from .everyday import (
-    STAY_SILENT,
-    current_time,
-    go_quiet,
-    stay_silent,
-    switch_language,
-    who_is_here,
-)
+from .everyday import current_time, go_quiet, switch_language, who_is_here
 from .history import (
     REPEATED,
     instructions_of,
@@ -34,6 +27,7 @@ from .history import (
     replies,
     unrepeated,
 )
+from .judging import decided, meant_for_her
 from .labels import unlabeled, unquoted
 from .listeners import is_human
 from .memory import Memory, summarised
@@ -57,8 +51,10 @@ class Answering(Agent):
         acknowledgements: Acknowledgements | None = None,
         delivery: Delivery | None = None,
         switching: Switching | None = None,
+        name: str = "",
     ):
         super().__init__(instructions=instructions, tools=registry.function_tools())
+        self._name = name
         self._registry = registry
         self._caller = caller
         self._persona = instructions
@@ -113,8 +109,6 @@ class Answering(Agent):
             self._delivery.heard(chat_ctx)
             self._delivery.filler.generating()
         chat_ctx = self._remembered(chat_ctx)
-        if not judged(chat_ctx):
-            tools = [tool for tool in tools if getattr(tool, "id", None) != STAY_SILENT]
         if self._switching is not None:
             instructions = self._briefed(self._switching.persona.instructions)
             update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
@@ -130,8 +124,12 @@ class Answering(Agent):
                 Agent.default.llm_node(self, last_turn(chat_ctx), tools, model_settings)
             )
 
-        first = unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
-        return unrepeated(recovering(first, plain), again, replies(chat_ctx))
+        first = recovering(
+            unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings)), plain
+        )
+        if judged(chat_ctx) and isinstance(model := self.session.llm, lk_llm.LLM):
+            first = decided(first, meant_for_her(model, chat_ctx, self._name))
+        return unrepeated(first, again, replies(chat_ctx))
 
     def tts_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
@@ -201,16 +199,11 @@ def follow(room: rtc.Room, roster: Roster) -> None:
 
 
 def everyday(
-    roster: Roster,
-    sleep: Callable[[], None] | None,
-    switching: Switching | None = None,
-    judges: bool = False,
+    roster: Roster, sleep: Callable[[], None] | None, switching: Switching | None = None
 ) -> list[Tool]:
     tools = [current_time(), who_is_here(roster.present)]
     if sleep is not None:
         tools.append(go_quiet(sleep))
-    if judges:
-        tools.append(stay_silent())
     if switching is not None and switching.enabled:
         tools.append(switch_language(switching.languages, switching.ask))
     return tools
@@ -227,8 +220,7 @@ def registry_for(
     scribing: Scribing | None = None,
 ) -> Registry:
     filler = delivery.filler if delivery is not None else None
-    judges = sleep is not None and p.config.agent.addressing.stays_awake
-    tools = everyday(roster, sleep, switching, judges)
+    tools = everyday(roster, sleep, switching)
     if scribing is not None:
         tools.extend(scribing.tools(caller))
     return Registry(

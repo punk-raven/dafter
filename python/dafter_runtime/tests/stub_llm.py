@@ -13,6 +13,13 @@ PROMPT_TOKENS = 50
 COMPLETION_TOKENS = 7
 
 
+def judging(chat_ctx: llm.ChatContext) -> bool:
+    first = chat_ctx.items[0] if chat_ctx.items else None
+    return isinstance(first, llm.ChatMessage) and (first.text_content or "").startswith(
+        "You listen to a live group call"
+    )
+
+
 class StubStream(llm.LLMStream):
     def __init__(
         self,
@@ -25,6 +32,9 @@ class StubStream(llm.LLMStream):
         super().__init__(owner, chat_ctx=chat_ctx, tools=tools, conn_options=conn_options)
         self._reply = owner.reply
         self._call = owner.calls.pop(0) if owner.calls else None
+        if judging(chat_ctx):
+            self._reply = owner.verdicts.pop(0) if owner.verdicts else "NO"
+            self._call = None
 
     async def _run(self) -> None:
         delta = llm.ChoiceDelta(role="assistant", content=self._reply)
@@ -44,9 +54,16 @@ class StubStream(llm.LLMStream):
 
 
 class StubLLM(llm.LLM[Any]):
-    def __init__(self, reply: str = REPLY, calls: Sequence[Call] | None = None) -> None:
+    def __init__(
+        self,
+        reply: str = REPLY,
+        calls: Sequence[Call] | None = None,
+        verdicts: Sequence[str] = (),
+    ) -> None:
         super().__init__()
         self.reply = reply
+        self.verdicts = list(verdicts)
+        self.judged: list[llm.ChatContext] = []
         self.calls: list[Call] = list(calls or [])
         self.requests: list[llm.ChatContext] = []
         self.offered: list[list[str]] = []
@@ -69,8 +86,11 @@ class StubLLM(llm.LLM[Any]):
         tool_choice: NotGivenOr[llm.ToolChoice] = NOT_GIVEN,
         extra_kwargs: NotGivenOr[dict[str, Any]] = NOT_GIVEN,
     ) -> llm.LLMStream:
-        self.requests.append(chat_ctx.copy())
-        self.offered.append(sorted(t.id for t in tools or []))
+        if judging(chat_ctx):
+            self.judged.append(chat_ctx.copy())
+        else:
+            self.requests.append(chat_ctx.copy())
+            self.offered.append(sorted(t.id for t in tools or []))
         return StubStream(self, chat_ctx=chat_ctx, tools=tools or [], conn_options=conn_options)
 
 

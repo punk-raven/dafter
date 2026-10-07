@@ -16,7 +16,7 @@ from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.toolbox import Answering, registry_for
 from dafter_runtime.worker import room_options
-from livekit.agents import AgentSession, llm
+from livekit.agents import AgentSession
 from stub_llm import REPLY, StubLLM, said
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
@@ -96,7 +96,12 @@ class Call:
             p, session, self.roster, lambda: self.gate.addressee, self.gate.go_quiet
         )
         self.voice.before_answer = self.registry.heard
-        self.agent = Answering(p.persona.instructions, self.registry, lambda: self.gate.addressee)
+        self.agent = Answering(
+            p.persona.instructions,
+            self.registry,
+            lambda: self.gate.addressee,
+            name=p.config.agent.name or "",
+        )
 
     async def _publish(self, body: bytes) -> None:
         self.sent.append(body)
@@ -115,9 +120,10 @@ def run_call(
     script: Callable[[Call, StubLLM], Any],
     calls: list[str] | None = None,
     stays_awake: bool = False,
+    verdicts: tuple[str, ...] | list[str] = (),
 ) -> StubLLM:
     p = called_plan(stays_awake)
-    stub = StubLLM(calls=calls)
+    stub = StubLLM(calls=calls, verdicts=verdicts)
 
     async def run() -> None:
         async with AgentSession[None](llm=stub) as session:
@@ -368,26 +374,23 @@ def test_only_a_well_formed_wake_command_is_read() -> None:
         assert command(data) is None
 
 
-def test_an_awake_agent_may_stay_silent_on_a_line_to_the_room_but_never_on_her_name() -> None:
+def test_an_awake_agent_answers_a_line_to_the_room_only_when_it_is_judged_meant_for_her() -> None:
     async def script(call: Call, stub: StubLLM) -> None:
         call.gate.heard(ASHA, "Nivya, what time is it?")
         await call.answered()
         call.gate.heard(RAVI, "Asha, are you coming on Saturday?")
         await call.answered()
         assert not call.gate.dormant
-        call.gate.heard(ASHA, "what time does it start?")
+        call.gate.heard(ASHA, "and what is the weather there?")
         await call.answered()
 
-    stub = run_call(script, calls=["", "stay_silent"], stays_awake=True)
-    assert len(stub.requests) == 3
-    assert "stay_silent" not in stub.offered[0]
-    assert "stay_silent" in stub.offered[1]
-    asked = said(stub.requests[2])
-    assert asked[-2:] == [
+    stub = run_call(script, stays_awake=True, verdicts=["NO", "YES"])
+    assert len(stub.judged) == 2, "her name is never judged, each line to the room is"
+    assert len(stub.requests) == 2, "a line judged not for her is never sent for a reply"
+    replies = [m for m in said(stub.requests[1]) if m[0] == "assistant"]
+    assert replies == [("assistant", REPLY)], "the line judged not for her got no reply"
+    assert said(stub.requests[1])[-2:] == [
         ("user", "[Speaker 2, to the room] Asha, are you coming on Saturday?"),
-        ("user", "[Speaker 1, to the room] what time does it start?"),
+        ("user", "[Speaker 1, to the room] and what is the weather there?"),
     ]
-    assert not any(
-        isinstance(item, llm.FunctionCall | llm.FunctionCallOutput)
-        for item in stub.requests[2].items
-    ), "a silence leaves no tool call or empty answer behind"
+    assert "[Speaker 1] and what is the weather there?" in (said(stub.judged[1])[-1][1] or "")

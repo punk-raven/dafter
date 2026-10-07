@@ -376,6 +376,7 @@ async def entrypoint(ctx: JobContext) -> None:
         Acknowledgements.of(p.config.turn.interruption.backchannel),
         delivery,
         switching,
+        name=p.config.agent.name or "",
     )
     if scribing is not None:
         scribing.briefed = lambda: agent.brief(scribing.context())
