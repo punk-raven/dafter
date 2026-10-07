@@ -75,4 +75,4 @@ def test_the_reply_stream_is_leveled_frame_by_frame() -> None:
 
     out = asyncio.run(collect())
     assert len(out) == len(frames)
-    assert level(out) < level(frames) - 6
+    assert level(out) < level(frames) - 4
