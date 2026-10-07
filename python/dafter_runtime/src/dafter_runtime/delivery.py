@@ -8,6 +8,7 @@ import weakref
 from collections.abc import AsyncIterable, AsyncIterator, Callable
 from typing import Any
 
+from dafter_core.config import AudioProfile
 from dafter_core.enums import Situation
 from dafter_core.speech import Fillers, PhrasesByLanguage, Situations, Speech, every_phrase
 from livekit import rtc
@@ -237,9 +238,10 @@ class Filler:
 
 
 class Delivery:
-    def __init__(self, speech: Speech, language: str) -> None:
+    def __init__(self, speech: Speech, language: str, audio: AudioProfile | None = None) -> None:
         self._situational = Situational(speech.situations)
-        self.own_voice = OwnVoice()
+        cancels_echo = audio is None or audio.echo_cancellation is not False
+        self.own_voice = OwnVoice(cancels_echo=cancels_echo)
         self.filler = Filler(speech.fillers, language, self.own_voice.said)
         self.situation = self._situational.opening()
 

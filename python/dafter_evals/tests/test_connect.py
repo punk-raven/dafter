@@ -33,6 +33,15 @@ def test_the_harness_asks_for_an_agent_that_greets_and_answers_every_turn() -> N
     assert session_overrides({"agent": {"greets": False}})["agent"]["greets"] is False
 
 
+def test_a_probe_that_feeds_back_the_agents_voice_states_a_line_without_echo_cancellation() -> None:
+    assert "media" not in session_overrides(None)
+    given = {"media": {"audio": {"red": False}, "video": {"enabled": False}}}
+    assert session_overrides(given, echoes=True)["media"] == {
+        "audio": {"red": False, "echoCancellation": False},
+        "video": {"enabled": False},
+    }
+
+
 class Unreachable(Probe):
     def __init__(self) -> None:
         super().__init__()

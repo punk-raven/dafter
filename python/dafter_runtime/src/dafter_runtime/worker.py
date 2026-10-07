@@ -343,7 +343,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(flush)
     switching = Switching(p.config.agent.language_switching, p.config.language, p.personas)
     captions = captions_for(p, events)
-    delivery = Delivery(p.config.agent.speech, p.config.language)
+    delivery = Delivery(p.config.agent.speech, p.config.language, p.config.media.audio)
     follow_language(switching, speech_plan, delivery, stages)
     called = (
         Called(ctx, p, stages, session, stt_sample_rate(p), switching, delivery, captions)
