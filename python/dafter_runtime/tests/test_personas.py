@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import pytest
 from dafter_runtime.personas import (
+    CASUAL_ENGLISH,
+    CASUAL_TALK,
     DEFAULT_REF,
     EVERYDAY_ENGLISH,
     FEMININE,
     SCRIPTS,
+    SUPPORT_REF,
+    SUPPORT_TALK,
     persona_for,
     written_in,
 )
@@ -14,7 +18,7 @@ NAME = "Nivya"
 ALIASES = ("निव्या", "ನಿವ್ಯ", "ನಿವ್ಯಾ", "నివ్య", "నివ్యా")
 SPOKEN = {"hi": "निव्या", "mr": "निव्या", "kn": "ನಿವ್ಯ", "te": "నివ్య", "en": "Nivya"}
 LANGUAGES = ("hi", "en", "kn", "mr", "te")
-REFS = (DEFAULT_REF, "persona://support/v3")
+REFS = (DEFAULT_REF, SUPPORT_REF)
 EVERY = [(ref, language) for ref in REFS for language in LANGUAGES]
 MASCULINE = {
     "hi": ("सकता", "रहा हूँ", "देखता", "बताता"),
@@ -62,7 +66,29 @@ def test_an_indic_persona_keeps_everyday_english_words_in_latin_script(
 ) -> None:
     instructions = persona_for(ref, language, NAME).instructions
     assert "Latin script" in instructions
-    assert all(word in instructions for word in EVERYDAY_ENGLISH)
+    everyday = EVERYDAY_ENGLISH if ref == SUPPORT_REF else CASUAL_ENGLISH
+    assert all(word in instructions for word in everyday)
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_default_agent_is_a_friend_on_the_call_not_a_support_line(language: str) -> None:
+    instructions = persona_for(DEFAULT_REF, language, NAME).instructions
+    assert "casual group call, never like a support line" in instructions
+    assert not any(word in instructions for word in ("order cancel", "refund", "delivery"))
+    assert CASUAL_TALK.examples[language] in instructions
+    support = persona_for(SUPPORT_REF, language, NAME).instructions
+    assert SUPPORT_TALK.examples[language] in support
+
+
+@pytest.mark.parametrize(("ref", "language"), EVERY)
+def test_the_agent_asks_again_instead_of_guessing_and_never_repeats_an_answer(
+    ref: str, language: str
+) -> None:
+    instructions = persona_for(ref, language, NAME).instructions
+    assert "ask in a few words for it again instead of guessing" in instructions
+    assert "Never repeat an answer you already gave in this call" in instructions
+    assert "never give it as the reason you cannot do something" in instructions
+    assert "never stop to ask the listener a question" in instructions
 
 
 @pytest.mark.parametrize(("ref", "language"), EVERY)
