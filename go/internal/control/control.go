@@ -321,6 +321,10 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = config.RoleParticipant
 	}
+	if sess.Ended() {
+		s.fail(w, located(errs.CodeSessionEnded, "/sessionId", "this call has ended because everyone left; start a new call"))
+		return
+	}
 	if err := consentToRecording(cfg, req.RecordingConsent); err != nil {
 		s.fail(w, err)
 		return
@@ -407,6 +411,8 @@ func statusFor(code errs.ErrorCode) int {
 		return http.StatusBadRequest
 	case errs.CodeAuthenticationFailed:
 		return http.StatusUnauthorized
+	case errs.CodeSessionEnded:
+		return http.StatusGone
 	case errs.CodeQuotaExceeded, errs.CodeBudgetExceeded, errs.CodeRateLimited:
 		return http.StatusTooManyRequests
 	case errs.CodeProviderUnavailable, errs.CodeProviderTimeout:

@@ -173,6 +173,24 @@ test('a call started without the agent asks for no transcription, because only t
   assert.deepEqual(calls[0].body.overrides.transcription, { mode: 'off' });
 });
 
+test('a link to a call that has ended says so instead of offering to join it', async () => {
+  const answers = { [`/sessions/${ROOM}`]: [200, { sessionId: ROOM, room: ROOM, config: RECORDED, endedAt: '2026-10-06T20:00:00Z' }] };
+  const { calls, elements } = page({ search: `?room=${ROOM}`, answers });
+  await settled();
+  assert.deepEqual(calls, [{ url: `/sessions/${ROOM}` }]);
+  assert.match(elements.get('lobby-error').textContent, /has ended/);
+  assert.equal(elements.get('btn-start').textContent, 'Start a call');
+  assert.equal(elements.get('recording-notice').hidden, true);
+});
+
+test('a join refused because the call ended says so', async () => {
+  const ended = [410, { code: 'session_ended', message: 'refused' }];
+  const { run, elements } = page({ answers: { [`/sessions/${ROOM}/join`]: ended } });
+  run(`document.getElementById('room-id').value = '${ROOM}'`);
+  assert.equal(await run('joinRoom()'), false);
+  assert.match(elements.get('lobby-error').textContent, /has ended/);
+});
+
 test('a call link cannot start a new call while it is still being opened', async () => {
   let release;
   const pending = new Promise((resolve) => { release = resolve; });

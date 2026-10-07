@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
@@ -15,14 +16,20 @@ import (
 )
 
 const (
-	EventTrackPublished = "track_published"
-	maxWebhookBytes     = 1 << 20
+	EventTrackPublished    = "track_published"
+	EventParticipantJoined = "participant_joined"
+	EventEgressEnded       = "egress_ended"
+	EventRoomFinished      = "room_finished"
+	maxWebhookBytes        = 1 << 20
 )
 
 type Webhook struct {
-	Event   string
-	Room    string
-	TrackID string
+	Event       string
+	Room        string
+	TrackID     string
+	Participant string
+	Egress      EgressInfo
+	At          time.Time
 }
 
 type webhookClaims struct {
@@ -38,6 +45,11 @@ type webhookJSON struct {
 	Track struct {
 		SID string `json:"sid"`
 	} `json:"track"`
+	Participant struct {
+		Identity string `json:"identity"`
+	} `json:"participant"`
+	EgressInfo *egressInfoJSON `json:"egressInfo"`
+	CreatedAt  int64JSON       `json:"createdAt"`
 }
 
 func (l *LiveKit) ReadWebhook(r *http.Request) (Webhook, error) {
@@ -61,5 +73,18 @@ func (l *LiveKit) ReadWebhook(r *http.Request) (Webhook, error) {
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return Webhook{}, errs.Wrap(errs.CodeInvalidConfig, err, "decode webhook")
 	}
-	return Webhook{Event: parsed.Event, Room: parsed.Room.Name, TrackID: parsed.Track.SID}, nil
+	hook := Webhook{
+		Event: parsed.Event, Room: parsed.Room.Name, TrackID: parsed.Track.SID,
+		Participant: parsed.Participant.Identity,
+	}
+	if parsed.CreatedAt > 0 {
+		hook.At = time.Unix(int64(parsed.CreatedAt), 0).UTC()
+	}
+	if parsed.EgressInfo != nil {
+		hook.Egress = parsed.EgressInfo.info()
+		if hook.Room == "" {
+			hook.Room = hook.Egress.Room
+		}
+	}
+	return hook, nil
 }

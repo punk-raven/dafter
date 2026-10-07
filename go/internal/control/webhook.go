@@ -2,11 +2,13 @@ package control
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/ids"
+	"github.com/punk-raven/dafter/go/internal/state"
 	"github.com/punk-raven/dafter/go/internal/transport"
 )
 
@@ -38,9 +40,66 @@ func (s *Service) background(work func(context.Context)) {
 }
 
 func (s *Service) handleHook(ctx context.Context, hook transport.Webhook) {
-	if hook.Event == transport.EventTrackPublished {
-		s.recordVoice(ctx, hook.Room, hook.TrackID)
+	at := hook.At
+	if at.IsZero() {
+		at = time.Now().UTC()
 	}
+	switch hook.Event {
+	case transport.EventTrackPublished:
+		s.recordVoice(ctx, hook.Room, hook.TrackID)
+	case transport.EventParticipantJoined:
+		if ids.ValidateID(ids.PrefixParticipant, hook.Participant) == nil {
+			if err := s.Store.MarkJoined(ctx, hook.Room, at); err != nil && !errors.Is(err, state.ErrNotFound) {
+				s.log().Warn("session join not recorded", "session", hook.Room, "error", err)
+			}
+		}
+	case transport.EventEgressEnded:
+		s.egressEnded(ctx, hook.Egress)
+	case transport.EventRoomFinished:
+		s.roomFinished(ctx, hook.Room, at)
+	}
+}
+
+func (s *Service) egressEnded(ctx context.Context, info transport.EgressInfo) {
+	if !egressIDPattern.MatchString(info.EgressID) {
+		return
+	}
+	endedAt := info.EndedAt
+	if endedAt.IsZero() {
+		endedAt = time.Now().UTC()
+	}
+	if err := s.Store.StopEgress(ctx, info.EgressID, endedAt); err != nil && !errors.Is(err, state.ErrNotFound) {
+		s.log().Warn("finished recording not settled", "egress", info.EgressID, "error", err)
+	}
+}
+
+func (s *Service) roomFinished(ctx context.Context, sessionID string, at time.Time) {
+	defer s.sessions.lock(sessionID)()
+	ended, err := s.Store.EndSession(ctx, sessionID, at)
+	if err != nil {
+		s.log().Warn("session end not recorded", "session", sessionID, "error", err)
+		return
+	}
+	egresses, err := s.Store.Egresses(ctx, sessionID)
+	if err != nil {
+		s.log().Warn("recordings of a closed room not settled", "session", sessionID, "error", err)
+	}
+	for _, e := range egresses {
+		if !e.Active() {
+			continue
+		}
+		if _, _, err := s.stopEgress(ctx, e); err != nil {
+			s.log().Warn("recording of a closed room not stopped", "session", sessionID, "egress", e.EgressID, "error", err)
+		}
+	}
+	if !ended {
+		return
+	}
+	if err := s.Store.EndDialIn(ctx, sessionID); err != nil && !errors.Is(err, state.ErrNotFound) {
+		s.log().Warn("dial-in of an ended call not closed", "session", sessionID, "error", err)
+	}
+	incSessionEnded()
+	s.log().Info("call ended: everyone left and the room closed", "session", sessionID)
 }
 
 func (s *Service) recordVoice(ctx context.Context, room, trackID string) {
@@ -49,7 +108,7 @@ func (s *Service) recordVoice(ctx context.Context, room, trackID string) {
 	}
 	defer s.voices.release(trackID)
 	sess, err := s.Store.Session(ctx, room)
-	if err != nil {
+	if err != nil || sess.Ended() {
 		return
 	}
 	cfg, err := config.Parse(sess.Config)

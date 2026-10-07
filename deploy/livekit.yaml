@@ -46,6 +46,7 @@ logging:
 # The egress container resolves "livekit" via the compose network.
 room:
   empty_timeout: 300
+  departure_timeout: 20
   max_participants: 10
 
 #turn:

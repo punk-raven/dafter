@@ -86,6 +86,7 @@ type sessionView struct {
 	Recordings    []recordingView `json:"recordings"`
 	AgentRefusal  json.RawMessage `json:"agentRefusal,omitempty"`
 	ScribeRefusal json.RawMessage `json:"scribeRefusal,omitempty"`
+	EndedAt       *time.Time      `json:"endedAt,omitempty"`
 }
 
 func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
@@ -243,7 +244,7 @@ func (s *Service) readSession(w http.ResponseWriter, r *http.Request) {
 	s.write(w, http.StatusOK, sessionView{
 		SessionID: sess.SessionID, Room: sess.Room, ConfigHash: sess.ConfigHash, ReleaseID: sess.ReleaseID,
 		Config: sess.Config, CreatedAt: sess.CreatedAt, Recordings: views,
-		AgentRefusal: sess.AgentRefusal, ScribeRefusal: sess.ScribeRefusal,
+		AgentRefusal: sess.AgentRefusal, ScribeRefusal: sess.ScribeRefusal, EndedAt: endedAt(sess),
 	})
 }
 
@@ -327,4 +328,12 @@ func (s *Service) decodeOptional(w http.ResponseWriter, r *http.Request, into an
 		return false
 	}
 	return true
+}
+
+func endedAt(sess state.Session) *time.Time {
+	if !sess.Ended() {
+		return nil
+	}
+	at := sess.EndedAt
+	return &at
 }

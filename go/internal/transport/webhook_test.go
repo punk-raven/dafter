@@ -51,8 +51,35 @@ func TestAWebhookTheMediaServerSignedIsRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadWebhook: %v", err)
 	}
-	if hook != (transport.Webhook{Event: transport.EventTrackPublished, Room: sessionID, TrackID: audioTrackID}) {
+	if hook.Event != transport.EventTrackPublished || hook.Room != sessionID || hook.TrackID != audioTrackID || hook.Participant != "p_4b81e0d7" {
 		t.Errorf("read %+v", hook)
+	}
+}
+
+func TestEveryEventTheControlPlaneActsOnIsRead(t *testing.T) {
+	t.Parallel()
+	lk := webhookReader(t)
+	read := func(name string) transport.Webhook {
+		t.Helper()
+		hook, err := lk.ReadWebhook(signedWebhook(t, fixture(t, "../webhook/"+name), apiKey, apiSecret, nil))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		return hook
+	}
+	if h := read("participant-joined.json"); h.Event != transport.EventParticipantJoined || h.Room != sessionID || h.Participant != "p_4b81e0d7" || !h.At.Equal(time.Unix(1791316752, 0)) {
+		t.Errorf("participant joined read as %+v", h)
+	}
+	if h := read("participant-joined-agent.json"); h.Participant != "agent-AJ_4w6LsXJWudCx" {
+		t.Errorf("agent joined read as %+v", h)
+	}
+	if h := read("room-finished.json"); h.Event != transport.EventRoomFinished || h.Room != sessionID {
+		t.Errorf("room finished read as %+v", h)
+	}
+	h := read("egress-ended.json")
+	if h.Event != transport.EventEgressEnded || h.Room != sessionID || h.Egress.EgressID != egressID || h.Egress.Status != "EGRESS_COMPLETE" ||
+		!h.Egress.EndedAt.Equal(time.Unix(0, 1791316767140796103)) {
+		t.Errorf("egress ended read as %+v", h)
 	}
 }
 

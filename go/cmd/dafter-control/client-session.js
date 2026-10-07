@@ -122,6 +122,7 @@ async function joinRoom() {
       log(`Join failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
       if (data.code === 'consent_required') await openRoomLobby(roomId);
+      else if (data.code === 'session_ended') showCallEnded();
       else document.getElementById('lobby-error').textContent = 'Could not join this call. Try again in a moment.';
       return false;
     }

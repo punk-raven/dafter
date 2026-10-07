@@ -35,6 +35,11 @@ var (
 		Help: "Total session joins.",
 	})
 
+	sessionsEndedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dafter_sessions_ended_total",
+		Help: "Calls ended because everyone left and the media server closed the room.",
+	})
+
 	sessionCreateDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "dafter_session_create_duration_seconds",
 		Help:    "Session creation latency.",
@@ -72,6 +77,8 @@ var (
 		Help: "Total errors by code.",
 	}, []string{"code"})
 )
+
+func incSessionEnded() { sessionsEndedTotal.Inc() }
 
 func incDispatch(ok bool) {
 	outcome := "failed"

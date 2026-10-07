@@ -84,6 +84,15 @@ function lobbyForSession(room, config) {
   if (window.history && window.history.replaceState) window.history.replaceState(null, '', `?room=${room}`);
 }
 
+function leaveCallLink(error) {
+  showLobby({ error });
+  if (window.history && window.history.replaceState) window.history.replaceState(null, '', '/');
+}
+
+function showCallEnded() {
+  leaveCallLink('This call has ended because everyone left. Start a new call instead.');
+}
+
 async function openRoomLobby(room) {
   document.getElementById('room-id').value = room;
   const btn = document.getElementById('btn-start');
@@ -93,8 +102,11 @@ async function openRoomLobby(room) {
     const data = await resp.json();
     if (!resp.ok) {
       log(`Call link refused: ${data.code} - ${data.message}`, 'error');
-      showLobby({ error: 'This call link is not valid. Start a new call instead.' });
-      if (window.history && window.history.replaceState) window.history.replaceState(null, '', '/');
+      leaveCallLink('This call link is not valid. Start a new call instead.');
+      return;
+    }
+    if (data.endedAt) {
+      showCallEnded();
       return;
     }
     lobbyForSession(room, data.config);

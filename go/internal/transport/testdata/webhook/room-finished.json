@@ -1,0 +1,15 @@
+{
+  "event": "room_finished",
+  "room": {
+    "sid": "RM_vXkrzjH2ouiY",
+    "name": "s_7f3a9c21",
+    "emptyTimeout": 300,
+    "departureTimeout": 20,
+    "maxParticipants": 10,
+    "creationTime": "1791316750",
+    "creationTimeMs": "1791316750412",
+    "activeRecording": true
+  },
+  "id": "EV_7nHc2PxQa9Ke",
+  "createdAt": "1791316790"
+}

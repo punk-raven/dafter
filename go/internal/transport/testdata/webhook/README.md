@@ -13,3 +13,17 @@ HS256 token in `Authorization`, issued under the API key and signed with its
 secret (`webhook.URLNotifier` in `livekit/protocol`).
 
 - `track-published.json`: a browser participant's microphone published
+- `participant-joined.json`: a person joined (kind STANDARD, so absent);
+  `participant-joined-agent.json` is the agent worker joining (kind AGENT).
+  The control plane tells them apart by identity: only a participant id it
+  minted (`p_`) is a person.
+- `egress-ended.json`: a recording finished; `egressInfo` is an `EgressInfo`
+  with `endedAt` in nanoseconds.
+- `room-finished.json`: the media server closed the room, which it does
+  `departureTimeout` seconds after the last participant other than an agent or
+  a recorder left (observed: a room holding only the agent and two egress
+  recorders closed 20 s after the last person left).
+
+The shapes were captured from `livekit/livekit-server` on the dev stack and
+trimmed; the room's `turnPassword` and every egress request (which carries
+storage credentials) are left out.
