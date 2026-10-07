@@ -122,3 +122,11 @@ test('a caller who shouts after being lifted is held below full scale', () => {
   delivered(-42, 30, gate);
   assert.ok(delivered(-4, 2, gate).peak <= 0.9, 'the shout is limited instead of clipping');
 });
+
+test('silence before the caller first speaks does not pre-lift their first words', () => {
+  const gate = newGate();
+  tone(SILENT, 20, gate);
+  assert.equal(gate.makeupDb, 0, 'nothing is lifted until the caller has been heard');
+  const first = delivered(-36, 0.5, gate);
+  assert.ok(first.level < -30, `the first half second arrives near the level it was spoken at, ${first.level.toFixed(1)} dB`);
+});

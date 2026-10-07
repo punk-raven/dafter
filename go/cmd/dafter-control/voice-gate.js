@@ -13,13 +13,13 @@ const GATE_LEVEL_S = 0.03;
 const GATE_LOOKAHEAD_S = 0.03;
 const FAR_END_FLOOR_DB = -50;
 const FAR_END_HOLD_S = 0.5;
-const MAKEUP_VOICE_DB = -24;
+const MAKEUP_VOICE_DB = -22;
 const MAKEUP_MAX_DB = 24;
 const MAKEUP_MIN_DB = -12;
-const MAKEUP_RISE_DB_PER_S = 3;
+const MAKEUP_RISE_DB_PER_S = 6;
 const MAKEUP_FALL_DB_PER_S = 12;
 const LIMIT_CEILING = 0.89;
-const LIMIT_ATTACK_S = 0.005;
+const LIMIT_ATTACK_S = 0.002;
 const LIMIT_RELEASE_S = 0.2;
 
 class SmoothedLevel {
@@ -55,11 +55,14 @@ class NearVoiceGate {
     this.peakAt = 0;
   }
 
-  makeup(seconds) {
+  makeup() {
+    return 10 ** (this.makeupDb / 20);
+  }
+
+  follow(seconds) {
     const wanted = Math.min(MAKEUP_MAX_DB, Math.max(MAKEUP_MIN_DB, MAKEUP_VOICE_DB - this.voice));
     const step = wanted - this.makeupDb;
     this.makeupDb += Math.max(-MAKEUP_FALL_DB_PER_S * seconds, Math.min(MAKEUP_RISE_DB_PER_S * seconds, step));
-    return 10 ** (this.makeupDb / 20);
   }
 
   open(block, far) {
@@ -82,6 +85,7 @@ class NearVoiceGate {
     else if (heard > this.voice) this.voice = Math.min(heard, this.voice + GATE_RISE_DB_PER_S * seconds);
     else this.voice = Math.max(heard, this.voice - GATE_FALL_DB_PER_S * seconds);
     this.voice = Math.max(GATE_LOWEST_DB, this.voice);
+    if (near) this.follow(seconds);
   }
 
   ahead(input) {
@@ -94,7 +98,7 @@ class NearVoiceGate {
 
   apply(input, output, far) {
     const target = this.open(input, far) ? 1 : this.closed;
-    const makeup = this.makeup(input.length / this.rate);
+    const makeup = this.makeup();
     const loudest = this.ahead(input) * makeup;
     const limit = loudest > LIMIT_CEILING ? LIMIT_CEILING / loudest : 1;
     const step = 1 - Math.exp(-1 / ((target > this.gain ? GATE_ATTACK_S : GATE_RELEASE_S) * this.rate));
