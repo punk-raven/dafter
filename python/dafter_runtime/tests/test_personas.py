@@ -91,3 +91,12 @@ def test_the_agent_greets_in_the_feminine(ref: str, language: str) -> None:
     for line in (script.greeting, script.introduction):
         assert not any(form in line for form in MASCULINE[language]), line
         assert any(form in line for form in FEMININE_FORMS[language]), line
+
+
+@pytest.mark.parametrize(("ref", "language"), EVERY)
+def test_replies_stay_short_unless_a_story_or_detail_is_asked_for(ref: str, language: str) -> None:
+    instructions = persona_for(ref, language, NAME).instructions
+    assert "Keep an ordinary reply to one or two short spoken sentences" in instructions
+    assert "a story, an explanation or more detail" in instructions
+    assert "finish it rather than stopping halfway" in instructions
+    assert "Keep every reply to one or two" not in instructions
