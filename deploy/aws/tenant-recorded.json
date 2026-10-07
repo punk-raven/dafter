@@ -8,11 +8,6 @@
   "telephony": {
     "trunk": "vobiz"
   },
-  "agent": {
-    "addressing": {
-      "mode": "manual"
-    }
-  },
   "media": {
     "audio": {
       "noiseCancellation": "rnnoise"

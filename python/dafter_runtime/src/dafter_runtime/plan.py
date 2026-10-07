@@ -109,9 +109,7 @@ def check_encryption(cfg: ResolvedSessionConfig, fetches_keys: bool) -> None:
         )
 
 
-RUNS_ADDRESSING = frozenset(
-    {AddressingMode.ALWAYS, AddressingMode.TRANSCRIPT, AddressingMode.MANUAL}
-)
+RUNS_ADDRESSING = frozenset({AddressingMode.ALWAYS, AddressingMode.TRANSCRIPT})
 
 
 def _check_addressing(cfg: ResolvedSessionConfig) -> None:
@@ -121,7 +119,7 @@ def _check_addressing(cfg: ResolvedSessionConfig) -> None:
             ErrorCode.UNSUPPORTED_CAPABILITY,
             "this worker cannot wait to be called by name in this addressing mode",
             "/agent/addressing/mode",
-            f"{mode} is not built in this worker; always, transcript and manual are",
+            f"{mode} is not built in this worker; always and transcript are",
         )
 
 

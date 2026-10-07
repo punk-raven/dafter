@@ -6,7 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from dafter_core.enums import AddressingMode
 from dafter_core.events import parse_event
 from dafter_core.hashing import seal
 from dafter_runtime.addressing import Gate
@@ -26,9 +25,9 @@ RAVI = "p_9d02c3aa"
 WINDOW_S = 20.0
 
 
-def called_plan(mode: str = "transcript") -> Plan:
+def called_plan() -> Plan:
     doc = json.loads(JOB.read_bytes())
-    doc["agent"]["addressing"]["mode"] = mode
+    doc["agent"]["addressing"]["mode"] = "transcript"
     sealed, _ = seal(json.dumps(doc))
     return plan(load(sealed), "dafter-py")
 
@@ -87,7 +86,6 @@ class Call:
             clock=self.clock,
             schedule=self.scheduler,
             name=p.config.agent.name or "",
-            by_name=p.config.agent.addressing.mode is not AddressingMode.MANUAL,
         )
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
@@ -110,10 +108,8 @@ class Call:
         await asyncio.sleep(0)
 
 
-def run_call(
-    script: Callable[[Call, StubLLM], Any], calls: list[str] | None = None, mode: str = "transcript"
-) -> StubLLM:
-    p = called_plan(mode)
+def run_call(script: Callable[[Call, StubLLM], Any], calls: list[str] | None = None) -> StubLLM:
+    p = called_plan()
     stub = StubLLM(calls=calls)
 
     async def run() -> None:
@@ -329,20 +325,3 @@ def test_only_a_well_formed_wake_command_is_read() -> None:
     assert command(b'{"action": "wake"}') == "wake"
     for data in (b"wake", b'{"action": "sleep"}', b'{"action": "wake", "as": "p_1"}', b"[]"):
         assert command(data) is None
-
-
-def test_a_manual_agent_never_wakes_to_its_name_and_answers_only_the_wake_control() -> None:
-    async def script(call: Call, stub: StubLLM) -> None:
-        call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
-        call.gate.heard(RAVI, "Nivya, are you there?")
-        assert call.gate.dormant
-        assert stub.requests == []
-
-        call.gate.wake(RAVI)
-        assert call.gate.addressee == RAVI
-        await call.answered()
-
-    stub = run_call(script, mode="manual")
-    [request] = stub.requests
-    assert (said(request)[-1][1] or "").endswith("[Speaker 2, to you] Nivya")
-    assert called_plan("manual").called_by_name

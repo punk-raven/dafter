@@ -192,7 +192,7 @@
           <option value="dial_in">Phones dial in with a PIN</option>
           <option value="both" selected>Dial in, and call phones in</option>
         </select>
-        <label class="lobby-check" for="agent-on"><input id="agent-on" type="checkbox" checked><span>Nivya joins to transcribe the call</span></label>
+        <label class="lobby-check" for="agent-on"><input id="agent-on" type="checkbox" checked><span>Nivya joins, transcribes, and answers when called by name</span></label>
       </div>
       <div id="recording-notice" class="recording-notice" role="alert" hidden><strong><span class="rec-dot"></span><span id="notice-what">This call is being recorded.</span></strong> <span id="notice-detail">Everyone's voice and video in it is recorded and kept.</span> By joining you agree to this.</div>
       <div id="lobby-share" class="lobby-share" hidden>
@@ -278,7 +278,6 @@
             <option value="" selected>follow the catalog (called by name)</option>
             <option value="always">always - every turn of one person</option>
             <option value="transcript">transcript - only when called by name</option>
-            <option value="manual">manual - only when someone presses Wake</option>
             <option value="on_device">on_device - local name spotting, refused until built</option>
           </select>
           <label>Greeting</label>

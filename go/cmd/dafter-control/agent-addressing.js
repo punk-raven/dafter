@@ -29,15 +29,8 @@ function whoWokeAgent() {
   return id;
 }
 
-function wakesOnlyByHand(config) {
-  const addressing = config && config.agent && config.agent.addressing;
-  return !!addressing && addressing.mode === 'manual';
-}
-
 function addressingText(state) {
-  if (agentAddressing.dormant === true) {
-    return wakesOnlyByHand(agentView.config) ? 'transcribing, answers when woken' : `waiting for its name, ${agentName(agentView.config)}`;
-  }
+  if (agentAddressing.dormant === true) return `waiting for its name, ${agentName(agentView.config)}`;
   if (agentAddressing.dormant === false) {
     const how = agentAddressing.wokenVia === 'manual' ? ' with the wake button' : '';
     return `${state || 'awake'} · called by ${whoWokeAgent()}${how}`;
@@ -52,7 +45,7 @@ function onAgentAddressing(payload) {
   agentAddressing.wokenVia = payload.wokenVia || null;
   const after = `${agentAddressing.dormant}|${agentAddressing.wokenBy}|${agentAddressing.wokenVia}`;
   if (before === after || agentAddressing.dormant === null) return null;
-  if (agentAddressing.dormant) return [`agent went dormant: it answers nobody until ${wakesOnlyByHand(agentView.config) ? 'someone presses Wake' : 'its name is said'}`, 'info'];
+  if (agentAddressing.dormant) return ['agent went dormant: it answers nobody until its name is said', 'info'];
   const how = agentAddressing.wokenVia === 'manual' ? ' with the wake button' : ' by name';
   return [`agent woke: called by ${whoWokeAgent()}${how}`, 'success'];
 }

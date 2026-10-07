@@ -50,11 +50,9 @@ class Gate:
         clock: Clock,
         schedule: Schedule,
         name: str = "",
-        by_name: bool = True,
     ) -> None:
         self._matcher = matcher
         self._name = name
-        self._by_name = by_name
         self._follow_up_s = follow_up_s
         self._responder = responder
         self._clock = clock
@@ -78,7 +76,7 @@ class Gate:
             self.sleep()
             self._responder.hush()
             return
-        if heard is Heard.CALLED and self._by_name:
+        if heard is Heard.CALLED:
             self._wake(speaker, WakeSource.NAME)
             self._answer(speaker, text, timing)
             return

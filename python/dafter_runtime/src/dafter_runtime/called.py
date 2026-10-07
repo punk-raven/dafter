@@ -8,7 +8,6 @@ from collections.abc import Callable, Coroutine
 from functools import partial
 from typing import Any
 
-from dafter_core.enums import AddressingMode
 from livekit import rtc
 from livekit.agents import AgentSession, JobContext
 from livekit.agents.llm import MetricsReport
@@ -24,6 +23,7 @@ from .delivery import Delivery
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .plan import Plan
+from .presence import ALONE_GRACE_S, Alone
 from .stages import Stages, hearing
 from .switching import Switching
 
@@ -46,7 +46,6 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         clock=loop.time,
         schedule=schedule,
         name=agent.name or "",
-        by_name=agent.addressing.mode is not AddressingMode.MANUAL,
     )
 
 
@@ -133,6 +132,7 @@ class Called:
             self._hearing,
         )
         self._tasks: set[asyncio.Task[None]] = set()
+        self._alone = Alone(self._leave_alone, loop.call_later, ALONE_GRACE_S)
 
     def addressee(self) -> str | None:
         return self.gate.addressee
@@ -177,6 +177,7 @@ class Called:
     def _joined(self, participant: rtc.RemoteParticipant) -> None:
         if not is_human(participant, self._ctx.room):
             return
+        self._alone.joined()
         self.roster.join(participant.identity, participant.name)
         self._spawn(self.listeners.join(participant.identity))
 
@@ -190,8 +191,12 @@ class Called:
             self._captions.left(participant.identity)
         self._spawn(self.listeners.leave(participant.identity))
         if not self.roster.present():
-            log.info("everyone left, closing the agent session")
-            self._session.shutdown()
+            log.info("everyone left", extra={"leaving_after_s": ALONE_GRACE_S})
+            self._alone.emptied()
+
+    def _leave_alone(self) -> None:
+        log.info("nobody came back, the agent leaves the call")
+        self._ctx.shutdown(reason="everyone left")
 
     def _state_changed(self, ev: AgentStateChangedEvent) -> None:
         self.gate.agent_state(ev.new_state)

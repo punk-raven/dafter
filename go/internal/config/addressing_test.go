@@ -51,7 +51,7 @@ func TestAlwaysNeedsNoName(t *testing.T) {
 
 func TestAModeThatWaitsToBeCalledNeedsAName(t *testing.T) {
 	t.Parallel()
-	for _, mode := range []config.AddressingMode{config.AddressingTranscript, config.AddressingManual, config.AddressingOnDevice} {
+	for _, mode := range []config.AddressingMode{config.AddressingTranscript, config.AddressingOnDevice} {
 		rejectedAt(t, addressed(t, "", &config.Addressing{Mode: mode}), "/agent/name")
 	}
 }
