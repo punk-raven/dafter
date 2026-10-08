@@ -86,7 +86,7 @@ def test_a_naive_timestamp_is_refused_before_it_reaches_the_wire() -> None:
     assert "timezone" in exc.value.message
 
 
-def test_utc_is_written_as_Z_matching_go() -> None:
+def test_utc_is_written_with_z_suffix_matching_go() -> None:
     assert event(EventType.SESSION_SIGNAL, {"name": "x"}).to_dict()["occurredAt"].endswith("Z")
 
 

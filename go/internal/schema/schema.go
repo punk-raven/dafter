@@ -62,14 +62,14 @@ var Default = func() *Validator {
 
 func walkSchemas(visit func(id string, doc any) error) ([]string, error) {
 	var ids []string
-	err := fs.WalkDir(schemasFS, ".", func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(generatedSchemasFS, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() || !strings.HasSuffix(path.Base(p), ".schema.json") {
 			return nil
 		}
-		b, err := schemasFS.ReadFile(p)
+		b, err := generatedSchemasFS.ReadFile(p)
 		if err != nil {
 			return fmt.Errorf("schema: read %s: %w", p, err)
 		}
@@ -196,15 +196,13 @@ func bound(r *big.Rat) string {
 }
 
 func Raw(p string) ([]byte, error) {
-	return schemasFS.ReadFile(path.Join("schemas", p))
+	return generatedSchemasFS.ReadFile(path.Join("schemas", p))
 }
 
 func ValidateAgainst(id string, doc any, code errs.ErrorCode) error {
 	return Default.ValidateAgainst(id, doc, code)
 }
 
-// Validate the document before decoding it: decoding first drops fields the
-// struct does not declare, so the schema never sees them.
 func (v *Validator) ValidateDocument(id string, raw []byte, code errs.ErrorCode) error {
 	s, err := v.SchemaFor(id)
 	if err != nil {

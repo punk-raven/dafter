@@ -11,7 +11,6 @@ type ProviderContext struct {
 	NativeCode string `json:"nativeCode,omitempty"`
 }
 
-// Message must stay safe to log: no name, email, phone or transcript content.
 type Error struct {
 	Code      ErrorCode        `json:"code"`
 	Message   string           `json:"message"`
@@ -47,8 +46,6 @@ func Wrap(code ErrorCode, err error, format string, args ...any) *Error {
 	return e
 }
 
-// Auth and quota failures are excluded on purpose: retrying burns budget and
-// delays the page.
 func retryable(code ErrorCode) bool {
 	switch code {
 	case CodeProviderUnavailable, CodeProviderTimeout, CodeRateLimited, CodeStreamClosed:

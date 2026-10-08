@@ -4,10 +4,18 @@ linters:
   default: standard
   enable:
     - depguard
+    - errname
     - errorlint
     - misspell
+    - revive
 
   settings:
+    revive:
+      rules:
+        - name: var-naming
+        - name: receiver-naming
+        - name: error-naming
+        - name: error-strings
     depguard:
       # errs -> schema and schema -> config are cycles the compiler rejects
       # before depguard runs. The rules stay as documentation of the graph.

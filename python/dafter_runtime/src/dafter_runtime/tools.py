@@ -49,7 +49,7 @@ class Tool:
     filler: str = ""
 
 
-class ToolRefused(ValueError):
+class ToolRefusedError(ValueError):
     pass
 
 
@@ -66,11 +66,11 @@ def checked(tools: Iterable[Tool], shared_filler: bool = False) -> dict[str, Too
     by_name: dict[str, Tool] = {}
     for tool in tools:
         if tool.name in by_name:
-            raise ToolRefused(f"two tools are named {tool.name}")
+            raise ToolRefusedError(f"two tools are named {tool.name}")
         if tool.speed is Speed.SLOW and not tool.filler and not shared_filler:
-            raise ToolRefused(f"{tool.name} is slow and has no filler to play")
+            raise ToolRefusedError(f"{tool.name} is slow and has no filler to play")
         if tool.effect is Effect.BINDING and not tool.roles:
-            raise ToolRefused(f"{tool.name} is binding and names no role allowed to use it")
+            raise ToolRefusedError(f"{tool.name} is binding and names no role allowed to use it")
         by_name[tool.name] = tool
     return by_name
 
@@ -176,7 +176,7 @@ __all__ = [
     "Registry",
     "Speed",
     "Tool",
-    "ToolRefused",
+    "ToolRefusedError",
     "arguments_key",
     "checked",
 ]

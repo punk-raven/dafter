@@ -90,8 +90,13 @@ tools: check-tools $(LK) ## check-tools, plus the pinned lk used by the media lo
 setup: ## Prepare a fresh clone: check the toolchain, generate, resolve the Python environment
 	@./scripts/setup.sh
 
+.PHONY: rules-check
+rules-check: ## Check the repository rules the agent hooks enforce, and test the checker
+	@cd scripts && python3 -m unittest discover -s agent_rules/tests -t . -q
+	@cd scripts && python3 -m agent_rules check
+
 .PHONY: check
-check: generate-check vet lint test js-test py-lint py-test ## What CI runs
+check: generate-check rules-check vet lint test js-test py-lint py-test ## What CI runs
 
 .PHONY: dev
 dev: setup ## Build and start the full dev stack
