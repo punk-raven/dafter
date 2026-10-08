@@ -14,7 +14,6 @@ log = logging.getLogger("dafter.runtime.history")
 
 CUT_SHORT_WORDS = 5
 RECENT_REPLIES = 3
-RETRY_ITEMS = 6
 OPENING_WORDS = 8
 REPEAT_RATIO = 0.8
 REPEATED = (
@@ -64,7 +63,7 @@ def judged(chat_ctx: lk_llm.ChatContext) -> bool:
     return bool(lines) and f", {TO_THE_ROOM}]" in lines[-1]
 
 
-def recent_turns(chat_ctx: lk_llm.ChatContext, count: int = RETRY_ITEMS) -> lk_llm.ChatContext:
+def last_turn(chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
     minimal = lk_llm.ChatContext()
     asked = [
         item
@@ -72,8 +71,8 @@ def recent_turns(chat_ctx: lk_llm.ChatContext, count: int = RETRY_ITEMS) -> lk_l
         if isinstance(item, lk_llm.ChatMessage) and (item.text_content or "").strip()
     ]
     instructions = [m for m in asked if m.role in ("system", "developer")][:1]
-    turns = [m for m in asked if m.role in ("user", "assistant")][-count:]
-    minimal.items[:] = [*instructions, *turns]
+    users = [m for m in asked if m.role == "user"][-1:]
+    minimal.items[:] = [*instructions, *users]
     return minimal
 
 
@@ -89,7 +88,7 @@ async def recovering(
         if started or exc.retryable:
             raise
         log.warning(
-            "the model refused the request, it is asked again with only the last few turns",
+            "the model refused the request, it is asked again with only the last turn",
             extra={"status": exc.status_code},
         )
         async for chunk in fallback():
@@ -174,11 +173,10 @@ def instructions_of(chat_ctx: lk_llm.ChatContext) -> str:
 
 __all__ = [
     "REPEATED",
-    "RETRY_ITEMS",
     "cut_short",
     "instructions_of",
     "judged",
-    "recent_turns",
+    "last_turn",
     "recovering",
     "repeats",
     "replies",

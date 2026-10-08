@@ -22,12 +22,12 @@ from .history import (
     REPEATED,
     instructions_of,
     judged,
-    recent_turns,
+    last_turn,
     recovering,
     replies,
     unrepeated,
 )
-from .judging import Bench, decided, meant_for_her
+from .judging import decided, meant_for_her
 from .labels import unlabeled, unquoted
 from .listeners import is_human
 from .memory import Memory, summarised
@@ -52,11 +52,9 @@ class Answering(Agent):
         delivery: Delivery | None = None,
         switching: Switching | None = None,
         name: str = "",
-        bench: Bench | None = None,
     ):
         super().__init__(instructions=instructions, tools=registry.function_tools())
         self._name = name
-        self._bench = bench
         self._registry = registry
         self._caller = caller
         self._persona = instructions
@@ -123,14 +121,14 @@ class Answering(Agent):
 
         def plain() -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
             return unlabeled(
-                Agent.default.llm_node(self, recent_turns(chat_ctx), tools, model_settings)
+                Agent.default.llm_node(self, last_turn(chat_ctx), tools, model_settings)
             )
 
         first = recovering(
             unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings)), plain
         )
         if judged(chat_ctx) and isinstance(model := self.session.llm, lk_llm.LLM):
-            first = decided(first, meant_for_her(model, chat_ctx, self._name, self._bench))
+            first = decided(first, meant_for_her(model, chat_ctx, self._name))
         return unrepeated(first, again, replies(chat_ctx))
 
     def tts_node(

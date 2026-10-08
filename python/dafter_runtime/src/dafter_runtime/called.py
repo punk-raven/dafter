@@ -11,13 +11,13 @@ from typing import Any
 from dafter_core.speech import every_phrase
 from livekit import rtc
 from livekit.agents import AgentSession, JobContext
-from livekit.agents.llm import ChatMessage, MetricsReport
+from livekit.agents.llm import MetricsReport
 from livekit.agents.metrics import AgentSessionUsage
-from livekit.agents.voice.events import AgentStateChangedEvent, ConversationItemAddedEvent
+from livekit.agents.voice.events import AgentStateChangedEvent
 
-from .addressing import BUSY_STATES, Gate, Timer, never_echoed, nobody_counted
+from .addressing import BUSY_STATES, Gate, Timer
 from .answering import Roster, Voice
-from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged, is_question
+from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged
 from .barge_in import BargeIn, Resume, follow
 from .captions import Captions
 from .delivery import Delivery
@@ -36,13 +36,7 @@ CONTROL_TOPIC = "dafter.agent"
 COMMANDS = frozenset({"wake"})
 
 
-def gate_for(
-    p: Plan,
-    voice: Voice,
-    loop: asyncio.AbstractEventLoop,
-    present: Callable[[], int] = nobody_counted,
-    echoed: Callable[[str], bool] = never_echoed,
-) -> Gate:
+def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
     agent = p.config.agent
 
     def schedule(delay: float, callback: Callable[[], None]) -> Timer:
@@ -58,8 +52,6 @@ def gate_for(
         meaning=meaning_for(p),
         busy_words=p.config.turn.interruption.min_words,
         stays_awake=agent.addressing.stays_awake,
-        present=present,
-        echoed=echoed,
     )
 
 
@@ -96,15 +88,6 @@ def listening(p: Plan, stages: Stages) -> Callable[[], AgentSession[Any]]:
         return listener_session(stages.listener_stt(), stages.vad, handling)
 
     return new_session
-
-
-def follow_replies(session: AgentSession[Any], gate: Gate) -> None:
-    def added(ev: ConversationItemAddedEvent) -> None:
-        item = ev.item
-        if isinstance(item, ChatMessage) and item.role == "assistant":
-            gate.replied(not item.interrupted and is_question(item.text_content or ""))
-
-    session.on("conversation_item_added", added)
 
 
 def through(sieves: list[Filter]) -> Filter:
@@ -147,13 +130,7 @@ class Called:
         self.roster = Roster()
         self.voice = Voice(session, self.roster, interruptible=p.config.turn.interruption.enabled)
         loop = asyncio.get_running_loop()
-        self.gate = gate_for(
-            p,
-            self.voice,
-            loop,
-            present=lambda: len(self.roster.present()),
-            echoed=lambda speaker: self.barge_in.echoed(speaker),
-        )
+        self.gate = gate_for(p, self.voice, loop)
         self.barge_in = barge_in_for(p, self.gate, self.voice, loop)
         self._acknowledgements = Acknowledgements.of(p.config.turn.interruption.backchannel)
         self._floor = SessionFloor(session)
@@ -249,7 +226,6 @@ class Called:
 
     def listen(self) -> None:
         self._session.on("agent_state_changed", self._state_changed)
-        follow_replies(self._session, self.gate)
         self._ctx.room.on("participant_connected", self._joined)
         self._ctx.room.on("participant_disconnected", self._left)
         self._ctx.room.on("data_received", self._data)
@@ -263,7 +239,6 @@ __all__ = [
     "Called",
     "barge_in_for",
     "command",
-    "follow_replies",
     "gate_for",
     "listening",
     "resume_for",

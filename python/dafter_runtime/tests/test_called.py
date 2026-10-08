@@ -10,7 +10,7 @@ from dafter_core.events import parse_event
 from dafter_core.hashing import seal
 from dafter_runtime.addressing import Gate
 from dafter_runtime.answering import Roster, Voice
-from dafter_runtime.called import command, follow_replies, meaning_for
+from dafter_runtime.called import command, meaning_for
 from dafter_runtime.events import SessionEvents
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
@@ -92,7 +92,6 @@ class Call:
         )
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
-        follow_replies(session, self.gate)
         self.registry = registry_for(
             p, session, self.roster, lambda: self.gate.addressee, self.gate.go_quiet
         )
@@ -102,7 +101,6 @@ class Call:
             self.registry,
             lambda: self.gate.addressee,
             name=p.config.agent.name or "",
-            bench=self.gate,
         )
 
     async def _publish(self, body: bytes) -> None:

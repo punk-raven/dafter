@@ -46,10 +46,10 @@ def effective(cfg: ResolvedSessionConfig) -> dict[str, Any]:
     )
 
 
-def test_the_catalog_hindi_session_runs_its_speech_settings_with_fillers_off() -> None:
+def test_the_catalog_hindi_session_runs_every_speech_setting() -> None:
     assert effective(job("hindi-groq-webrtc-job.json")) == {
         "llm": {"provider": "groq", "model": "qwen/qwen3.8-27b"},
-        "fillers": False,
+        "fillers": True,
         "backchannel": True,
         "normalization": "platform",
     }
