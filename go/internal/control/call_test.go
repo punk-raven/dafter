@@ -58,6 +58,30 @@ func (s *stubTransport) HangUp(_ context.Context, room, identity string) error {
 	return nil
 }
 
+func (s *stubTransport) OpenRooms(_ context.Context, rooms []string) (map[string]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.roomErr != nil {
+		return nil, s.roomErr
+	}
+	open := map[string]bool{}
+	for _, room := range rooms {
+		if !s.closed[room] {
+			open[room] = true
+		}
+	}
+	return open, nil
+}
+
+func (s *stubTransport) closeRoom(room string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed == nil {
+		s.closed = map[string]bool{}
+	}
+	s.closed[room] = true
+}
+
 type lockedBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer

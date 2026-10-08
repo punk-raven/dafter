@@ -263,7 +263,9 @@ def disclosure(cfg: ResolvedSessionConfig) -> str | None:
 
 def voiced(agent: Agent, language: str) -> Persona:
     persona = persona_for(agent.persona_ref, language, agent.name, agent.addressing.aliases)
-    return called_by_name(persona) if agent.addressing.waits_to_be_called else persona
+    if not agent.addressing.waits_to_be_called:
+        return persona
+    return called_by_name(persona, agent.addressing.stays_awake)
 
 
 def _switchable(cfg: ResolvedSessionConfig, vendors: tuple[Vendor, ...]) -> dict[str, Persona]:

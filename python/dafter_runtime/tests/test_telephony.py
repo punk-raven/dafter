@@ -101,6 +101,18 @@ def test_a_meeting_that_takes_phone_guests_keeps_its_own_tuning_and_tells_them()
     assert stt_sample_rate(p) == 16000
 
 
+def test_a_meeting_that_takes_dial_in_calls_tells_every_caller_too() -> None:
+    for guests in ("dial_in", "both"):
+
+        def dial_in(doc: dict[str, Any], guests: str = guests) -> None:
+            takes_phone_guests(doc)
+            doc["telephony"]["phoneGuests"] = guests
+
+        p = variant(dial_in, WEB_JOB)
+        assert p.takes_phone_calls and not p.on_a_phone
+        assert p.disclosure == RECORDED
+
+
 def always(doc: dict[str, Any]) -> None:
     doc["agent"]["addressing"]["mode"] = "always"
 

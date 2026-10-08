@@ -1,0 +1,33 @@
+{
+  "event": "participant_joined",
+  "room": {
+    "sid": "RM_vXkrzjH2ouiY",
+    "name": "s_7f3a9c21",
+    "emptyTimeout": 300,
+    "departureTimeout": 20,
+    "maxParticipants": 10,
+    "creationTime": "1791316750",
+    "creationTimeMs": "1791316750412"
+  },
+  "participant": {
+    "sid": "PA_Hq2LmZ8xR4tN",
+    "identity": "agent-AJ_4w6LsXJWudCx",
+    "state": "ACTIVE",
+    "joinedAt": "1791316753",
+    "joinedAtMs": "1791316753102",
+    "name": "Nivya",
+    "version": 2,
+    "permission": {
+      "canSubscribe": true,
+      "canPublish": true,
+      "canPublishData": true,
+      "agent": true
+    },
+    "kind": "AGENT",
+    "attributes": {
+      "dafter.role": "agent"
+    }
+  },
+  "id": "EV_k8Rz3WqYv1Lm",
+  "createdAt": "1791316753"
+}

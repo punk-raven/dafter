@@ -92,6 +92,8 @@ def test_silence_is_not_a_caption_and_a_language_outside_bcp47_is_left_out() -> 
     async def script(events: SessionEvents) -> None:
         captions = Captions(events.emit, None)
         captions.heard(ASHA, "  ", False, "hi-IN")
+        captions.heard(ASHA, ".", True, "hi-IN")
+        captions.heard(ASHA, "\u200b", True, "hi-IN")
         captions.heard(ASHA, "hello", True, "multi-lingual")
 
     [only] = captured(script)

@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
-from dafter_runtime.labels import unlabeled
+from dafter_runtime.labels import unlabeled, unquoted
 from livekit.agents import llm
 
 
@@ -69,3 +69,20 @@ def test_chunks_without_text_do_not_end_the_wait_for_a_label() -> None:
     out = spoken(pieces)
     assert out[:2] == [empty, empty]
     assert text(out[2:]) == "जी, बताइए।"
+
+
+def test_quote_marks_never_reach_the_voice_so_no_piece_of_a_story_is_only_a_quote() -> None:
+    joke = ['He says, "Doctor, I think', " I'm a pair of curtains.", '"', " The doctor smiles."]
+
+    async def say() -> list[str]:
+        async def text() -> AsyncIterator[str]:
+            for chunk in joke:
+                yield chunk
+
+        return [chunk async for chunk in unquoted(text())]
+
+    assert asyncio.run(say()) == [
+        "He says, Doctor, I think",
+        " I'm a pair of curtains.",
+        " The doctor smiles.",
+    ]

@@ -27,6 +27,10 @@ def phone_guests(c: ResolvedSessionConfig) -> bool:
     return c.channel is not Channel.TELEPHONY and c.telephony.phone_guests is not PhoneGuests.OFF
 
 
+def dials_in(c: ResolvedSessionConfig) -> bool:
+    return phone_guests(c) and c.telephony.phone_guests in (PhoneGuests.DIAL_IN, PhoneGuests.BOTH)
+
+
 @dataclass(frozen=True, slots=True)
 class CrossFieldRule:
     broken: Callable[[ResolvedSessionConfig], bool]
@@ -157,6 +161,15 @@ CROSS_FIELD_RULES: tuple[CrossFieldRule, ...] = (
         because=(
             "a phone guest sees no recording indicator and only the agent tells them the "
             "meeting is recorded, so a recorded session that takes phone calls needs the agent"
+        ),
+    ),
+    CrossFieldRule(
+        broken=lambda c: c.telephony.dial_in is not None and not dials_in(c),
+        code=ErrorCode.INVALID_CONFIG,
+        pointer="/telephony/dialIn",
+        because=(
+            "only a session whose phoneGuests is dial_in or both takes calls into its meeting "
+            "numbers, so a caller check in any other session admits nobody"
         ),
     ),
     CrossFieldRule(

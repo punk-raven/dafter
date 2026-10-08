@@ -40,11 +40,13 @@
   "$defs": {
     "ErrorCode": {
       "type": "string",
+      "description": "session_ended: the call is over, because everyone left and the media server closed its room, so its link joins nothing and a new call is needed.",
       "enum": [
         "invalid_config",
         "unsupported_capability",
         "residency_violation",
         "consent_required",
+        "session_ended",
         "privacy_mode_forbids",
         "quota_exceeded",
         "budget_exceeded",

@@ -7,6 +7,7 @@ from dafter_core import (
     AddressingMode,
     AgentMode,
     AgentState,
+    CallerCheck,
     Channel,
     EgressLayout,
     EgressPreset,
@@ -76,6 +77,11 @@ CASES = [
         PhoneGuests,
         schemas.TELEPHONY,
         ("$defs", "Telephony", "properties", "phoneGuests", "enum"),
+    ),
+    (
+        CallerCheck,
+        schemas.TELEPHONY,
+        ("$defs", "DialIn", "properties", "callerCheck", "enum"),
     ),
 ]
 

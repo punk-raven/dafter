@@ -1,4 +1,4 @@
-const { Room, RoomEvent, Track, ConnectionState, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
+const { Room, RoomEvent, Track, ConnectionState, DisconnectReason, VideoPresets, ExternalE2EEKeyProvider, createLocalAudioTrack } = LivekitClient;
 
 const E2EE_WORKER_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.e2ee.worker.mjs';
 
@@ -104,9 +104,52 @@ const NOISE_FILTERS = {
   rnnoise: {
     label: 'rnnoise (wasm)',
     nativeSuppression: false,
-    createProcessor: createRnnoiseProcessor,
+    createProcessor: () => createRnnoiseProcessor(false),
+  },
+  rnnoise_gated: {
+    label: 'rnnoise (wasm) + near-voice gate',
+    nativeSuppression: false,
+    steadyGain: true,
+    createProcessor: () => createRnnoiseProcessor(true),
   },
 };
+
+const VOICE_GATE_URL = '/voice-gate.js';
+
+const farEndTracks = new Map();
+const farEndSources = new Map();
+let farEndGate = null;
+
+function hearFarEnd(id, mediaStreamTrack) {
+  farEndTracks.set(id, mediaStreamTrack);
+  feedFarEnd(id);
+}
+
+function forgetFarEnd(id) {
+  farEndTracks.delete(id);
+  unfeedFarEnd(id);
+}
+
+function playFarEndInto(gate) {
+  for (const id of [...farEndSources.keys()]) unfeedFarEnd(id);
+  farEndGate = gate;
+  for (const id of farEndTracks.keys()) feedFarEnd(id);
+}
+
+function feedFarEnd(id) {
+  const track = farEndTracks.get(id);
+  if (!farEndGate || !track || farEndSources.has(id)) return;
+  const source = farEndGate.context.createMediaStreamSource(new MediaStream([track]));
+  source.connect(farEndGate, 0, 1);
+  farEndSources.set(id, source);
+}
+
+function unfeedFarEnd(id) {
+  const source = farEndSources.get(id);
+  if (!source) return;
+  source.disconnect();
+  farEndSources.delete(id);
+}
 
 function fillNoiseFilterChoices() {
   const el = document.getElementById('noise-cancellation');
@@ -124,7 +167,7 @@ function noiseFilterFor(value) {
     { label: `${value} (no entry in this client)`, nativeSuppression: false, createProcessor: null, unknown: true };
 }
 
-async function createRnnoiseProcessor() {
+async function createRnnoiseProcessor(gated) {
   if (typeof AudioWorkletNode === 'undefined') {
     throw new Error('this browser has no AudioWorklet');
   }
@@ -136,19 +179,28 @@ async function createRnnoiseProcessor() {
 
   let source = null;
   let node = null;
+  let gate = null;
   let sink = null;
 
   return {
-    name: 'rnnoise',
+    name: gated ? 'rnnoise_gated' : 'rnnoise',
     async init(opts) {
       const ctx = opts.audioContext;
       if (!ctx) throw new Error('no audio context on the track');
       await ctx.audioWorklet.addModule(`${RNNOISE_BASE}/rnnoise/workletProcessor.js`);
+      if (gated) await ctx.audioWorklet.addModule(VOICE_GATE_URL);
       source = ctx.createMediaStreamSource(new MediaStream([opts.track]));
       node = new wns.RnnoiseWorkletNode(ctx, { maxChannels: 1, wasmBinary });
       sink = ctx.createMediaStreamDestination();
       source.connect(node);
-      node.connect(sink);
+      if (gated) {
+        gate = new AudioWorkletNode(ctx, 'near-voice-gate', { numberOfInputs: 2, outputChannelCount: [1] });
+        node.connect(gate, 0, 0);
+        gate.connect(sink);
+        playFarEndInto(gate);
+      } else {
+        node.connect(sink);
+      }
       this.processedTrack = sink.stream.getAudioTracks()[0];
     },
     async restart(opts) {
@@ -156,12 +208,20 @@ async function createRnnoiseProcessor() {
       await this.init(opts);
     },
     async destroy() {
+      if (gate) { playFarEndInto(null); gate.disconnect(); gate = null; }
       if (node) { node.destroy(); node.disconnect(); node = null; }
       if (source) { source.disconnect(); source = null; }
       sink = null;
       this.processedTrack = undefined;
     },
   };
+}
+
+function showNoiseFilter(text, working) {
+  const label = document.getElementById('noise-filter');
+  label.textContent = text ? `Noise filter: ${text}` : '';
+  label.hidden = !text;
+  label.classList.toggle('noise-filter-off', !working);
 }
 
 async function publishMicrophone(room) {
@@ -176,6 +236,7 @@ async function publishMicrophone(room) {
   if (!entry || !entry.createProcessor) {
     await room.localParticipant.setMicrophoneEnabled(true, capture);
     log(`Microphone published; noise filter ${activeNoiseFilter}`, entry && entry.unknown ? 'warn' : 'success');
+    showNoiseFilter(activeNoiseFilter, Boolean(entry) && !entry.unknown && entry.nativeSuppression);
     return;
   }
 
@@ -192,6 +253,7 @@ async function publishMicrophone(room) {
     }
     await room.localParticipant.publishTrack(track, { source: Track.Source.Microphone });
     log(`Microphone published through ${requested} (${RNNOISE_PKG}); the browser's own suppression is off`, 'success');
+    showNoiseFilter(entry.label, true);
   } catch (err) {
     log(`Noise filter ${requested} unavailable (${err.message}); falling back to the browser's own suppression`, 'error');
     if (track) track.stop();
@@ -200,6 +262,7 @@ async function publishMicrophone(room) {
     await room.localParticipant.setMicrophoneEnabled(
       true, Object.assign({}, capture, { noiseSuppression: true }));
     log(`Microphone published; noise filter ${activeNoiseFilter}`, 'warn');
+    showNoiseFilter(`${NOISE_FILTERS.native.label}, ${entry.label} failed to load`, false);
   }
 }
 
@@ -236,11 +299,11 @@ function roomOptionsFrom(config) {
     }
   }
 
-  const capture = {};
-  if (audio.echoCancellation !== undefined) capture.echoCancellation = audio.echoCancellation;
   const filter = noiseFilterFor(audio.noiseCancellation);
+  const capture = { autoGainControl: !(filter && filter.steadyGain) };
+  if (audio.echoCancellation !== undefined) capture.echoCancellation = audio.echoCancellation;
   if (filter) capture.noiseSuppression = filter.nativeSuppression;
-  if (Object.keys(capture).length) options.audioCaptureDefaults = capture;
+  options.audioCaptureDefaults = capture;
 
   if (Object.keys(publish).length) options.publishDefaults = publish;
   return options;

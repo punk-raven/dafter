@@ -114,3 +114,51 @@ func TestPanelIsNotOnThePublicListener(t *testing.T) {
 		}
 	}
 }
+
+func TestTheCallPageServesEveryAssetItLoads(t *testing.T) {
+	linked := regexp.MustCompile(`(?:src|href)="(/[^"]+)"`).FindAllStringSubmatch(string(testClientHTML), -1)
+	if len(linked) == 0 {
+		t.Fatal("the call page links no assets")
+	}
+	for _, m := range append(linked, []string{"", "/favicon.ico"}) {
+		name, ok := clientAssetPaths[m[1]]
+		if !ok {
+			t.Errorf("the call page loads %s, which the public listener does not serve", m[1])
+			continue
+		}
+		if _, err := clientAssets.Open(name); err != nil {
+			t.Errorf("%s is served from %s, which is not embedded: %v", m[1], name, err)
+		}
+	}
+}
+
+func TestTheCallPageNamesEachAssetByItsContent(t *testing.T) {
+	page, err := versionedClientPage()
+	if err != nil {
+		t.Fatalf("versionedClientPage: %v", err)
+	}
+	linked := regexp.MustCompile(`(?:src|href)="(/[^"?]+)(\?v=[0-9a-f]{12})?"`).FindAllStringSubmatch(string(page), -1)
+	for _, m := range linked {
+		if m[2] == "" {
+			t.Errorf("%s is linked without its content version, so a cache can serve an older copy beside a newer page", m[1])
+		}
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !serveClient(page)(w, r) {
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	for path, want := range map[string]string{"/": "no-cache", "/client.js": "no-cache", "/client.js?v=0123456789ab": "public, max-age=31536000, immutable"} {
+		resp, err := srv.Client().Get(srv.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		if err := resp.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if got := resp.Header.Get("Cache-Control"); resp.StatusCode != http.StatusOK || got != want {
+			t.Errorf("GET %s: %d with Cache-Control %q, want 200 with %q", path, resp.StatusCode, got, want)
+		}
+	}
+}

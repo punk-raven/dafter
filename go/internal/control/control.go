@@ -32,9 +32,14 @@ type Service struct {
 	Log       *slog.Logger
 	Trunks    transport.Trunks
 
-	held heldCalls
+	held     heldCalls
+	prompts  pinPrompts
+	sessions sessionLocks
+	voices   claims
 
 	WorkerSecret string
+	IdentityKey  []byte
+	Background   func(func())
 }
 
 func (s *Service) Handler() http.Handler {
@@ -53,6 +58,8 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /telephony/{trunk}/answer", s.answerCall)
 	mux.HandleFunc("POST /telephony/{trunk}/held/{token}", s.callHeld)
 	mux.HandleFunc("POST /telephony/{trunk}/bridge", s.bridgeCall)
+	mux.HandleFunc("POST /telephony/{trunk}/pin", s.meetingPIN)
+	mux.HandleFunc("PUT /sessions/{sessionID}/dial-in/numbers", s.setAllowedNumbers)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/key", s.scribeKey)
 	mux.HandleFunc("POST /sessions/{sessionID}/scribe/refusal", s.scribeRefusal)
 	mux.HandleFunc("GET /sessions/{sessionID}/transcription/sources", s.transcriptionSources)
@@ -61,6 +68,7 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
 	mux.HandleFunc("POST /sessions/{sessionID}/minutes", s.storeMinutes)
 	mux.HandleFunc("GET /sessions/{sessionID}/minutes", s.readMinutes)
+	mux.HandleFunc("POST /livekit/webhook", s.mediaServerWebhook)
 	return mux
 }
 
@@ -72,6 +80,7 @@ type createSessionRequest struct {
 	Channel   config.Channel  `json:"channel"`
 	LLM       string          `json:"llm,omitempty"`
 	Role      config.Role     `json:"role,omitempty"`
+	Device    string          `json:"device,omitempty"`
 	Overrides json.RawMessage `json:"overrides,omitempty"`
 }
 
@@ -87,9 +96,10 @@ type createSessionResponse struct {
 	ExpiresAt     time.Time        `json:"expiresAt"`
 	ICEServers    []turn.ICEServer `json:"iceServers,omitempty"`
 
-	EncryptionKey    string `json:"encryptionKey,omitempty"`
-	AgentDispatchID  string `json:"agentDispatchId,omitempty"`
-	ScribeDispatchID string `json:"scribeDispatchId,omitempty"`
+	EncryptionKey    string         `json:"encryptionKey,omitempty"`
+	DialIn           *dialInDetails `json:"dialIn,omitempty"`
+	AgentDispatchID  string         `json:"agentDispatchId,omitempty"`
+	ScribeDispatchID string         `json:"scribeDispatchId,omitempty"`
 }
 
 func mintEncryptionKey() (string, error) {
@@ -119,9 +129,8 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		req.Role = config.RoleParticipant
 	}
 
-	participantID, err := ids.NewID(ids.PrefixParticipant)
-	if err != nil {
-		s.fail(w, errs.Wrap(errs.CodeInternal, err, "mint participant id"))
+	if err := checkDevice(req.Device); err != nil {
+		s.fail(w, err)
 		return
 	}
 	opened, err := s.openSession(r.Context(), config.Request{
@@ -138,6 +147,11 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sess, resolved, sessionID := opened.sess, opened.resolved, opened.sess.SessionID
+	participantID, err := s.participantFor(sessionID, req.Device)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
 
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sessionID,
@@ -172,6 +186,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:        token.ExpiresAt,
 		ICEServers:       iceServers,
 		EncryptionKey:    keyFor(resolved.Config, sess, req.Role),
+		DialIn:           s.dialInFor(r.Context(), resolved.Config, sessionID, req.Role),
 		AgentDispatchID:  opened.dispatchID,
 		ScribeDispatchID: opened.scribeDispatchID,
 	})
@@ -203,6 +218,11 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 	if trunk != "" && resolved.Config.TrunkName() != trunk {
 		return openedSession{}, located(errs.CodeInvalidConfig, "/telephony/trunk", "an inbound call's session names the trunk it arrived on")
 	}
+	if resolved.Config.TakesDialIn() {
+		if _, err := s.meetingNumbers(resolved.Config); err != nil {
+			return openedSession{}, err
+		}
+	}
 
 	sess := state.Session{
 		SessionID:  sessionID,
@@ -221,8 +241,13 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 	if err := s.Store.CreateSession(ctx, sess); err != nil {
 		return openedSession{}, err
 	}
+	if resolved.Config.TakesDialIn() {
+		if err := s.openDialIn(ctx, sess); err != nil {
+			return openedSession{}, err
+		}
+	}
 	if rec := resolved.Config.Recording; rec.Enabled && rec.StartAt == config.StartAtSessionCreate {
-		if _, _, err := s.startEgress(ctx, sess, resolved.Config, startRecordingRequest{}, true, state.Egress{}); err != nil {
+		if _, _, err := s.startEgress(ctx, sess, resolved.Config, resolved.Config.Recording.EffectiveLayout(), startRecordingRequest{}, true, state.Egress{}); err != nil {
 			return openedSession{}, err
 		}
 	}
@@ -255,7 +280,17 @@ func (s *Service) dispatchAgent(ctx context.Context, sess state.Session, cfg *co
 }
 
 type joinSessionRequest struct {
-	Role config.Role `json:"role,omitempty"`
+	Role             config.Role `json:"role,omitempty"`
+	RecordingConsent string      `json:"recordingConsent,omitempty"`
+	Device           string      `json:"device,omitempty"`
+}
+
+func consentToRecording(cfg *config.ResolvedSessionConfig, given string) error {
+	if !cfg.Recording.Enabled || given == cfg.Recording.ConsentArtifactID {
+		return nil
+	}
+	return located(errs.CodeConsentRequired, "/recordingConsent",
+		"this session is recorded; a joiner names the consent artifact it was shown before it is let in")
 }
 
 func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
@@ -286,12 +321,20 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = config.RoleParticipant
 	}
-
-	participantID, err := ids.NewID(ids.PrefixParticipant)
-	if err != nil {
-		s.fail(w, errs.Wrap(errs.CodeInternal, err, "mint participant id"))
+	if sess.Ended() {
+		s.fail(w, located(errs.CodeSessionEnded, "/sessionId", "this call has ended because everyone left; start a new call"))
 		return
 	}
+	if err := consentToRecording(cfg, req.RecordingConsent); err != nil {
+		s.fail(w, err)
+		return
+	}
+	participantID, err := s.participantFor(sess.SessionID, req.Device)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.resumeRecording(r.Context(), sess, cfg)
 
 	token, err := s.Transport.MintToken(transport.Grant{
 		Room:     sess.Room,
@@ -326,6 +369,7 @@ func (s *Service) joinSession(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:     token.ExpiresAt,
 		ICEServers:    iceServers,
 		EncryptionKey: keyFor(cfg, sess, req.Role),
+		DialIn:        s.dialInFor(r.Context(), cfg, sessionID, req.Role),
 	})
 }
 
@@ -367,6 +411,8 @@ func statusFor(code errs.ErrorCode) int {
 		return http.StatusBadRequest
 	case errs.CodeAuthenticationFailed:
 		return http.StatusUnauthorized
+	case errs.CodeSessionEnded:
+		return http.StatusGone
 	case errs.CodeQuotaExceeded, errs.CodeBudgetExceeded, errs.CodeRateLimited:
 		return http.StatusTooManyRequests
 	case errs.CodeProviderUnavailable, errs.CodeProviderTimeout:

@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response><Speak voice="WOMAN" language="en-GB">Thank you. Joining the meeting now.</Speak><Conference stayAlone="true" startConferenceOnEnter="true" endConferenceOnExit="true" beep="false" timeLimit="1800" callbackUrl="https://calls.example.com/telephony/vobiz/held/0f1e2d3c4b5a69788796a5b4c3d2e1f0" callbackMethod="POST">0f1e2d3c4b5a69788796a5b4c3d2e1f0</Conference></Response>

@@ -1,0 +1,21 @@
+{
+  "residency": {
+    "allowedRegions": ["ap-south-1"]
+  },
+  "budgets": {
+    "maxSessionCostUsd": 2.5
+  },
+  "telephony": {
+    "trunk": "vobiz"
+  },
+  "agent": {
+    "addressing": {
+      "staysAwake": true
+    }
+  },
+  "media": {
+    "audio": {
+      "noiseCancellation": "rnnoise_gated"
+    }
+  }
+}

@@ -1,7 +1,9 @@
 {
   "trunk": {
-    "hostname": "sip.vobiz.ai",
-    "transport": "SIP_TRANSPORT_UDP"
+    "hostname": "registrar.vobiz.ai:5060",
+    "transport": "SIP_TRANSPORT_TCP",
+    "authUsername": "dafter_bridge",
+    "authPassword": "not-a-real-endpoint-password"
   },
   "sipCallTo": "12345678901234567",
   "sipNumber": "+12025550100",

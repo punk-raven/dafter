@@ -1,7 +1,9 @@
+#dial-in-fields label { margin-top: 8px; }
 .guests-call { border-bottom: 1px solid #1c1c1c; }
 .guests-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; }
 .guests-bar strong { font-size: 12px; font-weight: 600; }
 .guests-count { margin-left: auto; font-size: 11px; font-family: monospace; color: #4ade80; }
+.guests-dial-in { padding: 6px 12px 0; font-size: 12px; font-family: monospace; color: #a7f3d0; overflow-wrap: anywhere; }
 .guests-dial { display: flex; align-items: stretch; gap: 8px; padding: 6px 12px 8px; }
 .guests-dial input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; }
 .guests-dial input:disabled { color: #555; cursor: not-allowed; }

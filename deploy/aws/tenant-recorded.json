@@ -1,0 +1,47 @@
+{
+  "residency": {
+    "allowedRegions": ["ap-south-1"]
+  },
+  "budgets": {
+    "maxSessionCostUsd": 2.5
+  },
+  "telephony": {
+    "trunk": "vobiz"
+  },
+  "agent": {
+    "addressing": {
+      "staysAwake": true
+    },
+    "pipeline": {
+      "vad": {
+        "options": {
+          "activationThreshold": 0.6,
+          "minSpeechMs": 250
+        }
+      }
+    }
+  },
+  "turn": {
+    "interruption": {
+      "minWords": 2,
+      "minDurationMs": 500,
+      "resumeFalseInterruption": false
+    }
+  },
+  "media": {
+    "audio": {
+      "noiseCancellation": "rnnoise_gated"
+    }
+  },
+  "recording": {
+    "enabled": true,
+    "layout": "room_composite",
+    "startAt": "session_create",
+    "tracks": true,
+    "consentArtifactId": "consent_recording_notice_v2"
+  },
+  "transcription": {
+    "mode": "live",
+    "consentArtifactId": "consent_transcription_notice_v1"
+  }
+}

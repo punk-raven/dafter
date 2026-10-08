@@ -1,0 +1,16 @@
+{
+  "tuning": {
+    "turn": { "endpointingDelayMs": 0 }
+  },
+  "overlay": {
+    "media": {
+      "egress": {
+        "width": 960,
+        "height": 540,
+        "framerate": 15,
+        "videoBitrate": 1200,
+        "videoCodec": "h264_main"
+      }
+    }
+  }
+}

@@ -20,7 +20,7 @@ indicator and only the agent tells them. A `trusted_agent` session on
 `webrtc` is not a phone call and passes.
 
 A session on another channel takes phone guests only when its telephony
-block says `phoneGuests: dial_out`: the trunk is the tenant's phone line and
+block says `phoneGuests` `dial_out`, `dial_in` or `both`: the trunk is the tenant's phone line and
 says which carrier a call would use, not whether the session wants phones, so
 a trunk with `phoneGuests` off admits no phone and changes nothing. Phone
 guests need a trunk to be called in on (`/telephony/phoneGuests`), and on the
@@ -30,3 +30,10 @@ to a meeting that takes phone guests: an end-to-end encrypted one cannot
 (`/telephony/phoneGuests`), and a recorded one needs the agent
 (`/agent/enabled`). On the telephony channel the channel rules above report
 instead, so a broken phone call is reported once.
+
+Every one of those rules reads "phone guests other than off", so `dial_in`
+and `both` are held to each of them exactly as `dial_out` is. A session that
+takes dial-in states how a caller is admitted in `dialIn.callerCheck`
+(`callerCheck` is what a valid document resolves to, `pin` when unstated); a
+`dialIn` block in a session that takes no dial-in (`off`, `dial_out`, or the
+telephony channel) admits nobody and is refused at `/telephony/dialIn`.

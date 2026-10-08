@@ -39,9 +39,15 @@ class Roster:
         return [self.label(i) for i in self._present]
 
 
-def turn_text(roster: Roster, speaker: str, text: str, overheard: list[Said]) -> str:
+TO_YOU = "to you"
+TO_THE_ROOM = "to the room"
+
+
+def turn_text(
+    roster: Roster, speaker: str, text: str, overheard: list[Said], judged: bool = False
+) -> str:
     lines = [f"[{roster.label(s.speaker)}, not to you] {s.text}" for s in overheard]
-    lines.append(f"[{roster.label(speaker)}, to you] {text}")
+    lines.append(f"[{roster.label(speaker)}, {TO_THE_ROOM if judged else TO_YOU}] {text}")
     return "\n".join(lines)
 
 
@@ -52,18 +58,26 @@ class Voice:
         self._interruptible = interruptible
         self.reply: SpeechHandle | None = None
         self.before_answer: Callable[[str, str], None] | None = None
+        self.judging: Callable[[bool], None] | None = None
         self.announce: Callable[[str | None, WakeSource | None], None] | None = None
 
     def answer(
-        self, speaker: str, text: str, overheard: list[Said], timing: Timing | None = None
+        self,
+        speaker: str,
+        text: str,
+        overheard: list[Said],
+        timing: Timing | None = None,
+        judged: bool = False,
     ) -> None:
         if self.before_answer is not None:
             self.before_answer(speaker, text)
+        if self.judging is not None:
+            self.judging(judged)
         if self._interruptible:
             self._session.interrupt()
         said = ChatMessage(
             role="user",
-            content=[turn_text(self._roster, speaker, text, overheard)],
+            content=[turn_text(self._roster, speaker, text, overheard, judged)],
             metrics=heard(timing),
         )
         self.reply = self._session.generate_reply(user_input=said)
@@ -107,4 +121,4 @@ class Voice:
             self.announce(woken_by, via)
 
 
-__all__ = ["Roster", "Voice", "turn_text"]
+__all__ = ["TO_THE_ROOM", "TO_YOU", "Roster", "Voice", "turn_text"]

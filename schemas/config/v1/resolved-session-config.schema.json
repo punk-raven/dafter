@@ -137,6 +137,11 @@
           "minimum": 1000,
           "maximum": 120000,
           "default": 20000
+        },
+        "staysAwake": {
+          "type": "boolean",
+          "description": "Once called by name or woken, the agent stays awake until someone tells it to go to sleep or be quiet, instead of sleeping when the follow-up window ends. While awake it hears every line in the call and decides for each one whether it is meant for it, answering only those; a line with its name is always answered. followUpWindowMs does not apply.",
+          "default": false
         }
       }
     },
@@ -410,8 +415,8 @@
         },
         "noiseCancellation": {
           "type": "string",
-          "description": "Which filter the publishing client puts in front of its microphone. off asks for no suppression at all; native is the browser's own suppression, applied as a capture constraint; rnnoise is the RNNoise WASM filter attached to the track as a processor, with the browser's own suppression turned off, because two suppressors in series fight each other. Echo cancellation is separate and stays on in every mode. Every member has something implementing it: a member with no mechanism behind it is a guarantee nobody enforces.",
-          "enum": ["off", "native", "rnnoise"],
+          "description": "Which filter the publishing client puts in front of its microphone. off asks for no suppression at all; native is the browser's own suppression, applied as a capture constraint; rnnoise is the RNNoise WASM filter attached to the track as a processor, with the browser's own suppression turned off, because two suppressors in series fight each other. rnnoise_gated is rnnoise followed by a near-voice gate that keeps the loudest voice close to the microphone, the caller's, and holds back sound far below it, such as a television or people across the room; a voice as loud as the caller's still passes, since telling two voices apart needs speaker isolation. Echo cancellation and automatic gain are separate and stay on in every mode. Every member has something implementing it: a member with no mechanism behind it is a guarantee nobody enforces.",
+          "enum": ["off", "native", "rnnoise", "rnnoise_gated"],
           "default": "native"
         }
       }
@@ -432,6 +437,11 @@
           "type": "string",
           "enum": ["session_create", "first_publish"],
           "default": "first_publish"
+        },
+        "tracks": {
+          "type": "boolean",
+          "description": "Also record each voice in the call, every published audio track, to its own file beside the layout's recording, because one person's voice alone is what a transcript or an evaluation is made from. The control plane starts each one when the media server reports the track published, copying the published audio without transcoding, and keeps who it belongs to. Video stays in the layout's recording only: a separate file per camera costs the egress host a process per track.",
+          "default": false
         },
         "retentionClass": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
         "consentArtifactId": {

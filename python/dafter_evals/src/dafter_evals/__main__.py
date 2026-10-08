@@ -21,7 +21,8 @@ from .voice import Voice
 
 
 def overrides(args: argparse.Namespace) -> dict[str, Any]:
-    return session_overrides(json.loads(args.overrides) if args.overrides else None)
+    given = json.loads(args.overrides) if args.overrides else None
+    return session_overrides(given, echoes=args.echo > 0)
 
 
 def arguments() -> argparse.Namespace:

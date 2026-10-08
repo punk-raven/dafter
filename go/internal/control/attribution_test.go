@@ -19,6 +19,15 @@ func (s *stubTransport) publish(trackID string, p transport.TrackPublisher) {
 	s.owners[trackID] = p
 }
 
+func (s *stubTransport) ReadWebhook(r *http.Request) (transport.Webhook, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if r.Header.Get("Authorization") != "signed" {
+		return transport.Webhook{}, errs.Errorf(errs.CodeAuthenticationFailed, "webhook is not signed by the media server")
+	}
+	return s.hook, nil
+}
+
 func (s *stubTransport) TrackOwner(_ context.Context, _, trackID string) (transport.TrackPublisher, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

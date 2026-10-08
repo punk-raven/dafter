@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dafter POC - Test Client</title>
+<title>Dafter call</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
 <link rel="stylesheet" href="/agent.css">
 <link rel="stylesheet" href="/captions.css">
 <link rel="stylesheet" href="/scribe.css">
 <link rel="stylesheet" href="/phone.css">
 <link rel="stylesheet" href="/guests.css">
+<link rel="stylesheet" href="/tiles.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e0e0e0; }
@@ -25,11 +27,12 @@
 
   .layout { display: flex; height: calc(100vh - 57px); }
   .sidebar { width: 320px; min-width: 320px; border-right: 1px solid #222; overflow-y: auto; padding: 16px; }
-  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; --transcript-h: 88px; }
+  body.in-call .sidebar { width: 264px; min-width: 264px; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; --transcript-h: 160px; }
 
-  .video-grid { flex: 1 0 calc(100% - var(--transcript-h)); display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px; padding: 8px; align-content: start; }
-  .video-tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-  .video-tile video { width: 100%; height: 100%; object-fit: contain; }
+  .video-grid { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; grid-template-columns: repeat(var(--tile-cols, 1), var(--tile-w, minmax(0, 1fr))); gap: 8px; padding: 8px; justify-content: center; align-content: center; overflow: hidden; }
+  .video-tile { position: relative; min-width: 0; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
+  .video-tile video { display: block; width: 100%; height: 100%; object-fit: contain; }
   .video-tile .label { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 
   .stats-panel { flex-shrink: 0; border-top: 1px solid #222; background: #0c0c0c; max-height: 320px; display: flex; flex-direction: column; }
@@ -123,16 +126,43 @@
   .advanced > summary::before { content: '\25B8'; display: inline-block; width: 14px; }
   .advanced[open] > summary::before { content: '\25BE'; }
   .advanced[open] > summary { margin-bottom: 12px; }
-  .sidebar:has(.advanced[open]) { width: 520px; min-width: 520px; }
+  .sidebar:has(.advanced[open]) { width: min(520px, 38vw); min-width: min(520px, 38vw); }
   .advanced .stats-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
   .advanced .log-panel { border: 1px solid #222; border-radius: 6px; margin-top: 12px; }
   .lobby-hint { margin: auto; color: #555; font-size: 14px; }
 
+  .lobby-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; color: #f3f4f6; }
+  .start input#display-name { padding: 10px; font-size: 15px; }
+  .start label { margin-top: 12px; }
+  .start select:disabled { color: #9ca3af; cursor: not-allowed; opacity: 1; }
+  .lobby-create { margin-top: 4px; }
+  .noise-filter { font-size: 12px; color: #86efac; margin: -2px 0 2px; }
+  .noise-filter.noise-filter-off { color: #fbbf24; }
+  .lobby-left { margin: 0 0 4px; font-size: 14px; line-height: 1.5; color: #9ca3af; }
+  .btn-new-call { background: transparent; color: #c4b5fd; border: 1px solid #3f3a5a; padding: 11px 16px; font-size: 15px; margin-top: 10px; }
+  .btn-new-call:hover { background: #1c1830; border-color: #6d5fb0; }
+  .start .lobby-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; font-size: 13px; line-height: 1.4; color: #cbd5e1; cursor: pointer; }
+  .lobby-check input { width: auto; margin: 2px 0 0; accent-color: #7c3aed; flex-shrink: 0; }
+  .recording-notice { margin-top: 14px; padding: 10px 12px; border: 1px solid #7f1d1d; background: #2a1212; color: #fecaca; border-radius: 6px; font-size: 13px; line-height: 1.5; }
+  .recording-notice strong { color: #fca5a5; }
+  .rec-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 6px; vertical-align: 1px; animation: rec-pulse 1.6s ease-in-out infinite; }
+  @keyframes rec-pulse { 50% { opacity: 0.35; } }
+  .badge-rec { background: #3a1c1c; color: #fca5a5; }
+  .rec-banner { flex-shrink: 0; padding: 8px 12px; background: #2a1212; color: #fecaca; border-bottom: 1px solid #7f1d1d; font-size: 13px; text-align: center; }
+  .lobby-share { margin-top: 14px; }
+  .link-row { display: flex; gap: 6px; }
+  .link-row input { flex: 1; min-width: 0; font-family: monospace; font-size: 12px; color: #4ade80; background: #0f1f0f; border-color: #2d5a2d; }
+  .link-row button { width: auto; margin: 0; padding: 6px 12px; }
+  .lobby-error { margin-top: 10px; color: #f87171; font-size: 13px; }
+  .lobby-error:empty { display: none; }
+  [hidden] { display: none !important; }
+
   @media (max-width: 640px) {
     .header { padding: 12px 16px; }
     .layout { flex-direction: column; height: auto; min-height: calc(100vh - 49px); }
-    .sidebar, .sidebar:has(.advanced[open]) { width: auto; min-width: 0; border-right: none; border-bottom: 1px solid #222; overflow-y: visible; }
-    .main { flex: 1; min-height: 50vh; }
+    .sidebar, body.in-call .sidebar, .sidebar:has(.advanced[open]) { width: auto; min-width: 0; border-right: none; border-bottom: 1px solid #222; overflow-y: visible; }
+    .main { flex: 1; min-height: 70vh; overflow: visible; }
+    .video-grid { min-height: 40vh; }
     .lobby-hint { padding: 24px 16px; text-align: center; }
   }
 </style>
@@ -140,52 +170,85 @@
 <body>
 
 <div class="header">
-  <h1>Dafter POC</h1>
+  <h1>Dafter</h1>
   <span id="status-badge" class="badge badge-disconnected">disconnected</span>
+  <span id="rec-badge" class="badge badge-rec" hidden><span class="rec-dot"></span>Recording</span>
   <span id="e2ee-badge" class="badge" style="display:none" title="Room.isE2EEEnabled"></span>
 </div>
 
 <div class="layout">
   <div class="sidebar">
     <div id="panel-start" class="start">
-      <label for="language">Language</label>
-      <select id="language">
-        <option value="kn-IN">Kannada</option>
-        <option value="hi" selected>Hindi</option>
-        <option value="en-IN">English</option>
-        <option value="mr-IN">Marathi</option>
-        <option value="te-IN">Telugu</option>
-      </select>
-      <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
-      <select id="llm" onchange="rememberLlm()"></select>
-      <div id="speech-toggles" class="speech-toggles"></div>
-      <button id="btn-start" class="btn-start" onclick="startCall()">Start call</button>
+      <h2 id="lobby-title" class="lobby-title">Start a call</h2>
+      <p id="lobby-left" class="lobby-left" hidden></p>
+      <div id="lobby-identity">
+        <label for="display-name">Your name</label>
+        <input id="display-name" type="text" maxlength="40" autocomplete="name" spellcheck="false" placeholder="How others see you">
+        <label for="language">Language</label>
+        <select id="language">
+          <option value="kn-IN">Kannada</option>
+          <option value="hi" selected>Hindi</option>
+          <option value="en-IN">English</option>
+          <option value="mr-IN">Marathi</option>
+          <option value="te-IN">Telugu</option>
+        </select>
+      </div>
+      <div id="lobby-create" class="lobby-create">
+        <label for="phone-guests">Phone guests</label>
+        <select id="phone-guests" onchange="renderDialInFields()">
+          <option value="">No phones</option>
+          <option value="dial_out">Call phones into the call</option>
+          <option value="dial_in">Phones dial in with a PIN</option>
+          <option value="both" selected>Dial in, and call phones in</option>
+        </select>
+        <label class="lobby-check" for="agent-on"><input id="agent-on" type="checkbox" checked><span>Nivya joins, transcribes, and answers when called by name</span></label>
+      </div>
+      <div id="recording-notice" class="recording-notice" role="alert" hidden><strong><span class="rec-dot"></span><span id="notice-what">This call is being recorded.</span></strong> <span id="notice-detail">Everyone's voice and video in it is recorded and kept.</span> By joining you agree to this.</div>
+      <div id="lobby-share" class="lobby-share" hidden>
+        <label for="lobby-link">Invite link</label>
+        <div class="link-row">
+          <input id="lobby-link" readonly onclick="this.select()">
+          <button class="btn-copy" type="button" onclick="copyJoinLink(this)">Copy</button>
+        </div>
+      </div>
+      <button id="btn-start" class="btn-start" onclick="lobbyAction()">Start a call</button>
+      <button id="btn-new-call" class="btn-new-call" type="button" onclick="startNewCall()" hidden>Start a new call</button>
+      <div id="lobby-error" class="lobby-error"></div>
     </div>
 
     <div id="panel-call" class="call-controls">
       <button id="btn-mic" class="btn-toggle" type="button" onclick="toggleMic()">Mic on</button>
       <button id="btn-camera" class="btn-toggle" type="button" onclick="toggleCamera()">Camera on</button>
+      <div id="noise-filter" class="noise-filter wide" role="status" hidden></div>
       <button id="agent-wake" class="btn-wake wide" type="button" onclick="wakeAgent()" style="display:none">Wake the agent</button>
       <button class="btn-copy wide" type="button" onclick="copyJoinLink(this)">Copy join link</button>
       <button id="btn-leave" class="btn-leave wide" type="button" onclick="leaveSession()">Leave</button>
     </div>
 
-    <hr id="phone-divider" class="divider">
-
-    <div id="panel-phone">
-      <fieldset>
-        <legend>Phone call</legend>
-        <label for="phone-to">Number to call (E.164)</label>
-        <input id="phone-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX">
-        <button id="btn-call" class="btn-call" onclick="placePhoneCall()">Call</button>
-        <div class="phone-status"><span id="phone-state" class="phone-pill phone-pill-idle">no call</span><span id="phone-detail" class="phone-detail"></span></div>
-        <div id="phone-problem" class="phone-problem"></div>
-        <div id="phone-hint" class="phone-hint"></div>
-      </fieldset>
-    </div>
-
     <details id="advanced" class="advanced">
       <summary>Advanced</summary>
+
+      <fieldset class="start">
+        <legend>Agent call</legend>
+        <label for="llm">LLM <span id="llm-provider" class="llm-provider"></span></label>
+        <select id="llm" onchange="rememberLlm()"></select>
+        <div id="speech-toggles" class="speech-toggles"></div>
+      </fieldset>
+
+      <hr id="phone-divider" class="divider">
+
+      <div id="panel-phone">
+        <fieldset>
+          <legend>Phone call</legend>
+          <label for="phone-to">Number to call (E.164)</label>
+          <input id="phone-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX">
+          <button id="btn-call" class="btn-call" onclick="placePhoneCall()">Call</button>
+          <div class="phone-status"><span id="phone-state" class="phone-pill phone-pill-idle">no call</span><span id="phone-detail" class="phone-detail"></span></div>
+          <div id="phone-problem" class="phone-problem"></div>
+          <div id="phone-hint" class="phone-hint"></div>
+        </fieldset>
+      </div>
+
 
       <div id="panel-create">
         <fieldset>
@@ -221,12 +284,6 @@
           <select id="noise-cancellation">
             <option value="" selected>follow the catalog</option>
           </select>
-          <label>Agent</label>
-          <select id="agent-mode">
-            <option value="" selected>follow the catalog</option>
-            <option value="on">on - dispatch the worker pool</option>
-            <option value="off">off - no agent</option>
-          </select>
           <label>Agent answers</label>
           <select id="addressing-mode">
             <option value="" selected>follow the catalog (called by name)</option>
@@ -260,11 +317,18 @@
             <option value="" selected>follow the catalog (off)</option>
             <option value="on">on - live notes, scores and minutes</option>
           </select>
-          <label>Phone guests</label>
-          <select id="phone-guests">
-            <option value="" selected>off</option>
-            <option value="dial_out">dial out - call phones into the meeting</option>
-          </select>
+          <div id="dial-in-fields" style="display:none">
+            <label>Caller check</label>
+            <select id="dial-in-check" onchange="renderDialInFields()">
+              <option value="pin" selected>pin - anyone with the meeting PIN</option>
+              <option value="pin_and_number">pin_and_number - the PIN from an allowed number</option>
+              <option value="number">number - an allowed number, no PIN</option>
+            </select>
+            <div id="dial-in-numbers-field" style="display:none">
+              <label>Allowed numbers</label>
+              <input id="dial-in-numbers" type="text" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX, +91XXXXXXXXXX" aria-label="Calling numbers allowed to dial in (E.164, comma separated)">
+            </div>
+          </div>
         </fieldset>
         <button id="btn-create" class="btn-create" onclick="createSession()">Create session only</button>
       </div>
@@ -373,13 +437,14 @@
   </div>
 
   <div class="main">
+    <div id="rec-banner" class="rec-banner" role="status" hidden><span class="rec-dot"></span>This call is being recorded</div>
     <div id="video-grid" class="video-grid"></div>
     <div id="transcripts" class="transcripts"></div>
-    <div class="lobby-hint">Pick a language and an LLM, then Start call</div>
+    <div id="lobby-hint" class="lobby-hint">Enter your name, then start or join a call</div>
   </div>
 </div>
 
 <script src="/agent-llm.js"></script><script src="/agent-speech.js"></script><script src="/agent-call.js"></script><script src="/agent-turns.js"></script><script src="/agent-metrics.js"></script><script src="/agent-refusal.js"></script><script src="/agent-addressing.js"></script><script src="/agent.js"></script>
-<script src="/client.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script>
+<script src="/client.js"></script><script src="/client-names.js"></script><script src="/client-stats.js"></script><script src="/client-session.js"></script><script src="/client-call.js"></script><script src="/client-media.js"></script><script src="/client-captions.js"></script><script src="/client-scribe.js"></script><script src="/client-phone.js"></script><script src="/client-guests.js"></script><script src="/client-dialin.js"></script><script src="/client-layout.js"></script><script src="/client-tiles.js"></script><script src="/client-lobby.js"></script>
 </body>
 </html>

@@ -123,22 +123,6 @@ func (l *LiveKit) RecallAgents(ctx context.Context, room, pool string) ([]Dispat
 }
 
 func (l *LiveKit) roomOpen(ctx context.Context, room string) (bool, error) {
-	token, err := l.serviceToken(serviceGrant{RoomList: true})
-	if err != nil {
-		return false, err
-	}
-	raw, err := l.call(ctx, twirpRoomPrefix+methodListRooms, token, listRoomsRequest{Names: []string{room}})
-	if err != nil {
-		return false, err
-	}
-	var listed listRoomsJSON
-	if err := json.Unmarshal(raw, &listed); err != nil {
-		return false, errs.Wrap(errs.CodeInternal, err, "decode %s response", methodListRooms)
-	}
-	for _, r := range listed.Rooms {
-		if r.Name == room {
-			return true, nil
-		}
-	}
-	return false, nil
+	open, err := l.OpenRooms(ctx, []string{room})
+	return open[room], err
 }

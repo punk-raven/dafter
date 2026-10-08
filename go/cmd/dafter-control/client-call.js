@@ -1,13 +1,16 @@
 async function startCall() {
   const btn = document.getElementById('btn-start');
   btn.disabled = true;
-  const roomId = await createSession();
-  if (roomId) await joinRoom();
+  const created = await createSession();
+  if (created) {
+    lobbyForSession(created.room, created.config);
+    if (!recordingOf(created.config).enabled) await joinRoom();
+  }
   btn.disabled = false;
 }
 
 function joinLink(roomId) {
-  return `${window.location.origin}?room=${roomId}`;
+  return `${window.location.origin}/?room=${roomId}`;
 }
 
 function copyJoinLink(btn) {
@@ -60,9 +63,8 @@ async function toggleCamera() {
   try {
     await local.setCameraEnabled(turnOn);
     const pub = local.getTrackPublication(Track.Source.Camera);
-    if (turnOn && pub && pub.track && !document.getElementById(`tile-${local.identity}-video`)) {
-      attachTrack(pub.track, local, true, !syntheticVideo);
-    }
+    if (turnOn && pub && pub.track) attachTrack(pub.track, local, true, !syntheticVideo);
+    renderPerson(local);
     log(`Camera ${turnOn ? 'on' : 'off'}`, 'success');
   } catch (err) {
     log(`Could not turn the camera ${turnOn ? 'on' : 'off'}: ${err.message}`, 'error');

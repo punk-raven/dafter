@@ -40,6 +40,7 @@ type sessionView struct {
 	Recordings    []recordingView `json:"recordings"`
 	AgentRefusal  json.RawMessage `json:"agentRefusal"`
 	ScribeRefusal json.RawMessage `json:"scribeRefusal"`
+	EndedAt       *time.Time      `json:"endedAt"`
 }
 
 func recordingRequest(layout, startAt string) string {

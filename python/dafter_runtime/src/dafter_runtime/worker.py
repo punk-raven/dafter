@@ -343,7 +343,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(flush)
     switching = Switching(p.config.agent.language_switching, p.config.language, p.personas)
     captions = captions_for(p, events)
-    delivery = Delivery(p.config.agent.speech, p.config.language)
+    delivery = Delivery(p.config.agent.speech, p.config.language, p.config.media.audio)
     follow_language(switching, speech_plan, delivery, stages)
     called = (
         Called(ctx, p, stages, session, stt_sample_rate(p), switching, delivery, captions)
@@ -358,7 +358,7 @@ async def entrypoint(ctx: JobContext) -> None:
     caller: Callable[[], str | None]
     sleep: Callable[[], None] | None = None
     if called is not None:
-        caller, roster, sleep = called.addressee, called.roster, called.gate.sleep
+        caller, roster, sleep = called.addressee, called.roster, called.gate.go_quiet
     else:
         roster = Roster()
         follow(ctx.room, roster)
@@ -367,6 +367,7 @@ async def entrypoint(ctx: JobContext) -> None:
     registry = registry_for(p, session, roster, caller, sleep, delivery, switching, scribing)
     if called is not None:
         called.voice.before_answer = answering(switching, registry.heard)
+        called.voice.judging = delivery.filler.hold
         called.voice.announce = events.addressed
     agent = Answering(
         p.persona.instructions,
@@ -375,6 +376,7 @@ async def entrypoint(ctx: JobContext) -> None:
         Acknowledgements.of(p.config.turn.interruption.backchannel),
         delivery,
         switching,
+        name=p.config.agent.name or "",
     )
     if scribing is not None:
         scribing.briefed = lambda: agent.brief(scribing.context())

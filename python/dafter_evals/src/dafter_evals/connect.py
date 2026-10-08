@@ -12,9 +12,14 @@ LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost"})
 ANSWERS_THE_PROBE: dict[str, Any] = {"greets": True, "addressing": {"mode": "always"}}
 
 
-def session_overrides(given: dict[str, Any] | None) -> dict[str, Any]:
+def session_overrides(given: dict[str, Any] | None, echoes: bool = False) -> dict[str, Any]:
     stated = given or {}
-    return {**stated, "agent": {**ANSWERS_THE_PROBE, **stated.get("agent", {})}}
+    shaped = {**stated, "agent": {**ANSWERS_THE_PROBE, **stated.get("agent", {})}}
+    if echoes:
+        media = stated.get("media", {})
+        audio = {**media.get("audio", {}), "echoCancellation": False}
+        shaped["media"] = {**media, "audio": audio}
+    return shaped
 
 
 def livekit_url(control: str, url: str) -> str:

@@ -16,6 +16,7 @@
   {"language": "en", "text": "Okay Nivya, that's all", "heard": "stopped", "why": "called and told it is done"},
   {"language": "en", "text": "stop", "heard": "stop", "why": "a bare stop word"},
   {"language": "en", "text": "Please don't stop the music", "heard": "aside", "why": "a stop word inside a longer utterance"},
+  {"language": "en", "text": "Nivya, go to sleep now.", "heard": "stopped", "why": "told to sleep, by name"},
 
   {"language": "hi", "text": "निव्या, आज मौसम कैसा है?", "heard": "called", "why": "the name opens the utterance"},
   {"language": "hi", "text": "अरे निव्या, अभी कितने बजे हैं", "heard": "called", "why": "the name after a particle"},
@@ -39,6 +40,7 @@
   {"language": "mr", "text": "नव्या घरात आलो", "heard": "aside", "why": "navya, new, at the start of the utterance"},
   {"language": "mr", "text": "निव्या, थांब", "heard": "stopped", "why": "called and told to stop"},
   {"language": "mr", "text": "पुरे", "heard": "stop", "why": "a bare stop word"},
+  {"language": "mr", "text": "निव्या, झोप.", "heard": "stopped", "why": "told to sleep, by name"},
 
   {"language": "kn", "text": "ನಿವ್ಯ, ಸಮಯ ಎಷ್ಟು?", "heard": "called", "why": "the name opens the utterance"},
   {"language": "kn", "text": "ಏ ನಿವ್ಯಾ ಇವತ್ತು ಹವಾಮಾನ ಹೇಗಿದೆ", "heard": "called", "why": "the long-vowel spelling after a particle"},
@@ -58,5 +60,14 @@
   {"language": "te", "text": "నవ్య, ఇక్కడికి రా", "heard": "aside", "why": "a declared near miss"},
   {"language": "te", "text": "దివ్య మరియు నిత్య వస్తున్నారు", "heard": "aside", "why": "declared near misses"},
   {"language": "te", "text": "నివ్య, ఆపు", "heard": "stopped", "why": "called and told to stop"},
-  {"language": "te", "text": "చాలు", "heard": "stop", "why": "a bare stop word"}
+  {"language": "te", "text": "చాలు", "heard": "stop", "why": "a bare stop word"},
+  {"language": "hi", "text": "स्टॉप।", "heard": "stop", "why": "stop said in English and written in Devanagari by a code-mixed recognizer"},
+  {"language": "hi", "text": "हाय निव्या, कैसी हो?", "heard": "called", "why": "the name after a spoken hi"},
+  {"language": "hi", "text": "निव्या, सो जाओ।", "heard": "stopped", "why": "told to sleep, by name"},
+  {"language": "kn", "text": "ಸ್ಟಾಪ್", "heard": "stop", "why": "stop said in English and written in Kannada script"},
+  {"language": "kn", "text": "ಹಾಯ್ ನಿವ್ಯ, ಹೇಗಿದ್ದೀಯ?", "heard": "called", "why": "the name after a spoken hi"},
+  {"language": "kn", "text": "ನಿವ್ಯ, ಮಲಗು.", "heard": "stopped", "why": "told to sleep, by name"},
+  {"language": "te", "text": "స్టాప్", "heard": "stop", "why": "stop said in English and written in Telugu script"},
+  {"language": "te", "text": "హాయ్ నివ్య, ఎలా ఉన్నావు?", "heard": "called", "why": "the name after a spoken hi"},
+  {"language": "te", "text": "నివ్య, నిద్రపో.", "heard": "stopped", "why": "told to sleep, by name"}
 ]

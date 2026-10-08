@@ -2,6 +2,7 @@ package transport_test
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -123,6 +124,9 @@ var vobizEnv = map[string]string{
 	"VOBIZ_SIP_WEBHOOK_URL": "https://calls.example.com/",
 	"VOBIZ_SIP_AUTH_TOKEN":  "not-a-real-token",
 	"VOBIZ_SIP_BRIDGE_APP":  "12345678901234567",
+
+	"VOBIZ_SIP_BRIDGE_USERNAME": "dafter_bridge",
+	"VOBIZ_SIP_BRIDGE_PASSWORD": "not-a-real-endpoint-password",
 }
 
 func shippedTable(t *testing.T) []byte {
@@ -147,7 +151,8 @@ func TestTheShippedVobizTrunkReadsEverythingPerAccountFromTheEnvironment(t *test
 	}
 	in := v.Inbound
 	if in == nil || in.PublicURL != "https://calls.example.com" || in.SigningKey != "not-a-real-token" ||
-		in.BridgeHost != "sip.vobiz.ai" || in.BridgeUser != "12345678901234567" || in.Session.Profile != "" {
+		in.BridgeHost != "registrar.vobiz.ai:5060" || in.BridgeUser != "12345678901234567" || in.Session.Profile != "" ||
+		in.BridgeUsername != "dafter_bridge" || in.BridgePassword != "not-a-real-endpoint-password" {
 		t.Errorf("vobiz inbound = %+v", in)
 	}
 }
@@ -174,5 +179,23 @@ func TestTheShippedTableBootsWithNoCarrierConfigured(t *testing.T) {
 		!strings.Contains(strings.Join(de.Details, "\n"), "/vobiz/inbound/publicUrlRef") ||
 		!strings.Contains(strings.Join(de.Details, "\n"), "/vobiz/inbound/signingKeyRef") {
 		t.Errorf("a half-configured inbound trunk was accepted: %v", err)
+	}
+}
+
+func TestTheBridgeLegNeedsBothOfTheSIPEndpointsCredentials(t *testing.T) {
+	t.Parallel()
+	for _, unset := range []string{"VOBIZ_SIP_BRIDGE_USERNAME", "VOBIZ_SIP_BRIDGE_PASSWORD"} {
+		env := maps.Clone(vobizEnv)
+		delete(env, unset)
+		pointer := "/vobiz/inbound/bridgeUsernameRef"
+		if strings.HasSuffix(unset, "PASSWORD") {
+			pointer = "/vobiz/inbound/bridgePasswordRef"
+		}
+		if _, _, err := transport.LoadTrunks(shippedTable(t), environment(env)); !strings.Contains(problems(err), pointer) {
+			t.Errorf("without %s: %v", unset, err)
+		}
+	}
+	if _, _, err := transport.LoadTrunks(shippedTable(t), vobizWith(map[string]string{"VOBIZ_SIP_BRIDGE_USERNAME": "bridge@registrar.vobiz.ai"})); !strings.Contains(problems(err), "/vobiz/inbound/bridgeUsernameRef") {
+		t.Errorf("an endpoint username with a host was accepted: %v", err)
 	}
 }

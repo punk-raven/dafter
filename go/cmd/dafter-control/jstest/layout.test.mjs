@@ -7,10 +7,12 @@ const html = readFileSync(new URL('testclient.html', dir), 'utf8');
 const scripts = readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8'));
 const advancedAt = html.indexOf('<details id="advanced"');
 
-const MAIN_SCREEN = ['language', 'llm', 'speech-toggles', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave'];
+const MAIN_SCREEN = [
+  'display-name', 'language', 'phone-guests', 'agent-on', 'recording-notice', 'lobby-link', 'btn-start', 'btn-mic', 'btn-camera', 'agent-wake', 'btn-leave',
+];
 const ADVANCED = [
-  'tenant', 'channel', 'profile', 'privacy-mode', 'resolution', 'noise-cancellation', 'agent-mode',
-  'addressing-mode', 'agent-greeting', 'recording-layout', 'btn-create', 'room-id', 'role', 'ice-policy',
+  'llm', 'speech-toggles', 'phone-to', 'btn-call', 'tenant', 'channel', 'profile', 'privacy-mode', 'resolution', 'noise-cancellation',
+  'addressing-mode', 'agent-greeting', 'recording-layout', 'dial-in-check', 'dial-in-numbers', 'btn-create', 'room-id', 'role', 'ice-policy',
   'btn-join', 'my-resolution', 'btn-record-start', 'btn-record-stop', 'agent-toggle', 'stats-panel', 'log',
 ];
 
@@ -30,6 +32,19 @@ test('the main screen holds only the call, everything else sits under Advanced',
   for (const id of MAIN_SCREEN) assert.ok(position(id) < advancedAt, `#${id} belongs on the main screen`);
   for (const id of ADVANCED) assert.ok(position(id) > advancedAt, `#${id} belongs under Advanced`);
   assert.ok(html.indexOf('onclick="copyJoinLink(this)"') < advancedAt, 'Copy join link belongs on the main screen');
+});
+
+test('a new call has the agent in it and takes phones both ways unless the starter says otherwise', () => {
+  assert.match(html, /<input id="agent-on" type="checkbox" checked>/);
+  const select = html.slice(position('phone-guests'), html.indexOf('</select>', position('phone-guests')));
+  assert.match(select, /<option value="both" selected>/);
+  assert.equal(select.split(' selected').length, 2);
+});
+
+test('the recording notice is shown on the join screen and as a banner during the call', () => {
+  assert.match(html, /id="recording-notice"[^>]*hidden>.*This call is being recorded\..*By joining you agree to this\./);
+  assert.match(html, /id="rec-banner"[^>]*hidden>.*This call is being recorded</);
+  assert.match(html, /id="rec-badge"[^>]*hidden>/);
 });
 
 test('the language list offers the five focus languages by name, Hindi first chosen', () => {

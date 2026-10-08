@@ -8,6 +8,7 @@ from collections.abc import Callable, Coroutine
 from functools import partial
 from typing import Any
 
+from dafter_core.speech import every_phrase
 from livekit import rtc
 from livekit.agents import AgentSession, JobContext
 from livekit.agents.llm import MetricsReport
@@ -22,7 +23,10 @@ from .captions import Captions
 from .delivery import Delivery
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
+from .noise import Meaning
 from .plan import Plan
+from .plausible import Plausible
+from .presence import ALONE_GRACE_S, Alone
 from .stages import Stages, hearing
 from .switching import Switching
 
@@ -45,7 +49,14 @@ def gate_for(p: Plan, voice: Voice, loop: asyncio.AbstractEventLoop) -> Gate:
         clock=loop.time,
         schedule=schedule,
         name=agent.name or "",
+        meaning=meaning_for(p),
+        busy_words=p.config.turn.interruption.min_words,
+        stays_awake=agent.addressing.stays_awake,
     )
+
+
+def meaning_for(p: Plan) -> Meaning:
+    return Meaning(every_phrase(p.config.turn.interruption.backchannel.words))
 
 
 def resume_for(p: Plan, voice: Voice) -> Resume | None:
@@ -66,6 +77,7 @@ def barge_in_for(p: Plan, gate: Gate, voice: Voice, loop: asyncio.AbstractEventL
         schedule=loop.call_later,
         resume=resume_for(p, voice),
         waits_for_words=Acknowledgements.of(interruption.backchannel) is not None,
+        meaning=meaning_for(p),
     )
 
 
@@ -131,6 +143,7 @@ class Called:
             self._hearing,
         )
         self._tasks: set[asyncio.Task[None]] = set()
+        self._alone = Alone(self._leave_alone, loop.call_later, ALONE_GRACE_S)
 
     def addressee(self) -> str | None:
         return self.gate.addressee
@@ -152,7 +165,7 @@ class Called:
             self._captions.follow(speaker, session)
 
     def _hearing(self, speaker: str, session: AgentSession[Any]) -> Filter:
-        sieves: list[Filter] = []
+        sieves: list[Filter] = [Plausible()]
         if self._delivery is not None:
             echoed = partial(self.barge_in.echoing, speaker)
             sieves.append(self._delivery.own_voice.hearing(session, echoed))
@@ -175,6 +188,7 @@ class Called:
     def _joined(self, participant: rtc.RemoteParticipant) -> None:
         if not is_human(participant, self._ctx.room):
             return
+        self._alone.joined()
         self.roster.join(participant.identity, participant.name)
         self._spawn(self.listeners.join(participant.identity))
 
@@ -188,8 +202,12 @@ class Called:
             self._captions.left(participant.identity)
         self._spawn(self.listeners.leave(participant.identity))
         if not self.roster.present():
-            log.info("everyone left, closing the agent session")
-            self._session.shutdown()
+            log.info("everyone left", extra={"leaving_after_s": ALONE_GRACE_S})
+            self._alone.emptied()
+
+    def _leave_alone(self) -> None:
+        log.info("nobody came back, the agent leaves the call")
+        self._ctx.shutdown(reason="everyone left")
 
     def _state_changed(self, ev: AgentStateChangedEvent) -> None:
         self.gate.agent_state(ev.new_state)

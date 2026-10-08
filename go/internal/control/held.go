@@ -146,11 +146,14 @@ func (h *heldCalls) known(token string) bool {
 
 func (c heldCall) dialBack(t transport.Trunk) transport.PhoneCall {
 	return transport.PhoneCall{
-		Room:            c.room,
-		Identity:        c.identity,
-		SIPUser:         t.Inbound.BridgeUser,
-		Headers:         map[string]string{vobiz.BridgeHeader: c.token},
-		Trunk:           transport.Trunk{Provider: t.Provider, Address: t.Inbound.BridgeHost, Transport: t.Transport, Numbers: t.Numbers},
+		Room:     c.room,
+		Identity: c.identity,
+		SIPUser:  t.Inbound.BridgeUser,
+		Headers:  map[string]string{vobiz.BridgeHeader: c.token},
+		Trunk: transport.Trunk{
+			Provider: t.Provider, Address: t.Inbound.BridgeHost, Transport: t.Transport, Numbers: t.Numbers,
+			AuthUsername: t.Inbound.BridgeUsername, AuthPassword: t.Inbound.BridgePassword,
+		},
 		RingingTimeout:  c.ringing,
 		MaxCallDuration: c.limit,
 	}

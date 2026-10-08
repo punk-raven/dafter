@@ -16,13 +16,17 @@ are strings in seconds.
   `secret://` references.
 
 - `create-sip-participant-bridge.json`: the dial-back of an inbound call. The
-  carrier holds the caller in a conference, and the call goes to its
-  application's public SIP address (`sipCallTo` is the application id, the
-  inline trunk's host the carrier's application domain) carrying the per-call
-  bridge token as the `X-VH-Bridge` header, which the carrier passes to the
-  application's answer URL. No credentials: the application address takes the
-  call, the token is what admits it to the right conference. The caller's own
-  number never reaches the media server at all.
+  carrier holds the caller in a conference, and the call goes to the carrier's
+  registrar (the inline trunk's host and port) as the carrier's SIP endpoint
+  attached to the bridge application, authenticating with that endpoint's
+  username and password (made up here, from the table's `secret://`
+  references in a real call). The carrier answers a call from the endpoint
+  with the endpoint's application, so `sipCallTo` (the application id) only
+  names the leg. The leg carries the per-call bridge token as the
+  `X-VH-Bridge` header, which the carrier passes to the application's answer
+  URL as a form field of the same name; the token is what admits it to the
+  right conference. The caller's own number never reaches the media server at
+  all.
 
 What keeps the dialed number out of the room: `participantIdentity` is the
 opaque `p_` id the control plane minted, `participantName` is the constant

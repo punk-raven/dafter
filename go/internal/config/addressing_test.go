@@ -42,6 +42,21 @@ func TestEveryAddressingModeValidatesWithAName(t *testing.T) {
 	}
 }
 
+func TestAnAgentCanStayAwakeUntilToldToSleep(t *testing.T) {
+	t.Parallel()
+	c := addressed(t, "Nivya", &config.Addressing{Mode: config.AddressingTranscript, StaysAwake: true})
+	if err := c.Validate(); err != nil {
+		t.Fatalf("stays awake rejected: %v", err)
+	}
+	raw, err := json.Marshal(c.Agent.Addressing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"staysAwake":true`) {
+		t.Errorf("staysAwake not written: %s", raw)
+	}
+}
+
 func TestAlwaysNeedsNoName(t *testing.T) {
 	t.Parallel()
 	if err := addressed(t, "", &config.Addressing{Mode: config.AddressingAlways}).Validate(); err != nil {
@@ -78,6 +93,7 @@ func TestAddressingOutsideItsBoundsIsRejected(t *testing.T) {
 		"duplicate alias":    `{"mode": "transcript", "aliases": ["निव्या", "निव्या"]}`,
 		"unknown field":      `{"mode": "transcript", "wakeWord": "Nivya"}`,
 		"alias not a string": `{"mode": "transcript", "aliases": [7]}`,
+		"awake not a flag":   `{"mode": "transcript", "staysAwake": "yes"}`,
 	}
 	for name, block := range cases {
 		t.Run(name, func(t *testing.T) {

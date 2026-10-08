@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hkdf"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"errors"
@@ -13,10 +16,14 @@ import (
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
 
-const sealedKeyPrefix = "v1:"
+const (
+	sealedKeyPrefix = "v1:"
+	indexKeyInfo    = "dafter state index v1"
+)
 
 type KeyCipher struct {
-	aead cipher.AEAD
+	aead  cipher.AEAD
+	index []byte
 }
 
 func NewKeyCipher(secret []byte) (*KeyCipher, error) {
@@ -31,7 +38,19 @@ func NewKeyCipher(secret []byte) (*KeyCipher, error) {
 	if err != nil {
 		return nil, errs.Wrap(errs.CodeInternal, err, "build session key cipher")
 	}
-	return &KeyCipher{aead: aead}, nil
+	index, err := hkdf.Key(sha256.New, secret, nil, indexKeyInfo, sha256.Size)
+	if err != nil {
+		return nil, errs.Wrap(errs.CodeInternal, err, "derive state index key")
+	}
+	return &KeyCipher{aead: aead, index: index}, nil
+}
+
+func (k *KeyCipher) digest(purpose, value string) string {
+	mac := hmac.New(sha256.New, k.index)
+	mac.Write([]byte(purpose))
+	mac.Write([]byte{0})
+	mac.Write([]byte(value))
+	return base64.RawStdEncoding.EncodeToString(mac.Sum(nil))
 }
 
 func ParseKeyCipher(encoded string) (*KeyCipher, error) {

@@ -24,7 +24,12 @@ type Session struct {
 	EncryptionKey string
 	AgentRefusal  json.RawMessage
 	ScribeRefusal json.RawMessage
+
+	JoinedAt time.Time
+	EndedAt  time.Time
 }
+
+func (s Session) Ended() bool { return !s.EndedAt.IsZero() }
 
 type Egress struct {
 	EgressID  string
@@ -56,6 +61,17 @@ type SessionStore interface {
 	Transcript(ctx context.Context, sessionID string, version int) (Transcript, error)
 	AddMinutes(ctx context.Context, m Minutes) (Minutes, error)
 	LatestMinutes(ctx context.Context, sessionID string) (Minutes, error)
+	CreateDialIn(ctx context.Context, sessionID, pin string, at time.Time) error
+	DialInPIN(ctx context.Context, sessionID string) (string, error)
+	DialInByPIN(ctx context.Context, pin string) (DialIn, error)
+	DialInsAllowing(ctx context.Context, number string) ([]DialIn, error)
+	DialIns(ctx context.Context) ([]DialIn, error)
+	DialInAllows(ctx context.Context, sessionID, number string) (bool, error)
+	SetDialInNumbers(ctx context.Context, sessionID string, numbers []string) error
+	MarkDialInOpened(ctx context.Context, sessionID string, at time.Time) error
+	EndDialIn(ctx context.Context, sessionID string) error
+	MarkJoined(ctx context.Context, sessionID string, at time.Time) error
+	EndSession(ctx context.Context, sessionID string, at time.Time) (bool, error)
 	Close() error
 }
 
@@ -81,7 +97,9 @@ CREATE TABLE IF NOT EXISTS sessions (
 	encryption_key TEXT NOT NULL DEFAULT '',
 	agent_refusal  TEXT NOT NULL DEFAULT '',
 	scribe_refusal TEXT NOT NULL DEFAULT '',
-	release_id     INTEGER NOT NULL DEFAULT 0
+	release_id     INTEGER NOT NULL DEFAULT 0,
+	joined_at      INTEGER NOT NULL DEFAULT 0,
+	ended_at       INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 CREATE TABLE IF NOT EXISTS egresses (
 	egress_id   TEXT PRIMARY KEY,
@@ -105,6 +123,8 @@ var addedColumns = map[string][]column{
 		{"agent_refusal", "TEXT NOT NULL DEFAULT ''"},
 		{"scribe_refusal", "TEXT NOT NULL DEFAULT ''"},
 		{"release_id", "INTEGER NOT NULL DEFAULT 0"},
+		{"joined_at", "INTEGER NOT NULL DEFAULT 0"},
+		{"ended_at", "INTEGER NOT NULL DEFAULT 0"},
 	},
 	"egresses": {
 		{"track_id", "TEXT NOT NULL DEFAULT ''"},
@@ -131,7 +151,7 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 			return nil, closing(db, err)
 		}
 	}
-	for _, migration := range []string{transcriptsMigration, minutesMigration} {
+	for _, migration := range []string{transcriptsMigration, minutesMigration, dialInMigration} {
 		if _, err := db.ExecContext(ctx, migration); err != nil {
 			return nil, closing(db, errs.Wrap(errs.CodeInternal, err, "migrate session store"))
 		}
@@ -203,14 +223,15 @@ func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT session_id, tenant_id, room, config_hash, config, created_at, encryption_key,
-		        agent_refusal, scribe_refusal, release_id
+		        agent_refusal, scribe_refusal, release_id, joined_at, ended_at
 		 FROM sessions WHERE session_id = ?`, sessionID)
 
 	var sess Session
 	var config, sealed, refusal, scribeRefusal string
-	var createdAt int64
+	var createdAt, joinedAt, endedAt int64
 	switch err := row.Scan(&sess.SessionID, &sess.TenantID, &sess.Room,
-		&sess.ConfigHash, &config, &createdAt, &sealed, &refusal, &scribeRefusal, &sess.ReleaseID); {
+		&sess.ConfigHash, &config, &createdAt, &sealed, &refusal, &scribeRefusal, &sess.ReleaseID,
+		&joinedAt, &endedAt); {
 	case errors.Is(err, sql.ErrNoRows):
 		return Session{}, ErrNotFound
 	case err != nil:
@@ -230,6 +251,8 @@ func (s *Store) Session(ctx context.Context, sessionID string) (Session, error) 
 		sess.ScribeRefusal = json.RawMessage(scribeRefusal)
 	}
 	sess.CreatedAt = time.UnixMicro(createdAt).UTC()
+	sess.JoinedAt = instant(joinedAt)
+	sess.EndedAt = instant(endedAt)
 	return sess, nil
 }
 

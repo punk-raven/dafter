@@ -14,7 +14,9 @@ const guestView = {
 function guestsBlockedReason(config) {
   if (!config) return 'no session config';
   if (config.privacyMode && config.privacyMode !== 'open') return 'an end-to-end encrypted session takes no phone guests, because the SIP bridge decodes every frame';
-  if (!config.telephony || config.telephony.phoneGuests !== 'dial_out') return 'this session takes no phone guests; create it with Phone guests set to dial out';
+  const guests = config.telephony && config.telephony.phoneGuests;
+  if (guests === 'dial_in') return 'this session takes phone guests by dial-in only; create it with Phone guests set to dial out or both to call one';
+  if (!callsGuestsOut(guests)) return 'this session takes no phone guests; create it with Phone guests set to dial out or both';
   if (!config.telephony.trunk) return 'this tenant has no phone line to call guests in on';
   return '';
 }
@@ -42,6 +44,7 @@ function guestTile(guest) {
   tile = document.createElement('div');
   tile.id = id;
   tile.className = 'video-tile guest-tile';
+  tile.dataset.identity = guest.identity;
   tile.innerHTML = `
     <div class="guest-face"><div class="guest-ring"></div><div class="guest-glyph"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></div></div>
     <div class="guest-tile-state"><span class="guest-dot"></span><span class="guest-state-text"></span></div>
@@ -56,7 +59,7 @@ function renderGuest(guest) {
   const tile = guestTile(guest);
   tile.dataset.state = guest.state;
   tile.querySelector('.guest-state-text').textContent = GUEST_STATES[guest.state];
-  tile.querySelector('.label').textContent = `Phone guest ${guest.number} · ${guest.identity}`;
+  tile.querySelector('.label').textContent = `Phone guest ${guest.number}`;
   const button = tile.querySelector('.guest-hangup');
   button.style.display = guest.state === 'hangup' ? 'none' : '';
   button.disabled = guest.busy;
@@ -108,7 +111,8 @@ function guestsSection() {
       <strong>Phone guests</strong>
       <span id="guests-count" class="guests-count"></span>
     </div>
-    <div class="guests-dial">
+    <div id="guests-dial-in" class="guests-dial-in" style="display:none"></div>
+    <div id="guests-dial-out" class="guests-dial">
       <input id="guests-to" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+91XXXXXXXXXX" aria-label="Number to call (E.164)">
       <button id="guests-call-btn" class="guests-btn" type="button">Call</button>
     </div>
@@ -196,6 +200,7 @@ function watchGuests(room, data) {
   const { RoomEvent } = LivekitClient;
   Object.assign(guestView, { room, sessionId: data.sessionId, reason: guestsBlockedReason(data.config), busy: false, problem: '' });
   guestsSection().style.display = '';
+  showDialIn(data.dialIn, data.config && data.config.telephony && data.config.telephony.phoneGuests);
   const refresh = (participant) => { onGuestParticipant(participant); renderGuestControls(); };
   room.on(RoomEvent.ParticipantConnected, refresh);
   room.on(RoomEvent.ParticipantAttributesChanged, (changed, participant) => refresh(participant));
@@ -215,4 +220,5 @@ function stopGuests() {
   if (!section) return;
   section.style.display = 'none';
   document.getElementById('guests-to').value = '';
+  showDialIn(null, null);
 }

@@ -29,6 +29,7 @@ MORE_ECHO = ("योजना के बारे", "योजना के ब�
 REPLY = "आपका ऑर्डर कल तक पहुँच जाएगा, मैं आपको उसकी जानकारी भेजती हूँ।"
 REPLY_ECHO = ("आपका ऑर्डर कल", "आपका ऑर्डर कल तक पहुँच जाएगा")
 CALLER = ("रुकिए", "रुकिए, एक सवाल है")
+IN_HER_WORDS = ("आपका ऑर्डर", "आपका ऑर्डर कब आएगा")
 
 
 @dataclass(frozen=True)
@@ -38,10 +39,11 @@ class Outcome:
     paused: int
 
 
-def planned(mode: str) -> Plan:
+def planned(mode: str, cancels_echo: bool) -> Plan:
     doc = json.loads(JOB.read_bytes())
     doc["turn"]["interruption"]["falseInterruptionTimeoutMs"] = RESUME_MS
     doc["agent"]["addressing"]["mode"] = mode
+    doc["media"]["audio"]["echoCancellation"] = cancels_echo
     sealed, _ = seal(json.dumps(doc))
     return plan(load(sealed), "dafter-py")
 
@@ -59,7 +61,7 @@ async def hears(
 
 
 def echoed_always(*heard: tuple[str, ...]) -> Outcome:
-    p = planned("always")
+    p = planned("always", cancels_echo=False)
 
     async def run() -> Outcome:
         recognizer, detector, speaker = ScriptedSTT(), ScriptedVAD(), Speaker()
@@ -75,7 +77,7 @@ def echoed_always(*heard: tuple[str, ...]) -> Outcome:
         )
         session.input.audio = Microphone()
         session.output.audio = speaker
-        delivery = Delivery(p.config.agent.speech, p.config.language)
+        delivery = Delivery(p.config.agent.speech, p.config.language, p.config.media.audio)
         registry = registry_for(p, session, Roster(), lambda: None, None)
         acknowledgements = Acknowledgements.of(p.config.turn.interruption.backchannel)
         agent = Answering(
@@ -109,8 +111,10 @@ class Room:
         return None
 
 
-def echoed_called(*heard: tuple[str, ...]) -> Outcome:
-    p = planned("transcript")
+def echoed_called(
+    *heard: tuple[str, ...], then: tuple[tuple[str, ...], ...] = (), cancels_echo: bool = False
+) -> Outcome:
+    p = planned("transcript", cancels_echo)
 
     async def run() -> Outcome:
         recognizer, detector, speaker = ScriptedSTT(), ScriptedVAD(), Speaker()
@@ -123,7 +127,7 @@ def echoed_called(*heard: tuple[str, ...]) -> Outcome:
             aec_warmup_duration=None,
         )
         voice_session.output.audio = speaker
-        delivery = Delivery(p.config.agent.speech, p.config.language)
+        delivery = Delivery(p.config.agent.speech, p.config.language, p.config.media.audio)
         stages = SimpleNamespace(turn_detector=None, vad=detector, listener_stt=lambda: recognizer)
         ctx = SimpleNamespace(room=Room(), add_shutdown_callback=lambda _: None)
         job = cast(JobContext, ctx)
@@ -156,6 +160,15 @@ def echoed_called(*heard: tuple[str, ...]) -> Outcome:
             await hears(recognizer, detector, says, speaker)
         await asyncio.wait_for(asyncio.ensure_future(_done(reply)), 10)
         await asyncio.sleep(0.6)
+        if then:
+            called.gate.wake(ASHA)
+            reply = called.voice.reply
+            assert reply is not None
+            await until(lambda: voice_session.agent_state == "speaking")
+            for says in then:
+                await hears(recognizer, detector, says, speaker)
+            await asyncio.wait_for(asyncio.ensure_future(_done(reply)), 10)
+            await asyncio.sleep(0.6)
         outcome = Outcome(reply.interrupted, turns, speaker.pauses)
         await listening.aclose()
         await voice_session.aclose()
@@ -188,3 +201,25 @@ def test_a_called_agent_on_an_echoing_line_is_still_cut_by_the_caller() -> None:
     outcome = echoed_called(REPLY_ECHO, CALLER)
     assert outcome.interrupted
     assert outcome.turns == [CALLER[-1]]
+
+
+def test_on_an_echoing_line_the_caller_still_stops_the_agent_with_a_short_stop() -> None:
+    outcome = echoed_called(REPLY_ECHO, ("रुको",))
+    assert outcome.interrupted
+
+
+def test_an_echo_on_one_reply_does_not_deafen_the_caller_on_the_next() -> None:
+    outcome = echoed_called(REPLY_ECHO, then=(("सुनो", "सुनो ज़रा"),))
+    assert outcome.interrupted
+
+
+def test_where_echo_is_cancelled_a_caller_using_her_words_cuts_her_and_is_answered() -> None:
+    outcome = echoed_called(IN_HER_WORDS, cancels_echo=True)
+    assert outcome.interrupted
+    assert outcome.turns == [IN_HER_WORDS[-1]]
+
+
+def test_on_a_line_without_echo_cancellation_the_same_words_are_taken_for_her_echo() -> None:
+    outcome = echoed_called(IN_HER_WORDS, cancels_echo=False)
+    assert not outcome.interrupted
+    assert outcome.turns == []
