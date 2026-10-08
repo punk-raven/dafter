@@ -1,0 +1,8 @@
+line-cap deploy/grafana/dashboards/*.json
+line-cap docs/dafter.md
+line-cap **/go.sum
+line-cap python/uv.lock
+line-cap skills-lock.json
+line-cap testdata/**
+em-dash testdata/rfc8785/**
+comments testdata/rfc8785/**
