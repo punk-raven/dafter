@@ -12,6 +12,8 @@ from livekit.agents import AgentSession
 from livekit.agents.voice.events import UserInputTranscribedEvent
 from livekit.agents.voice.io import TextOutput
 
+from .naming import words
+
 log = logging.getLogger("dafter.runtime.captions")
 
 PARTICIPANT = re.compile(r"^p_[0-9a-f]{8}$")
@@ -98,7 +100,7 @@ class Captions:
 
     def heard(self, participant: str, text: str, final: bool, language: str | None) -> None:
         text = text.strip()
-        if not text:
+        if not words(text):
             return
         sid = self._open.get(participant) or segment_id()
         self._open[participant] = sid

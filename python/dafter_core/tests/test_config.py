@@ -389,3 +389,9 @@ def test_the_barge_in_stop_budget_defaults_to_the_schema_value() -> None:
     stated = doc(budgets={"turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 250})
     assert parse(stated).budgets.barge_in_stop_p50_ms == 250
     assert refuse(doc(budgets={"turnGapP50Ms": 800, "turnGapP95Ms": 1500, "bargeInStopP50Ms": 0}))
+
+
+def test_each_voice_is_recorded_on_its_own_only_when_asked() -> None:
+    recording: dict[str, Any] = {"enabled": True, "consentArtifactId": "consent_1"}
+    assert not parse(doc(recording=recording)).recording.tracks
+    assert parse(doc(recording={**recording, "tracks": True})).recording.tracks

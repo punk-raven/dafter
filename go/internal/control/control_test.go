@@ -54,6 +54,9 @@ type stubTransport struct {
 
 	closed  map[string]bool
 	roomErr error
+
+	hook      transport.Webhook
+	trackGate chan struct{}
 }
 
 func (s *stubTransport) RecallAgents(_ context.Context, room, pool string) ([]transport.DispatchInfo, error) {
@@ -99,6 +102,9 @@ func (s *stubTransport) MintToken(g transport.Grant) (transport.Token, error) {
 }
 
 func (s *stubTransport) StartEgress(_ context.Context, req transport.EgressRequest) (transport.EgressInfo, error) {
+	if req.Layout == config.LayoutTrack && s.trackGate != nil {
+		<-s.trackGate
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.egressErr != nil {
@@ -165,6 +171,8 @@ func serve(t *testing.T) *harness {
 	svc := &control.Service{
 		Catalog: catalog, Store: store, Transport: tport, TokenTTL: 15 * time.Minute,
 		WorkerSecret: workerSecret, Trunks: transport.Trunks{"vobiz": carrierTrunk},
+		IdentityKey: []byte("identity-key-for-tests-only-32by"),
+		Background:  func(work func()) { work() },
 	}
 	server := httptest.NewServer(svc.MetricsHandler())
 	t.Cleanup(server.Close)

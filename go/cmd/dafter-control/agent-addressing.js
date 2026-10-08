@@ -26,7 +26,7 @@ function whoWokeAgent() {
   const room = agentView.room;
   const id = agentAddressing.wokenBy;
   if (room && room.localParticipant && room.localParticipant.identity === id) return 'you';
-  return id;
+  return typeof nameOf === 'function' ? nameOf(id, room) : id;
 }
 
 function addressingText(state) {
@@ -65,7 +65,7 @@ async function wakeAgent() {
 function renderWakeButton(present) {
   const button = document.getElementById('agent-wake');
   if (!button) return;
-  button.style.display = waitsToBeCalled(agentView.config) ? '' : 'none';
+  button.style.display = waitsToBeCalled(agentView.config) && !agentQuiet(agentView.config) ? '' : 'none';
   button.textContent = `Wake ${agentName(agentView.config)}`;
   button.disabled = !present;
   button.title = present ? 'Wake the agent as if you had said its name' : 'the agent is not in the call';

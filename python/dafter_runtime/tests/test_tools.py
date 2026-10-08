@@ -23,7 +23,7 @@ from dafter_runtime.tools import (
     ToolRefused,
     checked,
 )
-from livekit.agents import Agent, AgentSession, llm
+from livekit.agents import Agent, AgentSession, StopResponse, llm
 from stub_llm import StubLLM
 
 ASHA = "p_4b81e0d7"
@@ -203,11 +203,12 @@ def test_who_is_here_names_the_people_in_the_call() -> None:
     assert asyncio.run(who.run({})) == "2 in the call: Asha, Speaker 2."
 
 
-def test_go_quiet_sends_the_agent_to_sleep() -> None:
+def test_go_quiet_sends_the_agent_to_sleep_and_ends_the_turn_without_a_reply() -> None:
     slept: list[bool] = []
     quiet = go_quiet(lambda: slept.append(True))
     assert (quiet.speed, quiet.effect) == (Speed.FAST, Effect.READ)
-    asyncio.run(quiet.run({}))
+    with pytest.raises(StopResponse):
+        asyncio.run(quiet.run({}))
     assert slept == [True]
 
 

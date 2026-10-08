@@ -53,6 +53,13 @@ def test_every_addressing_mode_parses_with_a_name(mode: AddressingMode) -> None:
     )
 
 
+def test_an_agent_can_stay_awake_until_told_to_sleep() -> None:
+    awake = parse(with_addressing({"mode": "transcript", "staysAwake": True})).agent.addressing
+    assert awake.stays_awake
+    assert not parse(with_addressing({"mode": "transcript"})).agent.addressing.stays_awake
+    assert rejected({"mode": "transcript", "staysAwake": "yes"}).code is ErrorCode.INVALID_CONFIG
+
+
 def test_always_needs_no_name() -> None:
     assert parse(with_addressing({"mode": "always"}, name=None)).agent.name is None
 

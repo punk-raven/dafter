@@ -34,11 +34,12 @@ type claims struct {
 }
 
 type LiveKit struct {
-	url     string
-	httpURL string
-	key     string
-	secret  string
-	now     func() time.Time
+	url       string
+	publicURL string
+	httpURL   string
+	key       string
+	secret    string
+	now       func() time.Time
 
 	storage *EgressStorage
 	client  *http.Client
@@ -57,6 +58,16 @@ func WithEgressStorage(s EgressStorage) Option {
 			}
 		}
 		l.storage = &s
+		return nil
+	}
+}
+
+func WithPublicURL(publicURL string) Option {
+	return func(l *LiveKit) error {
+		if u, err := url.Parse(publicURL); err != nil || u.Host == "" || (u.Scheme != "ws" && u.Scheme != "wss") {
+			return errs.Errorf(errs.CodeInvalidConfig, "the public media server url must be ws:// or wss://")
+		}
+		l.publicURL = publicURL
 		return nil
 	}
 }
@@ -126,7 +137,11 @@ func (l *LiveKit) MintToken(g Grant) (Token, error) {
 	if err != nil {
 		return Token{}, errs.Wrap(errs.CodeInternal, err, "mint join token")
 	}
-	return Token{JWT: signed, URL: l.url, ExpiresAt: expires}, nil
+	joinURL := l.url
+	if l.publicURL != "" {
+		joinURL = l.publicURL
+	}
+	return Token{JWT: signed, URL: joinURL, ExpiresAt: expires}, nil
 }
 
 func ptr(b bool) *bool { return &b }

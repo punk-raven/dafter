@@ -18,11 +18,23 @@ from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowl
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
-from .labels import unlabeled
+from .history import (
+    REPEATED,
+    instructions_of,
+    judged,
+    last_turn,
+    recovering,
+    replies,
+    unrepeated,
+)
+from .judging import decided, meant_for_her
+from .labels import unlabeled, unquoted
 from .listeners import is_human
+from .memory import Memory, summarised
 from .naming import words
 from .own_voice import wait_for_words
 from .plan import Plan
+from .plausible import Plausible
 from .scribing import Scribing
 from .switching import Switching
 from .tools import NO_FILLING, Filling, Registry, Tool
@@ -39,8 +51,10 @@ class Answering(Agent):
         acknowledgements: Acknowledgements | None = None,
         delivery: Delivery | None = None,
         switching: Switching | None = None,
+        name: str = "",
     ):
         super().__init__(instructions=instructions, tools=registry.function_tools())
+        self._name = name
         self._registry = registry
         self._caller = caller
         self._persona = instructions
@@ -51,6 +65,7 @@ class Answering(Agent):
         self._switching = switching if switching is not None and switching.enabled else None
         self._floor: SessionFloor | None = None
         self._ear: Filter | None = None
+        self._memory: Memory | None = None
 
     def brief(self, context: str) -> None:
         self._context = context
@@ -64,7 +79,7 @@ class Answering(Agent):
     def stt_node(
         self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
     ) -> Events:
-        events: Events = Agent.default.stt_node(self, audio, model_settings)
+        events: Events = Plausible()(Agent.default.stt_node(self, audio, model_settings))
         if self._delivery is not None:
             if self._ear is None:
                 own_voice = self._delivery.own_voice
@@ -76,29 +91,60 @@ class Answering(Agent):
             self._floor = SessionFloor(self.session)
         return acknowledged(self._acknowledgements, self._floor)(events)
 
+    def _remembered(self, chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
+        if self._memory is None:
+            model = self.session.llm
+            summarise = (
+                (lambda prompt: summarised(model, prompt))
+                if isinstance(model, lk_llm.LLM)
+                else None
+            )
+            self._memory = Memory(summarise, agent="the agent")
+        return self._memory.context(chat_ctx)
+
     def llm_node(
         self, chat_ctx: lk_llm.ChatContext, tools: list[lk_llm.Tool], model_settings: ModelSettings
     ) -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
         if self._delivery is not None:
             self._delivery.heard(chat_ctx)
             self._delivery.filler.generating()
+        chat_ctx = self._remembered(chat_ctx)
         if self._switching is not None:
-            chat_ctx = chat_ctx.copy()
             instructions = self._briefed(self._switching.persona.instructions)
             update_instructions(chat_ctx, instructions=instructions, add_if_missing=True)
-        return unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings))
+
+        def again() -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
+            asked = chat_ctx.copy()
+            reminder = f"{instructions_of(asked)}\n\n{REPEATED}"
+            update_instructions(asked, instructions=reminder, add_if_missing=True)
+            return unlabeled(Agent.default.llm_node(self, asked, tools, model_settings))
+
+        def plain() -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
+            return unlabeled(
+                Agent.default.llm_node(self, last_turn(chat_ctx), tools, model_settings)
+            )
+
+        first = recovering(
+            unlabeled(Agent.default.llm_node(self, chat_ctx, tools, model_settings)), plain
+        )
+        if judged(chat_ctx) and isinstance(model := self.session.llm, lk_llm.LLM):
+            first = decided(first, meant_for_her(model, chat_ctx, self._name))
+        return unrepeated(first, again, replies(chat_ctx))
 
     def tts_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
     ) -> AsyncIterable[rtc.AudioFrame]:
         if self._delivery is not None and isinstance(voice := self.session.tts, Styled):
             voice.style(str(self._delivery.situation))
+        text = unquoted(text)
         if self._delivery is not None:
             text = self._delivery.own_voice.saying(text)
-        reply = Agent.default.tts_node(self, text, model_settings)
-        if self._delivery is None or not self._delivery.filler.enabled:
+        reply: AsyncIterable[rtc.AudioFrame] = Agent.default.tts_node(self, text, model_settings)
+        if self._delivery is None:
             return reply
-        return self._delivery.filler.ahead(reply, lambda: self.session.current_speech)
+        if self._delivery.filler.enabled:
+            reply = self._delivery.filler.ahead(reply, lambda: self.session.current_speech)
+        return self._delivery.loudness.leveled(reply)
 
     async def on_user_turn_completed(
         self, turn_ctx: lk_llm.ChatContext, new_message: lk_llm.ChatMessage

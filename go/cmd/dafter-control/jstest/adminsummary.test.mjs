@@ -51,7 +51,7 @@ test('a read-only LLM route reads as plain rows, options included', () => {
   const rows = JSON.parse(JSON.stringify(run(`glanceRows('llms', ${JSON.stringify(catalog.llms['groq/openai/gpt-oss-120b'])})`)));
   assert.deepEqual(rows, [
     ['Provider', 'Groq'], ['Model', 'openai/gpt-oss-120b'], ['Key', 'secret://tenants/t_9c21a4be/groq/api-key'],
-    ['Temperature', '0.4'], ['Max tokens', '200'], ['Reasoning effort', 'low'],
+    ['Temperature', '0.4'], ['Max tokens', '800'], ['Reasoning effort', 'low'],
   ]);
   assert.deepEqual(JSON.parse(JSON.stringify(run(`glanceRows('defaults', {})`))), []);
 });

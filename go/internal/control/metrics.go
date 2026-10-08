@@ -35,6 +35,11 @@ var (
 		Help: "Total session joins.",
 	})
 
+	sessionsEndedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dafter_sessions_ended_total",
+		Help: "Calls ended because everyone left and the media server closed the room.",
+	})
+
 	sessionCreateDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "dafter_session_create_duration_seconds",
 		Help:    "Session creation latency.",
@@ -72,6 +77,8 @@ var (
 		Help: "Total errors by code.",
 	}, []string{"code"})
 )
+
+func incSessionEnded() { sessionsEndedTotal.Inc() }
 
 func incDispatch(ok bool) {
 	outcome := "failed"
@@ -149,6 +156,7 @@ func (s *Service) MetricsHandler() http.Handler {
 	mux.HandleFunc("GET /sessions/{sessionID}/transcripts/{version}", s.exportTranscript)
 	mux.HandleFunc("POST /sessions/{sessionID}/minutes", s.storeMinutes)
 	mux.HandleFunc("GET /sessions/{sessionID}/minutes", s.readMinutes)
+	mux.HandleFunc("POST /livekit/webhook", s.mediaServerWebhook)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		start := time.Now()

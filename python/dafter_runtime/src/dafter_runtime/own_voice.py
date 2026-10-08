@@ -12,7 +12,7 @@ from livekit.agents.voice.events import AgentStateChangedEvent, UserStateChanged
 
 from .addressing import Clock
 from .backchannel import TRANSCRIPTS, Events, Filter, text_of
-from .naming import within_one_edit, words
+from .naming import STOPS, within_one_edit, words
 
 log = logging.getLogger("dafter.runtime.own_voice")
 
@@ -22,18 +22,38 @@ ONSET_GRACE_S = 0.5
 SHARE = 0.6
 NEW_WORDS = 3
 STEM = 4
+PREFIX = 3
+ECHO_WORDS = 2
+QUOTED_WORDS = 4
 
 Words = tuple[str, ...]
 
 
 def recognized_as(heard: str, spoken: str) -> bool:
-    if spoken.startswith(heard) or (len(spoken) >= STEM and heard.startswith(spoken)):
+    if heard == spoken or (len(heard) >= PREFIX and spoken.startswith(heard)):
+        return True
+    if len(spoken) >= STEM and heard.startswith(spoken):
         return True
     return min(len(heard), len(spoken)) >= STEM and within_one_edit(heard, spoken)
 
 
 def missed(heard: Words, said: frozenset[str]) -> int:
     return sum(1 for w in heard if w not in said and not any(recognized_as(w, s) for s in said))
+
+
+def run_of(heard: Words, said: Words) -> int:
+    longest = 0
+    for i in range(len(heard)):
+        for j in range(len(said)):
+            run = 0
+            while (
+                i + run < len(heard)
+                and j + run < len(said)
+                and recognized_as(heard[i + run], said[j + run])
+            ):
+                run += 1
+            longest = max(longest, run)
+    return longest
 
 
 @dataclass(slots=True)
@@ -49,8 +69,9 @@ class Stretch:
 
 
 class OwnVoice:
-    def __init__(self, clock: Clock = time.time) -> None:
+    def __init__(self, clock: Clock = time.time, cancels_echo: bool = True) -> None:
         self.clock = clock
+        self.cancels_echo = cancels_echo
         self._said: deque[Spoken] = deque()
         self._stretches: deque[Stretch] = deque()
 
@@ -90,17 +111,35 @@ class OwnVoice:
         heard = words(text)
         if not heard or onset is None or not self._speaking_at(onset, now):
             return False
+        if self.cancels_echo:
+            return self._quoted(heard)
         new = missed(heard, frozenset(w for s in self._said for w in s.words))
+        if heard in STOPS and new == len(heard):
+            return False
         return new <= (1 - SHARE) * len(heard) or (echoing and new < NEW_WORDS)
+
+    def _quoted(self, heard: Words) -> bool:
+        run = run_of(heard, tuple(w for s in self._said for w in s.words))
+        return run >= QUOTED_WORDS and run >= SHARE * len(heard)
+
+    def stretch_at(self, onset: float | None) -> Stretch | None:
+        if onset is None:
+            return None
+        now = self.clock()
+        return next(
+            (
+                s
+                for s in self._stretches
+                if s.began <= onset <= (now if s.ended is None else s.ended) + ONSET_GRACE_S
+            ),
+            None,
+        )
 
     def hearing(self, session: AgentSession[Any], echoed: Callable[[], None]) -> Filter:
         return Ear(self, session, echoed)
 
     def _speaking_at(self, onset: float, now: float) -> bool:
-        return any(
-            s.began <= onset <= (now if s.ended is None else s.ended) + ONSET_GRACE_S
-            for s in self._stretches
-        )
+        return self.stretch_at(onset) is not None
 
     def _forget(self, now: float) -> None:
         while len(self._said) > KEPT_SPEECHES and now - self._said[0].at > KEPT_S:
@@ -124,7 +163,9 @@ class Ear:
         self._clock = voice.clock
         self._onset: float | None = None
         self._vad = False
-        self._echoing = False
+        self._echo_in: Stretch | None = None
+        self._quoted_in: Stretch | None = None
+        self._reported = False
         session.on("user_state_changed", self._user_state)
 
     def _user_state(self, ev: UserStateChangedEvent) -> None:
@@ -145,13 +186,25 @@ class Ear:
             yield event
 
     def _echoes(self, text: str) -> bool:
-        if not self._voice.echoes(text, self._onset, self._echoing):
+        stretch = self._voice.stretch_at(self._onset)
+        echoing = stretch is not None and stretch is self._echo_in
+        if not self._voice.echoes(text, self._onset, echoing):
             return False
-        if not self._echoing:
-            log.info("a microphone returns the agent's own voice, it is no longer heard")
-            self._echoing = True
-            self._echoed()
+        if not echoing and len(words(text)) >= ECHO_WORDS:
+            self._heard_echo(stretch)
         return True
 
+    def _heard_echo(self, stretch: Stretch | None) -> None:
+        if self._voice.cancels_echo:
+            if stretch is not self._quoted_in:
+                self._quoted_in = stretch
+                log.info("a microphone returned a run of the agent's own words, it is ignored")
+        else:
+            self._echo_in = stretch
+            log.info("a microphone returns the agent's voice, its echo is ignored this reply")
+        if not self._reported:
+            self._reported = True
+            self._echoed()
 
-__all__ = ["Ear", "OwnVoice", "missed", "recognized_as", "wait_for_words"]
+
+__all__ = ["Ear", "OwnVoice", "missed", "recognized_as", "run_of", "wait_for_words"]

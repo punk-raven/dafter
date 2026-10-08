@@ -12,13 +12,23 @@ const agentView = {
 };
 
 const AGENT_PENDING_MS = 20000;
+const AGENT_STATE_ATTRIBUTE = 'lk.agent.state';
+const AGENT_STATES = ['initializing', 'listening', 'thinking', 'speaking'];
+
+function followAgentAttributes(participant) {
+  const state = (participant.attributes || {})[AGENT_STATE_ATTRIBUTE];
+  if (!AGENT_STATES.includes(state) || state === agentView.state) return;
+  agentView.state = state;
+  setAgentTileState(state);
+  renderAgentControls();
+}
 
 function agentOverride() {
-  const value = document.getElementById('agent-mode').value;
+  const enabled = document.getElementById('agent-on').checked !== false;
   const greeting = document.getElementById('agent-greeting').value;
-  const override = value === '' ? {} : { enabled: value === 'on' };
-  if (greeting !== '' && value !== 'off') override.greets = greeting === 'on';
-  return Object.keys(override).length ? override : null;
+  const override = { enabled };
+  if (greeting !== '' && enabled) override.greets = greeting === 'on';
+  return override;
 }
 
 function agentParticipant(room) {
@@ -76,6 +86,11 @@ function agentPanel() {
     <div id="agent-lines" class="agent-lines"><div class="agent-empty">speech shows here as it is recognised</div></div>`;
   document.getElementById('transcripts').append(transcript);
   return panel;
+}
+
+function agentQuiet(config) {
+  const guests = config && config.telephony && config.telephony.phoneGuests;
+  return agentBlockedReason(config) !== '' && !guests;
 }
 
 function agentBlockedReason(config) {
@@ -200,9 +215,10 @@ function watchAgent(room, data) {
   agentView.config = data.config;
   agentView.state = null;
   resetAgentAddressing();
-  agentPanel().style.display = '';
+  const quiet = agentQuiet(data.config);
+  agentPanel().style.display = quiet ? 'none' : '';
   document.getElementById('agent-title').textContent = (data.config && data.config.agent && data.config.agent.name) || 'Agent';
-  document.getElementById('agent-transcript').style.display = '';
+  document.getElementById('agent-transcript').style.display = quiet || captionsLive(data.config) ? 'none' : '';
   resetAgentTurns();
   agentView.effective = null;
   renderAgentLlm(data.config, []);
@@ -219,6 +235,10 @@ function watchAgent(room, data) {
     clearAgentRefusal();
     showAgentTile(participant);
     setAgentPending(null);
+    followAgentAttributes(participant);
+  });
+  room.on(RoomEvent.ParticipantAttributesChanged, (changed, participant) => {
+    if (participant && participant.isAgent) followAgentAttributes(participant);
   });
   room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     if (!participant.isAgent) return;
@@ -236,7 +256,11 @@ function watchAgent(room, data) {
   });
   room.on(RoomEvent.AudioPlaybackStatusChanged, () => renderAudioUnlock(room));
   room.on(RoomEvent.Connected, () => {
-    room.remoteParticipants.forEach((p) => { if (p.isAgent) showAgentTile(p); });
+    room.remoteParticipants.forEach((p) => {
+      if (!p.isAgent) return;
+      showAgentTile(p);
+      followAgentAttributes(p);
+    });
     renderAudioUnlock(room);
     renderAgentControls();
   });

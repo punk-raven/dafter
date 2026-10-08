@@ -92,8 +92,8 @@ test('each call brings its own numbered phone guest, and the number is never kep
   }
   assert.deepEqual(p.requests.map((r) => r.path), [`/sessions/${SESSION}/call/start`, `/sessions/${SESSION}/call/start`]);
   assert.deepEqual(p.requests.map((r) => r.body), [{ to: NUMBER }, { to: NUMBER }]);
-  assert.equal(p.byId('guest-p_3d5f7a90').querySelector('.label').textContent, 'Phone guest 1 · p_3d5f7a90');
-  assert.equal(p.byId('guest-p_8e1b2c44').querySelector('.label').textContent, 'Phone guest 2 · p_8e1b2c44');
+  assert.equal(p.byId('guest-p_3d5f7a90').querySelector('.label').textContent, 'Phone guest 1');
+  assert.equal(p.byId('guest-p_8e1b2c44').querySelector('.label').textContent, 'Phone guest 2');
   assert.equal(p.byId('guest-p_8e1b2c44').querySelector('.guest-state-text').textContent, 'dialing');
   assert.equal(p.byId('guests-count').textContent, '2 on the call');
   assert.deepEqual(leaks(p), []);

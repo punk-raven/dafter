@@ -1,0 +1,31 @@
+{
+  "event": "participant_joined",
+  "room": {
+    "sid": "RM_vXkrzjH2ouiY",
+    "name": "s_7f3a9c21",
+    "emptyTimeout": 300,
+    "departureTimeout": 20,
+    "maxParticipants": 10,
+    "creationTime": "1791316750",
+    "creationTimeMs": "1791316750412"
+  },
+  "participant": {
+    "sid": "PA_SCyLYg2n6e6d",
+    "identity": "p_4b81e0d7",
+    "state": "ACTIVE",
+    "joinedAt": "1791316752",
+    "joinedAtMs": "1791316752389",
+    "version": 2,
+    "permission": {
+      "canSubscribe": true,
+      "canPublish": true,
+      "canPublishData": true
+    },
+    "clientProtocol": 2,
+    "capabilities": [
+      "CAP_COMPRESSION_DEFLATE_RAW"
+    ]
+  },
+  "id": "EV_dTPobxYgwQ9z",
+  "createdAt": "1791316752"
+}

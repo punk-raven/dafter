@@ -13,6 +13,7 @@ function form(values) {
   g.transcriptionOverride = () => null;
   g.scribeOverride = () => false;
   g.chosenLlm = () => undefined;
+  g.deviceKey = () => 'dv_4b81e0d7a1c2f3e4b5a6c7d8';
   g.speechOverrides = () => {};
   return run;
 }

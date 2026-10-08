@@ -4,6 +4,7 @@ function sessionRequest() {
     language: document.getElementById('language').value,
     channel: document.getElementById('channel').value,
     llm: chosenLlm(),
+    device: deviceKey(),
   };
   const profile = document.getElementById('profile').value.trim();
   if (profile) body.profile = profile;
@@ -37,7 +38,7 @@ function sessionRequest() {
     body.overrides = body.overrides || {};
     body.overrides.recording = { enabled: true, layout, consentArtifactId: 'consent_testclient' };
   }
-  const transcription = transcriptionOverride();
+  const transcription = transcriptionOverride() || (agent && !agent.enabled ? 'off' : null);
   if (transcription) applyTranscriptionOverride(body, transcription);
   if (scribeOverride()) applyScribeOverride(body);
   const phoneGuests = document.getElementById('phone-guests').value;
@@ -54,7 +55,7 @@ function showCreatedSession(data) {
   log(`Room: ${data.room} | Hash: ${data.configHash.slice(0, 16)}...`, 'success');
   if (data.agentDispatchId) log(`Agent dispatched to ${data.config.agent.pool} (${data.agentDispatchId}); join to talk to it`, 'success');
 
-  const joinUrl = `${window.location.origin}?room=${data.room}`;
+  const joinUrl = joinLink(data.room);
   document.getElementById('created-room-id').textContent = data.room;
   document.getElementById('join-link').value = joinUrl;
   document.getElementById('session-created-info').style.display = 'block';
@@ -77,7 +78,9 @@ async function createSession() {
     showResponse(data);
 
     if (!resp.ok) {
-      log(`Create failed: ${data.code} - ${data.message}`, 'error');
+      const details = (data.details || []).join('; ');
+      log(`Create failed: ${data.code} - ${data.message}${details ? ` (${details})` : ''}`, 'error');
+      document.getElementById('lobby-error').textContent = `Could not start the call: ${details || data.message}`;
       btn.disabled = false;
       return null;
     }
@@ -85,7 +88,7 @@ async function createSession() {
     showCreatedSession(data);
     await allowDialInNumbers(data);
     btn.disabled = false;
-    return data.room;
+    return data;
   } catch (err) {
     log(`Error: ${err.message}`, 'error');
   }
@@ -105,10 +108,12 @@ async function joinRoom() {
 
   try {
     log(`Joining room ${roomId}...`);
+    const joinBody = { role: document.getElementById('role').value, device: deviceKey() };
+    if (lobbyConsent && roomId === lastRoomId) joinBody.recordingConsent = lobbyConsent;
     const resp = await fetch(`/sessions/${roomId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: document.getElementById('role').value }),
+      body: JSON.stringify(joinBody),
     });
     const data = await resp.json();
     showResponse(data);
@@ -116,6 +121,9 @@ async function joinRoom() {
     if (!resp.ok) {
       log(`Join failed: ${data.code} - ${data.message}`, 'error');
       btn.disabled = false;
+      if (data.code === 'consent_required') await openRoomLobby(roomId);
+      else if (data.code === 'session_ended') showCallEnded();
+      else document.getElementById('lobby-error').textContent = 'Could not join this call. Try again in a moment.';
       return false;
     }
 
@@ -148,11 +156,13 @@ async function joinRoom() {
     if (e2ee) roomOptions.encryption = e2ee;
 
     room = new Room(roomOptions);
+    watchNames(room);
     watchAgent(room, data);
     watchCaptions(room, data);
     watchScribe(data);
     watchPhone(room, data);
     watchGuests(room, data);
+    watchTiles(room);
 
     room.on(RoomEvent.ParticipantEncryptionStatusChanged, (enabled, participant) => {
       const who = participant && participant.identity === room.localParticipant.identity ? 'you' : (participant ? participant.identity : 'unknown');
@@ -197,6 +207,9 @@ async function joinRoom() {
       log(`Disconnected: ${reason || 'unknown'}`, 'warn');
       setBadge('disconnected');
       cleanup();
+      if (reason !== DisconnectReason.CLIENT_INITIATED) {
+        afterCall(roomId, reason === DisconnectReason.DUPLICATE_IDENTITY ? 'moved' : 'dropped');
+      }
     });
 
     const rtcConfig = { iceTransportPolicy: icePolicy };
@@ -205,7 +218,9 @@ async function joinRoom() {
     }
 
     let connectUrl;
-    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+    if (data.url && data.url.startsWith('wss://')) {
+      connectUrl = data.url;
+    } else if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
       const lkUrl = new URL(data.url);
       lkUrl.hostname = window.location.hostname;
       connectUrl = lkUrl.toString();
@@ -225,6 +240,13 @@ async function joinRoom() {
     }
 
     log('Connected! Publishing tracks...', 'success');
+    nameJoined(room);
+    document.getElementById('panel-create').style.display = 'none';
+    document.getElementById('panel-join').style.display = 'none';
+    document.getElementById('session-created-info').style.display = 'none';
+    setInCall(true);
+    showRecordingPanel(data);
+    showRecordingIndicator(data.config);
 
     let micPublished = false;
     try {
@@ -233,6 +255,7 @@ async function joinRoom() {
     } catch (micErr) {
       log(`No microphone (${micErr.message})`, publishesVideo ? 'warn' : 'error');
       activeNoiseFilter = null;
+      showNoiseFilter('', true);
     }
 
     if (publishesVideo) {
@@ -255,12 +278,7 @@ async function joinRoom() {
     if (localVideoTrack && localVideoTrack.track) {
       attachTrack(localVideoTrack.track, room.localParticipant, true, !syntheticVideo);
     }
-
-    document.getElementById('panel-create').style.display = 'none';
-    document.getElementById('panel-join').style.display = 'none';
-    document.getElementById('session-created-info').style.display = 'none';
-    setInCall(true);
-    showRecordingPanel(data);
+    renderMediaToggles();
 
     startStats(data);
     monitorICE();
@@ -269,16 +287,23 @@ async function joinRoom() {
     log(`Error: ${err.message}`, 'error');
     btn.disabled = false;
     setBadge('disconnected');
+    if (room && room.state !== ConnectionState.Connected) {
+      room.disconnect();
+      cleanup();
+    }
+    document.getElementById('lobby-error').textContent = `Could not connect to the call (${err.message}). Try again.`;
     return false;
   }
 }
 
 async function leaveSession() {
+  const left = lastRoomId;
   if (room) {
     await requestMinutes(room);
     await room.disconnect();
   }
   cleanup();
+  await afterCall(left, 'left');
 }
 
 function cleanup() {
@@ -297,11 +322,14 @@ function cleanup() {
     syntheticAudioCtx.close();
     syntheticAudioCtx = null;
   }
+  playFarEndInto(null);
+  farEndTracks.clear();
   if (noiseAudioCtx) {
     noiseAudioCtx.close();
     noiseAudioCtx = null;
   }
   activeNoiseFilter = null;
+  showNoiseFilter('', true);
   room = null;
   if (e2eeWorker) {
     e2eeWorker.terminate();
@@ -316,4 +344,5 @@ function cleanup() {
   setInCall(false);
   document.getElementById('ice-info').style.display = 'none';
   document.getElementById('panel-recording').style.display = 'none';
+  showRecordingIndicator(null);
 }

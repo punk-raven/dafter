@@ -4,9 +4,9 @@ import asyncio
 from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
-from dafter_runtime.backchannel import Events
+from dafter_runtime.backchannel import Events, Filter
 from dafter_runtime.naming import words
-from dafter_runtime.own_voice import OwnVoice, missed, recognized_as
+from dafter_runtime.own_voice import OwnVoice, missed, recognized_as, run_of
 from livekit.agents import AgentSession, LanguageCode, stt
 from livekit.agents.voice.events import UserStateChangedEvent
 
@@ -35,8 +35,8 @@ class Listening:
         )
 
 
-def speaking(clock: Clock, *texts: str) -> OwnVoice:
-    voice = OwnVoice(clock)
+def speaking(clock: Clock, *texts: str, cancels_echo: bool = False) -> OwnVoice:
+    voice = OwnVoice(clock, cancels_echo=cancels_echo)
     voice.speaking()
     for text in texts:
         voice.said(text)
@@ -85,7 +85,7 @@ def test_an_answer_that_starts_after_the_agent_stops_is_heard_even_in_its_words(
 
 def test_nothing_is_dropped_before_the_agent_speaks_or_without_a_known_start() -> None:
     clock = Clock()
-    voice = OwnVoice(clock)
+    voice = OwnVoice(clock, cancels_echo=False)
     voice.said(REPLY)
     assert not voice.echoes(REPLY, onset=clock.now)
     voice.speaking()
@@ -105,7 +105,7 @@ def test_a_line_known_to_echo_needs_three_new_words_over_the_agent() -> None:
 
 def test_text_streamed_to_the_voice_is_matched_as_whole_words() -> None:
     clock = Clock()
-    voice = OwnVoice(clock)
+    voice = OwnVoice(clock, cancels_echo=False)
     voice.speaking()
 
     async def chunks() -> AsyncIterator[str]:
@@ -157,4 +157,120 @@ def test_the_ear_drops_the_echo_and_reports_the_line_once() -> None:
         return [e async for e in heard]
 
     assert asyncio.run(hear()) == [sent[0], sent[3]]
+    assert echoed == [True]
+
+
+def test_a_fragment_of_one_or_two_letters_is_not_a_word_cut_short() -> None:
+    assert not recognized_as("a", "agreement")
+    assert not recognized_as("re", "rental")
+    assert recognized_as("ren", "rental")
+    assert recognized_as("is", "is")
+
+
+def test_a_stop_the_agent_never_said_is_never_its_echo() -> None:
+    clock = Clock()
+    voice = speaking(clock, REPLY)
+    clock.now += 1
+    onset = clock.now - 0.2
+    assert not voice.echoes("stop", onset, echoing=True)
+    assert not voice.echoes("रुको", onset, echoing=True)
+    said_it = speaking(clock, "बस एक second, मैं check करती हूँ")
+    clock.now += 1
+    assert said_it.echoes("बस", clock.now - 0.2, echoing=True)
+
+
+def ear_hears(ear: Filter, *texts: str) -> list[str]:
+    async def hear() -> list[str]:
+        async def events() -> AsyncIterator[stt.SpeechEvent | str]:
+            for text in texts:
+                yield transcript(stt.SpeechEventType.FINAL_TRANSCRIPT, text)
+
+        return [text_of_event(e) async for e in ear(events())]
+
+    return asyncio.run(hear())
+
+
+def text_of_event(event: stt.SpeechEvent | str) -> str:
+    return event if isinstance(event, str) else event.alternatives[0].text
+
+
+def test_one_word_like_the_agents_is_dropped_without_marking_the_line() -> None:
+    clock = Clock()
+    voice = speaking(clock, REPLY)
+    listening = Listening()
+    echoed: list[bool] = []
+    ear = voice.hearing(cast(AgentSession[Any], listening), lambda: echoed.append(True))
+    listening.starts_speaking()
+    assert ear_hears(ear, "notice", "wait wait") == ["wait wait"]
+    assert echoed == []
+
+
+def test_an_echo_is_ignored_for_the_reply_it_was_heard_in_not_for_the_whole_call() -> None:
+    clock = Clock()
+    voice = speaking(clock, REPLY)
+    listening = Listening()
+    echoed: list[bool] = []
+    ear = voice.hearing(cast(AgentSession[Any], listening), lambda: echoed.append(True))
+    listening.starts_speaking()
+    assert ear_hears(ear, "Keep your rental agreement", "complete") == []
+    assert echoed == [True]
+
+    clock.now += 2
+    voice.quiet()
+    clock.now += 5
+    voice.speaking()
+    voice.said("The legal notice is due on Monday.")
+    clock.now += 1
+    listening.starts_speaking()
+    assert ear_hears(ear, "wait wait") == ["wait wait"]
+    assert echoed == [True]
+
+
+STORY = (
+    "Here is a story you will like. Once upon a time, in a small village, "
+    "a girl could tell the weather from the clouds."
+)
+GREETING = "Yes, how can I help you?"
+
+
+def test_a_run_counts_her_words_heard_in_the_order_she_said_them() -> None:
+    said = words(STORY)
+    assert run_of(words("here is a story you will like"), said) == 7
+    assert run_of(words("can you tell a different story"), said) == 1
+    assert run_of(words("a story you"), said) == 3
+    assert run_of((), said) == 0
+
+
+def test_where_echo_is_cancelled_a_caller_using_her_words_over_her_is_heard() -> None:
+    clock = Clock()
+    cancelled = speaking(clock, GREETING, STORY, cancels_echo=True)
+    echoing = speaking(clock, GREETING, STORY)
+    clock.now += 2
+    onset = clock.now - 0.5
+    for said in ("Can you tel", "A wonderful story", "No, no, I want a different one"):
+        assert not cancelled.echoes(said, onset)
+    assert echoing.echoes("Can you tel", onset)
+    assert not cancelled.echoes("Can you tell a different story?", onset, echoing=True)
+
+
+def test_where_echo_is_cancelled_a_long_run_of_her_words_is_still_her_voice() -> None:
+    clock = Clock()
+    voice = speaking(clock, STORY, cancels_echo=True)
+    clock.now += 2
+    onset = clock.now - 0.5
+    assert voice.echoes("once upon a time in a small village", onset)
+    assert voice.echoes("a girl could tell the weather", onset)
+    assert not voice.echoes("a girl could", onset)
+    assert not voice.echoes("wait, a girl could tell, but I want another story", onset)
+
+
+def test_where_echo_is_cancelled_her_words_never_deafen_the_caller_for_the_reply() -> None:
+    clock = Clock()
+    voice = speaking(clock, STORY, cancels_echo=True)
+    listening = Listening()
+    echoed: list[bool] = []
+    ear = voice.hearing(cast(AgentSession[Any], listening), lambda: echoed.append(True))
+    listening.starts_speaking()
+    heard = ear_hears(ear, "once upon a time in a small village", "different story", "hello")
+    assert heard == ["different story", "hello"]
     assert echoed == [True]

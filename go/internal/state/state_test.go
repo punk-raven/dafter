@@ -138,8 +138,8 @@ func TestOpeningAnOlderStoreAddsTheKeyColumn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read a session stored before the column existed: %v", err)
 	}
-	if got.EncryptionKey != "" || got.AgentRefusal != nil {
-		t.Errorf("an older session reads back with key %q and refusal %s", got.EncryptionKey, got.AgentRefusal)
+	if got.EncryptionKey != "" || got.AgentRefusal != nil || got.Ended() || !got.JoinedAt.IsZero() {
+		t.Errorf("an older session reads back with key %q, refusal %s, joined %v, ended %v", got.EncryptionKey, got.AgentRefusal, got.JoinedAt, got.EndedAt)
 	}
 	if err := s.SetAgentRefusal(t.Context(), "s_7f3a9c21", json.RawMessage(`{"code":"internal"}`)); err != nil {
 		t.Errorf("record a refusal in a migrated store: %v", err)
@@ -376,5 +376,40 @@ func TestSessionKeysAreSealedAtRestAndReadOnlyUnderTheirKey(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	if _, err := s.Session(t.Context(), keyed.SessionID); err == nil {
 		t.Error("a key sealed under one DAFTER_STATE_KEY opened under another")
+	}
+}
+
+func TestACallEndsOnlyOnceAndOnlyAfterSomeoneJoined(t *testing.T) {
+	t.Parallel()
+	s := store(t)
+	sess := session(t)
+	if err := s.CreateSession(t.Context(), sess); err != nil {
+		t.Fatal(err)
+	}
+	joined := time.Date(2026, 10, 6, 19, 0, 0, 0, time.UTC)
+	if ended, err := s.EndSession(t.Context(), sess.SessionID, joined); err != nil || ended {
+		t.Fatalf("a call nobody joined ended: %v %v", ended, err)
+	}
+	for _, at := range []time.Time{joined, joined.Add(time.Minute)} {
+		if err := s.MarkJoined(t.Context(), sess.SessionID, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	closed := joined.Add(10 * time.Minute)
+	if ended, err := s.EndSession(t.Context(), sess.SessionID, closed); err != nil || !ended {
+		t.Fatalf("the call did not end: %v %v", ended, err)
+	}
+	if ended, _ := s.EndSession(t.Context(), sess.SessionID, closed.Add(time.Hour)); ended {
+		t.Error("a call ended twice")
+	}
+	got, err := s.Session(t.Context(), sess.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.JoinedAt.Equal(joined) || !got.EndedAt.Equal(closed) || !got.Ended() {
+		t.Errorf("joined %v ended %v, want the first join %v and the close %v", got.JoinedAt, got.EndedAt, joined, closed)
+	}
+	if err := s.MarkJoined(t.Context(), "s_00000000", joined); !errors.Is(err, state.ErrNotFound) {
+		t.Errorf("marking an unknown session joined: %v", err)
 	}
 }

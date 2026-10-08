@@ -176,7 +176,14 @@ class Responder:
         self.pauses = 0
         self.resumes = 0
 
-    def answer(self, speaker: str, text: str, overheard: list[Said], timing: Timing | None) -> None:
+    def answer(
+        self,
+        speaker: str,
+        text: str,
+        overheard: list[Said],
+        timing: Timing | None,
+        judged: bool = False,
+    ) -> None:
         return None
 
     def hush(self) -> None:

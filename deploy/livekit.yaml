@@ -27,6 +27,11 @@ redis:
 keys:
   devkey: secret
 
+webhook:
+  api_key: devkey
+  urls:
+    - http://control:8080/livekit/webhook
+
 # LiveKit's own Prometheus metrics (rooms, participants, tracks, packets,
 # loss, RTT, plus the Go process collectors for CPU and memory). The main
 # port (7880) does not serve /metrics; only this dedicated port does.
@@ -41,6 +46,7 @@ logging:
 # The egress container resolves "livekit" via the compose network.
 room:
   empty_timeout: 300
+  departure_timeout: 20
   max_participants: 10
 
 #turn:

@@ -10,7 +10,7 @@ from dafter_core.events import parse_event
 from dafter_core.hashing import seal
 from dafter_runtime.addressing import Gate
 from dafter_runtime.answering import Roster, Voice
-from dafter_runtime.called import command
+from dafter_runtime.called import command, meaning_for
 from dafter_runtime.events import SessionEvents
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import Plan, load, plan
@@ -25,9 +25,10 @@ RAVI = "p_9d02c3aa"
 WINDOW_S = 20.0
 
 
-def called_plan() -> Plan:
+def called_plan(stays_awake: bool = False) -> Plan:
     doc = json.loads(JOB.read_bytes())
     doc["agent"]["addressing"]["mode"] = "transcript"
+    doc["agent"]["addressing"]["staysAwake"] = stays_awake
     sealed, _ = seal(json.dumps(doc))
     return plan(load(sealed), "dafter-py")
 
@@ -86,14 +87,21 @@ class Call:
             clock=self.clock,
             schedule=self.scheduler,
             name=p.config.agent.name or "",
+            meaning=meaning_for(p),
+            stays_awake=p.config.agent.addressing.stays_awake,
         )
         self.voice.announce = self.events.addressed
         session.on("agent_state_changed", lambda ev: self.gate.agent_state(ev.new_state))
         self.registry = registry_for(
-            p, session, self.roster, lambda: self.gate.addressee, self.gate.sleep
+            p, session, self.roster, lambda: self.gate.addressee, self.gate.go_quiet
         )
         self.voice.before_answer = self.registry.heard
-        self.agent = Answering(p.persona.instructions, self.registry, lambda: self.gate.addressee)
+        self.agent = Answering(
+            p.persona.instructions,
+            self.registry,
+            lambda: self.gate.addressee,
+            name=p.config.agent.name or "",
+        )
 
     async def _publish(self, body: bytes) -> None:
         self.sent.append(body)
@@ -108,9 +116,14 @@ class Call:
         await asyncio.sleep(0)
 
 
-def run_call(script: Callable[[Call, StubLLM], Any], calls: list[str] | None = None) -> StubLLM:
-    p = called_plan()
-    stub = StubLLM(calls=calls)
+def run_call(
+    script: Callable[[Call, StubLLM], Any],
+    calls: list[str] | None = None,
+    stays_awake: bool = False,
+    verdicts: tuple[str, ...] | list[str] = (),
+) -> StubLLM:
+    p = called_plan(stays_awake)
+    stub = StubLLM(calls=calls, verdicts=verdicts)
 
     async def run() -> None:
         async with AgentSession[None](llm=stub) as session:
@@ -168,12 +181,10 @@ def test_the_agent_stays_silent_until_called_then_answers_with_what_others_said(
     ]
 
 
-def test_the_caller_follows_up_without_the_name_and_others_do_not_reach_it() -> None:
+def test_the_caller_follows_up_without_the_name() -> None:
     async def script(call: Call, stub: StubLLM) -> None:
         call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
         await call.answered()
-        call.gate.heard(RAVI, "मुझे भी जानना है")
-        assert len(stub.requests) == 1
         call.gate.heard(ASHA, "और कहाँ है?")
         await call.answered()
 
@@ -182,8 +193,42 @@ def test_the_caller_follows_up_without_the_name_and_others_do_not_reach_it() -> 
     assert said(stub.requests[1])[1:] == [
         ("user", "[Speaker 1, to you] निव्या, मीटिंग कितने बजे है?"),
         ("assistant", REPLY),
-        ("user", "[Speaker 2, not to you] मुझे भी जानना है\n[Speaker 1, to you] और कहाँ है?"),
+        ("user", "[Speaker 1, to you] और कहाँ है?"),
     ]
+
+
+def test_someone_else_speaking_closes_the_follow_up_so_the_caller_names_her_again() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
+        await call.answered()
+        call.gate.heard(RAVI, "मुझे भी जानना है")
+        assert call.gate.dormant
+        call.gate.heard(ASHA, "और कहाँ है?")
+        assert len(stub.requests) == 1
+        call.gate.heard(ASHA, "निव्या, और कहाँ है?")
+        await call.answered()
+
+    stub = run_call(script)
+    assert len(stub.requests) == 2
+    assert said(stub.requests[1])[-1] == (
+        "user",
+        "[Speaker 2, not to you] मुझे भी जानना है\n"
+        "[Speaker 1, not to you] और कहाँ है?\n"
+        "[Speaker 1, to you] निव्या, और कहाँ है?",
+    )
+
+
+def test_a_backchannel_from_someone_else_keeps_the_follow_up_open() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "निव्या, मीटिंग कितने बजे है?")
+        await call.answered()
+        call.gate.heard(RAVI, "हम्म")
+        assert not call.gate.dormant
+        call.gate.heard(ASHA, "और कहाँ है?")
+        await call.answered()
+
+    stub = run_call(script)
+    assert len(stub.requests) == 2
 
 
 def test_the_window_runs_from_the_end_of_the_reply_then_it_sleeps() -> None:
@@ -247,10 +292,10 @@ def test_the_caller_leaving_sends_it_to_sleep() -> None:
     run_call(script)
 
 
-def test_what_was_said_long_ago_is_not_context() -> None:
+def test_everything_said_before_she_was_called_is_context_however_long_ago() -> None:
     async def script(call: Call, stub: StubLLM) -> None:
         call.gate.heard(RAVI, "old news")
-        call.clock.now += 91
+        call.clock.now += 3600
         call.gate.heard(RAVI, "fresh news")
         call.gate.heard(ASHA, "Nivya, what time is it?")
         await call.answered()
@@ -258,7 +303,9 @@ def test_what_was_said_long_ago_is_not_context() -> None:
     stub = run_call(script)
     assert said(stub.requests[0])[-1] == (
         "user",
-        "[Speaker 2, not to you] fresh news\n[Speaker 1, to you] Nivya, what time is it?",
+        "[Speaker 2, not to you] old news\n"
+        "[Speaker 2, not to you] fresh news\n"
+        "[Speaker 1, to you] Nivya, what time is it?",
     )
 
 
@@ -283,7 +330,7 @@ def test_the_agent_can_send_itself_to_sleep_with_go_quiet() -> None:
         call.gate.heard(ASHA, "and tomorrow?")
 
     stub = run_call(script, calls=["go_quiet"])
-    assert len(stub.requests) == 2
+    assert len(stub.requests) == 1
     assert stub.offered[0] == ["current_time", "go_quiet", "who_is_here"]
 
 
@@ -325,3 +372,25 @@ def test_only_a_well_formed_wake_command_is_read() -> None:
     assert command(b'{"action": "wake"}') == "wake"
     for data in (b"wake", b'{"action": "sleep"}', b'{"action": "wake", "as": "p_1"}', b"[]"):
         assert command(data) is None
+
+
+def test_an_awake_agent_answers_a_line_to_the_room_only_when_it_is_judged_meant_for_her() -> None:
+    async def script(call: Call, stub: StubLLM) -> None:
+        call.gate.heard(ASHA, "Nivya, what time is it?")
+        await call.answered()
+        call.gate.heard(RAVI, "Asha, are you coming on Saturday?")
+        await call.answered()
+        assert not call.gate.dormant
+        call.gate.heard(ASHA, "and what is the weather there?")
+        await call.answered()
+
+    stub = run_call(script, stays_awake=True, verdicts=["NO", "YES"])
+    assert len(stub.judged) == 2, "her name is never judged, each line to the room is"
+    assert len(stub.requests) == 2, "a line judged not for her is never sent for a reply"
+    replies = [m for m in said(stub.requests[1]) if m[0] == "assistant"]
+    assert replies == [("assistant", REPLY)], "the line judged not for her got no reply"
+    assert said(stub.requests[1])[-2:] == [
+        ("user", "[Speaker 2, to the room] Asha, are you coming on Saturday?"),
+        ("user", "[Speaker 1, to the room] and what is the weather there?"),
+    ]
+    assert "[Speaker 1] and what is the weather there?" in (said(stub.judged[1])[-1][1] or "")

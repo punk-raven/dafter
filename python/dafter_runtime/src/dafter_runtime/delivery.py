@@ -8,6 +8,7 @@ import weakref
 from collections.abc import AsyncIterable, AsyncIterator, Callable
 from typing import Any
 
+from dafter_core.config import AudioProfile
 from dafter_core.enums import Situation
 from dafter_core.speech import Fillers, PhrasesByLanguage, Situations, Speech, every_phrase
 from livekit import rtc
@@ -16,6 +17,7 @@ from livekit.agents import tts as lk_tts
 from livekit.agents.types import USERDATA_TTS_STARTED_TIME
 from livekit.agents.voice.events import AgentStateChangedEvent, CloseEvent, UserStateChangedEvent
 
+from .loudness import Loudness
 from .naming import words
 from .own_voice import OwnVoice
 from .personas import base_language
@@ -85,6 +87,7 @@ class Filler:
         self._preparing: asyncio.Future[None] | None = None
         self._speaking: set[int] = set()
         self._generating_since: float | None = None
+        self._held = False
 
     def _of(self, language: str) -> tuple[str, ...]:
         if not self._fillers.enabled:
@@ -131,7 +134,12 @@ class Filler:
 
         def state_changed(ev: AgentStateChangedEvent) -> None:
             self._hush()
-            if ev.new_state == "thinking" and self.enabled and not self._speaking:
+            if (
+                ev.new_state == "thinking"
+                and self.enabled
+                and not self._speaking
+                and not self._held
+            ):
                 self._timer = loop.call_later(self.after, self._due.set)
 
         session.on("agent_state_changed", state_changed)
@@ -151,6 +159,9 @@ class Filler:
 
         session.on("user_state_changed", state_changed)
         session.on("close", closed)
+
+    def hold(self, held: bool) -> None:
+        self._held = held
 
     def generating(self) -> None:
         self._generating_since = time.perf_counter()
@@ -237,9 +248,11 @@ class Filler:
 
 
 class Delivery:
-    def __init__(self, speech: Speech, language: str) -> None:
+    def __init__(self, speech: Speech, language: str, audio: AudioProfile | None = None) -> None:
         self._situational = Situational(speech.situations)
-        self.own_voice = OwnVoice()
+        cancels_echo = audio is None or audio.echo_cancellation is not False
+        self.own_voice = OwnVoice(cancels_echo=cancels_echo)
+        self.loudness = Loudness()
         self.filler = Filler(speech.fillers, language, self.own_voice.said)
         self.situation = self._situational.opening()
 

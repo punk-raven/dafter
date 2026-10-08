@@ -24,7 +24,7 @@
           "ನವ್ಯ", "ದಿವ್ಯ", "ಕಾವ್ಯ", "ಭವ್ಯ", "ನಿತ್ಯ", "ನೀವ್ಯಾರು",
           "నవ్య", "దివ్య", "కావ్య", "భవ్య", "నిత్య"
         ],
-        "followUpWindowMs": 20000
+        "followUpWindowMs": 15000
       },
       "speech": {
         "normalization": "platform",
@@ -83,11 +83,11 @@
           "maxWords": 3,
           "answerWithinMs": 1500,
           "words": {
-            "hi": ["हाँ", "हां", "हाँजी", "हांजी", "जी", "हम्म", "हम", "हूँ", "हूं", "अच्छा", "ठीक है", "सही", "सही है", "बिल्कुल", "ओके", "haan", "haanji", "ji", "hmm", "achha", "accha", "theek hai", "ok"],
-            "en": ["ok", "okay", "hmm", "hm", "mm", "mhm", "uh huh", "yeah", "yes", "yep", "right", "sure", "alright", "got it", "i see"],
-            "kn": ["ಹೌದು", "ಹೂಂ", "ಹೂ", "ಹಾಂ", "ಸರಿ", "ಓಕೆ", "ಆಯ್ತು"],
+            "hi": ["हाँ", "हां", "हा", "हाँजी", "हांजी", "जी", "हम्म", "हम", "हूँ", "हूं", "अच्छा", "अच्छा जी", "ठीक है", "सही", "सही है", "बिल्कुल", "ओके", "haan", "ha", "haanji", "ji", "hmm", "achha", "accha", "acha", "theek hai", "ok"],
+            "en": ["ok", "okay", "hmm", "hmmm", "hm", "mm", "mmm", "mhm", "uh huh", "aha", "yeah", "yes", "yep", "right", "sure", "alright", "got it", "i see", "oh okay"],
+            "kn": ["ಹೌದು", "ಹೂಂ", "ಹೂ", "ಹಾಂ", "ಹಾ", "ಸರಿ", "ಓಕೆ", "ಆಯ್ತು", "ಹ್ಮ್"],
             "mr": ["हो", "हं", "हम्म", "बरं", "ठीक आहे", "ओके", "अच्छा"],
-            "te": ["అవును", "ఊ", "ఊం", "హా", "సరే", "ఓకే", "అలాగే"]
+            "te": ["అవును", "ఊ", "ఊం", "హా", "హాం", "సరే", "ఓకే", "అలాగే", "హ్మ్"]
           }
         }
       }
@@ -130,7 +130,7 @@
         "provider": "sarvam",
         "model": "sarvam-105b",
         "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-        "options": { "temperature": 0, "maxTokens": 400 }
+        "options": { "temperature": 0, "maxTokens": 800 }
       },
       "summaryIntervalMs": 60000,
       "afterCallTimeoutSeconds": 900
@@ -208,7 +208,7 @@
               "model": "sarvam-105b",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 800 }
             },
             "tts": {
               "provider": "sarvam",
@@ -251,7 +251,7 @@
               "model": "sarvam-105b",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 800 }
             },
             "tts": {
               "provider": "sarvam",
@@ -294,7 +294,7 @@
               "model": "sarvam-105b",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 800 }
             },
             "tts": {
               "provider": "sarvam",
@@ -337,7 +337,7 @@
               "model": "sarvam-105b",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 800 }
             },
             "tts": {
               "provider": "sarvam",
@@ -359,7 +359,7 @@
       "tuning": {
         "turn": {
           "strategy": "provider_endpointing", "localVadEnabled": false,
-          "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
+          "silenceMs": 650, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
         }
       },
       "overlay": {
@@ -380,7 +380,7 @@
               "model": "sarvam-105b",
               "region": "ap-south-1",
               "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
-              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200 }
+              "options": { "prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 800 }
             },
             "tts": {
               "provider": "sarvam",
@@ -463,15 +463,15 @@
     }
   },
   "llms": {
-    "sarvam/sarvam-105b": {"provider": "sarvam", "model": "sarvam-105b", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key", "options": {"prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 200}},
-    "groq/qwen/qwen3.8-27b": {"provider": "groq", "model": "qwen/qwen3.8-27b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "reasoningEffort": "none"}},
-    "groq/openai/gpt-oss-20b": {"provider": "groq", "model": "openai/gpt-oss-20b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "reasoningEffort": "low"}},
-    "groq/openai/gpt-oss-120b": {"provider": "groq", "model": "openai/gpt-oss-120b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "reasoningEffort": "low"}},
-    "google/gemma-4-26b-a4b-it": {"provider": "google", "model": "gemma-4-26b-a4b-it", "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"extra_body": {"google": {"thinking_config": {"thinking_level": "minimal"}}}}}},
-    "google/gemma-4-31b-it": {"provider": "google", "model": "gemma-4-31b-it", "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"extra_body": {"google": {"thinking_config": {"thinking_level": "minimal"}}}}}},
-    "openrouter/qwen/qwen3.8-flash": {"provider": "openrouter", "model": "qwen/qwen3.8-flash", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"reasoning": {"enabled": false}}}},
-    "openrouter/nvidia/nemotron-3-super-120b-a12b:free": {"provider": "openrouter", "model": "nvidia/nemotron-3-super-120b-a12b:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"reasoning": {"enabled": false}}}},
-    "openrouter/inclusionai/ling-3.0-flash-sante:free": {"provider": "openrouter", "model": "inclusionai/ling-3.0-flash-sante:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 200, "extraBody": {"reasoning": {"enabled": false}}}},
+    "sarvam/sarvam-105b": {"provider": "sarvam", "model": "sarvam-105b", "region": "ap-south-1", "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key", "options": {"prewarm": true, "thinking": false, "temperature": 0.4, "maxTokens": 800}},
+    "groq/qwen/qwen3.8-27b": {"provider": "groq", "model": "qwen/qwen3.8-27b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "reasoningEffort": "none"}},
+    "groq/openai/gpt-oss-20b": {"provider": "groq", "model": "openai/gpt-oss-20b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "reasoningEffort": "low"}},
+    "groq/openai/gpt-oss-120b": {"provider": "groq", "model": "openai/gpt-oss-120b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "reasoningEffort": "low"}},
+    "google/gemma-4-26b-a4b-it": {"provider": "google", "model": "gemma-4-26b-a4b-it", "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "extraBody": {"extra_body": {"google": {"thinking_config": {"thinking_level": "minimal"}}}}}},
+    "google/gemma-4-31b-it": {"provider": "google", "model": "gemma-4-31b-it", "credentialRef": "secret://tenants/t_9c21a4be/gemini/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "extraBody": {"extra_body": {"google": {"thinking_config": {"thinking_level": "minimal"}}}}}},
+    "openrouter/qwen/qwen3.8-flash": {"provider": "openrouter", "model": "qwen/qwen3.8-flash", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "extraBody": {"reasoning": {"enabled": false}}}},
+    "openrouter/nvidia/nemotron-3-super-120b-a12b:free": {"provider": "openrouter", "model": "nvidia/nemotron-3-super-120b-a12b:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "extraBody": {"reasoning": {"enabled": false}}}},
+    "openrouter/inclusionai/ling-3.0-flash-sante:free": {"provider": "openrouter", "model": "inclusionai/ling-3.0-flash-sante:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "extraBody": {"reasoning": {"enabled": false}}}},
     "openrouter/liquid/lfm-2.5-2.6b:free": {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free", "credentialRef": "secret://tenants/t_9c21a4be/openrouter/api-key", "options": {"temperature": 0.4, "maxTokens": 600, "extraBody": {"reasoning": {"effort": "low"}}}}
   }
 }

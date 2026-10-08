@@ -86,6 +86,7 @@ type sessionView struct {
 	Recordings    []recordingView `json:"recordings"`
 	AgentRefusal  json.RawMessage `json:"agentRefusal,omitempty"`
 	ScribeRefusal json.RawMessage `json:"scribeRefusal,omitempty"`
+	EndedAt       *time.Time      `json:"endedAt,omitempty"`
 }
 
 func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +112,7 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 		track = attributed(req.TrackID, owner)
 	}
 
-	stored, info, err := s.startEgress(r.Context(), sess, cfg, req, false, track)
+	stored, info, err := s.startEgress(r.Context(), sess, cfg, cfg.Recording.EffectiveLayout(), req, false, track)
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -122,8 +123,7 @@ func (s *Service) startRecording(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, req startRecordingRequest, beforeFirstJoin bool, track state.Egress) (state.Egress, transport.EgressInfo, error) {
-	layout := cfg.Recording.EffectiveLayout()
+func (s *Service) startEgress(ctx context.Context, sess state.Session, cfg *config.ResolvedSessionConfig, layout config.EgressLayout, req startRecordingRequest, beforeFirstJoin bool, track state.Egress) (state.Egress, transport.EgressInfo, error) {
 	info, err := s.Transport.StartEgress(ctx, transport.EgressRequest{
 		Room:         sess.Room,
 		SessionID:    sess.SessionID,
@@ -244,7 +244,7 @@ func (s *Service) readSession(w http.ResponseWriter, r *http.Request) {
 	s.write(w, http.StatusOK, sessionView{
 		SessionID: sess.SessionID, Room: sess.Room, ConfigHash: sess.ConfigHash, ReleaseID: sess.ReleaseID,
 		Config: sess.Config, CreatedAt: sess.CreatedAt, Recordings: views,
-		AgentRefusal: sess.AgentRefusal, ScribeRefusal: sess.ScribeRefusal,
+		AgentRefusal: sess.AgentRefusal, ScribeRefusal: sess.ScribeRefusal, EndedAt: endedAt(sess),
 	})
 }
 
@@ -328,4 +328,12 @@ func (s *Service) decodeOptional(w http.ResponseWriter, r *http.Request, into an
 		return false
 	}
 	return true
+}
+
+func endedAt(sess state.Session) *time.Time {
+	if !sess.Ended() {
+		return nil
+	}
+	at := sess.EndedAt
+	return &at
 }

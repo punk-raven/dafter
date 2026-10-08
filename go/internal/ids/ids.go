@@ -42,6 +42,17 @@ func NewID(p IDPrefix) (string, error) {
 	return string(p) + "_" + hex.EncodeToString(b), nil
 }
 
+func FromDigest(p IDPrefix, digest []byte) (string, error) {
+	n, ok := idBytes[p]
+	if !ok {
+		return "", fmt.Errorf("ids: unknown id prefix %q", p)
+	}
+	if len(digest) < n {
+		return "", fmt.Errorf("ids: a %q id needs %d digest bytes, got %d", p, n, len(digest))
+	}
+	return string(p) + "_" + hex.EncodeToString(digest[:n]), nil
+}
+
 func MustNewID(p IDPrefix) string {
 	id, err := NewID(p)
 	if err != nil {

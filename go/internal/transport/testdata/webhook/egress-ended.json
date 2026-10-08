@@ -1,0 +1,26 @@
+{
+  "event": "egress_ended",
+  "egressInfo": {
+    "egressId": "EG_abc123",
+    "roomId": "RM_vXkrzjH2ouiY",
+    "roomName": "s_7f3a9c21",
+    "sourceType": "EGRESS_SOURCE_TYPE_SDK",
+    "status": "EGRESS_COMPLETE",
+    "startedAt": "1791316753933380824",
+    "endedAt": "1791316767140796103",
+    "updatedAt": "1791316767140796103",
+    "fileResults": [
+      {
+        "filename": "s_7f3a9c21/track-TR_AMabc123-20261006195913.ogg",
+        "startedAt": "1791316753933380824",
+        "endedAt": "1791316767140796103",
+        "duration": "13207415279",
+        "size": "554112",
+        "location": "https://127.0.0.1:9000/dafter-recordings/s_7f3a9c21/track-TR_AMabc123-20261006195913.ogg"
+      }
+    ],
+    "details": "End reason: Source closed"
+  },
+  "id": "EV_SVtfnmzyEMWD",
+  "createdAt": "1791316767"
+}

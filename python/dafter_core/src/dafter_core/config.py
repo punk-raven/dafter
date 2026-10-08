@@ -141,6 +141,7 @@ class Addressing:
     aliases: tuple[str, ...] = ()
     near_misses: tuple[str, ...] = ()
     follow_up_window_ms: int = 20000
+    stays_awake: bool = False
 
     @property
     def waits_to_be_called(self) -> bool:
@@ -153,6 +154,7 @@ class Addressing:
             aliases=tuple(d.get("aliases", ())),
             near_misses=tuple(d.get("nearMisses", ())),
             follow_up_window_ms=d.get("followUpWindowMs", 20000),
+            stays_awake=d.get("staysAwake", False),
         )
 
 
@@ -346,6 +348,7 @@ class Recording:
     enabled: bool
     layout: EgressLayout = EgressLayout.TRACK
     start_at: RecordingStart = RecordingStart.FIRST_PUBLISH
+    tracks: bool = False
     retention_class: str | None = None
     consent_artifact_id: str | None = None
 
@@ -355,6 +358,7 @@ class Recording:
             enabled=d["enabled"],
             layout=EgressLayout(d.get("layout", EgressLayout.TRACK)),
             start_at=RecordingStart(d.get("startAt", RecordingStart.FIRST_PUBLISH)),
+            tracks=d.get("tracks", False),
             retention_class=d.get("retentionClass"),
             consent_artifact_id=d.get("consentArtifactId"),
         )

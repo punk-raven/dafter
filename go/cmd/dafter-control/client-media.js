@@ -74,37 +74,23 @@ async function stopRecording() {
 }
 
 function attachTrack(track, participant, isLocal = false, mirror = isLocal) {
-  const tileId = `tile-${participant.identity}-${track.kind}`;
-  let tile = document.getElementById(tileId);
-
-  if (track.kind === 'video') {
-    if (!tile) {
-      tile = document.createElement('div');
-      tile.id = tileId;
-      tile.className = 'video-tile';
-      tile.innerHTML = `<span class="label">${participant.identity}${isLocal ? ' (you)' : ''}</span>`;
-      document.getElementById('video-grid').appendChild(tile);
-    }
-    const el = track.attach();
-    el.style.width = '100%';
-    el.style.height = '100%';
-    if (mirror) el.style.transform = 'scaleX(-1)';
-    tile.insertBefore(el, tile.firstChild);
-  }
+  if (track.kind === 'video') showCamera(track, participant, mirror);
 
   if (track.kind === 'audio' && !isLocal) {
     const el = track.attach();
     el.id = `audio-${participant.identity}`;
     document.body.appendChild(el);
+    hearFarEnd(track.sid, track.mediaStreamTrack);
   }
 }
 
 function detachTrack(track, participant) {
-  track.detach().forEach(el => el.remove());
   if (track.kind === 'video') {
-    const tile = document.getElementById(`tile-${participant.identity}-video`);
-    if (tile) tile.remove();
+    hideCamera(track, participant);
+    return;
   }
+  track.detach().forEach(el => el.remove());
+  if (track.kind === 'audio') forgetFarEnd(track.sid);
 }
 
 function removeTile(identity) {
@@ -164,20 +150,14 @@ async function publishTestPattern(room) {
   await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
   log('Synthetic audio track published (440Hz tone)', 'success');
 
-  const tile = document.createElement('div');
-  tile.id = `tile-${room.localParticipant.identity}-video`;
-  tile.className = 'video-tile';
+  const tile = personTile(room.localParticipant);
   const vid = document.createElement('video');
+  vid.className = 'tile-video';
   vid.srcObject = videoStream;
   vid.autoplay = true;
   vid.muted = true;
-  vid.style.cssText = 'width:100%;height:100%';
-  tile.appendChild(vid);
-  const label = document.createElement('span');
-  label.className = 'label';
-  label.textContent = `${room.localParticipant.identity} (you - synthetic)`;
-  tile.appendChild(label);
-  document.getElementById('video-grid').appendChild(tile);
+  tile.insertBefore(vid, tile.firstChild);
+  renderPerson(room.localParticipant);
 }
 
 async function monitorICE() {
@@ -225,11 +205,3 @@ async function monitorICE() {
 fillNoiseFilterChoices();
 fillLlmChoices();
 fillSpeechToggles();
-
-(function seedFromURL() {
-  const roomParam = new URLSearchParams(window.location.search).get('room');
-  if (!roomParam) return;
-  document.getElementById('room-id').value = roomParam;
-  log(`Join link for ${roomParam}`);
-  joinRoom();
-})();
