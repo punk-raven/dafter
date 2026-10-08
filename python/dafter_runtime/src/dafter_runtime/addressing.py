@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Protocol
 
 from dafter_core.enums import WakeSource
@@ -13,6 +14,8 @@ from .noise import Meaning
 log = logging.getLogger("dafter.runtime.addressing")
 
 BUSY_STATES = frozenset({"thinking", "speaking"})
+FLOOR_S = 10.0
+REPAIR_S = 6.0
 
 Timing = Mapping[str, Any]
 
@@ -47,6 +50,20 @@ Clock = Callable[[], float]
 Schedule = Callable[[float, Callable[[], None]], Timer]
 
 
+class Route(Enum):
+    ANSWER = "answer"
+    JUDGE = "judge"
+    KEEP = "keep"
+
+
+def nobody_counted() -> int:
+    return 0
+
+
+def never_echoed(speaker: str) -> bool:
+    return False
+
+
 class Gate:
     def __init__(
         self,
@@ -59,6 +76,8 @@ class Gate:
         meaning: Meaning | None = None,
         busy_words: int = 1,
         stays_awake: bool = False,
+        present: Callable[[], int] = nobody_counted,
+        echoed: Callable[[str], bool] = never_echoed,
     ) -> None:
         self._matcher = matcher
         self._name = name
@@ -75,6 +94,16 @@ class Gate:
         self._quiet_after_reply = False
         self._timer: Timer | None = None
         self._said: list[Said] = []
+        self._present = present
+        self._echoed = echoed
+        self._state = "listening"
+        self._asked = False
+        self._finished_at: float | None = None
+        self._answering: str | None = None
+        self._talking_to: str | None = None
+        self._since: set[str] = set()
+        self._judging: str | None = None
+        self._refused: tuple[str, float] | None = None
 
     @property
     def dormant(self) -> bool:
@@ -84,7 +113,12 @@ class Gate:
     def addressee(self) -> str | None:
         return self._addressee
 
+    def people(self) -> int:
+        return self._present()
+
     def heard(self, speaker: str, text: str, timing: Timing | None = None) -> None:
+        if self._says_something(text):
+            self._since.add(speaker)
         heard = self._matcher.hear(text)
         if heard is Heard.STOPPED or (heard is Heard.STOP and not self.dormant):
             self.sleep()
@@ -112,12 +146,54 @@ class Gate:
         self._said.append(Said(speaker, text, self._clock()))
 
     def _judge(self, speaker: str, text: str, timing: Timing | None) -> None:
-        if not self._busy:
-            self._answer(speaker, text, timing, judged=True)
-        elif speaker == self._addressee:
+        if self._busy:
+            if speaker == self._addressee:
+                self._answer(speaker, text, timing)
+            else:
+                self._overheard(speaker, text)
+            return
+        route = self._route(speaker, text)
+        if route is Route.ANSWER:
             self._answer(speaker, text, timing)
+        elif route is Route.JUDGE:
+            self._answer(speaker, text, timing, judged=True)
         else:
             self._overheard(speaker, text)
+
+    def _route(self, speaker: str, text: str) -> Route:
+        bare = self._meaning is not None and self._meaning.acknowledges(text)
+        if self._present() == 1 and not self._echoed(speaker):
+            if not bare or self._asked:
+                return Route.ANSWER
+            log.info("a bare acknowledgement in a one-to-one call is left unanswered")
+            return Route.KEEP
+        if self._holds_floor(speaker):
+            log.info("an answer to her question is answered without a verdict")
+            return Route.ANSWER
+        if self._repairs(speaker):
+            log.info("a line said again after a verdict of no is answered")
+            self._refused = None
+            return Route.ANSWER
+        return Route.JUDGE
+
+    def _holds_floor(self, speaker: str) -> bool:
+        if not self._asked or speaker != self._talking_to or self._finished_at is None:
+            return False
+        recent = self._clock() - self._finished_at <= FLOOR_S
+        return recent and not (self._since - {speaker})
+
+    def _repairs(self, speaker: str) -> bool:
+        if self._refused is None:
+            return False
+        refused, at = self._refused
+        return refused == speaker and self._clock() - at <= REPAIR_S
+
+    def verdict(self, meant: bool) -> None:
+        judged, self._judging = self._judging, None
+        self._refused = None if meant or judged is None else (judged, self._clock())
+
+    def replied(self, asked: bool) -> None:
+        self._asked = asked
 
     def _says_something(self, text: str) -> bool:
         return self._meaning is None or bool(self._meaning.words(text))
@@ -158,6 +234,11 @@ class Gate:
             self.sleep()
 
     def agent_state(self, state: str) -> None:
+        if self._state == "speaking" and state != "speaking":
+            self._finished_at = self._clock()
+            self._talking_to = self._answering
+            self._since = set()
+        self._state = state
         self._busy = state in BUSY_STATES
         if self._busy:
             self._stop_timer()
@@ -176,6 +257,8 @@ class Gate:
     def _answer(self, speaker: str, text: str, timing: Timing | None, judged: bool = False) -> None:
         overheard, self._said = self._said, []
         self._quiet_after_reply = False
+        self._answering = speaker
+        self._judging = speaker if judged else None
         self._start_timer()
         self._responder.answer(speaker, text, overheard, timing, judged)
 
@@ -195,4 +278,15 @@ class Gate:
             self.sleep()
 
 
-__all__ = ["Gate", "Responder", "Said", "Timer", "Timing"]
+__all__ = [
+    "FLOOR_S",
+    "REPAIR_S",
+    "Gate",
+    "Responder",
+    "Route",
+    "Said",
+    "Timer",
+    "Timing",
+    "never_echoed",
+    "nobody_counted",
+]
