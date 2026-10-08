@@ -1,4 +1,3 @@
-// Package ids mints and validates the platform's opaque identifiers.
 package ids
 
 import (
@@ -18,14 +17,14 @@ const (
 	PrefixEvent       IDPrefix = "e"
 )
 
-// Event ids double as webhook idempotency keys that consumers store: 16 is not
-// widenable later.
+const eventIDBytesFixedAsStoredIdempotencyKey = 16
+
 var idBytes = map[IDPrefix]int{
 	PrefixTenant:      4,
 	PrefixSession:     4,
 	PrefixParticipant: 4,
 	PrefixRecording:   4,
-	PrefixEvent:       16,
+	PrefixEvent:       eventIDBytesFixedAsStoredIdempotencyKey,
 }
 
 var idPattern = regexp.MustCompile(`^([tspre])_([0-9a-f]+)$`)

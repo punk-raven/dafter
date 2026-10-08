@@ -20,7 +20,7 @@ from dafter_runtime.tools import (
     Registry,
     Speed,
     Tool,
-    ToolRefused,
+    ToolRefusedError,
     checked,
 )
 from livekit.agents import Agent, AgentSession, StopResponse, llm
@@ -79,7 +79,7 @@ class Harness:
     ],
 )
 def test_a_tool_that_cannot_be_enforced_is_refused(tools: list[Tool], because: str) -> None:
-    with pytest.raises(ToolRefused, match=because):
+    with pytest.raises(ToolRefusedError, match=because):
         checked(tools)
 
 
@@ -237,7 +237,7 @@ def test_a_slow_tool_without_its_own_filler_plays_the_sessions_next_phrase() -> 
     phrases = iter(["जी, एक पल।", "अच्छा, ज़रा देखती हूँ।"])
     filling = Filling(lambda: next(phrases), 0.0)
     assert ("assistant", "जी, एक पल।") in said_while_running(Harness(slow, filling=filling))
-    with pytest.raises(ToolRefused, match="no filler"):
+    with pytest.raises(ToolRefusedError, match="no filler"):
         Harness(slow)
 
 

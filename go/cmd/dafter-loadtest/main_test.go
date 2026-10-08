@@ -10,10 +10,7 @@ import (
 	"time"
 )
 
-// runLoad must return once the duration has passed. It used to hand every
-// goroutine the same time.After channel, which only one of them could
-// receive from, so the reporter never exited and the run hung forever.
-func TestRunLoadReturnsAfterDuration(t *testing.T) {
+func TestRunLoadReturnsAfterDurationWithEveryWorkerAndReporterStopped(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/join") {
 			w.WriteHeader(http.StatusCreated)
