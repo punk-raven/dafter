@@ -16,7 +16,8 @@
   - `dafter_scribe`: the silent scribe, pool `dafter-scribe` (`uv run dafter-scribe start`); notes,
     turn scores and minutes from the live captions.
 - `go/tools/enumgen`: emits enum constants for both halves. `Makefile` is the entry point;
-  `.github/workflows/ci.yml` runs it.
+  `.github/workflows/ci.yml` runs it on pushes to main and on pull requests only while they carry
+  the `run-ci` label (Dependabot's too).
 - `testdata/`: fixtures read by both halves, so a cross-language claim is checked on both sides.
   Each directory has a README stating what it pins. `testdata/rfc8785/` is vendored verbatim: never
   edit or reformat it.
