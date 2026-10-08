@@ -377,7 +377,6 @@ async def entrypoint(ctx: JobContext) -> None:
         delivery,
         switching,
         name=p.config.agent.name or "",
-        bench=called.gate if called is not None else None,
     )
     if scribing is not None:
         scribing.briefed = lambda: agent.brief(scribing.context())

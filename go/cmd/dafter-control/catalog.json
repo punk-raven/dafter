@@ -29,7 +29,7 @@
       "speech": {
         "normalization": "platform",
         "fillers": {
-          "enabled": false,
+          "enabled": true,
           "afterMs": 600,
           "phrases": {
             "hi": ["हम्म, एक second।", "अच्छा, check करती हूँ।", "हाँ जी, बस एक second।", "जी, देखती हूँ।"],
