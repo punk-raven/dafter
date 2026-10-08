@@ -1,4 +1,4 @@
-# Dafter
+# Dafter - Open Source Voice Agent Orchestration
 
 [![ci](https://github.com/punk-raven/dafter/actions/workflows/ci.yml/badge.svg)](https://github.com/punk-raven/dafter/actions/workflows/ci.yml)
 
