@@ -9,7 +9,7 @@ from dafter_runtime.events import SessionEvents
 from dafter_scribe.notes import (
     AgentNote,
     Notes,
-    Unreadable,
+    UnreadableReplyError,
     notes_payload,
     read_notes,
     with_note,
@@ -70,7 +70,7 @@ def test_bracketed_and_repeated_speaker_labels_are_read_as_one_speaker_each() ->
     ["not json", "[1, 2]", json.dumps({"decisions": ["x"]}), json.dumps({"summary": "   "})],
 )
 def test_notes_without_a_summary_are_unreadable(raw: str) -> None:
-    with pytest.raises(Unreadable):
+    with pytest.raises(UnreadableReplyError):
         read_notes(raw, LABELS)
 
 

@@ -15,7 +15,7 @@ from .notes import (
     ActionItem,
     AgentNote,
     Notes,
-    Unreadable,
+    UnreadableReplyError,
     action_items,
     arguments,
     lines,
@@ -56,7 +56,7 @@ def read_minutes(raw: str, taken: Sequence[AgentNote]) -> Minutes:
     doc = arguments(raw)
     summary = text(doc.get("summary"), SUMMARY)
     if not summary:
-        raise Unreadable("the minutes carry no summary")
+        raise UnreadableReplyError("the minutes carry no summary")
     return Minutes(
         summary=summary,
         decisions=lines(doc.get("decisions"), LINE, DECISIONS),

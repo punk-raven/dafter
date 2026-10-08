@@ -45,7 +45,7 @@ target-version = "py311"
 extend-exclude = ["**/enums.py", "**/_schemas/**"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "RUF"]
+select = ["E", "F", "I", "B", "UP", "RUF", "N"]
 
 [tool.ruff.lint.isort]
 known-third-party = [

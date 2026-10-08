@@ -76,7 +76,7 @@ NOTES_SCHEMA = schema(
 )
 
 
-class Unreadable(ValueError):
+class UnreadableReplyError(ValueError):
     pass
 
 
@@ -175,9 +175,9 @@ def arguments(raw: str) -> dict[str, Any]:
     try:
         doc = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise Unreadable("the arguments are not JSON") from exc
+        raise UnreadableReplyError("the arguments are not JSON") from exc
     if not isinstance(doc, dict):
-        raise Unreadable("the arguments are not an object")
+        raise UnreadableReplyError("the arguments are not an object")
     return doc
 
 
@@ -185,7 +185,7 @@ def read_notes(raw: str, labels: Sequence[str]) -> Notes:
     doc = arguments(raw)
     summary = text(doc.get("summary"), SUMMARY)
     if not summary:
-        raise Unreadable("the notes carry no summary")
+        raise UnreadableReplyError("the notes carry no summary")
     return Notes(
         summary=summary,
         decisions=lines(doc.get("decisions"), LINE, DECISIONS),
@@ -235,7 +235,7 @@ __all__ = [
     "ActionItem",
     "AgentNote",
     "Notes",
-    "Unreadable",
+    "UnreadableReplyError",
     "action_items",
     "arguments",
     "lines",

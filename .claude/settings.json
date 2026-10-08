@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Edit(/go/internal/**/*_gen.go)",
+      "Edit(/go/internal/schema/schemas/**)",
+      "Edit(/python/dafter_core/src/dafter_core/_schemas/**)",
+      "Edit(/python/dafter_core/src/dafter_core/enums.py)",
+      "Edit(/testdata/rfc8785/**)",
+      "Read(/.env)",
+      "Edit(/.env)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'AGENTS.md rules 1-8 are hard rules for this message and every subagent; no exceptions without an explicit user bypass for this message.'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR}/scripts\" && python3 -m agent_rules pre-edit"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR}/scripts\" && python3 -m agent_rules post-edit"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR}/scripts\" && python3 -m agent_rules stop"
+          }
+        ]
+      }
+    ]
+  },
+  "skillOverrides": {
+    "golang-documentation": "user-invocable-only",
+    "golang-dependency-injection": "user-invocable-only",
+    "golang-stay-updated": "user-invocable-only"
+  }
+}
