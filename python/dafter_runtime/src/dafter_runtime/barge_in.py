@@ -103,6 +103,9 @@ class BargeIn:
         self._echoing.add(speaker)
         self.acknowledged(speaker)
 
+    def echoed(self, speaker: str) -> bool:
+        return speaker in self._echoing
+
     def left(self, speaker: str) -> None:
         self._echoing.discard(speaker)
         if (hearing := self._hearing.pop(speaker, None)) is not None:
