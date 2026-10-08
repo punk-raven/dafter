@@ -90,7 +90,7 @@ class LateLLM(StubLLM):
 
 
 def speech_config(after_ms: int) -> Any:
-    fillers = replace(CFG.agent.speech.fillers, after_ms=after_ms)
+    fillers = replace(CFG.agent.speech.fillers, enabled=True, after_ms=after_ms)
     return replace(CFG.agent.speech, fillers=fillers)
 
 
@@ -171,6 +171,12 @@ def test_a_slow_reply_plays_one_filler_ahead_of_it_and_says_so() -> None:
     assert c.filled == [False, True]
 
 
+def test_the_catalog_keeps_fillers_off_unless_a_session_turns_them_on() -> None:
+    assert not CFG.agent.speech.fillers.enabled
+    assert not Delivery(CFG.agent.speech, "hi").filler.enabled
+    assert Delivery(speech_config(600), "hi").filler.enabled
+
+
 def test_a_quick_reply_plays_no_filler() -> None:
     c = converse(0.0, "मेरा बिल देखिए")
     assert c.filled == [False, False]
@@ -194,7 +200,7 @@ def test_no_filler_plays_while_someone_is_talking(talker: str) -> None:
 
 
 def test_a_switched_language_fills_with_its_own_phrases_synthesized_once() -> None:
-    delivery = Delivery(CFG.agent.speech, "hi")
+    delivery = Delivery(speech_config(CFG.agent.speech.fillers.after_ms), "hi")
     reader = SlowReader(0.1)
     hindi, kannada = (CFG.agent.speech.fillers.phrases[lang] for lang in ("hi", "kn"))
 
