@@ -22,7 +22,7 @@ from .history import (
     REPEATED,
     instructions_of,
     judged,
-    last_turn,
+    recent_turns,
     recovering,
     replies,
     unrepeated,
@@ -123,7 +123,7 @@ class Answering(Agent):
 
         def plain() -> AsyncIterable[lk_llm.ChatChunk | str | FlushSentinel]:
             return unlabeled(
-                Agent.default.llm_node(self, last_turn(chat_ctx), tools, model_settings)
+                Agent.default.llm_node(self, recent_turns(chat_ctx), tools, model_settings)
             )
 
         first = recovering(

@@ -5,8 +5,9 @@ from collections.abc import AsyncIterable, AsyncIterator
 
 import pytest
 from dafter_runtime.history import (
+    RETRY_ITEMS,
     instructions_of,
-    last_turn,
+    recent_turns,
     recovering,
     repeats,
     replies,
@@ -143,12 +144,25 @@ def test_a_call_without_its_answer_an_answer_without_its_call_and_empty_turns_ar
     assert said(kept) == [("system", "You are Nivya."), ("user", "Nivya, what time is it?")]
 
 
-def test_the_last_turn_alone_is_her_instructions_and_the_latest_question() -> None:
-    minimal = last_turn(went_quiet_then_called_again())
+def test_a_retry_keeps_her_instructions_and_the_recent_turns_without_tool_calls() -> None:
+    minimal = recent_turns(went_quiet_then_called_again())
     assert said(minimal) == [
         ("system", "You are Nivya."),
+        ("user", "[Speaker 1, to you] Nivya, that is all, be quiet now"),
+        ("assistant", "Okay, talk later."),
         ("user", "[Speaker 1, to you] Nivya, are you there?"),
     ]
+    assert not any(isinstance(item, llm.FunctionCall) for item in minimal.items)
+
+
+def test_a_retry_of_a_long_call_keeps_only_its_last_few_turns() -> None:
+    turns = [("user" if n % 2 == 0 else "assistant", f"line {n}", False) for n in range(10)]
+    minimal = recent_turns(call(*turns))
+    assert said(minimal) == [
+        ("system", "You are Nivya."),
+        *[("user" if n % 2 == 0 else "assistant", f"line {n}") for n in range(4, 10)],
+    ]
+    assert len(minimal.items) == RETRY_ITEMS + 1
 
 
 def refused() -> APIStatusError:
@@ -161,7 +175,7 @@ async def failing(after: int) -> AsyncIterator[str]:
     raise refused()
 
 
-def test_a_refused_request_is_asked_again_with_only_the_last_turn() -> None:
+def test_a_refused_request_is_asked_again_with_only_the_last_few_turns() -> None:
     assert (
         spoken(recovering(failing(0), lambda: stream("Yes, ", "I am here."))) == "Yes, I am here."
     )
