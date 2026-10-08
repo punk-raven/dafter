@@ -16,6 +16,7 @@ log = logging.getLogger("dafter.runtime.addressing")
 BUSY_STATES = frozenset({"thinking", "speaking"})
 FLOOR_S = 10.0
 REPAIR_S = 6.0
+STOP_AFTER_S = 3.0
 
 Timing = Mapping[str, Any]
 
@@ -120,7 +121,8 @@ class Gate:
         if self._says_something(text):
             self._since.add(speaker)
         heard = self._matcher.hear(text)
-        if heard is Heard.STOPPED or (heard is Heard.STOP and not self.dormant):
+        stopped = heard is Heard.STOP and not self.dormant and self._stop_counts(speaker)
+        if heard is Heard.STOPPED or stopped:
             self.sleep()
             self._responder.hush()
             return
@@ -187,6 +189,12 @@ class Gate:
             return False
         refused, at = self._refused
         return refused == speaker and self._clock() - at <= REPAIR_S
+
+    def _stop_counts(self, speaker: str) -> bool:
+        if self._present() <= 1 or speaker == self._addressee or self._state == "speaking":
+            return True
+        finished = self._finished_at
+        return finished is not None and self._clock() - finished <= STOP_AFTER_S
 
     def verdict(self, meant: bool) -> None:
         judged, self._judging = self._judging, None
@@ -281,6 +289,7 @@ class Gate:
 __all__ = [
     "FLOOR_S",
     "REPAIR_S",
+    "STOP_AFTER_S",
     "Gate",
     "Responder",
     "Route",

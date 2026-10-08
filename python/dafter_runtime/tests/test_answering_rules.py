@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from dafter_core.enums import WakeSource
-from dafter_runtime.addressing import FLOOR_S, REPAIR_S, Gate, Said, Timing
+from dafter_runtime.addressing import FLOOR_S, REPAIR_S, STOP_AFTER_S, Gate, Said, Timing
 from dafter_runtime.naming import Matcher
 from dafter_runtime.noise import Meaning
 
@@ -22,6 +22,7 @@ class Never:
 class Turns:
     def __init__(self) -> None:
         self.turns: list[tuple[str, str, bool, list[str]]] = []
+        self.hushed = 0
 
     def answer(
         self,
@@ -34,7 +35,7 @@ class Turns:
         self.turns.append((speaker, text, judged, [s.text for s in overheard]))
 
     def hush(self) -> None:
-        return None
+        self.hushed += 1
 
     def addressed(self, woken_by: str | None, via: WakeSource | None) -> None:
         return None
@@ -186,3 +187,43 @@ def test_a_verdict_of_yes_leaves_nothing_to_repair() -> None:
 
 def test_the_gate_reports_the_people_present_to_the_judge() -> None:
     assert Call(4).gate.people() == 4
+
+
+def test_in_a_group_a_bare_stop_from_someone_else_is_not_for_her() -> None:
+    call = called_by(ASHA, 2, asked=False)
+    call.now += STOP_AFTER_S + 1
+    call.gate.heard(RAVI, "bye")
+    assert not call.gate.dormant
+    assert call.turns.hushed == 0
+    call.gate.heard(ASHA, "bye")
+    assert call.gate.dormant
+    assert call.turns.hushed == 1
+
+
+def test_in_a_group_a_bare_stop_said_while_or_just_after_she_speaks_still_stops_her() -> None:
+    speaking = called_by(ASHA, 2, asked=False)
+    speaking.now += STOP_AFTER_S + 1
+    speaking.gate.agent_state("speaking")
+    speaking.gate.heard(RAVI, "bas")
+    assert speaking.gate.dormant
+
+    just_after = called_by(ASHA, 2, asked=False)
+    just_after.now += STOP_AFTER_S - 1
+    just_after.gate.heard(RAVI, "bye")
+    assert just_after.gate.dormant
+
+
+def test_her_name_with_a_stop_always_stops_her() -> None:
+    call = called_by(ASHA, 3, asked=False)
+    call.now += STOP_AFTER_S + 1
+    call.gate.heard(RAVI, "Nivya, bye")
+    assert call.gate.dormant
+    assert call.turns.hushed == 1
+
+
+def test_one_to_one_any_bare_stop_stops_her_as_before() -> None:
+    call = called_by(RAVI, 1, asked=False)
+    call.gate.left(RAVI)
+    call.now += STOP_AFTER_S + 1
+    call.gate.heard(ASHA, "bye")
+    assert call.gate.dormant
