@@ -51,7 +51,7 @@ jobs:
             go/go.sum
             go/tools/golangci/go.sum
       - name: cache the linter binary
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: go/bin
           key: golangci-${{ runner.os }}-${{ hashFiles('go/tools/golangci/go.sum') }}
@@ -74,7 +74,7 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
           cache-dependency-glob: python/uv.lock
@@ -96,7 +96,7 @@ jobs:
             go/go.sum
             go/tools/govulncheck/go.sum
       - name: cache the scanner binary
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: go/bin
           key: govulncheck-${{ runner.os }}-${{ hashFiles('go/tools/govulncheck/go.sum') }}
