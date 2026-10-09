@@ -4,6 +4,7 @@ import asyncio
 import time
 from typing import Any
 
+from dafter_runtime.plan import Plan
 from livekit import rtc
 from livekit.agents import (
     DEFAULT_API_CONNECT_OPTIONS,
@@ -16,6 +17,7 @@ from livekit.agents import (
 )
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 from livekit.agents.voice import io
+from livekit.agents.voice.turn import TurnDetectionEvent
 
 RATE = 16000
 FRAME_S = 0.01
@@ -208,6 +210,62 @@ class SlowReader(tts.TTS[Any]):
     ) -> Reading:
         self.read.append(text)
         return Reading(self, text, conn_options)
+
+
+class SureTurnStream:
+    model = "sure"
+    provider = "scripted"
+    is_fallback = False
+    prediction_timeout = 1.0
+
+    async def unlikely_threshold(self, language: LanguageCode | None) -> float | None:
+        return None
+
+    async def backchannel_threshold(self, language: LanguageCode | None) -> float | None:
+        return None
+
+    async def supports_language(self, language: LanguageCode | None) -> bool:
+        return True
+
+    def predict(self) -> asyncio.Future[TurnDetectionEvent]:
+        ended: asyncio.Future[TurnDetectionEvent] = asyncio.get_running_loop().create_future()
+        ended.set_result(
+            TurnDetectionEvent(
+                type="eot_prediction", end_of_turn_probability=1.0, last_speaking_time=time.time()
+            )
+        )
+        return ended
+
+    def cancel_inference(self, *, timed_out: bool = False) -> None:
+        pass
+
+    def flush(self, reason: str | None = None) -> None:
+        pass
+
+    def push_audio(self, frame: rtc.AudioFrame) -> None:
+        pass
+
+    def end_input(self) -> None:
+        pass
+
+    async def aclose(self) -> None:
+        pass
+
+
+class SureTurnDetector:
+    model = "sure"
+    provider = "scripted"
+
+    def stream(
+        self, *, conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS
+    ) -> SureTurnStream:
+        return SureTurnStream()
+
+
+def worker_turn_handling(p: Plan) -> dict[str, Any]:
+    if p.turn_detector is None:
+        return p.turn_handling
+    return {**p.turn_handling, "turn_detection": SureTurnDetector()}
 
 
 async def until(check: Any, timeout: float = 5.0) -> None:

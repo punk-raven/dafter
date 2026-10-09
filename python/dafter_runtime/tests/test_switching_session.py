@@ -19,7 +19,7 @@ from dafter_runtime.timing import Turns
 from dafter_runtime.toolbox import Answering, everyday, registry_for
 from livekit.agents import AgentSession, LanguageCode, llm
 from livekit.agents.voice.generation import INSTRUCTIONS_MESSAGE_ID
-from session_rig import Microphone, ScriptedSTT, SlowReader, Speaker, until
+from session_rig import Microphone, ScriptedSTT, SlowReader, Speaker, until, worker_turn_handling
 from stub_llm import StubLLM
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
@@ -88,7 +88,7 @@ def converse(p: Plan) -> tuple[list[str], list[str], Polyglot, list[str], list[s
             stt=recognizer,
             llm=model,
             tts=voice,
-            turn_handling=p.turn_handling,  # type: ignore[arg-type]
+            turn_handling=worker_turn_handling(p),  # type: ignore[arg-type]
             user_away_timeout=None,
             aec_warmup_duration=None,
         )
