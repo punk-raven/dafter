@@ -5,8 +5,10 @@ paths:
   - "python/dafter_providers/src/dafter_providers/{styled,endpointing}.py"
   - "python/dafter_providers/tests/test_{sarvam,sarvam_llm,realtime,sentences,silero,voices}.py"
   - "python/dafter_providers/tests/test_endpointing.py"
-  - "python/dafter_runtime/src/dafter_runtime/{backchannel,speech_plan,spoken_hindi,delivery}.py"
+  - "python/dafter_runtime/src/dafter_runtime/{backchannel,lexicon,speech_plan,delivery}.py"
+  - "python/dafter_runtime/src/dafter_runtime/spoken_*.py"
   - "python/dafter_runtime/tests/test_{backchannel,backchannel_session,speech_plan,delivery}.py"
+  - "python/dafter_runtime/tests/test_spoken_languages.py"
   - "python/dafter_runtime/tests/test_{turn_detection,text}.py"
   - "testdata/speech/**"
   - "schemas/config/v1/backchannel.schema.json"
@@ -30,8 +32,7 @@ Code: `python/dafter_providers/src/dafter_providers/sarvam/`.
 - `FinalFirstSTT` holds end of speech until the final transcript (Sarvam sends `vad.speech_end`
   first; the framework would commit a stale transcript). It releases end of speech with the final
   and waits `finalGraceMs` (STT option) only for a late final.
-- `SentenceTTS` uses a tokenizer that ends sentences at the danda, so TTS starts on the first
-  sentence.
+- `SentenceTTS` ends sentences at the danda, so TTS starts on the first sentence.
 - bulbul:v3 takes pace (0.5 to 2), temperature (0.01 to 1 on the websocket) and a pronunciation
   dictionary's `dict_id` (TTS options `pace`, `temperature`, `styles` per situation,
   `dictionaryId`); no pitch or loudness.
@@ -41,12 +42,16 @@ Code: `python/dafter_providers/src/dafter_providers/sarvam/`.
   - livekit-agents drops text pushed after a stream's `flush()`, so `FirstSentenceAlone` in
     `sentences.py` sends the sentinel itself and ends only that segment on Sarvam's first `final`.
 - Text preprocessing is always on.
-- Sarvam's server VAD ends the turn. The local VAD (`agent.pipeline.vad`, the framework's bundled
-  Silero in `dafter_providers/silero`, loaded once per process by `prewarm` in `worker.py`) is for
-  interruptions only (`turn.interruption.localVadEnabled`, interruption mode `vad`).
-- Strategy `semantic` runs the framework's on-device turn detector (`inference.TurnDetector`,
-  `v1-mini`, dynamic endpointing) where `TURN_DETECTOR_LANGUAGES` in `plan.py` covers the language;
-  provider endpointing elsewhere.
+- Catalog turn strategy: `semantic` for en-IN and hi; `provider_endpointing` (Sarvam's server VAD
+  ends the turn, the local Silero VAD in `dafter_providers/silero` only catches interruptions) for
+  mr, te and kn. `semantic` runs `turn.detector` (`TURN_DETECTORS`, `registry.py`) where it covers
+  the language: `livekit` (default, `v1-mini`, `LOCAL_LANGUAGES`: en, hi) or `smart_turn` (Smart
+  Turn v3.2 trial for mr, off unless a session states it; weights pinned by revision and SHA-256,
+  fetched only under `DAFTER_SMART_TURN_PREWARM=1`: `providers.md`; a worker without them refuses
+  the job at `/turn/detector`). No detector covers te or kn.
+- Local VAD: Silero options (`activationThreshold` 0.5, `minSilenceMs` 250, `prefixPaddingMs` 500,
+  the installed `inference.VAD` defaults) per language in catalog `tuning`; change one only on
+  `vadscore` sweep data. Licence unchecked: MIT in repo metadata, CC BY-NC 4.0 in the README.
 - STT option `mode`: `transcribe` or `codemix` (English words kept in Latin script, finals only).
   The catalog sets codemix for every Indic language.
 - The plugin accepts only `saaras:v3-realtime` and its own list of 30 bulbul:v3 speakers.
@@ -61,6 +66,12 @@ Code: `python/dafter_providers/src/dafter_providers/sarvam/`.
   - `backchannel.py` sieves the recognizer's events in the agent's `stt_node` (the listeners' too)
     and drops an utterance of listed phrases said while a reply is pending or playing; it never
     becomes a turn or history.
+  - `lexicon.py`: affirmatives `backchannel.words`, `backchannel.negatives` (`reviewed` all false).
+    A negative ("no no", "ruko", "नहीं") is never an acknowledgement. `cue`: silent, affirmative,
+    negative, continued (an affirmative then real words) or speech; negative and continued yield.
+  - `acknowledged(..., cuts=True)` cuts the playing reply on a yielding transcript, below
+    `minWords`. The agent's `stt_node` (always mode, web and phone) sets it; listeners do not
+    (`barge_in.py` cuts there).
   - livekit-agents resumes the paused reply after `falseInterruptionTimeoutMs` (always mode; its
     default `aec_warmup_duration` also ignores barge-in for 3 s from the first time the agent speaks
     in a session).
@@ -70,9 +81,10 @@ Code: `python/dafter_providers/src/dafter_providers/sarvam/`.
     played time from `agent_state_changed`; a paused reply's silence does not count.
 - Text: `speech_plan.py` is the last `tts_text_transforms` entry, after the framework's markdown and
   emoji filters. It holds text to sentence ends, strips list numbering, applies `substitutions`, and
-  under normalization `platform` applies the language's rules (Hindi only: `spoken_hindi.py`,
-  vectors in `testdata/speech/`; Hindi personas write digits, English ones words). `provider` leaves
-  digits to TTS.
+  under normalization `platform` applies the language's rules (`NORMALIZERS`: en, hi, kn, mr, te,
+  in `spoken_<language>.py` on shared `spoken_rules.py`; vectors in `testdata/speech/`, the en, kn,
+  mr and te files `reviewed: false` until a native speaker checks them; Hindi personas write digits,
+  the others words). `provider` leaves digits to TTS.
 - Voice: `delivery.py` classifies the caller's last turn (concern, greeting, neutral; the opening is
   a greeting); the agent's `tts_node` calls `style()` on a TTS implementing
   `dafter_providers.Styled`.

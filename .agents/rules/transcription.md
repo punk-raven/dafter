@@ -72,6 +72,17 @@ Identical on both halves (Go and Python) unless stated. Index:
   never makes a person hidden) and only for its session.
 - Publishes `scribe.notes` every `summaryIntervalMs` (also each rewrite's timeout; a failure keeps
   the last notes), `agent.turn_scored` (stage 4 `Judge`) and `scribe.minutes`.
+- Turn scoring (`judging.py`): the `dafter-screen` judge and criteria, the language's filled bank.
+  Only sampled turns (`sampling.py`, SHA-256 of the segment id under `scribe.scoring` rate, default
+  0), at most `maxTurnsPerSession`; no rate, no judge built. Metrics `dafter_scribe_turns`,
+  `_verdicts`, `_turn_score` (`quality.py`; language, version, arm, criterion) on
+  `DAFTER_METRICS_PORT`; dashboard `dafter-agent-quality.json`.
+- `keepFailures` plus `DAFTER_SCRIBE_REVIEW_DIR`: `fail` turns go to a JSONL review queue
+  (`review.py`), audio referenced only under recording consent. `dafter-scribe-export` promotes
+  them (`testdata/golden/README.md`, Sampling loop). Dev compose mounts the git-ignored
+  `.scribe-review/`.
+- Open decision: retention of review queue entries and who may read them (they hold caller text).
+  No policy is set; do not add one in code until it is decided.
 - Minutes so far on request: `{"action":"minutes"}` on data topic `dafter.scribe`.
 - When everyone leaves, `on_session_end` (`after_call`, bounded by `afterCallTimeoutSeconds`) writes
   the final minutes, stores them (`POST /sessions/{id}/minutes`, worker credential both ways,

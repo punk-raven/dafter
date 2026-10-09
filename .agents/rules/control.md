@@ -4,6 +4,7 @@ paths:
   - "go/internal/control/{lifecycle_test,locks,release_test}.go"
   - "go/internal/control/{recording,recording_test,recording_state_test,webhook,webhook_test}.go"
   - "go/internal/control/{metrics,metrics_internal_test}.go"
+  - "go/internal/control/{canary,canary_test,canary_internal_test}.go"
   - "go/internal/transport/{dispatch,dispatch_test,egress,egress_test,webhook,webhook_test}.go"
   - "go/internal/transport/{rooms,rooms_test}.go"
   - "go/internal/transport/testdata/{dispatch,egress,webhook}/**"
@@ -45,6 +46,19 @@ Identical on both halves (Go and Python) unless stated. Index:
     room, found with a `roomList`-only service token (listing a closed room's dispatches waits on a
     node that hosts nothing).
 
+## Versions and canary
+
+- A session carries the bundle it runs as `version` (`id`, `candidate`) in its hashed document;
+  the worker labels every metric with it, the control plane counts
+  `dafter_sessions_by_version_total{version,arm}`. Publish a changed bundle under a new id.
+- `routeCanary` (`go/internal/control/canary.go`), in `openSession` before resolution: the
+  session's profile's `canary.percent` of sessions go to `canary.profile`, by SHA-256 of the
+  candidate's version id and the device key or inbound caller number, else the session id. Default
+  0 (off); 5 to 10 for a first rollout. Never log or store the caller key.
+- Promote: point the agent, trunk or sessions at the candidate profile; roll back: percent 0. Both
+  through the admin API, no redeploy. Raise percent above 0 only after the candidate passes the
+  `dafter-scenarios` pass^k gate in CI.
+
 ## Recording and webhooks
 
 - The control plane starts and stops recordings from the session's stored config
@@ -71,6 +85,9 @@ Identical on both halves (Go and Python) unless stated. Index:
   nothing.
 - Never run the browser's own suppression and a processor together (stacked suppressors degrade
   speech). Echo cancellation is separate and stays on.
+- The worker's own filter (`agent.pipeline.noiseFilter`, `agent.md`) never stacks on a client
+  processor: while it is not `off` the worker refuses `rnnoise` and `rnnoise_gated` before joining;
+  `off` and `native` run beside it.
 - Attach a processor to the microphone track before it is published, never after.
 - Worklet and WASM assets come from a pinned CDN URL beside the SDK pin. Every load failure falls
   back to `native` visibly (the call shows the active filter).

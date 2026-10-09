@@ -2,10 +2,11 @@
 paths:
   - "python/dafter_runtime/src/dafter_runtime/{plan,worker,personas,own_voice,addressing,called}.py"
   - "python/dafter_runtime/src/dafter_runtime/{listeners,barge_in,naming}.py"
-  - "python/dafter_runtime/src/dafter_runtime/{timing,tools,toolbox,consent}.py"
+  - "python/dafter_runtime/src/dafter_runtime/{timing,tools,toolbox,consent,stages}.py"
   - "python/dafter_runtime/tests/test_{plan,worker,personas,own_voice,own_voice_session,naming}.py"
   - "python/dafter_runtime/tests/test_{called,called_timing}.py"
   - "python/dafter_runtime/tests/test_{listeners,barge_in,barge_in_resume,awake,tools}.py"
+  - "python/dafter_runtime/tests/test_{noise_filter,answering_cuts}.py"
   - "testdata/addressing/**"
   - "go/internal/config/addressing_test.go"
   - "python/dafter_core/tests/test_addressing.py"
@@ -23,7 +24,8 @@ Identical on both halves (Go and Python) unless stated. Index:
   e2ee without a worker credential or under a key model other than `server_shared`; an unregistered
   provider; a language a provider does not declare; a turn strategy it cannot run; a local VAD the
   pipeline does not name; an unknown persona; addressing `on_device`; language switching with an STT
-  that cannot identify a language, or a listed language without a persona or provider.
+  that cannot identify a language, or a listed language without a persona or provider; a noise
+  filter it cannot run (below).
 - Every refusal, a stage that cannot be built after accepting (a missing provider key) and a
   withheld key after accepting are posted to `POST /sessions/{id}/agent/refusal` as an error
   document. `GET /sessions/{id}` returns it as `agentRefusal` until the next invite; the test client
@@ -31,6 +33,15 @@ Identical on both halves (Go and Python) unless stated. Index:
 - Providers are constructed and TTS prewarmed before `ctx.connect`.
 - The worker strips `lk.pii.*` fields (transcripts) from framework log records and exports traces
   with PII off.
+
+## Noise filter
+
+- `agent.pipeline.noiseFilter`: `off` (default), `nc` (noise), `bvc` (also other voices, wideband
+  only), `bvc_telephony`; Krisp via `livekit-plugins-noise-cancellation`, LiveKit Cloud only.
+- `filtered_input` (`stages.py`) feeds the linked session and every listener (`called.py`,
+  `transcribing.py`); a SIP participant gets the narrowband `phone_variant`.
+- `noise_filter` in `plan.py` refuses `bvc` on channel `telephony`, a missing plugin, and a client
+  model filter under it (no stacking: `control.md`, Client noise filters).
 
 ## Agent identity
 
