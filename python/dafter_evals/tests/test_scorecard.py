@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from dafter_core.config import Budgets, parse
 from dafter_evals.__main__ import route, usage
 from dafter_evals.probe import Events
@@ -12,6 +13,7 @@ from dafter_evals.scorecard import (
     PENDING_LATENCY,
     PENDING_LIVE_ACCURACY,
     PENDING_NATURALNESS,
+    PENDING_ROUNDTRIP,
     main,
     markdown,
     scorecard,
@@ -121,3 +123,45 @@ def test_a_live_run_records_its_route_and_what_a_minute_of_call_cost() -> None:
         "unpriced": ["llm:sarvam/sarvam-105b"],
     }
     assert usage(None, 60.0)["costPerMinuteInr"] is None
+
+
+def roundtrip(language: str, cer: float) -> Any:
+    return {
+        "kind": "dafter.tts.roundtrip",
+        "ranAt": "2026-10-08T10:00:00+00:00",
+        "language": language,
+        "tts": {"provider": "sarvam", "model": "bulbul:v3", "voice": "priya", "id": SARVAM[2]},
+        "stt": {"provider": "sarvam", "model": "saaras:v3-realtime"},
+        "line": {"rate": 8000, "codec": "g711-mulaw"},
+        "summary": {"cer": cer, "cases": 40, "failed": 0, "entities": {"accuracy": 0.95}},
+        "regression": {"verdict": "held"},
+    }
+
+
+def test_a_tts_round_trip_lands_on_its_language_with_its_naturalness(tmp_path: Path) -> None:
+    ratings = {"hi": {"sarvam/bulbul:v3 priya": {"score": 3.9, "raters": 2, "clips": 40}}}
+    card = scorecard([], [], ratings, ["hi", "te-IN"], [roundtrip("hi", 0.041)])
+    (row,) = card["languages"]["hi"]["ttsRoundTrip"]
+    assert (row["tts"], row["voice"], row["cer"], row["entityAccuracy"]) == (
+        SARVAM[2],
+        "priya",
+        0.041,
+        0.95,
+    )
+    assert row["naturalness"]["score"] == 3.9 and row["regression"] == "held"
+    assert card["languages"]["hi"]["pending"] == []
+    assert card["languages"]["te-IN"]["ttsRoundTrip"] is None
+    assert card["languages"]["te-IN"]["pending"] == [PENDING_ROUNDTRIP]
+    text = markdown(card)
+    assert "CER 4.1%, entities 95%, naturalness 3.9" in text
+    assert "TTS round trip at 8 kHz G.711: pending" in text
+    report = tmp_path / "tts.json"
+    report.write_text(json.dumps(roundtrip("kn-IN", 0.08)))
+    out = tmp_path / "card.json"
+    assert main(["--tts", str(report), "--languages", "kn-IN", "--out", str(out)]) == 0
+    assert json.loads(out.read_text())["languages"]["kn-IN"]["ttsRoundTrip"][0]["cer"] == 0.08
+
+
+def test_a_tts_file_that_is_not_a_round_trip_report_is_refused() -> None:
+    with pytest.raises(ValueError, match="not a dafter-tts run report"):
+        scorecard([], [], {}, ["hi"], [{"kind": "dafter.asr.accuracy"}])

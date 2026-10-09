@@ -1,0 +1,27 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 1,
+  "language": "hi",
+  "nativeReview": {
+    "status": "pending",
+    "reviewers": []
+  },
+  "clips": [
+    {
+      "id": "hi-0001",
+      "audio": "audio/hi/hi-0001.wav",
+      "channel": "telephony_8k",
+      "consentId": "consent-example-0001",
+      "annotators": ["annotator-a", "annotator-b"],
+      "reference": {
+        "native": "मेरा नंबर 98450 12345 है और 500 रुपये भेजो",
+        "romanized": "mera number 98450 12345 hai aur 500 rupaye bhejo"
+      },
+      "entities": [
+        { "kind": "phone", "text": "98450 12345", "startChar": 10, "endChar": 21 },
+        { "kind": "amount", "text": "500 रुपये", "startChar": 28, "endChar": 37 }
+      ],
+      "labels": ["turn:end", "codemix", "noise:traffic", "voice:male_adult"]
+    }
+  ]
+}

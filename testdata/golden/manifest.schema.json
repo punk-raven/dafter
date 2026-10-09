@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dafter.dev/testdata/golden/manifest.schema.json",
+  "title": "Golden set manifest",
+  "description": "One language's consented Vobiz golden clips, read by dafter_evals.golden.load.",
+  "type": "object",
+  "required": ["version", "language", "nativeReview", "clips"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "language": { "enum": ["en-IN", "hi", "te-IN", "kn-IN", "mr-IN"] },
+    "nativeReview": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["pending", "in_review", "approved"] },
+        "reviewers": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "if": { "properties": { "status": { "const": "approved" } } },
+      "then": { "required": ["reviewers"], "properties": { "reviewers": { "minItems": 1 } } }
+    },
+    "clips": { "type": "array", "items": { "$ref": "#/$defs/clip" } }
+  },
+  "$defs": {
+    "clip": {
+      "type": "object",
+      "required": ["id", "audio", "channel", "consentId", "annotators", "reference"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "audio": { "type": "string", "pattern": "^audio/(?!.*\\.\\.)[^/].*$" },
+        "channel": { "enum": ["telephony_8k", "wideband"] },
+        "consentId": { "type": "string", "minLength": 1 },
+        "annotators": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reference": {
+          "type": "object",
+          "required": ["native"],
+          "additionalProperties": false,
+          "properties": {
+            "native": { "type": "string", "minLength": 1 },
+            "romanized": { "type": ["string", "null"], "minLength": 1 }
+          }
+        },
+        "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" } },
+        "labels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:turn:(?:hold|end)|codemix|(?:backchannel|interruption|noise|voice):[a-z0-9]+(?:_[a-z0-9]+)*)$"
+          }
+        }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "required": ["kind", "text", "startChar", "endChar"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["number", "phone", "amount", "name", "address", "date"] },
+        "text": { "type": "string", "minLength": 1 },
+        "startChar": { "type": "integer", "minimum": 0 },
+        "endChar": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

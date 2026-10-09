@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import itertools
 import json
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -143,12 +144,19 @@ def test_the_hindi_bank_is_the_scripted_hindi_turns() -> None:
     assert (bank.script, bank.register) == ("Devanagari", "आप")
 
 
-@pytest.mark.parametrize("language", ["kn", "en", "mr", "te"])
-def test_other_languages_have_empty_banks_that_say_so(language: str) -> None:
+@pytest.mark.parametrize("language", banks.LANGUAGES)
+def test_every_bank_loads_with_questions(language: str) -> None:
     bank = banks.load(language)
-    assert bank.empty
-    assert f"banks/{language}.json" in bank.refusal()
-    assert "never generates" in bank.refusal()
+    assert not bank.empty
+    assert bank.language == language
+
+
+@pytest.mark.parametrize("language", ["kn", "en", "mr", "te"])
+def test_draft_banks_mark_every_question_unreviewed(language: str) -> None:
+    path = resources.files(banks.PACKAGE).joinpath("banks", f"{language}.json")
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    assert raw["questions"]
+    assert all(q["reviewed"] is False for q in raw["questions"])
 
 
 def test_an_unknown_language_has_no_bank() -> None:
@@ -247,7 +255,7 @@ def screen(
 
     bank = banks.Bank("hi", "Hindi", "Devanagari", "आप", hindi().questions[:2])
     graded = Judge(judge, classify, bank, 5.0) if judge else None
-    settings = Settings(date="2026-09-27", runs=runs)
+    settings = Settings(date="2026-09-27", runs=runs, backoff=0.0)
     s = Screen(settings, bank, INSTRUCTIONS, graded, build, ticks(), said.append, tools)
     candidates = catalogs.load().pick(["gemini_flash_lite", "gemini_flash", "openai_mini"])
     return asyncio.run(s.run(candidates)), said
@@ -282,6 +290,36 @@ def test_the_screen_records_rate_limits_and_skips_a_candidate_it_cannot_build() 
     assert record.cost_inr == pytest.approx(record.cost * 95.82)
     assert ok.summary()["costPer1kRepliesInr"] == pytest.approx(record.cost_inr * 1000)
     assert slow.records[0].native_code == "429"
+    assert (slow.records[0].attempts, slow.records[0].transient) == (4, True)
+    assert limited.calls == 2 * 2 * 4 and ok.records[0].attempts == 1
+    assert any("gemini_flash hi-" in s and "retrying in 0s" in s for s in said)
+
+
+class Flaky(Stub):
+    def __init__(self, failures: int, error: BaseException) -> None:
+        super().__init__()
+        self.failures = failures
+        self.failure = error
+
+    def chat(self, **kwargs: Any) -> llm.LLMStream:
+        self.error = self.failure if self.failures > 0 else None
+        self.failures -= 1
+        return super().chat(**kwargs)
+
+
+def test_a_transient_failure_is_retried_until_the_call_is_answered() -> None:
+    flaky = Flaky(2, APIStatusError("busy", status_code=503))
+    rows, _ = screen({"gemini-3.5-flash-lite": flaky})
+    first, second = rows[0].records
+    assert (first.answered, first.attempts) == (True, 3)
+    assert (second.answered, second.attempts) == (True, 1)
+
+
+def test_a_permanent_failure_is_not_retried() -> None:
+    refused = Stub(error=APIStatusError("bad key", status_code=401))
+    rows, _ = screen({"gemini-3.5-flash-lite": refused})
+    assert refused.calls == 2 and rows[0].records[0].attempts == 1
+    assert rows[0].records[0].transient is False
 
 
 def test_a_tool_call_is_graded_by_the_livekit_tool_use_judge() -> None:
@@ -323,11 +361,26 @@ def run_cli(argv: list[str], monkeypatch: pytest.MonkeyPatch, judge_key: bool = 
     return int(exited.value.code or 0)
 
 
+def only_hindi_filled(monkeypatch: pytest.MonkeyPatch, *filled: banks.Bank) -> None:
+    load = banks.load
+    given = {bank.language: bank for bank in filled}
+
+    def pick(language: str) -> banks.Bank:
+        if language in given:
+            return given[language]
+        real = load(language)
+        if language == "hi":
+            return real
+        return banks.Bank(real.language, real.name, real.script, real.register, ())
+
+    monkeypatch.setattr(banks, "load", pick)
+
+
 def test_the_cli_writes_a_ranked_table_and_a_spot_check_sample(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     argv = ["--out", str(tmp_path), "--runs", "2", "--candidates", "gemini_flash_lite,openai_mini"]
-    assert run_cli(argv, monkeypatch) == 0
+    assert run_cli(argv, monkeypatch) == 1
     results = (tmp_path / "results.jsonl").read_text(encoding="utf-8").splitlines()
     sample = (tmp_path / "spot-check.jsonl").read_text(encoding="utf-8").splitlines()
     assert (len(results), len(sample)) == (2 * 2 * 23, 19)
@@ -340,13 +393,17 @@ def test_the_cli_writes_a_ranked_table_and_a_spot_check_sample(
     assert "judge: judge_gemini_flash" in table and "openai/gpt-5.4-mini" in table
     assert "USD prices converted at USD 1 = INR 95.82 on 2026-09-25 (https://" in table
     assert summary["usdToInr"]["inrPerUsd"] == 95.82
+    assert summary["gate"]["go"] is False
+    assert sorted(summary["gate"]["misses"]) == ["gemini_flash_lite", "openai_mini"]
+    assert run_cli([*argv, "--report-only"], monkeypatch) == 0
 
 
 def test_empty_banks_are_skipped_with_their_reason_and_the_rest_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    only_hindi_filled(monkeypatch)
     argv = ["--out", str(tmp_path), "--runs", "1", "--candidates", "gemini_flash_lite"]
-    assert run_cli([*argv, "--language", "kn,hi,kn"], monkeypatch) == 0
+    assert run_cli([*argv, "--language", "kn,hi,kn", "--report-only"], monkeypatch) == 0
     assert "skipped: the Kannada (kn) question bank is empty" in capsys.readouterr().err
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert summary["languages"] == ["hi"] and list(summary["skippedLanguages"]) == ["kn"]
@@ -358,12 +415,11 @@ def test_empty_banks_are_skipped_with_their_reason_and_the_rest_run(
 def test_several_languages_rank_together_and_apart(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    load = banks.load
     english = banks.Bank("en", "English", None, None, (banks.Question("en-01", "Hello?"),))
-    monkeypatch.setattr(banks, "load", lambda lang: english if lang == "en" else load(lang))
+    only_hindi_filled(monkeypatch, english)
     monkeypatch.setattr(cli, "persona_for", lambda ref, lang, name: Persona(INSTRUCTIONS, "hi"))
     argv = ["--out", str(tmp_path), "--runs", "2", "--candidates", "gemini_flash_lite"]
-    assert run_cli([*argv, "--language", "all"], monkeypatch) == 0
+    assert run_cli([*argv, "--language", "all", "--report-only"], monkeypatch) == 0
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert summary["languages"] == ["hi", "en"]
     assert sorted(summary["skippedLanguages"]) == ["kn", "mr", "te"]
@@ -405,6 +461,7 @@ def test_an_unknown_language_is_refused_before_anything_runs() -> None:
 def test_the_cli_refuses_an_empty_bank(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    only_hindi_filled(monkeypatch)
     assert run_cli(["--out", str(tmp_path), "--language", "kn"], monkeypatch) == 2
     assert "Kannada (kn) question bank is empty" in capsys.readouterr().err
     assert not (tmp_path / "results.jsonl").exists()

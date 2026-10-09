@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+import pytest
+from dafter_evals.screen import __main__ as cli
 from dafter_evals.screen import catalog as catalogs
-from dafter_evals.screen.report import Record, Row, merged, rank, sample, table
+from dafter_evals.screen.report import Record, Row, gate, merged, rank, sample, table
 
 CATALOG = catalogs.load()
 PICK = {c.id: c for c in CATALOG.candidates}
@@ -125,3 +127,59 @@ def test_after_a_judge_ran_the_sample_is_drawn_from_judged_replies_only() -> Non
     assert all(s["judge"]["verdicts"] for s in picked)
     assert len(sample([*judged, *failed], seed=7)) == 4
     assert sample(failed, seed=7, judged=True) == []
+
+
+def test_the_gate_passes_only_when_every_candidate_meets_every_criterion() -> None:
+    clean = [Row(PICK["openai_mini"], [rec("openai_mini", n) for n in range(3)])]
+    assert gate(clean) == {"go": True, "complete": True, "misses": {}, "incomplete": {}}
+    assert gate([])["go"] is False
+
+
+def test_quality_misses_fail_and_unanswered_transient_calls_leave_the_run_incomplete() -> None:
+    probe = {"expected_tools": ["lookup_order"], "missed_tools": ["lookup_order"]}
+    flawed = [
+        rec("gemini_flash", 0, error="rate_limited", reply=None, transient=True, attempts=4),
+        rec("gemini_flash", 1, verdicts={"correctness": "fail", "language": "maybe"}),
+        rec("gemini_flash", 2, **probe),
+    ]
+    verdict = gate([*rows()[:3], Row(PICK["gemini_flash"], flawed)])
+    assert (verdict["go"], verdict["complete"]) == (False, False)
+    assert verdict["misses"] == {
+        "gemini_flash": ["1 of 1 tool probes not clean", "correctness failed on 1 replies"]
+    }
+    assert verdict["incomplete"] == {"gemini_flash": ["1 of 3 calls unanswered after retries"]}
+    summary = Row(PICK["gemini_flash"], flawed).summary()
+    assert (summary["retriedCalls"], summary["incomplete"]) == (
+        1,
+        verdict["incomplete"]["gemini_flash"],
+    )
+
+
+def test_a_skipped_candidate_leaves_the_run_incomplete_not_failed() -> None:
+    verdict = gate(rows())
+    assert verdict["misses"] == {}
+    assert verdict["incomplete"] == {"sarvam_105b": ["not screened: authentication_failed: no key"]}
+
+
+def test_a_call_the_provider_refused_outright_is_a_candidate_miss() -> None:
+    refused = [rec("gemini_flash", 0, error="bad_request", reply=None), rec("gemini_flash", 1)]
+    verdict = gate([Row(PICK["gemini_flash"], refused)])
+    assert verdict["misses"] == {"gemini_flash": ["1 of 2 calls refused by the provider"]}
+    assert verdict["complete"] is True
+
+
+@pytest.mark.parametrize(
+    ("misses", "incomplete", "report_only", "code"),
+    [
+        ({}, {}, False, 0),
+        ({"a": ["x"]}, {}, False, 1),
+        ({"a": ["x"]}, {"b": ["y"]}, False, 1),
+        ({}, {"b": ["y"]}, False, 2),
+        ({"a": ["x"]}, {"b": ["y"]}, True, 0),
+    ],
+)
+def test_the_exit_code_tells_a_miss_from_an_incomplete_run(
+    misses: dict[str, list[str]], incomplete: dict[str, list[str]], report_only: bool, code: int
+) -> None:
+    verdict = {"go": not misses and not incomplete, "misses": misses, "incomplete": incomplete}
+    assert cli.exit_code(verdict, report_only) == code

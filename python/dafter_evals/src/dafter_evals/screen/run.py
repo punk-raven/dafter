@@ -28,6 +28,12 @@ class Settings:
     runs: int = 5
     pause: float = 0.0
     timeout: float = 20.0
+    retries: int = 3
+    backoff: float = 2.0
+    max_backoff: float = 30.0
+
+    def wait(self, attempt: int) -> float:
+        return float(min(self.backoff * 2**attempt, self.max_backoff))
 
 
 def build(ref: ProviderRef) -> tuple[llm.LLM[Any], Classify]:
@@ -46,7 +52,13 @@ def _cost(candidate: Candidate, reply: Reply, inr: bool = False) -> float | None
 
 
 def record(
-    settings: Settings, bank: Bank, candidate: Candidate, question: Question, run: int, reply: Reply
+    settings: Settings,
+    bank: Bank,
+    candidate: Candidate,
+    question: Question,
+    run: int,
+    reply: Reply,
+    attempts: int = 1,
 ) -> Record:
     err = reply.error
     tools = check(question, reply.responses, reply.text)
@@ -76,6 +88,8 @@ def record(
         digits=digits(reply.text) if reply.text else None,
         error=str(err.code) if err else None,
         native_code=err.provider.native_code if err and err.provider else None,
+        transient=err.retryable if err else False,
+        attempts=attempts,
         expected_tools=list(question.tools),
         tool_responses=[list(r) for r in reply.responses],
         missed_tools=tools.missed if err is None else [],
@@ -151,19 +165,33 @@ class Screen:
     ) -> list[Record]:
         out: list[Record] = []
         for q in self.bank.questions:
-            reply = await ask(
-                model,
-                classify,
-                self.instructions,
-                q.text,
-                self.settings.timeout,
-                self._now,
-                self._tools,
-            )
-            await asyncio.sleep(self.settings.pause)
-            rec = record(self.settings, self.bank, candidate, q, run, reply)
+            reply, attempts = await self._answer(candidate, model, classify, q)
+            rec = record(self.settings, self.bank, candidate, q, run, reply, attempts)
             if self.judge is not None:
                 rec = await judged(self.judge, rec, reply, self.settings.pause)
             self._say(f"{candidate.id} run {run} {q.id}: {rec.error or 'ok'}")
             out.append(rec)
         return out
+
+    async def _answer(
+        self, candidate: Candidate, model: llm.LLM[Any], classify: Classify, question: Question
+    ) -> tuple[Reply, int]:
+        attempt = 0
+        while True:
+            reply = await ask(
+                model,
+                classify,
+                self.instructions,
+                question.text,
+                self.settings.timeout,
+                self._now,
+                self._tools,
+            )
+            await asyncio.sleep(self.settings.pause)
+            err = reply.error
+            if err is None or not err.retryable or attempt >= self.settings.retries:
+                return reply, attempt + 1
+            wait = self.settings.wait(attempt)
+            self._say(f"{candidate.id} {question.id}: {err.code}, retrying in {wait:g}s")
+            await asyncio.sleep(wait)
+            attempt += 1

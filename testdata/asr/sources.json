@@ -8,7 +8,12 @@
     "license": "CC-BY-4.0",
     "homepage": "https://github.com/AI4Bharat/vistaar",
     "paper": "https://arxiv.org/abs/2208.11761",
-    "languages": { "hi": "hindi", "kn-IN": "kannada", "mr-IN": "marathi", "te-IN": "telugu" }
+    "languages": {
+      "hi": "hindi",
+      "kn-IN": "kannada",
+      "mr-IN": "marathi",
+      "te-IN": "telugu"
+    }
   },
   "svarah": {
     "name": "Svarah, Indian-accented English",
@@ -17,6 +22,71 @@
     "license": "CC-BY-4.0",
     "homepage": "https://huggingface.co/datasets/ai4bharat/Svarah",
     "paper": "https://arxiv.org/abs/2305.15760",
-    "languages": { "en-IN": "test" }
+    "languages": {
+      "en-IN": "test"
+    }
+  },
+  "indicvoices": {
+    "name": "IndicVoices, spontaneous and read speech from AI4Bharat",
+    "dataset": "ai4bharat/IndicVoices",
+    "revision": "c96f9088f138cf89d419da7e8e643e1f05c00a87",
+    "split": "valid",
+    "license": "CC-BY-4.0",
+    "homepage": "https://huggingface.co/datasets/ai4bharat/IndicVoices",
+    "paper": "https://arxiv.org/abs/2403.01926",
+    "languages": {
+      "hi": "hindi",
+      "kn-IN": "kannada",
+      "mr-IN": "marathi",
+      "te-IN": "telugu"
+    }
+  },
+  "lahaja": {
+    "name": "Lahaja, multi-accent Hindi",
+    "dataset": "ai4bharat/Lahaja",
+    "revision": "d4ffd2ecbdd933e37c917ddcf620eef159ceb3a7",
+    "license": "MIT",
+    "homepage": "https://huggingface.co/datasets/ai4bharat/Lahaja",
+    "paper": "https://arxiv.org/abs/2408.11440",
+    "languages": {
+      "hi": "test"
+    }
+  },
+  "mucs2021": {
+    "name": "MUCS 2021 sub-task 1, 8 kHz telephone-band read speech",
+    "sampleRateHz": 8000,
+    "license": "https://msropendata-web-api.azurewebsites.net/licenses/f1f352a6-243f-4905-8e00-389edbca9e83/view",
+    "homepage": "https://www.openslr.org/103/",
+    "paper": "https://arxiv.org/abs/2104.00235",
+    "languages": {
+      "hi": {
+        "archive": "https://openslr.elda.org/resources/103/Hindi_test.tar.gz",
+        "bytes": 258984925,
+        "etag": "\"f6fcbdd-5cc0965acd12f\"",
+        "lastModified": "Wed, 15 Sep 2021 14:20:16 GMT",
+        "speakers": 19
+      },
+      "mr-IN": {
+        "archive": "https://openslr.elda.org/resources/103/Marathi_test.tar.gz",
+        "bytes": 235375901,
+        "etag": "\"e078d1d-5cc097dc9c8d7\"",
+        "lastModified": "Wed, 15 Sep 2021 14:27:00 GMT"
+      }
+    }
+  },
+  "mucs2021-codeswitch": {
+    "name": "MUCS 2021 sub-task 2, Hindi-English code-switched lectures",
+    "sampleRateHz": 16000,
+    "license": "CC-BY-SA-4.0",
+    "homepage": "https://www.openslr.org/104/",
+    "paper": "https://arxiv.org/abs/2104.00235",
+    "languages": {
+      "hi": {
+        "archive": "https://openslr.elda.org/resources/104/Hindi-English_test.tar.gz",
+        "bytes": 443929204,
+        "etag": "\"1a75d274-5cc09b9ecc146\"",
+        "lastModified": "Wed, 15 Sep 2021 14:43:49 GMT"
+      }
+    }
   }
 }

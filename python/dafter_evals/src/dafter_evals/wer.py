@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,6 +21,29 @@ def normalise(text: str) -> str:
 
 def words(text: str) -> list[str]:
     return normalise(text).split()
+
+
+def characters(text: str) -> list[str]:
+    return list("".join(normalise(text).split()))
+
+
+Same = Callable[[int, int], bool]
+
+
+@dataclass(frozen=True, slots=True)
+class Edits:
+    reference_length: int
+    substitutions: int
+    deletions: int
+    insertions: int
+
+    @property
+    def errors(self) -> int:
+        return self.substitutions + self.deletions + self.insertions
+
+    @property
+    def rate(self) -> float:
+        return self.errors / self.reference_length
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,10 +71,10 @@ class Score:
         }
 
 
-def score(reference: Sequence[str], hypothesis: Sequence[str]) -> Score:
-    if not reference:
-        raise ValueError("a word error rate needs a reference with at least one word")
-    rows, cols = len(reference) + 1, len(hypothesis) + 1
+def align(reference_length: int, hypothesis_length: int, same: Same) -> Edits:
+    if reference_length == 0:
+        raise ValueError("an error rate needs a reference with at least one unit")
+    rows, cols = reference_length + 1, hypothesis_length + 1
     cost = [[(0, 0, 0)] * cols for _ in range(rows)]
     for i in range(1, rows):
         cost[i][0] = (0, i, 0)
@@ -59,7 +82,7 @@ def score(reference: Sequence[str], hypothesis: Sequence[str]) -> Score:
         cost[0][j] = (0, 0, j)
     for i in range(1, rows):
         for j in range(1, cols):
-            if reference[i - 1] == hypothesis[j - 1]:
+            if same(i - 1, j - 1):
                 cost[i][j] = cost[i - 1][j - 1]
                 continue
             s, d, n = cost[i - 1][j - 1]
@@ -70,11 +93,81 @@ def score(reference: Sequence[str], hypothesis: Sequence[str]) -> Score:
             ]
             cost[i][j] = min(candidates, key=lambda c: (sum(c), c))
     s, d, n = cost[-1][-1]
-    return Score(len(reference), s, d, n)
+    return Edits(reference_length, s, d, n)
+
+
+def edits(reference: Sequence[str], hypothesis: Sequence[str]) -> Edits:
+    return align(len(reference), len(hypothesis), lambda i, j: reference[i] == hypothesis[j])
+
+
+def score(reference: Sequence[str], hypothesis: Sequence[str]) -> Score:
+    if not reference:
+        raise ValueError("a word error rate needs a reference with at least one word")
+    found = edits(reference, hypothesis)
+    return Score(found.reference_length, found.substitutions, found.deletions, found.insertions)
 
 
 def word_error_rate(reference: str, hypothesis: str) -> Score:
     return score(words(reference), words(hypothesis))
+
+
+def character_error_rate(reference: str, hypothesis: str) -> Edits:
+    return edits(characters(reference), characters(hypothesis))
+
+
+def spelling_lattice(references: Sequence[str]) -> list[list[frozenset[str]]]:
+    spellings = [spelling for spelling in map(words, references) if spelling]
+    if not spellings:
+        raise ValueError("an orthography-aware error rate needs a reference with a word")
+    lattices: list[list[frozenset[str]]] = []
+    for spelling in spellings:
+        aligned = [s for s in spellings if len(s) == len(spelling)]
+        lattice = [frozenset(s[i] for s in aligned) for i in range(len(spelling))]
+        if lattice not in lattices:
+            lattices.append(lattice)
+    return lattices
+
+
+def _heard_in(heard: Sequence[str], lattice: Sequence[frozenset[str]]) -> Same:
+    return lambda i, j: heard[j] in lattice[i]
+
+
+def orthography_aware_error_rate(references: Sequence[str], hypothesis: str) -> Edits:
+    heard = words(hypothesis)
+    scored = [
+        align(len(lattice), len(heard), _heard_in(heard, lattice))
+        for lattice in spelling_lattice(references)
+    ]
+    return min(scored, key=lambda e: (e.rate, e.errors))
+
+
+@dataclass(frozen=True, slots=True)
+class Metrics:
+    wer: Score
+    cer: Edits
+    oiwer: Edits
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **self.wer.to_dict(),
+            "cer": round(self.cer.rate, 4),
+            "referenceCharacters": self.cer.reference_length,
+            "characterErrors": self.cer.errors,
+            "oiwer": round(self.oiwer.rate, 4),
+            "oiwerReferenceWords": self.oiwer.reference_length,
+            "oiwerErrors": self.oiwer.errors,
+        }
+
+
+def error_rates(references: Sequence[str], hypothesis: str) -> Metrics:
+    if not references:
+        raise ValueError("error rates need at least one reference")
+    primary = references[0]
+    return Metrics(
+        word_error_rate(primary, hypothesis),
+        character_error_rate(primary, hypothesis),
+        orthography_aware_error_rate(references, hypothesis),
+    )
 
 
 def transcript_text(
@@ -91,4 +184,20 @@ def transcript_text(
     )
 
 
-__all__ = ["Score", "normalise", "score", "transcript_text", "word_error_rate", "words"]
+__all__ = [
+    "Edits",
+    "Metrics",
+    "Score",
+    "align",
+    "character_error_rate",
+    "characters",
+    "edits",
+    "error_rates",
+    "normalise",
+    "orthography_aware_error_rate",
+    "score",
+    "spelling_lattice",
+    "transcript_text",
+    "word_error_rate",
+    "words",
+]

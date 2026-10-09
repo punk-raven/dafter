@@ -25,6 +25,7 @@ from livekit.agents.types import NOT_GIVEN, NotGivenOr
 ROOT = Path(__file__).resolve().parents[3]
 JOB = ROOT / "testdata" / "agent" / "kannada-webrtc-job.json"
 MANIFEST = ROOT / "testdata" / "asr" / "kathbath-kn-IN.json"
+SAMPLE_CLIPS = 20
 
 
 def wav(seconds: float, rate: int = 16000, channels: int = 1) -> bytes:
@@ -152,14 +153,28 @@ def test_a_run_over_its_budget_or_without_its_audio_never_starts(tmp_path: Path)
         main(common)
 
 
+def pinned_value(source: dict[str, Any], language: str, key: str) -> Any:
+    if key in source:
+        return source[key]
+    return source["languages"][language][key]
+
+
+def sample_size(source: dict[str, Any], language: str) -> int:
+    per_language = source["languages"][language]
+    if isinstance(per_language, dict):
+        return min(SAMPLE_CLIPS, int(per_language.get("speakers", SAMPLE_CLIPS)))
+    return SAMPLE_CLIPS
+
+
 def test_the_committed_samples_are_pinned_to_their_sources() -> None:
     sources = json.loads((MANIFEST.parent / "sources.json").read_text(encoding="utf-8"))
     for manifest in sorted(MANIFEST.parent.glob("*-*.json")):
         s = Sample.read(manifest.read_text(encoding="utf-8"))
         pinned = sources[s.dataset]
         assert s.language in pinned["languages"]
-        assert all(s.source[k] == pinned[k] for k in s.source)
-        assert len(s.clips) == 20 and len({c.speaker for c in s.clips}) == 20
+        assert all(s.source[k] == pinned_value(pinned, s.language, k) for k in s.source)
+        size = sample_size(pinned, s.language)
+        assert len(s.clips) == size and len({c.speaker for c in s.clips}) == size
         assert all(len(c.sha256) == 64 and c.reference for c in s.clips)
 
 

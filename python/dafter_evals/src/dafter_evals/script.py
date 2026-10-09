@@ -11,6 +11,7 @@ class Script:
     backchannels: tuple[str, ...]
     fillers: tuple[str, ...]
     paused: tuple[tuple[str, str], ...] = ()
+    reviewed: bool = False
 
 
 HINDI = Script(
@@ -59,4 +60,5 @@ HINDI = Script(
         ("मुझे रात को", "नींद नहीं आती, क्या करूँ?"),
         ("सुबह जल्दी", "कैसे उठें?"),
     ),
+    reviewed=True,
 )

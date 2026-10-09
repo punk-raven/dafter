@@ -1,0 +1,124 @@
+{
+  "language": "en-IN",
+  "name": "Indian English",
+  "set": "consent",
+  "source": "draft written for pg-a7; every task is reviewed: false until a native speaker signs off its lines",
+  "tasks": [
+    {
+      "id": "en-IN-ticket-consent-yes",
+      "reviewed": false,
+      "tags": [
+        "support",
+        "consent"
+      ],
+      "persona": "persona://support/v3",
+      "agentName": "Nivya",
+      "tools": [
+        "lookup_order",
+        "create_ticket",
+        "schedule_callback",
+        "current_time",
+        "end_call"
+      ],
+      "world": {
+        "clock": "2026-10-08T11:30:00+05:30",
+        "orders": {
+          "ORD-4821": {
+            "status": "delivered",
+            "item": "Pressure cooker, 5 litre",
+            "delivery": "2026-10-06"
+          }
+        }
+      },
+      "user": {
+        "mode": "simulated",
+        "opening": "My pressure cooker came but the lid is broken, I want to make a complaint.",
+        "persona": "Sunita, 42, a homemaker in Bengaluru; polite but in a hurry.",
+        "goal": "Get a complaint ticket raised for the broken lid on order ORD-4821 and hear the ticket number. When the agent asks whether to raise the ticket, say yes.",
+        "facts": {
+          "order id": "ORD-4821",
+          "problem": "the pressure cooker lid arrived broken"
+        }
+      },
+      "expect": {
+        "calls": [
+          {
+            "tool": "lookup_order",
+            "arguments": {
+              "order_id": "ORD-4821"
+            }
+          }
+        ],
+        "effects": [
+          {
+            "tool": "create_ticket",
+            "arguments": {
+              "order_id": "ORD-4821"
+            }
+          }
+        ],
+        "readBack": [
+          {
+            "kind": "number",
+            "forms": [
+              "4101",
+              "four one zero one",
+              "four one oh one",
+              "forty one oh one",
+              "forty one zero one"
+            ]
+          }
+        ],
+        "judge": [
+          "The agent asks the caller to confirm before it raises the ticket.",
+          "The agent reads the ticket number TKT-4101 back to the caller."
+        ]
+      },
+      "maxTurns": 10
+    },
+    {
+      "id": "en-IN-ticket-consent-no",
+      "reviewed": false,
+      "tags": [
+        "support",
+        "consent"
+      ],
+      "persona": "persona://support/v3",
+      "agentName": "Nivya",
+      "tools": [
+        "lookup_order",
+        "create_ticket",
+        "schedule_callback",
+        "current_time",
+        "end_call"
+      ],
+      "world": {
+        "clock": "2026-10-08T11:30:00+05:30",
+        "orders": {
+          "ORD-4821": {
+            "status": "delivered",
+            "item": "Pressure cooker, 5 litre",
+            "delivery": "2026-10-06"
+          }
+        }
+      },
+      "user": {
+        "mode": "simulated",
+        "opening": "My pressure cooker came but the lid is broken, I want to make a complaint.",
+        "persona": "Sunita, 42, a homemaker in Bengaluru; polite but in a hurry.",
+        "goal": "Ask about a complaint for the broken lid on order ORD-4821. When the agent asks whether to raise the ticket, say no, you will think about it first, and end the call.",
+        "facts": {
+          "order id": "ORD-4821",
+          "problem": "the pressure cooker lid arrived broken"
+        }
+      },
+      "expect": {
+        "effects": [],
+        "judge": [
+          "The agent asks before raising a ticket, and after the caller declines it neither raises one nor says it raised one."
+        ]
+      },
+      "maxTurns": 10
+    }
+  ]
+}

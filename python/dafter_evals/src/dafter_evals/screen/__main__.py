@@ -17,12 +17,16 @@ from livekit.agents import llm
 from . import bank as banks
 from . import catalog as catalogs
 from .judge import Judge
-from .report import Row, merged, sample, table
+from .report import Row, gate, merged, sample, table
 from .run import Screen, Settings, build
 from .tools import TOOLS
 from .turn import Classify
 
 FRAMEWORK_LOGGER = "livekit.agents"
+PASSED = 0
+GATE_FAILED = 1
+REFUSED = 2
+INCOMPLETE = REFUSED
 
 
 def progress(line: str) -> None:
@@ -62,9 +66,22 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--pause", type=float, default=0.0, help="seconds between provider calls")
     p.add_argument("--timeout", type=float, default=20.0, help="seconds per provider call")
     p.add_argument("--seed", type=int, default=0, help="seed for the spot-check sample")
+    p.add_argument(
+        "--retries", type=int, default=3, help="retries per call on a rate limit or transport fault"
+    )
+    p.add_argument(
+        "--backoff", type=float, default=2.0, help="seconds before the first retry, doubling"
+    )
+    p.add_argument(
+        "--report-only",
+        action="store_true",
+        help="exit 0 even when a candidate misses or the run is incomplete; refusals still exit 2",
+    )
     args = p.parse_args(argv)
     if args.runs < 1:
         p.error("--runs must be at least 1")
+    if args.retries < 0 or args.backoff < 0:
+        p.error("--retries and --backoff must not be negative")
     return args
 
 
@@ -145,13 +162,18 @@ async def screen(args: argparse.Namespace) -> int:
     for reason in skipped.values():
         sys.stderr.write(f"skipped: {reason}\n")
     if not ready:
-        return 2
+        return REFUSED
     catalog = catalogs.load()
     picked = catalog.pick(args.candidates.split(",") if args.candidates else None)
     judging = None if args.no_judge else judge_model(catalog)
     started = datetime.now(UTC)
     settings = Settings(
-        date=started.date().isoformat(), runs=args.runs, pause=args.pause, timeout=args.timeout
+        date=started.date().isoformat(),
+        runs=args.runs,
+        pause=args.pause,
+        timeout=args.timeout,
+        retries=args.retries,
+        backoff=args.backoff,
     )
     by_language: dict[str, list[Row]] = {}
     try:
@@ -173,6 +195,7 @@ async def screen(args: argparse.Namespace) -> int:
     rows = merged(list(by_language.values()))
     judged_by = f"{catalog.judge.id} ({catalog.judge.ref.model})" if judging else None
     text = report(rows, by_language, skipped, settings.date, judged_by, catalog.usd_to_inr)
+    verdict = gate(rows)
     meta = {
         "date": settings.date,
         "startedAt": started.isoformat(),
@@ -188,10 +211,20 @@ async def screen(args: argparse.Namespace) -> int:
         },
         "judge": judged_by,
         "sampleSeed": args.seed,
+        "gate": verdict,
     }
     write(args.out, rows, by_language, text, args.seed, meta)
     sys.stdout.write(text)
-    return 0
+    for kind in ("misses", "incomplete"):
+        for candidate, found in verdict[kind].items():
+            sys.stderr.write(f"{kind}: {candidate}: {'; '.join(found)}\n")
+    return exit_code(verdict, args.report_only)
+
+
+def exit_code(verdict: dict[str, Any], report_only: bool) -> int:
+    if verdict["go"] or report_only:
+        return PASSED
+    return GATE_FAILED if verdict["misses"] else INCOMPLETE
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -201,10 +234,10 @@ def main(argv: list[str] | None = None) -> None:
         code = asyncio.run(screen(args))
     except DafterError as exc:
         sys.stderr.write(f"screen refused: {exc.code}: {exc.message}\n")
-        code = 2
+        code = REFUSED
     except ValueError as exc:
         sys.stderr.write(f"screen refused: {exc}\n")
-        code = 2
+        code = REFUSED
     raise SystemExit(code)
 
 
