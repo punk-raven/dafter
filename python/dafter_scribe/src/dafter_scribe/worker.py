@@ -13,6 +13,7 @@ from dafter_runtime.answering import Roster
 from dafter_runtime.control import ControlPlane, encryption
 from dafter_runtime.events import TOPIC, SessionEvents
 from dafter_runtime.listeners import is_human, is_worker
+from dafter_runtime.metrics import exposition
 from dafter_runtime.plan import load
 from dafter_runtime.toolbox import follow
 from dafter_runtime.worker import redact_framework_logs, refuse
@@ -24,6 +25,7 @@ from .closing import REQUEST_TOPIC, Closing, command
 from .judging import Scorer
 from .keeper import MinutesKeeper
 from .plan import ScribePlan, plan
+from .scoring import scoring_loop
 from .scribe import Scribe
 from .transcript import Transcript
 from .writer import Writer
@@ -90,9 +92,11 @@ async def entrypoint(ctx: JobContext) -> None:
     redact_framework_logs()
     control = ControlPlane.from_env(ROLE)
     p: ScribePlan = plan(load(ctx.job.metadata), pool(), fetches_keys=control is not None)
+    loop = scoring_loop(p.config)
+    scoring_on = loop.sampling.scores_any
     try:
         model = p.writer.build()
-        judge = p.judge.build() if p.judge is not None else None
+        judge = p.judge.build() if p.judge is not None and scoring_on else None
     except DafterError as exc:
         await refuse(control, p.config.session_id, exc)
         raise
@@ -119,7 +123,13 @@ async def entrypoint(ctx: JobContext) -> None:
     if p.judge is not None and judge is not None:
         writer.spend.watch(judge)
         scorer = Scorer(
-            judge, p.judge.vendor.classify, events.emit, p.language, p.interval_s, p.judge.source()
+            judge,
+            p.judge.vendor.classify,
+            events.emit,
+            p.language,
+            p.interval_s,
+            p.judge.source(),
+            loop,
         )
     closing = Closing(p.config, writer, scorer, events.emit, events.envelope)
     scribe = Scribe(p.config, writer, scorer, closing)
@@ -170,10 +180,13 @@ async def after_call(ctx: JobContext) -> None:
 def server() -> AgentServer:
     redact_framework_logs()
     os.environ.setdefault(POOL_ENV, DEFAULT_POOL)
+    exposed = exposition()
     agent_server = AgentServer(
         permissions=PERMISSIONS,
         port=int(os.environ.get(HTTP_PORT_ENV) or 0),
         session_end_timeout=LONGEST_AFTER_CALL_S + 60,
+        prometheus_port=exposed.port if exposed else None,
+        prometheus_multiproc_dir=exposed.multiproc_dir if exposed else None,
     )
     agent_server.rtc_session(entrypoint, on_request=on_request, on_session_end=after_call)
     return agent_server

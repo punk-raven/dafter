@@ -9,8 +9,13 @@ from dafter_core.config import ResolvedSessionConfig
 from dafter_core.enums import EventType
 from dafter_core.hashing import seal
 from dafter_runtime.plan import load
+from dafter_scribe.quality import ScribeMetrics
+from dafter_scribe.review import ReviewQueue
+from dafter_scribe.sampling import Sampling
+from dafter_scribe.scoring import ScoringLoop, session_facts
 from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions, llm
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
+from prometheus_client import CollectorRegistry
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
 ASHA = "p_4b81e0d7"
@@ -131,3 +136,20 @@ class Sent:
 def prompt_of(ctx: llm.ChatContext) -> tuple[str, str]:
     messages = [m for m in ctx.items if isinstance(m, llm.ChatMessage)]
     return messages[0].text_content or "", messages[1].text_content or ""
+
+
+def scoring(
+    rate: float = 1.0,
+    cap: int = 200,
+    queue: ReviewQueue | None = None,
+    cfg: ResolvedSessionConfig | None = None,
+    metrics: ScribeMetrics | None = None,
+) -> ScoringLoop:
+    resolved = cfg if cfg is not None else config()
+    return ScoringLoop(
+        sampling=Sampling(rate, cap),
+        session=session_facts(resolved),
+        metrics=metrics if metrics is not None else ScribeMetrics(CollectorRegistry()),
+        place=("hi", "none", "stable"),
+        queue=queue,
+    )

@@ -10,11 +10,13 @@ dependencies = [
     "dafter-evals",
     "dafter-batch",
     "aiohttp>=3.9",
+    "prometheus-client>=0.22",
     "livekit-agents==1.8.3",
 ]
 
 [project.scripts]
 dafter-scribe = "dafter_scribe.__main__:main"
+dafter-scribe-export = "dafter_scribe.export:main"
 
 [build-system]
 requires = ["hatchling"]

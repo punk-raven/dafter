@@ -21,7 +21,17 @@ from dafter_scribe.transcript import Transcript
 from dafter_scribe.worker import JOBS, Job, after_call
 from dafter_scribe.writer import Writer
 from livekit.agents import JobContext
-from scribe_stub import ASHA, RAVI, ScriptedLLM, Sent, Step, caption, config, prompt_of
+from scribe_stub import (
+    ASHA,
+    RAVI,
+    ScriptedLLM,
+    Sent,
+    Step,
+    caption,
+    config,
+    prompt_of,
+    scoring,
+)
 
 MINUTES = {
     "summary": "रिपोर्ट शुक्रवार तक; बजट खुला।",
@@ -61,7 +71,9 @@ class Harness:
             5.0,
             {"provider": "sarvam", "model": "sarvam-105b"},
         )
-        self.scorer = Scorer(ScriptedLLM(), sarvam.classify, self.sent, language_of("hi"), 5.0, {})
+        self.scorer = Scorer(
+            ScriptedLLM(), sarvam.classify, self.sent, language_of("hi"), 5.0, {}, scoring()
+        )
         self.closing = Closing(self.cfg, self.writer, self.scorer, self.sent, self.events.envelope)
 
     def hear(self) -> None:
