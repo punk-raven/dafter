@@ -5,15 +5,20 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Protocol
 
-from dafter_core.config import ProviderRef, Turn
+from dafter_core.config import DEFAULT_TURN_DETECTOR, ProviderRef, Turn
 from dafter_core.enums import ErrorCode, Stage
 from dafter_core.errors import DafterError, ProviderContext
+from dafter_core.pipeline import NO_NOISE_FILTER
+from livekit import rtc
+from livekit.agents import inference
 from livekit.agents import llm as lk_llm
 from livekit.agents import stt as lk_stt
 from livekit.agents import tts as lk_tts
 from livekit.agents import vad as lk_vad
+from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
+from livekit.agents.voice.turn import _StreamingTurnDetector
 
-from . import openai_compat, sarvam, silero
+from . import krisp, openai_compat, sarvam, silero, smart_turn
 from .batch import BatchTranscriber
 
 AGENT_LLM = "/agent/pipeline/llm"
@@ -84,6 +89,96 @@ VENDORS: Mapping[str, Vendor] = MappingProxyType(
         },
     }
 )
+
+
+@dataclass(frozen=True, slots=True)
+class NoiseFilter:
+    name: str
+    vendor: str
+    narrowband: bool
+    phone_variant: str
+    installed: Callable[[], bool]
+    build: Callable[[str], rtc.NoiseCancellationOptions]
+
+
+NOISE_FILTERS: Mapping[str, NoiseFilter] = MappingProxyType(
+    {
+        name: NoiseFilter(
+            name=name,
+            vendor=krisp.NAME,
+            narrowband=name not in krisp.WIDEBAND_ONLY,
+            phone_variant=krisp.PHONE_VARIANTS[name],
+            installed=krisp.installed,
+            build=krisp.build_filter,
+        )
+        for name in krisp.MODELS
+    }
+)
+
+
+def noise_filter_for(name: str) -> NoiseFilter | None:
+    if name == NO_NOISE_FILTER:
+        return None
+    chosen = NOISE_FILTERS.get(name)
+    if chosen is None:
+        raise DafterError(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "no noise filter of that name is registered in this worker",
+            details=(f"at '{krisp.FILTER_AT}': registered: {', '.join(NOISE_FILTERS)}",),
+        )
+    return chosen
+
+
+LIVEKIT_TURN_DETECTOR_VERSION: inference.TurnDetectorVersions = "v1-mini"
+
+
+@dataclass(frozen=True, slots=True)
+class TurnDetectorKind:
+    name: str
+    languages: frozenset[str]
+    missing: Callable[[], str | None]
+    build: Callable[[], _StreamingTurnDetector]
+    prewarm: Callable[[], None]
+
+
+def _livekit_detector() -> _StreamingTurnDetector:
+    return inference.TurnDetector(version=LIVEKIT_TURN_DETECTOR_VERSION)
+
+
+TURN_DETECTORS: Mapping[str, TurnDetectorKind] = MappingProxyType(
+    {
+        DEFAULT_TURN_DETECTOR: TurnDetectorKind(
+            name=DEFAULT_TURN_DETECTOR,
+            languages=frozenset(LOCAL_LANGUAGES),
+            missing=lambda: None,
+            build=_livekit_detector,
+            prewarm=lambda: None,
+        ),
+        smart_turn.NAME: TurnDetectorKind(
+            name=smart_turn.NAME,
+            languages=smart_turn.LANGUAGES,
+            missing=smart_turn.missing,
+            build=smart_turn.build_detector,
+            prewarm=smart_turn.prewarm,
+        ),
+    }
+)
+
+
+def turn_detector_for(name: str) -> TurnDetectorKind:
+    chosen = TURN_DETECTORS.get(name)
+    if chosen is None:
+        raise DafterError(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "no turn detector of that name is registered in this worker",
+            details=(f"at '{smart_turn.DETECTOR_AT}': registered: {', '.join(TURN_DETECTORS)}",),
+        )
+    return chosen
+
+
+def prewarm_turn_detectors() -> None:
+    for kind in TURN_DETECTORS.values():
+        kind.prewarm()
 
 
 def batch_for(ref: ProviderRef | None) -> BatchTranscriber:
