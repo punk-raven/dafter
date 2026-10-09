@@ -349,10 +349,8 @@ func present(doc map[string]any, path []string) bool {
 }
 
 func merge(base, over map[string]any, pointer string) map[string]any {
-	out := make(map[string]any, len(base)+len(over))
-	for k, v := range base {
-		out[k] = v
-	}
+	out := make(map[string]any)
+	maps.Copy(out, base)
 	for k, v := range over {
 		at := pointer + "/" + pointerEscaper.Replace(k)
 		bm, baseIsObject := out[k].(map[string]any)
