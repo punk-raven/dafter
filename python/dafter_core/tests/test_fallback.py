@@ -30,7 +30,7 @@ GROQ = {
 
 def doc(fallback: dict[str, Any] | None) -> str:
     d = json.loads(json.dumps(MINIMAL))
-    d["agent"]["pipeline"] = {} if fallback is None else {"fallback": fallback}
+    d["agent"]["pipeline"] = {"llm": GROQ} if fallback is None else {"fallback": fallback}
     return json.dumps(d)
 
 

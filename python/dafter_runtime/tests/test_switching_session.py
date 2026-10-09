@@ -139,7 +139,7 @@ def test_the_agent_replies_in_the_language_the_caller_switched_to() -> None:
     assert "Reply only in English" in asked[0]
     assert "Reply only in Hindi" in asked[1]
     assert voice.languages == ["en-IN", "hi"]
-    assert numbers[0] == "₹1,25,000"
+    assert numbers[0] == "one lakh twenty five thousand rupees"
     assert "लाख" in numbers[1]
     assert languages == ["en-IN", "hi"]
     assert "switch_language" in tools

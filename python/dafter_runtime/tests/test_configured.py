@@ -56,7 +56,7 @@ def test_the_catalog_hindi_session_runs_every_speech_setting() -> None:
 
 
 def test_a_language_without_platform_rules_is_reported_as_the_providers() -> None:
-    cfg = job("english-webrtc-job.json")
+    cfg = dataclasses.replace(job("english-webrtc-job.json"), language="ta-IN")
     assert cfg.agent.speech.normalization is SpeechNormalization.PLATFORM
     assert effective(cfg)["normalization"] == "provider"
     assert effective(cfg)["llm"] == {"provider": "sarvam", "model": "sarvam-105b"}

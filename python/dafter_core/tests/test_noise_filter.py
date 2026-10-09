@@ -30,7 +30,7 @@ def doc(pipeline: dict[str, Any]) -> str:
 
 
 def test_a_pipeline_that_names_no_noise_filter_runs_none() -> None:
-    pipeline = parse(doc({})).agent.pipeline
+    pipeline = parse(doc({"vad": {"provider": "silero"}})).agent.pipeline
     assert pipeline is not None
     assert pipeline.noise_filter == NO_NOISE_FILTER == "off"
 

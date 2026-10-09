@@ -33,7 +33,9 @@ def job(**changes: Any) -> bytes:
     }
     doc["scribe"] = {**doc["scribe"], "enabled": True, "consentArtifactId": "consent_sc"}
     for key, value in changes.items():
-        if isinstance(value, dict) and isinstance(doc.get(key), dict):
+        if value is None:
+            doc.pop(key, None)
+        elif isinstance(value, dict) and isinstance(doc.get(key), dict):
             merged = {**doc[key], **value}
             doc[key] = {k: v for k, v in merged.items() if v is not None}
         else:

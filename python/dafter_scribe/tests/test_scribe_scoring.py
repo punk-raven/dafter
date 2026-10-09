@@ -126,7 +126,7 @@ def test_verdicts_are_counted_by_criterion() -> None:
 def test_metrics_are_labelled_by_the_version_and_arm_the_session_runs() -> None:
     cfg = config(version={"id": "support-v4", "candidate": True})
     assert place_of(cfg) == ("hi", "support-v4", "candidate")
-    assert place_of(config()) == ("hi", "none", "stable")
+    assert place_of(config(version=None)) == ("hi", "none", "stable")
 
 
 def test_the_judge_reads_the_filled_bank_for_its_language() -> None:
