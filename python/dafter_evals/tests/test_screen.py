@@ -470,7 +470,7 @@ def test_the_cli_refuses_an_empty_bank(
 def test_a_judge_that_cannot_run_refuses_the_screen_and_names_the_way_out(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    argv = ["--out", str(tmp_path), "--candidates", "gemini_flash_lite"]
+    argv = ["--out", str(tmp_path), "--candidates", "gemini_flash_lite", "--report-only"]
     assert run_cli(argv, monkeypatch, judge_key=False) == 2
     err = capsys.readouterr().err
     assert err.startswith("screen refused: authentication_failed: the judge judge_gemini_flash")
