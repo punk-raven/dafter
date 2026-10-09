@@ -139,33 +139,23 @@ func leafProblems(err error) []string {
 	}
 	var out []string
 	seen := map[string]bool{}
-	var walk func(e *jsonschema.ValidationError, names *kind.PropertyNames, namesAt []string)
-	walk = func(e *jsonschema.ValidationError, names *kind.PropertyNames, namesAt []string) {
+	var walk func(*jsonschema.ValidationError)
+	walk = func(e *jsonschema.ValidationError) {
 		if len(e.Causes) == 0 {
-			p := problem(e, names, namesAt)
+			p := fmt.Sprintf("at '%s': %s", pointer(e.InstanceLocation), rule(e.ErrorKind))
 			if !seen[p] {
 				seen[p] = true
 				out = append(out, p)
 			}
 			return
 		}
-		if k, ok := e.ErrorKind.(*kind.PropertyNames); ok {
-			names, namesAt = k, e.InstanceLocation
-		}
 		for _, c := range e.Causes {
-			walk(c, names, namesAt)
+			walk(c)
 		}
 	}
-	walk(ve, nil, nil)
+	walk(ve)
 	sort.Strings(out)
 	return out
-}
-
-func problem(e *jsonschema.ValidationError, names *kind.PropertyNames, namesAt []string) string {
-	if names == nil {
-		return fmt.Sprintf("at '%s': %s", pointer(e.InstanceLocation), rule(e.ErrorKind))
-	}
-	return fmt.Sprintf("at '%s': property name '%s' %s", pointer(namesAt), names.Property, rule(e.ErrorKind))
 }
 
 var pointerEscaper = strings.NewReplacer("~", "~0", "/", "~1")
