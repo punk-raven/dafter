@@ -11,6 +11,7 @@ from dafter_runtime.listeners import Listener, is_human, listener_options
 from livekit import rtc
 from livekit.agents import Agent, ModelSettings, StopResponse, llm, stt
 from livekit.agents.types import ATTRIBUTE_PUBLISH_ON_BEHALF
+from livekit.agents.voice.room_io import AudioInputOptions
 
 AGENT = "agent-AJ_x"
 
@@ -46,7 +47,7 @@ def test_every_human_kind_is_heard_and_agents_and_their_avatars_are_not() -> Non
 
 
 def test_a_listener_hears_one_participant_and_never_speaks() -> None:
-    options = listener_options("p_4b81e0d7", 16000)
+    options = listener_options("p_4b81e0d7", AudioInputOptions(sample_rate=16000))
     assert options.participant_identity == "p_4b81e0d7"
     audio = options.get_audio_input_options()
     assert audio is not None and audio.sample_rate == 16000
@@ -54,6 +55,15 @@ def test_a_listener_hears_one_participant_and_never_speaks() -> None:
     assert options.get_text_input_options() is None
     assert options.get_text_output_options() is not None
     assert options.close_on_disconnect is False
+
+
+def test_a_listener_hears_through_the_planned_noise_filter() -> None:
+    def chosen(params: object) -> rtc.NoiseCancellationOptions:
+        return rtc.NoiseCancellationOptions("NC", {})
+
+    planned = AudioInputOptions(sample_rate=16000, noise_cancellation=chosen)
+    audio = listener_options("p_4b81e0d7", planned).get_audio_input_options()
+    assert audio is not None and audio.noise_cancellation is chosen
 
 
 def test_a_listener_passes_each_finished_turn_and_its_timing_on_and_stops_the_reply() -> None:

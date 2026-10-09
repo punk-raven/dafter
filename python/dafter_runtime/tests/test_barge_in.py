@@ -10,10 +10,12 @@ from typing import Any, cast
 import pytest
 from dafter_core.enums import WakeSource
 from dafter_core.hashing import seal
+from dafter_core.speech import Backchannel
 from dafter_runtime.addressing import Gate, Said, Timing
 from dafter_runtime.answering import Roster, Voice
 from dafter_runtime.barge_in import BargeIn, follow
 from dafter_runtime.called import barge_in_for
+from dafter_runtime.lexicon import Lexicon
 from dafter_runtime.naming import Matcher
 from dafter_runtime.plan import load, plan
 from livekit.agents import (
@@ -29,6 +31,7 @@ from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChan
 from stub_llm import StubLLM, StubStream
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
+CATALOG = Path(__file__).resolve().parents[3] / "go" / "cmd" / "dafter-control" / "catalog.json"
 ASHA = "p_4b81e0d7"
 RAVI = "p_9d02c3aa"
 MIN_S = 0.25
@@ -69,6 +72,11 @@ class Scheduler:
             timer.callback()
 
 
+def catalog_lexicon() -> Lexicon:
+    defaults = json.loads(CATALOG.read_text(encoding="utf-8"))["defaults"]
+    return Lexicon.of(Backchannel.from_dict(defaults["turn"]["interruption"]["backchannel"]))
+
+
 class Rig:
     def __init__(self, caller: str | None = ASHA, min_words: int = 0) -> None:
         self.caller = caller
@@ -76,7 +84,13 @@ class Rig:
         self.clock = Clock()
         self.scheduler = Scheduler()
         self.barge_in = BargeIn(
-            MIN_S, min_words, lambda: self.caller, self._stop, self.clock, self.scheduler
+            MIN_S,
+            min_words,
+            lambda: self.caller,
+            self._stop,
+            self.clock,
+            self.scheduler,
+            lexicon=catalog_lexicon(),
         )
 
     def _stop(self) -> None:
@@ -126,11 +140,58 @@ def test_min_words_waits_for_enough_words_of_the_current_turn() -> None:
     rig.barge_in.committed(ASHA)
     rig.barge_in.speaking(ASHA, rig.clock.now)
     rig.scheduler.fire()
-    rig.barge_in.transcribed(ASHA, "रुको", final=True)
+    rig.barge_in.transcribed(ASHA, "सुनो", final=True)
     rig.barge_in.transcribed(ASHA, "एक", final=False)
     assert rig.stops == 0
     rig.barge_in.transcribed(ASHA, "एक मिनट", final=False)
     assert rig.stops == 1
+
+
+def over_the_gate(*heard: str, min_words: int = 3, echoing: bool = False) -> int:
+    rig = Rig(min_words=min_words)
+    if echoing:
+        rig.barge_in.echoing(ASHA)
+    rig.barge_in.speaking(ASHA, rig.clock.now)
+    rig.scheduler.fire()
+    for text in heard:
+        rig.barge_in.transcribed(ASHA, text, final=False)
+    return rig.stops
+
+
+@pytest.mark.parametrize(
+    "negative",
+    [
+        "no no",
+        "wait",
+        "nahi",
+        "नहीं",
+        "ruko ruko",
+        "aagu",
+        "ఆగు",
+        "illa",
+        "ಇಲ್ಲ",
+        "thamba",
+        "vaddu",
+    ],
+)
+def test_a_short_negative_cuts_her_under_the_three_word_gate(negative: str) -> None:
+    assert over_the_gate(negative) == 1
+
+
+def test_an_affirmative_with_more_speech_after_it_cuts_her_under_the_gate() -> None:
+    assert over_the_gate("haan", "haan ek baat") == 1
+    assert over_the_gate("okay so") == 1
+
+
+def test_a_standalone_affirmative_or_two_plain_words_hold_under_the_gate() -> None:
+    assert over_the_gate("haan", "haan ji") == 0
+    assert over_the_gate("mm-hmm") == 0
+    assert over_the_gate("एक दो") == 0
+
+
+def test_an_echoing_line_needs_its_words_even_for_a_negative() -> None:
+    assert over_the_gate("no no", echoing=True) == 0
+    assert over_the_gate("no no no", echoing=True) == 1
 
 
 def test_a_reply_starting_while_the_caller_still_talks_is_stopped() -> None:
@@ -351,3 +412,40 @@ def test_a_stop_command_ends_the_reply_and_sleeps_whatever_the_interruption_sett
         await voice.reply
 
     on_voice(script, interruptible)
+
+
+def called_plan(min_words: int) -> Any:
+    doc = json.loads(JOB.read_bytes())
+    defaults = json.loads(CATALOG.read_text(encoding="utf-8"))["defaults"]
+    doc["agent"]["addressing"]["mode"] = "transcript"
+    doc["turn"]["interruption"]["backchannel"] = defaults["turn"]["interruption"]["backchannel"]
+    doc["turn"]["interruption"]["minWords"] = min_words
+    sealed, _ = seal(json.dumps(doc))
+    return plan(load(sealed), "dafter-py")
+
+
+def stops_on_the_called_path(text: str) -> int:
+    p = called_plan(min_words=3)
+    responder = Responder()
+    scheduler = Scheduler()
+    gate = Gate(
+        Matcher.for_agent(p.config.agent), 20.0, responder, clock=Clock(), schedule=scheduler
+    )
+    loop = cast(asyncio.AbstractEventLoop, Loop(scheduler))
+    barge_in = barge_in_for(p, gate, cast(Voice, responder), loop)
+    gate.wake(RAVI)
+    barge_in.speaking(RAVI, time.time())
+    scheduler.pending[-1].callback()
+    barge_in.transcribed(RAVI, text, final=False)
+    return responder.stops
+
+
+@pytest.mark.parametrize("negative", ["ruko", "रुको", "nahi"])
+def test_a_catalog_negative_cuts_her_on_the_called_path_under_the_word_gate(
+    negative: str,
+) -> None:
+    assert stops_on_the_called_path(negative) == 1
+
+
+def test_a_catalog_acknowledgement_holds_on_the_called_path() -> None:
+    assert stops_on_the_called_path("haan") == 0

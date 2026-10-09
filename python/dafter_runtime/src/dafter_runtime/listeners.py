@@ -70,10 +70,10 @@ def listener_session(
     )
 
 
-def listener_options(identity: str, sample_rate: int) -> RoomOptions:
+def listener_options(identity: str, audio_input: AudioInputOptions) -> RoomOptions:
     return RoomOptions(
         participant_identity=identity,
-        audio_input=AudioInputOptions(sample_rate=sample_rate),
+        audio_input=audio_input,
         audio_output=False,
         text_input=False,
         close_on_disconnect=False,
@@ -85,14 +85,14 @@ class Listeners:
         self,
         room: rtc.Room,
         new_session: Callable[[], AgentSession[Any]],
-        sample_rate: int,
+        audio_input: AudioInputOptions,
         heard: Heard,
         joined: Joined,
         hearing: Hearing | None = None,
     ) -> None:
         self._room = room
         self._new_session = new_session
-        self._sample_rate = sample_rate
+        self.audio_input = audio_input
         self._heard = heard
         self._joined = joined
         self._hearing = hearing
@@ -113,7 +113,7 @@ class Listeners:
                 identity, self._heard, self._hearing(identity, session) if self._hearing else None
             ),
             room=self._room,
-            room_options=listener_options(identity, self._sample_rate),
+            room_options=listener_options(identity, self.audio_input),
             record=False,
         )
         log.info("listening to participant", extra={"participant": identity})

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.machinery
 import json
+import sys
+import types
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -10,6 +13,7 @@ from typing import Any, cast
 
 import pytest
 from dafter_core.hashing import seal
+from dafter_providers import krisp
 from dafter_runtime.captions import Captions
 from dafter_runtime.events import SessionEvents
 from dafter_runtime.plan import Plan, load, plan
@@ -27,8 +31,11 @@ def sarvam_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SARVAM_API_KEY", "test-only-not-a-key")
 
 
-def live_plan() -> Plan:
+def live_plan(**pipeline: str) -> Plan:
     doc = json.loads(JOB.read_bytes())
+    if pipeline:
+        doc["agent"]["addressing"]["mode"] = "always"
+        doc["agent"]["pipeline"].update(pipeline)
     doc["agent"]["pipeline"]["tts"]["options"]["prewarm"] = False
     doc["agent"]["pipeline"]["llm"]["options"]["prewarm"] = False
     doc["transcription"] = {"mode": "live", "consentArtifactId": "consent_tr"}
@@ -110,3 +117,31 @@ def test_everyone_human_is_transcribed_while_they_are_in_the_call() -> None:
     calls, ctx = asyncio.run(run())
     assert calls == [("join", ASHA), ("join", RAVI), ("leave", ASHA)]
     assert len(ctx.shutdown) == 1
+
+
+def test_every_listener_hears_through_the_planned_noise_filter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plugin = types.ModuleType(krisp.PLUGIN)
+    plugin.__spec__ = importlib.machinery.ModuleSpec(krisp.PLUGIN, None)
+    for model in krisp.MODELS.values():
+        setattr(plugin, model, lambda model=model: rtc.NoiseCancellationOptions(model, {}))
+    monkeypatch.setitem(sys.modules, krisp.PLUGIN, plugin)
+
+    async def run() -> tuple[int, bool]:
+        p = live_plan(noiseFilter="nc")
+        stages = build(p)
+
+        async def publish(body: bytes) -> None:
+            return None
+
+        events = SessionEvents(p.config, publish)
+        ctx = Ctx(Room())
+        transcribing = Transcribing(cast(Any, ctx), p, stages, Captions(events.emit, None), 16000)
+        audio = transcribing.listeners.audio_input
+        await stages.stt.aclose()
+        await stages.tts.aclose()
+        await stages.llm.aclose()
+        return audio.sample_rate, audio.noise_cancellation is not None
+
+    assert asyncio.run(run()) == (16000, True)

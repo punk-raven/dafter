@@ -5,9 +5,16 @@ import tempfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
+from typing import Any
 
 from dafter_core.config import ProviderRef
 from dafter_core.enums import Stage
+from dafter_core.errors import DafterError
+from dafter_core.versioning import version_label
+from livekit.agents import AgentSession
+from livekit.agents.voice.events import AgentFalseInterruptionEvent, SpeechCreatedEvent
+from livekit.agents.voice.speech_handle import SpeechHandle
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram
 
 from .cost import UNITS, Item, model_name, provider_name
@@ -41,12 +48,57 @@ LAYER_BUCKETS = (
 )
 SESSION_COST_BUCKETS = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0)
 
-PLACE = ("language", "channel")
+PLACE = ("language", "channel", "version")
 PIPELINE = (*PLACE, "stt", "llm", "tts")
 SPEND = (*PLACE, "stage", "provider", "model")
 UNPRICED = (*SPEND, "unit")
+FAILING = (*PLACE, "component", "vendor")
+FAILING_STAGES = (Stage.STT, Stage.LLM, Stage.TTS, Stage.CONTROL)
+NO_VENDOR = "none"
+PROGRAMMATIC = "programmatic"
 
 ItemKey = tuple[str, str, str, str]
+
+
+class Moment(StrEnum):
+    INTERRUPTION = "interruption"
+    FALSE_INTERRUPTION = "false_interruption"
+    BACKCHANNEL_SUPPRESSED = "backchannel_suppressed"
+    BACKCHANNEL_ANSWERED = "backchannel_answered"
+    FILLER_PLAYED = "filler_played"
+    PROVIDER_SWITCHED = "provider_switched"
+
+
+MOMENT_SERIES = {
+    Moment.INTERRUPTION: (
+        "dafter_agent_interruptions",
+        "Agent replies the user's voice cut off: audio activity or a committed user turn, never "
+        "code stopping the reply.",
+    ),
+    Moment.FALSE_INTERRUPTION: (
+        "dafter_agent_false_interruptions",
+        "Times the agent stopped or paused for a voice over it and no user turn followed.",
+    ),
+    Moment.BACKCHANNEL_SUPPRESSED: (
+        "dafter_agent_backchannels_suppressed",
+        "Acknowledgements said over the agent's reply that were held back instead of "
+        "interrupting it.",
+    ),
+    Moment.BACKCHANNEL_ANSWERED: (
+        "dafter_agent_backchannel_answers",
+        "Held-back acknowledgements that turned out to answer the agent's question and were "
+        "released as a user turn.",
+    ),
+    Moment.FILLER_PLAYED: (
+        "dafter_agent_filler_plays",
+        "Agent turns that played a filler before the reply.",
+    ),
+    Moment.PROVIDER_SWITCHED: (
+        "dafter_agent_provider_switches",
+        "Times an LLM or TTS stage marked a provider unavailable and moved along its fallback "
+        "chain.",
+    ),
+}
 
 
 class WorkerMetrics:
@@ -91,11 +143,22 @@ class WorkerMetrics:
             UNPRICED,
             registry=registry,
         )
+        self.moments = {
+            moment: Counter(name, about, PLACE, registry=registry)
+            for moment, (name, about) in MOMENT_SERIES.items()
+        }
+        self.provider_errors = Counter(
+            "dafter_agent_provider_errors",
+            "Pipeline stage failures a vendor adapter classified, retried or given up, by the "
+            "component that failed and the vendor behind it.",
+            FAILING,
+            registry=registry,
+        )
 
 
 def vendor(ref: ProviderRef | None) -> str:
     if ref is None:
-        return "none"
+        return NO_VENDOR
     return f"{provider_name(ref.provider)}/{model_name(ref.model or '')}"
 
 
@@ -117,21 +180,63 @@ def exposition(env: Mapping[str, str] = os.environ) -> Exposition | None:
     return Exposition(port=int(raw), multiproc_dir=shared)
 
 
+def cut_by_user(speech: SpeechHandle) -> bool:
+    if not speech.interrupted:
+        return False
+    return getattr(speech, "_interrupt_source", None) not in (None, PROGRAMMATIC)
+
+
 class SessionMetrics:
-    def __init__(self, metrics: WorkerMetrics, p: Plan) -> None:
+    def __init__(
+        self, metrics: WorkerMetrics, p: Plan, session: AgentSession[Any] | None = None
+    ) -> None:
         cfg = p.config
         self._metrics = metrics
-        self._place = (cfg.language, str(cfg.channel))
-        self._pipeline = (
-            *self._place,
-            vendor(p.pipeline.stt),
-            vendor(p.pipeline.llm),
-            vendor(p.pipeline.tts),
-        )
+        self._place = (cfg.language, str(cfg.channel), version_label(cfg.version))
+        self._vendors = {
+            Stage.STT: vendor(p.pipeline.stt),
+            Stage.LLM: vendor(p.pipeline.llm),
+            Stage.TTS: vendor(p.pipeline.tts),
+        }
+        self._pipeline = (*self._place, *self._vendors.values())
+        primaries = {
+            Stage.LLM: p.pipeline.llm.provider if p.pipeline.llm else None,
+            Stage.TTS: p.pipeline.tts.provider if p.pipeline.tts else None,
+        }
+        self._fallbacks = {
+            (stage, failover.ref.provider): vendor(failover.ref)
+            for stage, chain in p.fallbacks.items()
+            for failover in chain
+            if failover.ref.provider != primaries.get(stage)
+        }
         self._spent: dict[ItemKey, Decimal] = {}
         self._zero(p)
+        if session is not None:
+            self._follow(session)
+        SERVING.session = self
+
+    def _follow(self, session: AgentSession[Any]) -> None:
+        def speech_created(ev: SpeechCreatedEvent) -> None:
+            ev.speech_handle.add_done_callback(self._speech_done)
+
+        def false_interruption(_: AgentFalseInterruptionEvent) -> None:
+            self.count(Moment.FALSE_INTERRUPTION)
+
+        session.on("speech_created", speech_created)
+        session.on("agent_false_interruption", false_interruption)
+
+    def _speech_done(self, speech: SpeechHandle) -> None:
+        if cut_by_user(speech):
+            self.count(Moment.INTERRUPTION)
 
     def _zero(self, p: Plan) -> None:
+        for counter in self._metrics.moments.values():
+            counter.labels(*self._place)
+        for stage in FAILING_STAGES:
+            failing = self._vendors.get(stage, NO_VENDOR)
+            self._metrics.provider_errors.labels(*self._place, str(stage), failing)
+        for (stage, _), failing in self._fallbacks.items():
+            self._metrics.provider_errors.labels(*self._place, str(stage), failing)
         for layer in PAYLOAD_FIELDS:
             self._metrics.layers.labels(layer, *self._pipeline)
         self._metrics.serial_checked.labels(*self._pipeline)
@@ -163,6 +268,20 @@ class SessionMetrics:
             self._metrics.serial_checked.labels(*self._pipeline).inc()
         if serial:
             self._metrics.serial.labels(*self._pipeline).inc()
+        if timing.filler:
+            self.count(Moment.FILLER_PLAYED)
+
+    def count(self, moment: Moment) -> None:
+        self._metrics.moments[moment].labels(*self._place).inc()
+
+    def failing(self, stage: Stage, err: DafterError) -> str:
+        named = err.provider.name if err.provider is not None else None
+        return self._fallbacks.get((stage, named or ""), self._vendors.get(stage, NO_VENDOR))
+
+    def degraded(self, stage: Stage, err: DafterError, recoverable: bool) -> dict[str, Any]:
+        failing = self.failing(stage, err)
+        self._metrics.provider_errors.labels(*self._place, str(stage), failing).inc()
+        return {"error": err.to_dict(), "recoverable": recoverable}
 
     def usage(self, items: Iterable[Item]) -> None:
         for item in items:
@@ -183,6 +302,21 @@ class SessionMetrics:
             if item.cost is None:
                 labels = (*self._place, str(item.stage), item.provider, item.model, str(item.unit))
                 self._metrics.unpriced.labels(*labels).inc()
+        if SERVING.session is self:
+            SERVING.session = None
+
+
+@dataclass(slots=True)
+class Serving:
+    session: SessionMetrics | None = None
+
+
+SERVING = Serving()
+
+
+def counted(moment: Moment) -> None:
+    if SERVING.session is not None:
+        SERVING.session.count(moment)
 
 
 WORKER = WorkerMetrics()

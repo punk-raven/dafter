@@ -34,6 +34,7 @@ def called_plan(**turn: Any) -> Plan:
 
 
 SEMANTIC = {"strategy": "semantic", "localVadEnabled": True}
+PROVIDER_ENDPOINTING = {"strategy": "provider_endpointing", "localVadEnabled": False}
 
 
 def with_stages(p: Plan, check: Callable[[Stages], list[AgentSession[Any]]]) -> None:
@@ -69,7 +70,7 @@ def test_every_listener_shares_the_one_vad_and_turn_detector_and_has_its_own_rec
 
 def test_a_listener_ends_turns_on_the_recognizer_and_keeps_the_vad_for_barge_in() -> None:
     def check(stages: Stages) -> list[AgentSession[Any]]:
-        listener = listening(called_plan(), stages)()
+        listener = listening(called_plan(**PROVIDER_ENDPOINTING), stages)()
         assert listener.turn_detection == "stt"
         assert listener.vad is stages.vad
         interruption = listener.options.interruption
@@ -77,7 +78,7 @@ def test_a_listener_ends_turns_on_the_recognizer_and_keeps_the_vad_for_barge_in(
         assert listener.options.preemptive_generation["enabled"] is False
         return [listener]
 
-    with_stages(called_plan(), check)
+    with_stages(called_plan(**PROVIDER_ENDPOINTING), check)
 
 
 def test_the_voice_session_generates_preemptively_and_speaks_sentence_by_sentence() -> None:

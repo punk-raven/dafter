@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from dafter_core.enums import ErrorCode
 from dafter_core.errors import DafterError
 
+from .guardrails import guardrail_rules
+
 DEFAULT_REF = "persona://default"
 
 
@@ -175,6 +177,8 @@ def _hindi(talk: Talk) -> str:
         + _LISTENING
         + _ACKNOWLEDGE
         + _HONEST
+        + " "
+        + guardrail_rules("hi")
     )
 
 
@@ -189,6 +193,8 @@ def _english(talk: Talk) -> str:
         + _LISTENING
         + _ACKNOWLEDGE
         + _HONEST
+        + " "
+        + guardrail_rules("en")
     )
 
 
@@ -203,6 +209,8 @@ def _kannada(talk: Talk) -> str:
         + _LISTENING
         + _ACKNOWLEDGE
         + _HONEST
+        + " "
+        + guardrail_rules("kn")
     )
 
 
@@ -218,7 +226,7 @@ def _marathi(talk: Talk) -> str:
         + "Say prices, amounts, dates and times in Marathi words the way they are said aloud, "
         "for example पाचशे रुपये or साडेदहा वाजता, and phone or order numbers in English words "
         "written in Latin script, one digit at a time like nine eight four five; never write "
-        "digits. " + _LISTENING + _ACKNOWLEDGE + _HONEST
+        "digits. " + _LISTENING + _ACKNOWLEDGE + _HONEST + " " + guardrail_rules("mr")
     )
 
 
@@ -233,6 +241,8 @@ def _telugu(talk: Talk) -> str:
         + _LISTENING
         + _ACKNOWLEDGE
         + _HONEST
+        + " "
+        + guardrail_rules("te")
     )
 
 

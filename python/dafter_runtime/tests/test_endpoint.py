@@ -140,6 +140,7 @@ def test_the_worker_takes_the_endpoint_its_speech_to_text_held() -> None:
         "layer": "endpoint",
         "language": "hi",
         "channel": "webrtc",
+        "version": "nivya-v1",
         "stt": "sarvam/saaras:v3-realtime",
         "llm": "sarvam/sarvam-105b",
         "tts": "sarvam/bulbul:v3",

@@ -22,6 +22,7 @@ from livekit.agents import (
 from livekit.agents.types import NOT_GIVEN, NotGivenOr
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
+PROVIDER_ENDPOINTING = {"strategy": "provider_endpointing", "localVadEnabled": False}
 
 
 class OfflineLLM(llm.LLM[Any]):
@@ -86,7 +87,7 @@ def test_the_session_catches_barge_in_on_the_local_vad_and_ends_turns_on_the_rec
         ]
         assert callable(transforms[2])
 
-    check_session(offline_plan(), check)
+    check_session(offline_plan(**PROVIDER_ENDPOINTING), check)
 
 
 def test_a_semantic_session_runs_the_on_device_detector_with_dynamic_endpointing() -> None:

@@ -1,21 +1,32 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
 import sys
 import textwrap
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
-from dafter_core.enums import Stage, UsageUnit
+from dafter_core.enums import ErrorCode, Stage, UsageUnit
+from dafter_core.errors import DafterError, ProviderContext
+from dafter_core.hashing import seal
+from dafter_runtime.barge_in import BargeIn, Resume
 from dafter_runtime.cost import Item, load_prices, priced
 from dafter_runtime.metrics import (
+    MOMENT_SERIES,
     MULTIPROC_ENV,
     PORT_ENV,
+    SERVING,
+    Moment,
     SessionMetrics,
     WorkerMetrics,
+    counted,
     exposition,
 )
 from dafter_runtime.plan import Plan, load, plan
@@ -25,14 +36,16 @@ from prometheus_client import CollectorRegistry
 from prometheus_client.multiprocess import MultiProcessCollector
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
+VERSION = "nivya-v1"
 PIPELINE = {
     "language": "hi",
     "channel": "webrtc",
+    "version": VERSION,
     "stt": "sarvam/saaras:v3-realtime",
     "llm": "sarvam/sarvam-105b",
     "tts": "sarvam/bulbul:v3",
 }
-PLACE = {"language": "hi", "channel": "webrtc"}
+PLACE = {"language": "hi", "channel": "webrtc", "version": VERSION}
 LLM = {**PLACE, "stage": "llm", "provider": "sarvam", "model": "sarvam-105b"}
 
 
@@ -230,3 +243,150 @@ def test_a_layer_of_a_few_milliseconds_lands_in_its_own_bucket() -> None:
     assert registry.get_sample_value(bucket, {**labels, "le": "0.005"}) == 1
     for le in ("0.01", "0.025", "0.05"):
         assert registry.get_sample_value(bucket, {**labels, "le": le}) == 1
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.handlers: dict[str, Callable[[Any], None]] = {}
+
+    def on(self, event: str, handler: Callable[[Any], None]) -> None:
+        self.handlers[event] = handler
+
+    def speech_ends(self, interrupted: bool, source: str | None) -> None:
+        def add_done_callback(done: Callable[[Any], None]) -> None:
+            done(speech)
+
+        speech = SimpleNamespace(
+            interrupted=interrupted,
+            _interrupt_source=source,
+            add_done_callback=add_done_callback,
+        )
+        self.handlers["speech_created"](SimpleNamespace(speech_handle=speech))
+
+
+def moment_total(registry: CollectorRegistry, moment: Moment) -> float | None:
+    return registry.get_sample_value(f"{MOMENT_SERIES[moment][0]}_total", PLACE)
+
+
+def provider_errors(registry: CollectorRegistry, component: str, vendor: str) -> float | None:
+    labels = {**PLACE, "component": component, "vendor": vendor}
+    return registry.get_sample_value("dafter_agent_provider_errors_total", labels)
+
+
+def test_every_quality_series_reads_zero_before_the_first_turn() -> None:
+    registry, _ = fresh()
+    for moment in Moment:
+        assert moment_total(registry, moment) == 0
+    for stage in ("stt", "llm", "tts"):
+        assert provider_errors(registry, stage, PIPELINE[stage]) == 0
+    assert provider_errors(registry, "control", "none") == 0
+
+
+def test_a_moment_counted_anywhere_in_the_process_lands_on_the_serving_session() -> None:
+    registry, session = fresh()
+    counted(Moment.BACKCHANNEL_SUPPRESSED)
+    counted(Moment.BACKCHANNEL_SUPPRESSED)
+    counted(Moment.BACKCHANNEL_ANSWERED)
+    assert moment_total(registry, Moment.BACKCHANNEL_SUPPRESSED) == 2
+    assert moment_total(registry, Moment.BACKCHANNEL_ANSWERED) == 1
+    session.closed([])
+    assert SERVING.session is None
+    counted(Moment.BACKCHANNEL_SUPPRESSED)
+    assert moment_total(registry, Moment.BACKCHANNEL_SUPPRESSED) == 2
+
+
+def test_a_turn_that_played_a_filler_is_counted() -> None:
+    registry, session = fresh()
+    session.turn(TurnTiming(turn=0, interrupted=False, seconds={}, filler=True))
+    session.turn(TurnTiming(turn=1, interrupted=False, seconds={}))
+    assert moment_total(registry, Moment.FILLER_PLAYED) == 1
+
+
+def test_a_degraded_stage_is_counted_under_its_vendor_and_keeps_the_event_payload() -> None:
+    registry, session = fresh()
+    err = DafterError(ErrorCode.PROVIDER_TIMEOUT, "tts timed out", Stage.TTS, ProviderContext("x"))
+    assert session.degraded(Stage.TTS, err, True) == {"error": err.to_dict(), "recoverable": True}
+    session.degraded(Stage.CONTROL, err, False)
+    assert provider_errors(registry, "tts", PIPELINE["tts"]) == 1
+    assert provider_errors(registry, "control", "none") == 1
+    assert provider_errors(registry, "llm", PIPELINE["llm"]) == 0
+
+
+def test_only_a_reply_the_user_cut_off_counts_as_an_interruption() -> None:
+    registry = CollectorRegistry()
+    fake = FakeSession()
+    SessionMetrics(WorkerMetrics(registry), hindi_plan(), cast(Any, fake))
+    fake.speech_ends(interrupted=True, source="audio_activity")
+    fake.speech_ends(interrupted=True, source="user_turn")
+    fake.speech_ends(interrupted=True, source="programmatic")
+    fake.speech_ends(interrupted=False, source=None)
+    assert moment_total(registry, Moment.INTERRUPTION) == 2
+
+
+def test_the_frameworks_false_interruption_is_counted() -> None:
+    registry = CollectorRegistry()
+    fake = FakeSession()
+    SessionMetrics(WorkerMetrics(registry), hindi_plan(), cast(Any, fake))
+    fake.handlers["agent_false_interruption"](SimpleNamespace(resumed=True))
+    assert moment_total(registry, Moment.FALSE_INTERRUPTION) == 1
+
+
+def test_a_paused_reply_resumed_with_no_words_is_a_false_interruption() -> None:
+    registry, _ = fresh()
+    timers: list[Callable[[], None]] = []
+
+    def schedule(_: float, callback: Callable[[], None]) -> Any:
+        timers.append(callback)
+        return SimpleNamespace(cancel=lambda: None)
+
+    barge_in = BargeIn(
+        0.25,
+        0,
+        lambda: "p_4b81e0d7",
+        lambda: None,
+        lambda: 1000.0,
+        schedule,
+        resume=Resume(lambda: True, lambda: None, 2.0),
+    )
+    barge_in.speaking("p_4b81e0d7", 1000.0)
+    timers.pop()()
+    barge_in.quiet("p_4b81e0d7")
+    timers.pop()()
+    assert moment_total(registry, Moment.FALSE_INTERRUPTION) == 1
+
+
+def test_quality_counting_adds_no_series_beyond_the_ones_a_session_started_with() -> None:
+    registry, session = fresh()
+    before = series(registry)
+    for moment in Moment:
+        session.count(moment)
+    err = DafterError(ErrorCode.PROVIDER_TIMEOUT, "stt timed out", Stage.STT)
+    for stage in (Stage.STT, Stage.LLM, Stage.TTS, Stage.CONTROL):
+        session.degraded(stage, err, True)
+    assert series(registry) == before
+
+
+def versioned_plan(version: dict[str, Any] | None) -> Plan:
+    doc = json.loads(JOB.read_bytes())
+    doc.pop("version", None)
+    if version is not None:
+        doc["version"] = version
+    sealed, _ = seal(json.dumps(doc))
+    return plan(load(sealed), "dafter-py")
+
+
+@pytest.mark.parametrize(
+    ("version", "label"),
+    [({"id": "support-v4", "candidate": True}, "support-v4"), (None, "none")],
+    ids=["candidate", "unversioned"],
+)
+def test_every_series_carries_the_version_the_session_runs(
+    version: dict[str, Any] | None, label: str
+) -> None:
+    registry = CollectorRegistry()
+    session = SessionMetrics(WorkerMetrics(registry), versioned_plan(version))
+    session.count(Moment.FILLER_PLAYED)
+    place = {**PLACE, "version": label}
+    assert registry.get_sample_value(f"{MOMENT_SERIES[Moment.FILLER_PLAYED][0]}_total", place) == 1
+    e2e = {"layer": "e2e_latency", **PIPELINE, "version": label}
+    assert registry.get_sample_value("dafter_agent_turn_layer_seconds_count", e2e) == 0

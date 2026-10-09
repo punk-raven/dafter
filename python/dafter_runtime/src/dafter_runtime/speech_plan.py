@@ -8,12 +8,18 @@ from dafter_core.enums import SpeechNormalization
 from dafter_core.speech import Speech
 from livekit.agents.voice.transcription.text_transforms import TextTransforms
 
-from . import spoken_hindi
+from . import spoken_english, spoken_hindi, spoken_kannada, spoken_marathi, spoken_telugu
 from .personas import base_language
 
 Normalizer = Callable[[str], str]
 
-NORMALIZERS: Mapping[str, Normalizer] = {"hi": spoken_hindi.normalize}
+NORMALIZERS: Mapping[str, Normalizer] = {
+    "en": spoken_english.normalize,
+    "hi": spoken_hindi.normalize,
+    "kn": spoken_kannada.normalize,
+    "mr": spoken_marathi.normalize,
+    "te": spoken_telugu.normalize,
+}
 FRAMEWORK_TRANSFORMS: tuple[TextTransforms, ...] = ("filter_markdown", "filter_emoji")
 
 SENTENCE_END = re.compile(r"[.!?\u0964\u0965][\"'\u201d\u2019)\]]*\s+(?![\d\u20b9])|\n")

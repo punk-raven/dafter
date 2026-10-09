@@ -14,7 +14,7 @@ from livekit.agents import llm as lk_llm
 from livekit.agents.voice.generation import update_instructions
 
 from .answering import Roster
-from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowledged
+from .backchannel import Acknowledgements, Events, Filter, Floor, SessionFloor, acknowledged
 from .consent import Confirmations
 from .delivery import Delivery
 from .everyday import current_time, go_quiet, switch_language, who_is_here
@@ -63,7 +63,7 @@ class Answering(Agent):
         self._acknowledgements = acknowledgements
         self._delivery = delivery
         self._switching = switching if switching is not None and switching.enabled else None
-        self._floor: SessionFloor | None = None
+        self._floor: Floor | None = None
         self._ear: Filter | None = None
         self._memory: Memory | None = None
 
@@ -89,7 +89,7 @@ class Answering(Agent):
             events = self._switching.observe()(events)
         if self._floor is None:
             self._floor = SessionFloor(self.session)
-        return acknowledged(self._acknowledgements, self._floor)(events)
+        return acknowledged(self._acknowledgements, self._floor, cuts=True)(events)
 
     def _remembered(self, chat_ctx: lk_llm.ChatContext) -> lk_llm.ChatContext:
         if self._memory is None:

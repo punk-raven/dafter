@@ -101,7 +101,7 @@ def test_the_provider_mode_leaves_digits_for_tts() -> None:
 
 
 def test_a_language_without_rules_passes_through() -> None:
-    p = SpeechPlan(Speech(), "en-IN")
+    p = SpeechPlan(Speech(), "ta-IN")
     assert p.spoken("It costs ₹500.") == "It costs ₹500."
 
 

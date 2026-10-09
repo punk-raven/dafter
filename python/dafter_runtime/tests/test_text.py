@@ -102,7 +102,7 @@ def test_a_text_session_reports_its_turns_and_what_they_cost() -> None:
     )
     assert json.loads(sent[-1])["type"] == "session.usage"
 
-    place = {"language": "hi", "channel": "webrtc"}
+    place = {"language": "hi", "channel": "webrtc", "version": "nivya-v1"}
     ttft = {
         "layer": "llm_node_ttft",
         **place,

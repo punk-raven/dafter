@@ -21,13 +21,14 @@ from .backchannel import Acknowledgements, Events, Filter, SessionFloor, acknowl
 from .barge_in import BargeIn, Resume, follow
 from .captions import Captions
 from .delivery import Delivery
+from .lexicon import Lexicon
 from .listeners import Listeners, is_human, listener_session
 from .naming import Matcher
 from .noise import Meaning
 from .plan import Plan
 from .plausible import Plausible
 from .presence import ALONE_GRACE_S, Alone
-from .stages import Stages, hearing
+from .stages import Stages, filtered_input, hearing
 from .switching import Switching
 
 log = logging.getLogger("dafter.runtime.called")
@@ -78,6 +79,7 @@ def barge_in_for(p: Plan, gate: Gate, voice: Voice, loop: asyncio.AbstractEventL
         resume=resume_for(p, voice),
         waits_for_words=Acknowledgements.of(interruption.backchannel) is not None,
         meaning=meaning_for(p),
+        lexicon=Lexicon.of(interruption.backchannel),
     )
 
 
@@ -137,7 +139,7 @@ class Called:
         self.listeners = Listeners(
             ctx.room,
             listening(p, stages),
-            sample_rate,
+            filtered_input(p, sample_rate),
             self._heard,
             self._listening,
             self._hearing,

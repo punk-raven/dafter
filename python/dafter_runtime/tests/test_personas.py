@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from dafter_runtime.guardrails import guardrail_rules
 from dafter_runtime.personas import (
     CASUAL_ENGLISH,
     CASUAL_TALK,
@@ -126,3 +127,13 @@ def test_replies_stay_short_unless_a_story_or_detail_is_asked_for(ref: str, lang
     assert "a story, an explanation or more detail" in instructions
     assert "finish it rather than stopping halfway" in instructions
     assert "Keep every reply to one or two" not in instructions
+
+
+@pytest.mark.parametrize(("ref", "language"), EVERY)
+@pytest.mark.parametrize("name", [NAME, None])
+def test_every_persona_carries_the_guardrails_of_its_language(
+    ref: str, language: str, name: str | None
+) -> None:
+    instructions = persona_for(ref, language, name).instructions
+    assert guardrail_rules(language) in instructions
+    assert instructions.count("that you are an AI") == 1

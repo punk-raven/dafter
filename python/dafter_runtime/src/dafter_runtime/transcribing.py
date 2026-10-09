@@ -13,7 +13,7 @@ from .called import listening
 from .captions import Captions
 from .listeners import Listeners, is_human
 from .plan import Plan
-from .stages import Stages
+from .stages import Stages, filtered_input
 
 
 class Transcribing:
@@ -23,7 +23,11 @@ class Transcribing:
         self._ctx = ctx
         self._captions = captions
         self.listeners = Listeners(
-            ctx.room, listening(p, stages), sample_rate, self._heard, captions.follow
+            ctx.room,
+            listening(p, stages),
+            filtered_input(p, sample_rate),
+            self._heard,
+            captions.follow,
         )
         self._tasks: set[asyncio.Task[None]] = set()
 

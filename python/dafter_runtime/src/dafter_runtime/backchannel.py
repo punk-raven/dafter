@@ -11,6 +11,8 @@ from livekit.agents import AgentSession, llm, stt
 from livekit.agents.voice.events import AgentStateChangedEvent
 from livekit.agents.voice.speech_handle import SpeechHandle
 
+from .lexicon import Lexicon, phrases
+from .metrics import Moment, counted
 from .naming import words
 
 Clock = Callable[[], float]
@@ -30,23 +32,34 @@ AFTER_QUESTION = " \t\n\"')]\u00bb\u201d\u2019\u0964\u0965"
 
 
 class Acknowledgements:
-    def __init__(self, phrases: Iterable[str], max_words: int, answer_within: float) -> None:
-        self._phrases = frozenset(p for p in (words(text) for text in phrases) if p)
+    def __init__(
+        self,
+        listed: Iterable[str],
+        max_words: int,
+        answer_within: float,
+        lexicon: Lexicon | None = None,
+    ) -> None:
+        self._lexicon = lexicon if lexicon is not None else Lexicon(listed, ())
+        self._phrases = (phrases(listed) | self._lexicon.affirmatives) - self._lexicon.negatives
         self._max_words = max_words
         self.answer_within = answer_within
 
     @classmethod
     def of(cls, backchannel: Backchannel) -> Acknowledgements | None:
-        phrases = every_phrase(backchannel.words)
-        if not backchannel.enabled or not phrases:
+        listed = every_phrase(backchannel.words)
+        if not backchannel.enabled or not listed:
             return None
-        return cls(phrases, backchannel.max_words, backchannel.answer_within_ms / 1000)
+        lexicon = Lexicon.of(backchannel)
+        return cls(listed, backchannel.max_words, backchannel.answer_within_ms / 1000, lexicon)
 
     def only(self, text: str, finished: bool) -> bool:
         said = words(text)
-        if not said or len(said) > self._max_words:
+        if not said or len(said) > self._max_words or self._lexicon.negates(said):
             return False
         return self._covers(said, 0, finished)
+
+    def yields(self, text: str) -> bool:
+        return self._lexicon.yields(words(text))
 
     def _covers(self, said: tuple[str, ...], at: int, finished: bool) -> bool:
         if at == len(said):
@@ -113,6 +126,8 @@ class Reply:
 class Floor(Protocol):
     def held(self) -> bool: ...
 
+    def cut(self) -> None: ...
+
     def heard(self) -> Reply | None: ...
 
 
@@ -127,6 +142,11 @@ class SessionFloor:
 
     def held(self) -> bool:
         return holds_floor(self._session)
+
+    def cut(self) -> None:
+        speech = self._session.current_speech
+        if speech is not None and speech.allow_interruptions and holds_floor(self._session):
+            speech.interrupt(source="audio_activity")
 
     def heard(self) -> Reply | None:
         if self._speech is None or self._speech is not self._session.current_speech:
@@ -161,10 +181,12 @@ class Sieve:
         acknowledgements: Acknowledgements,
         floor: Floor,
         dropped: Callable[[], None] | None = None,
+        cuts: bool = False,
     ) -> None:
         self._acknowledgements = acknowledgements
         self._floor = floor
         self._dropped = dropped
+        self._cuts = cuts
         self._held: list[stt.SpeechEvent] = []
         self._finals: list[str] = []
         self._doubt = False
@@ -208,15 +230,21 @@ class Sieve:
     def _transcript(self, event: stt.SpeechEvent) -> list[stt.SpeechEvent]:
         if not self._doubt:
             if self._passing or not self._floor.held():
+                self._cut_if_yielding(text_of(event))
                 return [event]
             self._doubt_over()
         final = event.type is stt.SpeechEventType.FINAL_TRANSCRIPT
         said = " ".join([*self._finals, text_of(event)])
         if not self._floor.held() or not self._acknowledgements.only(said, finished=final):
+            self._cut_if_yielding(said)
             return self._release(event)
         if final:
             self._finals.append(text_of(event))
         return self._hold(event)
+
+    def _cut_if_yielding(self, said: str) -> None:
+        if self._cuts and self._floor.held() and self._acknowledgements.yields(said):
+            self._floor.cut()
 
     def _drop(self, event: stt.SpeechEvent) -> None:
         acknowledged = bool(self._finals)
@@ -225,6 +253,7 @@ class Sieve:
         self._reset()
         if not acknowledged:
             return
+        counted(Moment.BACKCHANNEL_SUPPRESSED)
         if self._dropped is not None:
             self._dropped()
         if over is not None and over is self._floor.heard():
@@ -238,6 +267,7 @@ class Sieve:
         self._pending = None
         left = pending.reply.played() - pending.played
         if asked and left <= self._acknowledgements.answer_within:
+            counted(Moment.BACKCHANNEL_ANSWERED)
             self._answers.extend(pending.events)
             self.answering.set()
 
@@ -299,11 +329,12 @@ def acknowledged(
     acknowledgements: Acknowledgements | None,
     floor: Floor,
     dropped: Callable[[], None] | None = None,
+    cuts: bool = False,
 ) -> Filter:
     def apply(events: Events) -> Events:
         if acknowledgements is None:
             return events
-        return sieved(events, Sieve(acknowledgements, floor, dropped))
+        return sieved(events, Sieve(acknowledgements, floor, dropped, cuts))
 
     return apply
 

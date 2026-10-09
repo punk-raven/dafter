@@ -36,10 +36,9 @@ def test_the_pinned_hindi_job_plans_the_sarvam_cascade() -> None:
     p = plan(load(job()), POOL)
     assert (p.stt.name, p.llm.name, p.tts.name) == ("sarvam", "sarvam", "sarvam")
     assert p.vad is not None and p.vad.name == "silero"
-    assert p.turn_detection == "stt"
+    assert p.turn_detection == "semantic"
     assert p.turn_handling == {
-        "turn_detection": "stt",
-        "endpointing": {"mode": "fixed", "min_delay": 0.0, "max_delay": 2.5},
+        "endpointing": {"mode": "dynamic", "min_delay": 0.0, "max_delay": 2.5},
         "preemptive_generation": {"enabled": True, "preemptive_tts": True},
         "interruption": {
             "enabled": True,
@@ -118,12 +117,12 @@ def test_a_job_for_another_pool_is_refused() -> None:
             "/turn/strategy",
         ),
         (
-            lambda d: d["turn"].update(strategy="semantic"),
+            lambda d: d["turn"].update(strategy="semantic", localVadEnabled=False),
             ErrorCode.INVALID_CONFIG,
             "/turn/localVadEnabled",
         ),
         (
-            lambda d: d["turn"].update(localVadEnabled=True),
+            lambda d: d["turn"].update(strategy="provider_endpointing", localVadEnabled=True),
             ErrorCode.INVALID_CONFIG,
             "/turn/localVadEnabled",
         ),
@@ -181,12 +180,15 @@ def test_an_encrypted_room_without_the_shared_key_model_is_refused() -> None:
 
 
 def test_auto_resolves_to_provider_endpointing_for_a_recognizer_that_endpoints() -> None:
-    p = plan(load(variant(lambda d: d["turn"].update(strategy="auto"))), POOL)
+    p = plan(
+        load(variant(lambda d: d["turn"].update(strategy="auto", localVadEnabled=False))), POOL
+    )
     assert p.turn_detection == "stt"
 
 
 def test_a_session_without_the_interruption_vad_plans_no_local_vad() -> None:
     def off(d: dict[str, Any]) -> None:
+        d["turn"].update(strategy="provider_endpointing", localVadEnabled=False)
         d["turn"]["interruption"]["localVadEnabled"] = False
         d["agent"]["pipeline"].pop("vad")
 

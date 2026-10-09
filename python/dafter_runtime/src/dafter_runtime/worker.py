@@ -7,7 +7,7 @@ from typing import Any
 
 from dafter_core.enums import EncryptionMode, EventType, Stage
 from dafter_core.errors import DafterError
-from dafter_providers import Multilingual
+from dafter_providers import Multilingual, prewarm_turn_detectors
 from livekit import local_inference, rtc
 from livekit.agents import (
     AgentServer,
@@ -31,7 +31,6 @@ from livekit.agents.voice.events import (
     SpeechCreatedEvent,
 )
 from livekit.agents.voice.room_io import (
-    AudioInputOptions,
     AudioOutputOptions,
     RoomOptions,
     TextOutputOptions,
@@ -53,7 +52,7 @@ from .metrics import WORKER, SessionMetrics, WorkerMetrics, exposition
 from .plan import Plan, load, plan
 from .scribing import Scribing
 from .speech_plan import SpeechPlan
-from .stages import Stages, build, hearing
+from .stages import Stages, build, filtered_input, hearing
 from .switching import Switching
 from .telephony import PhoneLines, Relink, phone_lines
 from .timing import Turns, TurnTiming
@@ -134,7 +133,7 @@ def room_options(p: Plan, tts_sample_rate: int, captions: Captions | None = None
             close_on_disconnect=False,
         )
     return RoomOptions(
-        audio_input=AudioInputOptions(sample_rate=stt_sample_rate(p)),
+        audio_input=filtered_input(p, stt_sample_rate(p)),
         audio_output=AudioOutputOptions(sample_rate=tts_sample_rate),
         text_output=text_output,
         close_on_disconnect=not p.takes_phone_calls,
@@ -179,7 +178,7 @@ def watch(
     turns = Turns(getattr(session.stt, "take_endpoint", None))
     generated = OutputTokens()
     prices = load_prices()
-    recorder = SessionMetrics(metrics, p)
+    recorder = SessionMetrics(metrics, p, session)
     spent = usage or (lambda: session.usage)
 
     def report_usage(final: bool) -> dict[str, Any]:
@@ -231,7 +230,7 @@ def watch(
         err = vendor.classify(inner, stage) if isinstance(inner, BaseException) else None
         recoverable = bool(getattr(ev.error, "recoverable", False))
         if err is not None:
-            degraded = {"error": err.to_dict(), "recoverable": recoverable}
+            degraded = recorder.degraded(stage, err, recoverable)
             events.emit(EventType.PROVIDER_DEGRADED, degraded, current_trace_id())
         log.error(
             "pipeline stage failed",
@@ -454,6 +453,7 @@ def spent(
 def prewarm(proc: JobProcess) -> None:
     local_inference.init_vad()
     local_inference.init_eot()
+    prewarm_turn_detectors()
 
 
 def server() -> AgentServer:

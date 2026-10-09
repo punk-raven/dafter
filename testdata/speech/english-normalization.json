@@ -1,0 +1,185 @@
+{
+  "reviewed": false,
+  "cases": [
+    {
+      "kind": "currency",
+      "text": "The total is ₹1,25,000.",
+      "spoken": "The total is one lakh twenty five thousand rupees."
+    },
+    {
+      "kind": "currency",
+      "text": "The ticket costs ₹12.50.",
+      "spoken": "The ticket costs twelve rupees fifty paise."
+    },
+    {
+      "kind": "currency",
+      "text": "Just pay Rs. 1 now.",
+      "spoken": "Just pay one rupee now."
+    },
+    {
+      "kind": "currency",
+      "text": "You can borrow up to ₹5 lakh.",
+      "spoken": "You can borrow up to five lakh rupees."
+    },
+    {
+      "kind": "currency",
+      "text": "The flat costs ₹1.5 crore.",
+      "spoken": "The flat costs one and a half crore rupees."
+    },
+    {
+      "kind": "currency",
+      "text": "The fee is 500 rupees.",
+      "spoken": "The fee is five hundred rupees."
+    },
+    {
+      "kind": "currency",
+      "text": "INR 10,000 was sent.",
+      "spoken": "ten thousand rupees was sent."
+    },
+    {
+      "kind": "currency",
+      "text": "Deposit Rs 2,500/- today.",
+      "spoken": "Deposit two thousand five hundred rupees today."
+    },
+    {
+      "kind": "currency",
+      "text": "Rs 2 lakhs is the limit.",
+      "spoken": "two lakh rupees is the limit."
+    },
+    {
+      "kind": "number",
+      "text": "The village has 1,20,500 people.",
+      "spoken": "The village has one lakh twenty thousand five hundred people."
+    },
+    {
+      "kind": "number",
+      "text": "1,23,45,678 votes were cast.",
+      "spoken": "one crore twenty three lakh forty five thousand six hundred seventy eight votes were cast."
+    },
+    {
+      "kind": "number",
+      "text": "The stadium seats 1,250,000 people.",
+      "spoken": "The stadium seats twelve lakh fifty thousand people."
+    },
+    {
+      "kind": "number",
+      "text": "Add 2.5 kg of sugar.",
+      "spoken": "Add two and a half kg of sugar."
+    },
+    {
+      "kind": "date",
+      "text": "Your EMI is due on 05/01/2026.",
+      "spoken": "Your EMI is due on fifth January twenty twenty six."
+    },
+    {
+      "kind": "date",
+      "text": "The meeting is on 2025-12-25.",
+      "spoken": "The meeting is on twenty fifth December twenty twenty five."
+    },
+    {
+      "kind": "date",
+      "text": "India became independent on 15 August 1947.",
+      "spoken": "India became independent on fifteenth August nineteen forty seven."
+    },
+    {
+      "kind": "date",
+      "text": "Republic Day is January 26, 2026.",
+      "spoken": "Republic Day is twenty sixth January twenty twenty six."
+    },
+    {
+      "kind": "date",
+      "text": "Join us on 5th March 2026.",
+      "spoken": "Join us on fifth March twenty twenty six."
+    },
+    {
+      "kind": "time",
+      "text": "The shop opens at 10:00 AM.",
+      "spoken": "The shop opens at ten in the morning."
+    },
+    {
+      "kind": "time",
+      "text": "The train leaves at 18:30.",
+      "spoken": "The train leaves at six thirty in the evening."
+    },
+    {
+      "kind": "time",
+      "text": "Call me at 9:05.",
+      "spoken": "Call me at nine oh five."
+    },
+    {
+      "kind": "time",
+      "text": "Lunch is at 1 PM.",
+      "spoken": "Lunch is at one in the afternoon."
+    },
+    {
+      "kind": "time",
+      "text": "We close at 12:00 PM.",
+      "spoken": "We close at twelve noon."
+    },
+    {
+      "kind": "time",
+      "text": "Be there by 10:00.",
+      "spoken": "Be there by ten o'clock."
+    },
+    {
+      "kind": "phone",
+      "text": "My number is 98765 43210.",
+      "spoken": "My number is nine eight seven six five, four three two one zero."
+    },
+    {
+      "kind": "phone",
+      "text": "Call +91 98765 43210 today.",
+      "spoken": "Call plus nine one, nine eight seven six five, four three two one zero today."
+    },
+    {
+      "kind": "code",
+      "text": "Your OTP is 482910.",
+      "spoken": "Your OTP is four eight two, nine one zero."
+    },
+    {
+      "kind": "percent",
+      "text": "Interest is 8.5%.",
+      "spoken": "Interest is eight and a half percent."
+    },
+    {
+      "kind": "percent",
+      "text": "Interest is 7.25%.",
+      "spoken": "Interest is seven point two five percent."
+    },
+    {
+      "kind": "percent",
+      "text": "Get 50% off.",
+      "spoken": "Get fifty percent off."
+    },
+    {
+      "kind": "ordinal",
+      "text": "He came 1st.",
+      "spoken": "He came first."
+    },
+    {
+      "kind": "ordinal",
+      "text": "This is the 21st century.",
+      "spoken": "This is the twenty first century."
+    },
+    {
+      "kind": "ordinal",
+      "text": "Go to the 2nd floor.",
+      "spoken": "Go to the second floor."
+    },
+    {
+      "kind": "ordinal",
+      "text": "It is her 100th match.",
+      "spoken": "It is her one hundredth match."
+    },
+    {
+      "kind": "indic-digits",
+      "text": "Pay ₹१,२५०.",
+      "spoken": "Pay one thousand two hundred fifty rupees."
+    },
+    {
+      "kind": "untouched",
+      "text": "The COVID-19 vaccine needs 4G.",
+      "spoken": "The COVID-19 vaccine needs 4G."
+    }
+  ]
+}
