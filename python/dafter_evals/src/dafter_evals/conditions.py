@@ -115,7 +115,8 @@ def mulaw_encode(samples: np.ndarray) -> np.ndarray:
     magnitude = np.minimum(np.abs(x), MULAW_CLIP) + MULAW_BIAS
     exponent = np.clip(np.floor(np.log2(magnitude)).astype(np.int32) - 7, 0, 7)
     mantissa = (magnitude >> (exponent + 3)) & 0x0F
-    return (~((sign << 7) | (exponent << 4) | mantissa) & 0xFF).astype(np.uint8)
+    codes: np.ndarray = (~((sign << 7) | (exponent << 4) | mantissa) & 0xFF).astype(np.uint8)
+    return codes
 
 
 def mulaw_decode(codes: np.ndarray) -> np.ndarray:
@@ -138,7 +139,8 @@ def frame_levels_db(samples: np.ndarray, rate: int) -> np.ndarray:
         return np.zeros(0)
     frames = samples[: count * size].astype(np.float64).reshape(count, size) / 32768.0
     power = np.mean(frames * frames, axis=1)
-    return 10 * np.log10(np.maximum(power, 1e-12))
+    levels: np.ndarray = 10 * np.log10(np.maximum(power, 1e-12))
+    return levels
 
 
 def active_frames(samples: np.ndarray, rate: int) -> np.ndarray:
