@@ -74,12 +74,33 @@ def test_the_backchannel_answer_window_is_bounded(ms: int) -> None:
     refused_at(doc(turn=late), "/turn/interruption/backchannel/answerWithinMs")
 
 
+def test_backchannel_negatives_and_review_marks_are_read_by_language() -> None:
+    lexicon = {
+        "words": {"hi": ["हाँ"]},
+        "negatives": {"hi": ["नहीं", "ruko"]},
+        "reviewed": {"hi": False},
+    }
+    c = parse(doc(turn={"interruption": {"backchannel": lexicon}}))
+    backchannel = c.turn.interruption.backchannel
+    assert backchannel.negatives == {"hi": ("नहीं", "ruko")}
+    assert backchannel.reviewed == {"hi": False}
+
+
+def test_an_empty_negative_or_a_review_mark_for_no_language_is_refused() -> None:
+    empty = {"interruption": {"backchannel": {"negatives": {"hi": [""]}}}}
+    refused_at(doc(turn=empty), "/turn/interruption/backchannel/negatives")
+    unnamed = {"interruption": {"backchannel": {"reviewed": {"Hindi": True}}}}
+    refused_at(doc(turn=unnamed), "/turn/interruption/backchannel/reviewed")
+
+
 def test_the_catalog_states_every_language_it_hears_acknowledgements_and_fillers_in() -> None:
     c = parse(JOB.read_bytes())
     backchannel = c.turn.interruption.backchannel
     assert set(backchannel.words) == {"hi", "en", "kn", "mr", "te"}
     assert {"हाँ", "ok", "ಹೌದು", "हो", "అవును"} <= set(every_phrase(backchannel.words))
     assert backchannel.answer_within_ms == 1500
+    assert set(backchannel.negatives) == set(backchannel.words)
+    assert not any(backchannel.reviewed.values())
     assert set(c.agent.speech.fillers.phrases) == {"hi", "en", "kn", "mr", "te"}
     assert c.agent.speech.fillers.after_ms == 600
 

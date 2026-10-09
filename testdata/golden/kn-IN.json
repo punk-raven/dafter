@@ -1,0 +1,10 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 1,
+  "language": "kn-IN",
+  "nativeReview": {
+    "status": "pending",
+    "reviewers": []
+  },
+  "clips": []
+}

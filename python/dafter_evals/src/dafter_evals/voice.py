@@ -10,6 +10,23 @@ from dafter_providers import vendor_for
 
 from .probe import SAMPLE_RATE, trim
 
+CALLER_VOICES: dict[str, str] = {
+    "hi": "ritu",
+    "en-IN": "aditya",
+    "te-IN": "kavitha",
+    "kn-IN": "roopa",
+    "mr-IN": "rupali",
+}
+
+
+def caller_voice(language: str) -> str:
+    if language not in CALLER_VOICES:
+        known = ", ".join(sorted(CALLER_VOICES))
+        raise DafterError(
+            ErrorCode.INVALID_CONFIG, f"no caller voice for {language}; one of {known}"
+        )
+    return CALLER_VOICES[language]
+
 
 class Voice:
     def __init__(self, cfg: ResolvedSessionConfig, speaker: str) -> None:

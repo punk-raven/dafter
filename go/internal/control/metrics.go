@@ -1,6 +1,7 @@
 package control
 
 import (
+	"cmp"
 	"net/http"
 	"slices"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	"github.com/punk-raven/dafter/go/internal/config"
 	"github.com/punk-raven/dafter/go/internal/errs"
 )
 
@@ -72,6 +74,11 @@ var (
 		Help: "Carrier webhooks for inbound calls by outcome: held, dialed, bridged, failed, hung_up or refused; for meeting dial-in also asked_pin, wrong_pin, admitted and dial_in_ended.",
 	}, []string{"outcome"})
 
+	sessionsByVersionTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dafter_sessions_by_version_total",
+		Help: "Sessions created by the persona and config version they run and the canary arm that chose it: stable or candidate. Version none: no layer states one.",
+	}, []string{"version", "arm"})
+
 	errorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dafter_errors_total",
 		Help: "Total errors by code.",
@@ -114,6 +121,14 @@ func incInbound(outcome string) {
 
 func incRecall(n int) {
 	agentDispatchesTotal.WithLabelValues("recalled").Add(float64(n))
+}
+
+func incVersion(cfg *config.ResolvedSessionConfig) {
+	version, arm := cmp.Or(cfg.VersionID(), "none"), "stable"
+	if cfg.OnCandidate() {
+		arm = "candidate"
+	}
+	sessionsByVersionTotal.WithLabelValues(version, arm).Inc()
 }
 
 func incError(code errs.ErrorCode) {

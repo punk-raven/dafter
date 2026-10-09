@@ -44,6 +44,8 @@ class Record:
     digits: bool | None
     error: str | None = None
     native_code: str | None = None
+    transient: bool = False
+    attempts: int = 1
     verdicts: dict[str, str] = field(default_factory=dict)
     score: float | None = None
     judge_reasoning: str = ""
@@ -60,6 +62,10 @@ class Record:
     @property
     def answered(self) -> bool:
         return self.error is None and self.reply is not None
+
+    @property
+    def incomplete(self) -> bool:
+        return not self.answered and self.transient
 
     @property
     def tools_clean(self) -> bool:
@@ -114,6 +120,29 @@ class Row:
             "claimedWithoutCall": sum(1 for r in self.records if r.claimed_without_call),
         }
 
+    def incomplete(self) -> list[str]:
+        if self.skipped:
+            return [f"not screened: {self.skipped}"]
+        unanswered = sum(1 for r in self.records if r.incomplete)
+        if unanswered:
+            return [f"{unanswered} of {len(self.records)} calls unanswered after retries"]
+        return []
+
+    def misses(self) -> list[str]:
+        found: list[str] = []
+        failed_calls = sum(1 for r in self.records if not r.answered and not r.transient)
+        if failed_calls:
+            found.append(f"{failed_calls} of {len(self.records)} calls refused by the provider")
+        tools = self.tool_summary()
+        unclean = tools["toolProbes"] - tools["toolProbesClean"]
+        if unclean:
+            found.append(f"{unclean} of {tools['toolProbes']} tool probes not clean")
+        for criterion in CRITERIA:
+            failed = sum(1 for r in self.records if r.verdicts.get(criterion) == "fail")
+            if failed:
+                found.append(f"{criterion} failed on {failed} replies")
+        return found
+
     def summary(self) -> dict[str, Any]:
         per_1k = self.cost_per_1k()
         price = self.candidate.price
@@ -144,7 +173,21 @@ class Row:
             "priceCurrency": price.currency if price else None,
             "freeTier": self.candidate.free_tier,
             "unverified": list(self.candidate.unverified),
+            "misses": self.misses(),
+            "incomplete": self.incomplete(),
+            "retriedCalls": sum(1 for r in self.records if r.attempts > 1),
         }
+
+
+def gate(rows: list[Row]) -> dict[str, Any]:
+    missed = {row.candidate.id: found for row in rows if (found := row.misses())}
+    incomplete = {row.candidate.id: found for row in rows if (found := row.incomplete())}
+    return {
+        "go": bool(rows) and not missed and not incomplete,
+        "complete": bool(rows) and not incomplete,
+        "misses": missed,
+        "incomplete": incomplete,
+    }
 
 
 def merged(per_language: list[list[Row]]) -> list[Row]:

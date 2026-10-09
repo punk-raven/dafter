@@ -1,6 +1,6 @@
 module github.com/punk-raven/dafter/go
 
-go 1.26.7
+go 1.26.9
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1

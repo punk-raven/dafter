@@ -133,3 +133,63 @@ func TestResolveRefusesAnOverrideThatPointsTheScribeAtAHostOrACredential(t *test
 		}
 	}
 }
+
+func scribeScoringDocument(t *testing.T, scoring string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(scribeVectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f scribeVectorFile
+	if err := json.Unmarshal(raw, &f); err != nil {
+		t.Fatal(err)
+	}
+	scribe := `{"enabled": true, "consentArtifactId": "c", "llm": "$llm"`
+	if scoring != "" {
+		scribe += `, "scoring": ` + scoring
+	}
+	return f.document(t, scribeCase{Patch: map[string]json.RawMessage{"scribe": json.RawMessage(scribe + "}")}})
+}
+
+func TestScribeScoringIsOffAndCappedByDefault(t *testing.T) {
+	t.Parallel()
+	cfg, err := config.Parse(scribeScoringDocument(t, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rate, limit := cfg.Scribe.Scoring.RateFor("hi"), cfg.Scribe.Scoring.TurnCap(); rate != 0 || limit != 20 {
+		t.Errorf("rate %v cap %d, want 0 and 20", rate, limit)
+	}
+}
+
+func TestScribeScoringReadsARatePerBaseLanguage(t *testing.T) {
+	t.Parallel()
+	cfg, err := config.Parse(scribeScoringDocument(t, `{"sampleRate": 0.05, "languageSampleRates": {"kn": 0.25}, "maxTurnsPerSession": 50, "keepFailures": true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := cfg.Scribe.Scoring
+	if s.RateFor("kn-IN") != 0.25 || s.RateFor("hi") != 0.05 || s.TurnCap() != 50 || !s.KeepFailures {
+		t.Errorf("scoring read as %+v", s)
+	}
+}
+
+func TestScribeScoringRefusesARateOrCapOutOfRange(t *testing.T) {
+	t.Parallel()
+	for scoring, pointer := range map[string]string{
+		`{"sampleRate": 1.5}`:                     "/scribe/scoring/sampleRate",
+		`{"maxTurnsPerSession": 0}`:               "/scribe/scoring/maxTurnsPerSession",
+		`{"languageSampleRates": {"hi-IN": 0.5}}`: "/scribe/scoring/languageSampleRates",
+		`{"everyTurn": true}`:                     "/scribe/scoring",
+	} {
+		_, err := config.Parse(scribeScoringDocument(t, scoring))
+		var de *errs.Error
+		if !errors.As(err, &de) || de.Code != errs.CodeInvalidConfig {
+			t.Errorf("%s: want %s, got %v", scoring, errs.CodeInvalidConfig, err)
+			continue
+		}
+		if !strings.Contains(strings.Join(de.Details, "\n"), pointer) {
+			t.Errorf("%s: no detail points at %s\n%v", scoring, pointer, de.Details)
+		}
+	}
+}

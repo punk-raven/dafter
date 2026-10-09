@@ -157,6 +157,11 @@ func serve(t *testing.T) *harness {
 	if err != nil {
 		t.Fatalf("load catalog: %v", err)
 	}
+	return serveCatalog(t, catalog)
+}
+
+func serveCatalog(t *testing.T, catalog *config.Catalog) *harness {
+	t.Helper()
 	store, err := state.Open(t.Context(), filepath.Join(t.TempDir(), "dafter.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
@@ -286,23 +291,23 @@ func turnStrategy(t *testing.T, r sessionResponse) config.TurnStrategy {
 	return cfg.Turn.Strategy
 }
 
-func TestHindiAndEnglishResolveDifferentTurnStrategies(t *testing.T) {
+func TestHindiAndMarathiResolveDifferentTurnStrategies(t *testing.T) {
 	t.Parallel()
 	h := serve(t)
 	hindi := h.create(t, request("hi", "webrtc"))
-	english := h.create(t, request("en-IN", "webrtc"))
+	marathi := h.create(t, request("mr-IN", "webrtc"))
 
-	hi, en := turnStrategy(t, hindi), turnStrategy(t, english)
-	if hi == en {
+	hi, mr := turnStrategy(t, hindi), turnStrategy(t, marathi)
+	if hi == mr {
 		t.Fatalf("both languages resolved %s from the same base", hi)
 	}
-	if hi != config.TurnProviderEndpointing {
-		t.Errorf("hi resolved %s, want %s", hi, config.TurnProviderEndpointing)
+	if hi != config.TurnSemantic {
+		t.Errorf("hi resolved %s, want %s", hi, config.TurnSemantic)
 	}
-	if en != config.TurnSemantic {
-		t.Errorf("en-IN resolved %s, want %s", en, config.TurnSemantic)
+	if mr != config.TurnProviderEndpointing {
+		t.Errorf("mr-IN resolved %s, want %s", mr, config.TurnProviderEndpointing)
 	}
-	if hindi.ConfigHash == english.ConfigHash {
+	if hindi.ConfigHash == marathi.ConfigHash {
 		t.Error("two different documents share one hash")
 	}
 }

@@ -96,6 +96,8 @@ def test_the_command_prints_the_score(capsys: pytest.CaptureFixture[str], tmp_pa
     )
     assert code == 0
     printed = json.loads(capsys.readouterr().out)
+    character_keys = ("cer", "referenceCharacters", "characterErrors")
+    character_counts = {k: printed.pop(k) for k in character_keys}
     assert printed == {
         "clip": "example-hi-meeting",
         "language": "hi",
@@ -105,7 +107,14 @@ def test_the_command_prints_the_score(capsys: pytest.CaptureFixture[str], tmp_pa
         "substitutions": 0,
         "deletions": 1,
         "insertions": 0,
+        "oiwer": round(1 / 18, 4),
+        "oiwerReferenceWords": 18,
+        "oiwerErrors": 1,
     }
+    assert 0 < character_counts["characterErrors"] < character_counts["referenceCharacters"]
+    assert character_counts["cer"] == round(
+        character_counts["characterErrors"] / character_counts["referenceCharacters"], 4
+    )
     text = tmp_path / "heard.txt"
     text.write_text("हाँ मुझे कल की मीटिंग का टाइम बताओ और ज़रा एजेंडा भी भेज देना दस बजे से पहले")
     assert main(["--reference", str(REFERENCE), "--text", str(text)]) == 0

@@ -7,6 +7,8 @@ type Backchannel struct {
 	MaxWords       int               `json:"maxWords,omitempty"`
 	AnswerWithinMs int               `json:"answerWithinMs,omitempty"`
 	Words          PhrasesByLanguage `json:"words,omitempty"`
+	Negatives      PhrasesByLanguage `json:"negatives,omitempty"`
+	Reviewed       map[string]bool   `json:"reviewed,omitempty"`
 }
 
 type Speech struct {

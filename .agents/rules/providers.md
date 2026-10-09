@@ -5,6 +5,8 @@ paths:
   - "schemas/common/v1/ids.schema.json"
   - "python/dafter_providers/src/dafter_providers/{credentials,registry,options}.py"
   - "python/dafter_providers/src/dafter_providers/openai_compat/**"
+  - "python/dafter_providers/src/dafter_providers/smart_turn/**"
+  - "python/dafter_providers/tests/test_smart_turn.py"
   - "python/dafter_providers/tests/test_{credentials,openai_compat,llm_placement}.py"
   - "python/dafter_runtime/src/dafter_runtime/labels.py"
   - "python/dafter_runtime/tests/test_{labels,llm_routes}.py"
@@ -61,3 +63,11 @@ Identical on both halves (Go and Python) unless stated. Index:
   other than that endpoint's key is refused.
 - The eval catalog (`dafter_evals/screen/candidates.json`) names the same vendors and holds no URL
   or key of its own.
+
+## Turn detector weights
+
+- Smart Turn (`dafter_providers/smart_turn`) weights are pinned by Hugging Face revision and SHA-256
+  in `weights.py` and cached in `DAFTER_MODEL_CACHE` (default `~/.cache/dafter/models`), never in
+  git. `prewarm_turn_detectors` (worker `prewarm`) downloads them only when
+  `DAFTER_SMART_TURN_PREWARM=1`; without it, it only loads weights already cached. A session that
+  chooses `smart_turn` on a worker without them is refused at `/turn/detector`.

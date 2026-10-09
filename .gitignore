@@ -65,5 +65,14 @@ build/
 # Word error rate clips: real voices, consent-bound, never committed
 /testdata/wer/audio/
 
+# Scribe review queue: failed production turns with caller text, never committed
+/.scribe-review/
+
+# Vobiz golden set clips: real call audio, consent-bound, never committed
+/testdata/golden/audio/
+
 # Public ASR sample audio: fetched by dafter-asr, never committed
 /testdata/asr/audio/
+
+# TTS round trip audio: written by dafter-tts run, never committed
+/testdata/speech/audio/

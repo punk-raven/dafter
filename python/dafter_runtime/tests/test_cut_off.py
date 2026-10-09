@@ -148,7 +148,9 @@ def rows_when_closed(after_playback_s: float) -> list[dict[str, Any]]:
 
 
 def test_a_reply_the_session_closed_on_before_its_first_word_still_gets_a_row() -> None:
-    assert rows_when_closed(0.05) == [{"turn": 0, "interrupted": True}]
+    assert rows_when_closed(0.05) == [
+        {"turn": 0, "interrupted": True, "configVersion": {"id": "nivya-v1", "arm": "stable"}}
+    ]
 
 
 def test_a_reply_cut_off_after_its_first_words_gets_one_row_with_its_layers() -> None:

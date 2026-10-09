@@ -17,7 +17,7 @@ from dafter_scribe.plan import language_of
 from dafter_scribe.scribe import Scribe
 from dafter_scribe.transcript import Transcript
 from dafter_scribe.writer import Writer
-from scribe_stub import ASHA, ScriptedLLM, Sent, caption, config
+from scribe_stub import ASHA, ScriptedLLM, Sent, caption, config, scoring
 
 AT = datetime(2026, 9, 24, 10, 0, tzinfo=UTC)
 
@@ -35,7 +35,7 @@ def inbox(scored: bool = False) -> Scribe:
         {"provider": "sarvam", "model": "sarvam-105b"},
     )
     scorer = (
-        Scorer(ScriptedLLM(), sarvam.classify, Sent(), language_of("hi"), 5.0, {})
+        Scorer(ScriptedLLM(), sarvam.classify, Sent(), language_of("hi"), 5.0, {}, scoring())
         if scored
         else None
     )

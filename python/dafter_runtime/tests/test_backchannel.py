@@ -55,9 +55,14 @@ class Floor:
         self.clock = Clock()
         self.reply = Reply(self.clock)
         self.reply.playing(True)
+        self.cuts = 0
 
     def held(self) -> bool:
         return self.holding
+
+    def cut(self) -> None:
+        self.cuts += 1
+        self.holding = False
 
     def heard(self) -> Reply | None:
         return self.reply if self.holding and self.hearing else None
@@ -98,6 +103,27 @@ def test_the_catalog_hears_each_languages_acknowledgements(text: str) -> None:
 )
 def test_anything_else_is_a_turn(text: str) -> None:
     assert not catalog().only(text, finished=True)
+
+
+@pytest.mark.parametrize(
+    "text", ["sari", "sare", "avunu", "houdu", "barobar", "mm-hmm", "haanji", "yeah"]
+)
+def test_the_lexicon_adds_romanized_acknowledgements_the_recognizer_may_write(text: str) -> None:
+    assert catalog().only(text, finished=True)
+
+
+@pytest.mark.parametrize("text", ["no no", "nahi", "illa", "thamba", "haan nahi", "okay wait"])
+def test_a_negative_is_never_an_acknowledgement(text: str) -> None:
+    assert not catalog().only(text, finished=True)
+    assert catalog().yields(text)
+
+
+def test_an_affirmative_with_more_after_it_yields_and_one_alone_does_not() -> None:
+    acknowledgements = catalog()
+    assert acknowledgements.yields("हाँ लेकिन रुकिए")
+    assert acknowledgements.yields("achha ek baat")
+    assert not acknowledgements.yields("हाँ जी")
+    assert not acknowledgements.yields("एक बात बताइए")
 
 
 def test_an_unfinished_word_or_phrase_is_still_in_doubt() -> None:
@@ -357,3 +383,54 @@ def test_the_stream_yields_an_answer_when_the_reply_ends_with_no_new_event() -> 
         return seen
 
     assert asyncio.run(collect()) == ["start_of_speech", "हाँ", "end_of_speech"]
+
+
+def test_a_negative_over_the_reply_cuts_it_when_the_sieve_cuts() -> None:
+    floor = Floor()
+    sieve = Sieve(catalog(), floor, cuts=True)
+    passed = run(
+        sieve,
+        event(KIND.START_OF_SPEECH),
+        event(KIND.INTERIM_TRANSCRIPT, "no"),
+        event(KIND.FINAL_TRANSCRIPT, "no no"),
+        event(KIND.END_OF_SPEECH),
+    )
+    assert floor.cuts == 1
+    assert [text for _, text in passed] == ["", "no", "no no", ""]
+
+
+def test_a_mixed_cue_cuts_the_reply_once_it_goes_past_the_affirmative() -> None:
+    floor = Floor()
+    sieve = Sieve(catalog(), floor, cuts=True)
+    run(sieve, event(KIND.START_OF_SPEECH), event(KIND.INTERIM_TRANSCRIPT, "हाँ"))
+    assert floor.cuts == 0
+    run(sieve, event(KIND.INTERIM_TRANSCRIPT, "हाँ लेकिन"))
+    assert floor.cuts == 1
+
+
+def test_a_negative_in_speech_already_passing_still_cuts_the_reply() -> None:
+    floor = Floor()
+    sieve = Sieve(catalog(), floor, cuts=True)
+    run(sieve, event(KIND.START_OF_SPEECH), event(KIND.INTERIM_TRANSCRIPT, "एक"))
+    assert floor.cuts == 0
+    run(sieve, event(KIND.INTERIM_TRANSCRIPT, "एक नहीं"))
+    assert floor.cuts == 1
+
+
+def test_a_sieve_that_does_not_cut_leaves_the_reply_to_the_barge_in() -> None:
+    floor = Floor()
+    sieve = Sieve(catalog(), floor)
+    run(sieve, event(KIND.START_OF_SPEECH), event(KIND.FINAL_TRANSCRIPT, "wait"))
+    assert floor.cuts == 0
+
+
+def test_an_acknowledgement_alone_never_cuts_the_reply() -> None:
+    floor = Floor()
+    sieve = Sieve(catalog(), floor, cuts=True)
+    run(
+        sieve,
+        event(KIND.START_OF_SPEECH),
+        event(KIND.FINAL_TRANSCRIPT, "हाँ जी"),
+        event(KIND.END_OF_SPEECH),
+    )
+    assert floor.cuts == 0

@@ -43,17 +43,10 @@ func TestAMeetingThatTakesPhoneGuestsKeepsItsOwnTuning(t *testing.T) {
 		t.Errorf("addressing %s, greets %v, video %v: the telephony channel's tuning leaked into the meeting",
 			cfg.Agent.Addressing.Mode, greets, cfg.VideoEnabled())
 	}
-	var doc struct {
-		Agent struct {
-			Pipeline map[string]struct {
-				Options map[string]any `json:"options"`
-			} `json:"pipeline"`
-		} `json:"agent"`
+	if cfg.Agent.Pipeline == nil || cfg.Agent.Pipeline.STT == nil {
+		t.Fatal("the meeting resolved without an stt stage")
 	}
-	if err := json.Unmarshal(created.Config, &doc); err != nil {
-		t.Fatal(err)
-	}
-	if stt := doc.Agent.Pipeline["stt"].Options["sampleRate"]; stt != float64(16000) {
+	if stt := cfg.Agent.Pipeline.STT.Options["sampleRate"]; stt != float64(16000) {
 		t.Errorf("stt sample rate %v; the 8 kHz telephony overlay is the channel's, not the phone guests'", stt)
 	}
 }

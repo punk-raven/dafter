@@ -10,6 +10,9 @@ from livekit.agents.tokenize.basic import split_words
 from livekit.agents.voice.events import UserInputTranscribedEvent, UserStateChangedEvent
 
 from .addressing import Clock, Schedule, Timer
+from .lexicon import NO_CUES, Lexicon, Said
+from .metrics import Moment, counted
+from .naming import words
 from .noise import Meaning
 
 log = logging.getLogger("dafter.runtime.barge_in")
@@ -51,9 +54,11 @@ class BargeIn:
         resume: Resume | None = None,
         waits_for_words: bool = False,
         meaning: Meaning | None = None,
+        lexicon: Lexicon = NO_CUES,
     ) -> None:
         self._min_duration = min_duration
         self._meaning = meaning
+        self._lexicon = lexicon
         self._min_words = max(min_words, 1 if waits_for_words or resume else 0)
         self._caller = caller
         self._stop = stop
@@ -141,19 +146,25 @@ class BargeIn:
         if self._paused and self._resume is not None:
             self._paused = False
             self._resume.resume()
+            counted(Moment.FALSE_INTERRUPTION)
             log.info("the agent resumed: no words came")
 
     def _try(self, speaker: str, hearing: Hearing) -> None:
         if speaker != self._caller():
             return
         transcript = hearing.transcript()
-        needed = max(self._min_words, 1) if speaker in self._echoing else self._min_words
+        echoing = speaker in self._echoing
+        needed = max(self._min_words, 1) if echoing else self._min_words
         stopped = self._meaning is not None and self._meaning.stop(transcript)
-        if needed > 0 and not stopped and self._said(transcript) < needed:
+        yielded = not echoing and self._lexicon.yields(words(transcript), self._acknowledges)
+        if needed > 0 and not stopped and not yielded and self._said(transcript) < needed:
             return
         self._hold_resume()
         self._paused = False
         self._stop()
+
+    def _acknowledges(self, said: Said) -> bool:
+        return self._meaning is not None and self._meaning.acknowledges(" ".join(said))
 
     def _said(self, transcript: str) -> int:
         if self._meaning is not None:

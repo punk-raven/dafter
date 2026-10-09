@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+import re
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Protocol
 
 from dafter_core.config import ProviderRef, ResolvedSessionConfig
 from dafter_core.enums import Stage, UsageUnit
@@ -17,12 +18,80 @@ from livekit.agents import stt
 from .corpus import Clip, Sample
 from .hearing import TAIL_S, Heard
 from .measure import percentile
-from .wer import Score, word_error_rate, words
+from .wer import Metrics, error_rates, normalise, words
 
 KIND = "dafter.asr.accuracy"
 IDENTIFY = "identify"
 
+PRIMARY_METRIC = {"en": "wer", "hi": "wer", "mr": "wer", "te": "cer", "kn": "cer"}
+ENTITY_KINDS = ("number", "phone", "amount", "name", "address", "date")
+DIGIT_GAP = re.compile(r"(?<=\d) (?=\d)")
+DEFAULT_TOLERANCE = 0.02
+
 Hear = Callable[[Clip], Awaitable[Heard]]
+
+
+class Entity(Protocol):
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def text(self) -> str: ...
+
+
+@dataclass(frozen=True, slots=True)
+class Expected:
+    references: tuple[str, ...]
+    entities: tuple[Entity, ...] = ()
+
+
+Expect = Callable[[Clip], Expected]
+
+
+def public_expected(clip: Clip) -> Expected:
+    return Expected((clip.reference,))
+
+
+def primary_metric(language: str) -> str:
+    return PRIMARY_METRIC.get(base_language(language), "wer")
+
+
+def entity_words(text: str) -> list[str]:
+    return DIGIT_GAP.sub("", normalise(text)).split()
+
+
+def entity_heard(entity_text: str, hypothesis: str) -> bool:
+    wanted, heard = entity_words(entity_text), entity_words(hypothesis)
+    if not wanted:
+        raise ValueError("an entity needs text with at least one word")
+    span = len(wanted)
+    return any(heard[i : i + span] == wanted for i in range(len(heard) - span + 1))
+
+
+def entity_rows(entities: Sequence[Entity], hypothesis: str) -> list[dict[str, Any]]:
+    return [
+        {"kind": e.kind, "text": e.text, "heard": entity_heard(e.text, hypothesis)}
+        for e in entities
+    ]
+
+
+def entity_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    found = [e for r in rows for e in r["entities"]]
+    by_kind = {
+        kind: {
+            "heard": sum(e["heard"] for e in found if e["kind"] == kind),
+            "of": sum(1 for e in found if e["kind"] == kind),
+        }
+        for kind in ENTITY_KINDS
+        if any(e["kind"] == kind for e in found)
+    }
+    heard = sum(e["heard"] for e in found)
+    return {
+        "heard": heard,
+        "of": len(found),
+        "accuracy": round(heard / len(found), 4) if found else None,
+        "byKind": by_kind,
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,14 +149,18 @@ def identified(sample: Sample, heard: Heard) -> bool | None:
     return all(base_language(language) == wanted for language in heard.languages)
 
 
-def clip_row(clip: Clip, heard: Heard, result: Score, sample: Sample) -> dict[str, Any]:
+def clip_row(
+    clip: Clip, heard: Heard, expected: Expected, result: Metrics, sample: Sample
+) -> dict[str, Any]:
     return {
         "id": clip.id,
         "speaker": clip.speaker,
         "durationS": clip.duration_s,
         "reference": clip.reference,
+        "alternateReferences": list(expected.references[1:]),
         "hypothesis": heard.text,
         **result.to_dict(),
+        "entities": entity_rows(expected.entities, heard.text),
         "latinWords": latin_words(heard.text),
         "languages": list(heard.languages),
         "languageConfidences": list(heard.confidences),
@@ -96,18 +169,35 @@ def clip_row(clip: Clip, heard: Heard, result: Score, sample: Sample) -> dict[st
     }
 
 
+def ratio(errors: int, length: int) -> float | None:
+    return round(errors / length, 4) if length else None
+
+
 def summary(rows: list[dict[str, Any]], s: Setup, sample: Sample, failed: int) -> dict[str, Any]:
     words = sum(r["referenceWords"] for r in rows)
     kinds = {k: sum(r[k] for r in rows) for k in ("substitutions", "deletions", "insertions")}
+    characters = sum(r["referenceCharacters"] for r in rows)
+    oiwer_words = sum(r["oiwerReferenceWords"] for r in rows)
+    rates = {
+        "wer": ratio(sum(kinds.values()), words),
+        "cer": ratio(sum(r["characterErrors"] for r in rows), characters),
+        "oiwer": ratio(sum(r["oiwerErrors"] for r in rows), oiwer_words),
+    }
+    metric = primary_metric(sample.language)
     judged = [r["identified"] for r in rows if r["identified"] is not None]
     finals = [r["finalAfterAudioMs"] for r in rows if r["finalAfterAudioMs"] is not None]
     cost = estimate(s, sample)
     return {
         "clips": len(rows),
         "failed": failed,
+        "primary": {"metric": metric, "value": rates[metric]},
         "referenceWords": words,
-        "wer": round(sum(kinds.values()) / words, 4) if words else None,
+        "wer": rates["wer"],
         **kinds,
+        "referenceCharacters": characters,
+        "cer": rates["cer"],
+        "oiwer": rates["oiwer"],
+        "entities": entity_summary(rows),
         "latinWords": sum(r["latinWords"] for r in rows),
         "identifiedCorrectly": sum(judged) if s.language is None else None,
         "identifiedOf": len(judged) if s.language is None else None,
@@ -117,7 +207,9 @@ def summary(rows: list[dict[str, Any]], s: Setup, sample: Sample, failed: int) -
     }
 
 
-async def measure(sample: Sample, s: Setup, hear: Hear, concurrency: int) -> dict[str, Any]:
+async def measure(
+    sample: Sample, s: Setup, hear: Hear, concurrency: int, expect: Expect = public_expected
+) -> dict[str, Any]:
     gate = asyncio.Semaphore(concurrency)
 
     async def one(clip: Clip) -> dict[str, Any] | None:
@@ -126,7 +218,9 @@ async def measure(sample: Sample, s: Setup, hear: Hear, concurrency: int) -> dic
                 heard = await hear(clip)
             except Exception as exc:
                 return {"id": clip.id, "error": type(exc).__name__}
-        return clip_row(clip, heard, word_error_rate(clip.reference, heard.text), sample)
+        expected = expect(clip)
+        result = error_rates(expected.references, heard.text)
+        return clip_row(clip, heard, expected, result, sample)
 
     results = [r for r in await asyncio.gather(*(one(c) for c in sample.clips)) if r]
     rows = [r for r in results if "error" not in r]
@@ -144,4 +238,61 @@ async def measure(sample: Sample, s: Setup, hear: Hear, concurrency: int) -> dic
     }
 
 
-__all__ = ["IDENTIFY", "KIND", "Setup", "estimate", "measure", "recognizer", "setup"]
+def baseline_key(report: Mapping[str, Any]) -> str:
+    stt_used = report["stt"]
+    parts = (report["dataset"], report["language"], stt_used["provider"], stt_used["model"])
+    return "/".join(str(p) for p in (*parts, stt_used["mode"], stt_used["hearing"]))
+
+
+def compare(report: Mapping[str, Any], baselines: Mapping[str, Any]) -> dict[str, Any]:
+    primary = report["summary"]["primary"]
+    key = baseline_key(report)
+    tolerance = float(baselines.get("tolerance", DEFAULT_TOLERANCE))
+    recorded = baselines.get("baselines", {}).get(key)
+    found = {"key": key, **primary, "tolerance": tolerance, "baseline": None}
+    if recorded is None or recorded.get("metric") != primary["metric"]:
+        return {**found, "verdict": "unrecorded"}
+    baseline = float(recorded["value"])
+    value = primary["value"]
+    regressed = value is None or value > baseline + tolerance
+    return {**found, "baseline": baseline, "verdict": "regressed" if regressed else "held"}
+
+
+def record(report: Mapping[str, Any], baselines: Mapping[str, Any]) -> dict[str, Any]:
+    primary = report["summary"]["primary"]
+    if primary["value"] is None:
+        raise ValueError("a run with no scored clips cannot be a baseline")
+    entry = {
+        "metric": primary["metric"],
+        "value": primary["value"],
+        "clips": report["summary"]["clips"],
+        "recordedAt": report["ranAt"],
+        "configHash": report.get("job", {}).get("configHash"),
+    }
+    recorded = {**baselines.get("baselines", {}), baseline_key(report): entry}
+    return {
+        "tolerance": baselines.get("tolerance", DEFAULT_TOLERANCE),
+        "baselines": dict(sorted(recorded.items())),
+    }
+
+
+__all__ = [
+    "ENTITY_KINDS",
+    "IDENTIFY",
+    "KIND",
+    "PRIMARY_METRIC",
+    "Entity",
+    "Expect",
+    "Expected",
+    "Setup",
+    "baseline_key",
+    "compare",
+    "entity_heard",
+    "estimate",
+    "measure",
+    "primary_metric",
+    "public_expected",
+    "recognizer",
+    "record",
+    "setup",
+]

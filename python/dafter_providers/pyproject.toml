@@ -9,7 +9,10 @@ dependencies = [
     "livekit-agents==1.8.3",
     "httpx[http2]==0.28.1",
     "livekit-plugins-openai==1.8.3",
+    "livekit-plugins-noise-cancellation==0.3.2",
     "livekit-plugins-sarvam==1.8.3",
+    "onnxruntime==1.30.0",
+    "transformers==5.19.0",
 ]
 
 [build-system]

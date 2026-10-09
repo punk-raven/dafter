@@ -17,7 +17,15 @@ from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.toolbox import Answering, registry_for
 from livekit.agents import Agent, AgentSession, llm
 from livekit.agents.voice import SpeechHandle
-from session_rig import Microphone, ScriptedSTT, ScriptedVAD, SlowReader, Speaker, until
+from session_rig import (
+    Microphone,
+    ScriptedSTT,
+    ScriptedVAD,
+    SlowReader,
+    Speaker,
+    until,
+    worker_turn_handling,
+)
 from stub_llm import StubLLM
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
@@ -91,7 +99,7 @@ def talked_over(
             llm=StubLLM(),
             tts=SlowReader(read),
             vad=detector,
-            turn_handling=p.turn_handling,  # type: ignore[arg-type]
+            turn_handling=worker_turn_handling(p),  # type: ignore[arg-type]
             user_away_timeout=None,
             aec_warmup_duration=None,
         )
@@ -146,7 +154,7 @@ def called_over(caller: Caller, opening: str, read: float = READ_S) -> Outcome:
             waits_for_words=True,
         )
         heard: list[str] = []
-        listening = listener_session(recognizer, detector, p.turn_handling)
+        listening = listener_session(recognizer, detector, worker_turn_handling(p))
         listening.input.audio = Microphone()
         follow(barge_in, ASHA, listening)
         hearing = acknowledged(

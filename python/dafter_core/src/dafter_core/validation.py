@@ -15,7 +15,12 @@ from .errors import DafterError
 _FILES = (
     schemas.IDS,
     schemas.LANGUAGE_SWITCHING,
+    "config/v1/phrases-by-language.schema.json",
     schemas.BACKCHANNEL,
+    "config/v1/fallback.schema.json",
+    "config/v1/noise-filter.schema.json",
+    "config/v1/turn-detector.schema.json",
+    "config/v1/version.schema.json",
     schemas.SCRIBE_CONFIG,
     schemas.RESOLVED_SESSION_CONFIG,
     schemas.AGENT_DEFINITION,

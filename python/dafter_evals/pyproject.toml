@@ -17,7 +17,9 @@ dafter-evals = "dafter_evals.__main__:main"
 dafter-wer = "dafter_evals.score:main"
 dafter-asr = "dafter_evals.asr:main"
 dafter-scorecard = "dafter_evals.scorecard:main"
+dafter-tts = "dafter_evals.tts:main"
 dafter-screen = "dafter_evals.screen.__main__:main"
+dafter-scenarios = "dafter_evals.scenarios.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

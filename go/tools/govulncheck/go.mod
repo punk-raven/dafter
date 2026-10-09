@@ -1,6 +1,6 @@
 module github.com/punk-raven/dafter/go/tools/govulncheck
 
-go 1.26.7
+go 1.26.9
 
 tool golang.org/x/vuln/cmd/govulncheck
 

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/version.schema.json",
+  "title": "Version",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "description": "The persona and config bundle a session runs, referenced from the resolved session config's version property. A layer states the id (the defaults for every session, a profile for the sessions that resolve with it), and the session carries it in its hashed, stored document, so the worker's events and metrics and the control plane's counters can compare one bundle against another. An id is immutable: a bundle that changes, its persona included, is published under a new id and never by editing the one already in use. A session override can state neither the id nor the arm.",
+  "required": ["id"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The bundle's immutable id, as an operator names it, e.g. support-v4.",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "candidate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Stamped by resolution, never stated by a layer: true when the control plane's canary routed this session from its profile to that profile's candidate, false on the stable arm."
+    }
+  }
+}

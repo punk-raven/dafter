@@ -1,0 +1,310 @@
+{
+  "uid": "dafter-agent-turns",
+  "title": "Dafter agent turns",
+  "description": "How the agent worker's turns go: reply gap p95 by language and by config version, interruptions, backchannels, provider errors and filler share. Scraped from the worker (DAFTER_METRICS_PORT, job dafter-agent).",
+  "tags": ["dafter"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]},
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "links": [
+    {
+      "title": "Dafter",
+      "type": "dashboards",
+      "tags": ["dafter"],
+      "asDropdown": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Reply time p95 by language",
+      "description": "Worker-measured reply gap (reply_gap) p95 per language and channel over 5 min. The dashed line is the 1.5 s target; the alert Reply gap p95 over 1500 ms fires per language when it holds above it for 5 min (deploy/grafana/provisioning/alerting).",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {"mode": "dashed"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#73BF69", "value": null},
+              {"color": "#F2495C", "value": 1500}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le, language, channel) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"reply_gap\"}[5m]))) * 1000",
+          "legendFormat": "{{language}} {{channel}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Reply time p95 by version",
+      "description": "Worker-measured reply gap (reply_gap) p95 per persona and config version over 5 min, so a canary's candidate reads against the stable version beside it. The version is the session's version.id (none: no layer states one); the control plane's dafter_sessions_by_version_total counts how many sessions each arm took. Raise a canary only while its line stays at or under the stable one.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {"mode": "dashed"}
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "#73BF69", "value": null},
+              {"color": "#F2495C", "value": 1500}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le, version) (rate(dafter_agent_turn_layer_seconds_bucket{layer=\"reply_gap\"}[5m]))) * 1000",
+          "legendFormat": "{{version}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Interruptions per minute",
+      "description": "Agent replies the user's voice cut off (audio activity or a committed user turn; code stopping a reply is not counted), beside false interruptions: the agent stopped or paused for a voice over it and no user turn followed.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (language, channel) (rate(dafter_agent_interruptions_total[5m])) * 60",
+          "legendFormat": "interrupted {{language}} {{channel}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (language, channel) (rate(dafter_agent_false_interruptions_total[5m])) * 60",
+          "legendFormat": "false {{language}} {{channel}}",
+          "refId": "B",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Backchannels per minute",
+      "description": "Acknowledgements said over the agent's reply that were held back instead of interrupting it, beside the held-back ones that turned out to answer the agent's question and were released as a user turn.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (language, channel) (rate(dafter_agent_backchannels_suppressed_total[5m])) * 60",
+          "legendFormat": "suppressed {{language}} {{channel}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (language, channel) (rate(dafter_agent_backchannel_answers_total[5m])) * 60",
+          "legendFormat": "real answer {{language}} {{channel}}",
+          "refId": "B",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Provider errors per minute",
+      "description": "Pipeline stage failures a vendor adapter classified, retried or given up (provider.degraded), by the component that failed and its vendor. control is a failure no stage owns.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (component, vendor) (rate(dafter_agent_provider_errors_total[5m])) * 60",
+          "legendFormat": "{{component}} {{vendor}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Filler share of turns (15 min)",
+      "description": "Share of agent turns that played a filler before the reply, per language and channel, against the turns measured end to end (e2e_latency).",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "never",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 * sum by (language, channel) (increase(dafter_agent_filler_plays_total[15m])) / (sum by (language, channel) (increase(dafter_agent_turn_layer_seconds_count{layer=\"e2e_latency\"}[15m])) > 0)",
+          "legendFormat": "{{language}} {{channel}}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    }
+  ]
+}

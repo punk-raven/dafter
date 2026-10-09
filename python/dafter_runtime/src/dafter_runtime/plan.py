@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from dafter_core.config import (
+    DEFAULT_TURN_DETECTOR,
     Agent,
     Pipeline,
     ProviderRef,
@@ -17,6 +19,7 @@ from dafter_core.enums import (
     Channel,
     EncryptionMode,
     ErrorCode,
+    NoiseCancellation,
     RecordingNotice,
     Stage,
     TurnStrategy,
@@ -24,13 +27,31 @@ from dafter_core.enums import (
 from dafter_core.errors import DafterError
 from dafter_core.hashing import hash_document
 from dafter_core.rules import phone_guests
-from dafter_providers import Vendor, vendor_for
-from livekit.agents.inference.eot.languages import LOCAL_LANGUAGES
+from dafter_providers import (
+    TURN_DETECTORS,
+    NoiseFilter,
+    TurnDetectorKind,
+    Vendor,
+    noise_filter_for,
+    turn_detector_for,
+    vendor_for,
+)
+from dafter_providers.fallback import classified_first
 
 from .personas import Persona, base_language, called_by_name, persona_for, recording_notice
 
 TurnDetection = Literal["stt", "semantic", "manual"]
-TURN_DETECTOR_LANGUAGES = frozenset(LOCAL_LANGUAGES)
+TURN_DETECTOR_LANGUAGES = TURN_DETECTORS[DEFAULT_TURN_DETECTOR].languages
+TURN_DETECTOR_AT = "/turn/detector"
+FALLBACK_AT = "/agent/pipeline/fallback"
+NOISE_FILTER_AT = "/agent/pipeline/noiseFilter"
+CLIENT_NOISE_MODELS = frozenset({NoiseCancellation.RNNOISE, NoiseCancellation.RNNOISE_GATED})
+
+
+@dataclass(frozen=True, slots=True)
+class Failover:
+    vendor: Vendor
+    ref: ProviderRef
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +68,9 @@ class Plan:
     stt_prompt: str | None = None
     disclosure: str | None = None
     personas: dict[str, Persona] = field(default_factory=dict)
+    fallbacks: Mapping[Stage, tuple[Failover, ...]] = field(default_factory=dict)
+    noise_filter: NoiseFilter | None = None
+    turn_detector: TurnDetectorKind | None = None
 
     @property
     def hearing(self) -> str | None:
@@ -169,6 +193,36 @@ def _vendor(ref: ProviderRef | None, stage: Stage, language: str) -> Vendor:
     return vendor
 
 
+def _same_route(ref: ProviderRef, primary: ProviderRef | None) -> bool:
+    return primary is not None and (ref.provider, ref.model) == (primary.provider, primary.model)
+
+
+def failovers(pipeline: Pipeline, language: str) -> dict[Stage, tuple[Failover, ...]]:
+    chains = {
+        Stage.LLM: (pipeline.llm, pipeline.fallback.llm),
+        Stage.TTS: (pipeline.tts, pipeline.fallback.tts),
+    }
+    planned: dict[Stage, tuple[Failover, ...]] = {}
+    for stage, (primary, staged) in chains.items():
+        chain: list[Failover] = []
+        for i, ref in enumerate(staged):
+            if _same_route(ref, primary):
+                continue
+            at = f"{FALLBACK_AT}/{stage}/{i}"
+            vendor = vendor_for(ref, stage, at)
+            if language not in vendor.languages:
+                raise _refuse(
+                    ErrorCode.UNSUPPORTED_CAPABILITY,
+                    f"a {stage} fallback provider does not serve this session's language",
+                    at,
+                    f"not declared by {vendor.name}",
+                )
+            chain.append(Failover(vendor, ref))
+        if chain:
+            planned[stage] = tuple(chain)
+    return planned
+
+
 def local_vad(pipeline: Pipeline, turn: Turn, detection: TurnDetection) -> Vendor | None:
     if detection == "semantic":
         why = "the turn detector reads the local VAD's speech boundaries"
@@ -187,7 +241,8 @@ def local_vad(pipeline: Pipeline, turn: Turn, detection: TurnDetection) -> Vendo
 
 
 def _semantic(turn: Turn, stt: Vendor, language: str) -> TurnDetection | None:
-    if base_language(language) not in TURN_DETECTOR_LANGUAGES:
+    detector = turn_detector_for(turn.detector)
+    if base_language(language) not in detector.languages:
         return "stt" if stt.native_endpointing else None
     if not turn.local_vad_enabled:
         raise _refuse(
@@ -196,7 +251,18 @@ def _semantic(turn: Turn, stt: Vendor, language: str) -> TurnDetection | None:
             "/turn/localVadEnabled",
             "must be true under the semantic strategy",
         )
+    if because := detector.missing():
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "the session's turn detector cannot run in this worker",
+            TURN_DETECTOR_AT,
+            f"{detector.name}: {because}",
+        )
     return "semantic"
+
+
+def chosen_detector(turn: Turn, detection: TurnDetection) -> TurnDetectorKind | None:
+    return turn_detector_for(turn.detector) if detection == "semantic" else None
 
 
 def turn_detection(turn: Turn, stt: Vendor, language: str) -> TurnDetection:
@@ -252,6 +318,34 @@ def turn_handling(turn: Turn, detection: TurnDetection) -> dict[str, Any]:
             "resume_false_interruption": i.resume_false_interruption,
         },
     }
+
+
+def noise_filter(cfg: ResolvedSessionConfig, pipeline: Pipeline) -> NoiseFilter | None:
+    chosen = noise_filter_for(pipeline.noise_filter)
+    if chosen is None:
+        return None
+    if cfg.channel is Channel.TELEPHONY and not chosen.narrowband:
+        raise _refuse(
+            ErrorCode.INVALID_CONFIG,
+            "the noise filter needs audio sampled above 8 kHz and a phone line carries 8 kHz",
+            NOISE_FILTER_AT,
+            f"{chosen.name} cannot run on the telephony channel; {chosen.phone_variant} can",
+        )
+    if cfg.media.audio.noise_cancellation in CLIENT_NOISE_MODELS:
+        raise _refuse(
+            ErrorCode.INVALID_CONFIG,
+            "two noise models would run in series on the caller's audio",
+            "/media/audio/noiseCancellation",
+            "must be off or native while agent.pipeline.noiseFilter is not off",
+        )
+    if not chosen.installed():
+        raise _refuse(
+            ErrorCode.UNSUPPORTED_CAPABILITY,
+            "the noise filter's plugin is not installed in this worker",
+            NOISE_FILTER_AT,
+            f"{chosen.vendor} {chosen.name} is not available",
+        )
+    return chosen
 
 
 def disclosure(cfg: ResolvedSessionConfig) -> str | None:
@@ -312,11 +406,15 @@ def _switchable(cfg: ResolvedSessionConfig, vendors: tuple[Vendor, ...]) -> dict
     return personas
 
 
+def _chained(vendor: Vendor) -> Vendor:
+    return replace(vendor, classify=classified_first(vendor.classify))
+
+
 def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> Plan:
     pipeline = _check_session(cfg, pool, fetches_keys)
     stt = _vendor(pipeline.stt, Stage.STT, cfg.language)
-    llm = _vendor(pipeline.llm, Stage.LLM, cfg.language)
-    tts = _vendor(pipeline.tts, Stage.TTS, cfg.language)
+    llm = _chained(_vendor(pipeline.llm, Stage.LLM, cfg.language))
+    tts = _chained(_vendor(pipeline.tts, Stage.TTS, cfg.language))
     detection = turn_detection(cfg.turn, stt, cfg.language)
     addressing = cfg.agent.addressing
     persona = voiced(cfg.agent, cfg.language)
@@ -337,4 +435,7 @@ def plan(cfg: ResolvedSessionConfig, pool: str, fetches_keys: bool = False) -> P
         stt_prompt=prompt,
         disclosure=disclosure(cfg),
         personas=personas,
+        fallbacks=failovers(pipeline, cfg.language),
+        noise_filter=noise_filter(cfg, pipeline),
+        turn_detector=chosen_detector(cfg.turn, detection),
     )

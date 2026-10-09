@@ -4,6 +4,7 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from dafter_core.enums import AgentState, EventType
 from dafter_core.events import parse_event
@@ -15,13 +16,16 @@ JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc
 TRACE = "4bf92f3577b34da6a3ce929d0e0e4736"
 
 
-def emitter(sent: list[bytes]) -> SessionEvents:
+def emitter(sent: list[bytes], version: dict[str, Any] | None = None) -> SessionEvents:
     async def publish(body: bytes) -> None:
         await asyncio.sleep(0)
         sent.append(body)
 
     doc = json.loads(JOB.read_bytes())
     doc["agent"]["addressing"]["mode"] = "always"
+    doc.pop("version", None)
+    if version is not None:
+        doc["version"] = version
     sealed, _ = seal(json.dumps(doc))
     cfg = load(sealed)
     return SessionEvents(cfg, publish, clock=lambda: datetime(2026, 9, 24, 10, 0, tzinfo=UTC))
@@ -85,3 +89,50 @@ def test_an_invalid_payload_is_dropped_without_spending_a_sequence_number() -> N
 
     asyncio.run(run())
     assert [parse_event(body).sequence for body in sent] == [0]
+
+
+SCORED = {
+    "segmentId": "sg_0000000000000001",
+    "source": {"provider": "sarvam", "model": "sarvam-105b"},
+    "score": 1.0,
+    "criteria": {"correctness": "pass"},
+}
+CONFIGURED = {
+    "llm": {"provider": "sarvam", "model": "sarvam-105b"},
+    "fillers": True,
+    "backchannel": True,
+    "normalization": "platform",
+}
+
+
+def versioned_payloads(version: dict[str, Any] | None) -> list[dict[str, Any]]:
+    sent: list[bytes] = []
+
+    async def run() -> None:
+        events = emitter(sent, version)
+        events.emit(EventType.AGENT_CONFIGURED, CONFIGURED)
+        events.changed("listening")
+        events.emit(EventType.AGENT_TURN_METRICS, {"turn": 0, "interrupted": False}, TRACE)
+        events.emit(EventType.AGENT_TURN_SCORED, SCORED)
+        await events.drain()
+
+    asyncio.run(run())
+    return [parse_event(body).payload for body in sent]
+
+
+def test_configured_turn_metrics_and_scores_carry_the_version_the_session_runs() -> None:
+    configured, state, turn, scored = versioned_payloads({"id": "support-v4", "candidate": True})
+    assert configured["configVersion"] == {"id": "support-v4", "arm": "candidate"}
+    assert turn["configVersion"] == {"id": "support-v4", "arm": "candidate"}
+    assert scored["configVersion"] == {"id": "support-v4", "arm": "candidate"}
+    assert "configVersion" not in state
+
+
+def test_a_stable_session_says_so() -> None:
+    _, _, turn, scored = versioned_payloads({"id": "support-v3"})
+    assert turn["configVersion"] == {"id": "support-v3", "arm": "stable"}
+    assert scored["configVersion"] == {"id": "support-v3", "arm": "stable"}
+
+
+def test_an_unversioned_session_sends_no_version() -> None:
+    assert all("configVersion" not in p for p in versioned_payloads(None))

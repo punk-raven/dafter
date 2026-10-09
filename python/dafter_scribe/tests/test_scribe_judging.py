@@ -8,9 +8,20 @@ from dafter_providers import sarvam
 from dafter_runtime.events import SessionEvents
 from dafter_scribe.judging import BACKLOG, Scorer
 from dafter_scribe.plan import language_of
+from dafter_scribe.scoring import ScoringLoop
 from dafter_scribe.transcript import Transcript
 from livekit.agents import APIStatusError
-from scribe_stub import ASHA, RAVI, ScriptedLLM, Sent, Step, caption, config, prompt_of
+from scribe_stub import (
+    ASHA,
+    RAVI,
+    ScriptedLLM,
+    Sent,
+    Step,
+    caption,
+    config,
+    prompt_of,
+    scoring,
+)
 
 VERDICTS = {
     "correctness": "pass",
@@ -22,9 +33,13 @@ VERDICTS = {
 JUDGE = {"provider": "sarvam", "model": "sarvam-105b"}
 
 
-def scorer(*steps: Step, timeout_s: float = 5.0) -> tuple[Scorer, Sent, ScriptedLLM]:
+def scorer(
+    *steps: Step, timeout_s: float = 5.0, loop: ScoringLoop | None = None
+) -> tuple[Scorer, Sent, ScriptedLLM]:
     model, sent = ScriptedLLM(*steps), Sent()
-    return Scorer(model, sarvam.classify, sent, language_of("hi"), timeout_s, JUDGE), sent, model
+    scoring_loop = loop if loop is not None else scoring()
+    s = Scorer(model, sarvam.classify, sent, language_of("hi"), timeout_s, JUDGE, scoring_loop)
+    return s, sent, model
 
 
 def hear(s: Scorer, t: Transcript, *lines: tuple[str, str | None]) -> None:

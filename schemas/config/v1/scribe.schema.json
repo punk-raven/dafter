@@ -4,7 +4,7 @@
   "title": "Scribe",
   "type": "object",
   "unevaluatedProperties": false,
-  "description": "A second agent in the session that never speaks. It joins hidden and publishes no track, reads the live captions the agent worker already publishes rather than transcribing again, and keeps rolling notes: a short summary, decisions, action items with an owner, open questions, and the names and numbers mentioned. The voice agent reads those notes as the call's context and answers summarize_call from them. It scores each agent turn with the stage 4 judge, and when the call ends it writes the minutes, starts the transcript after the call and logs the session's cost. It is off the conversation's path: when it is slow or fails, only the notes are late. A session without this block has no scribe. It sends what everyone said to its own LLM provider and keeps the minutes, so it is gated like transcription: it needs its own consent artifact, a sealed session refuses it, and it needs transcription live or both, since it reads those captions. All three are cross-field rules.",
+  "description": "A second agent in the session that never speaks. It joins hidden and publishes no track, reads the live captions the agent worker already publishes rather than transcribing again, and keeps rolling notes: a short summary, decisions, action items with an owner, open questions, and the names and numbers mentioned. The voice agent reads those notes as the call's context and answers summarize_call from them. It scores a sample of the agent turns with the stage 4 judge (scoring), and when the call ends it writes the minutes, starts the transcript after the call and logs the session's cost. It is off the conversation's path: when it is slow or fails, only the notes are late. A session without this block has no scribe. It sends what everyone said to its own LLM provider and keeps the minutes, so it is gated like transcription: it needs its own consent artifact, a sealed session refuses it, and it needs transcription live or both, since it reads those captions. All three are cross-field rules.",
   "required": ["enabled"],
   "properties": {
     "enabled": { "type": "boolean" },
@@ -25,7 +25,39 @@
     },
     "judge": {
       "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/ProviderRef",
-      "description": "Grades each agent turn on the stage 4 criteria (correct, right language, speakable). Absent: turns are not scored."
+      "description": "Grades the agent turns that scoring samples, on the same criteria and with the same judge as dafter-screen (correct, right language, register, speakable). Absent: turns are not scored."
+    },
+    "scoring": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "Which agent turns the judge grades, so production quality is measured on a sample of real calls and its cost stays bounded. Off by default: with no rate above zero no turn is scored, even when a judge is named.",
+      "properties": {
+        "sampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0,
+          "description": "The share of agent turns scored in a language languageSampleRates does not name. A turn is picked by a hash of its caption segment, so a replay picks the same turns."
+        },
+        "languageSampleRates": {
+          "type": "object",
+          "patternProperties": { "^[a-z]{2,3}$": { "type": "number", "minimum": 0, "maximum": 1 } },
+          "additionalProperties": false,
+          "description": "The share of agent turns scored per base language of the session (hi, en, te, kn, mr), overriding sampleRate for that language."
+        },
+        "maxTurnsPerSession": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 20,
+          "description": "The most turns one session scores, the cost cap: a sampled turn past it is counted as capped and not sent to the judge."
+        },
+        "keepFailures": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write each turn with a fail verdict to the scribe worker's review queue (DAFTER_SCRIBE_REVIEW_DIR), with what the caller said and the reply, so a reviewer can promote it into the golden set or the screen banks. Audio is referenced, never copied, and only when the session's recording has a consent artifact."
+        }
+      }
     },
     "summaryIntervalMs": {
       "type": "integer",

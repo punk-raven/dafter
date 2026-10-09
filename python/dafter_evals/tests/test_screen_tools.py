@@ -194,7 +194,7 @@ def test_the_cli_offers_the_fixed_tool_set(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setattr(cli, "build", build)
     argv = ["--out", str(tmp_path), "--runs", "1", "--candidates", "gemini_flash_lite"]
     with pytest.raises(SystemExit) as exited:
-        cli.main([*argv, "--no-judge"])
+        cli.main([*argv, "--no-judge", "--report-only"])
     assert exited.value.code == 0
     assert all(offered == ["get_weather", "end_call"] for offered in model.offered)
     results = (tmp_path / "results.jsonl").read_text(encoding="utf-8").splitlines()

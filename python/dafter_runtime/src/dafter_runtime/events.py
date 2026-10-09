@@ -15,6 +15,9 @@ from dafter_core.events import EventEnvelope
 
 TOPIC = "dafter.events"
 EVENT_VERSION = 1
+VERSIONED = frozenset(
+    {EventType.AGENT_CONFIGURED, EventType.AGENT_TURN_METRICS, EventType.AGENT_TURN_SCORED}
+)
 
 log = logging.getLogger("dafter.runtime.events")
 
@@ -49,9 +52,16 @@ class SessionEvents:
         self._called = cfg.agent.addressing.waits_to_be_called
         self._awake: tuple[str, WakeSource] | None = None
 
+    def versioned(self, event_type: EventType, payload: dict[str, Any]) -> dict[str, Any]:
+        version = self._cfg.version
+        if event_type not in VERSIONED or version is None:
+            return payload
+        return {**payload, "configVersion": {"id": version.id, "arm": version.arm}}
+
     def envelope(
         self, event_type: EventType, payload: dict[str, Any], trace_id: str | None = None
     ) -> EventEnvelope:
+        payload = self.versioned(event_type, payload)
         event = EventEnvelope(
             event_id=new_event_id(),
             type=event_type,

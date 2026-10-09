@@ -1,0 +1,209 @@
+{
+  "language": "te-IN",
+  "name": "Telugu",
+  "set": "flows",
+  "source": "draft written for pg-a7; every task is reviewed: false until a native speaker signs off its lines",
+  "tasks": [
+    {
+      "id": "te-IN-order-status",
+      "reviewed": false,
+      "tags": [
+        "support",
+        "lookup",
+        "code-mix"
+      ],
+      "persona": "persona://support/v3",
+      "agentName": "Nivya",
+      "tools": [
+        "lookup_order",
+        "create_ticket",
+        "schedule_callback",
+        "current_time",
+        "end_call"
+      ],
+      "world": {
+        "clock": "2026-10-08T11:30:00+05:30",
+        "orders": {
+          "ORD-4821": {
+            "status": "shipped",
+            "item": "Pressure cooker, 5 litre",
+            "delivery": "2026-10-12"
+          }
+        }
+      },
+      "user": {
+        "mode": "simulated",
+        "opening": "హలో, నా order ఇంకా రాలేదు, status కొంచెం చెప్తారా?",
+        "persona": "Sunita, 42, a homemaker in Hyderabad; polite but in a hurry.",
+        "goal": "Find out where order ORD-4821 is and when it will arrive, then thank the agent.",
+        "facts": {
+          "order id": "ORD-4821",
+          "name": "Sunita"
+        }
+      },
+      "expect": {
+        "calls": [
+          {
+            "tool": "lookup_order",
+            "arguments": {
+              "order_id": "ORD-4821"
+            }
+          }
+        ],
+        "effects": [],
+        "readBack": [
+          {
+            "kind": "date",
+            "forms": [
+              "12 అక్టోబర్",
+              "పన్నెండు అక్టోబర్",
+              "అక్టోబర్ 12",
+              "అక్టోబర్ పన్నెండు",
+              "12 October"
+            ]
+          }
+        ],
+        "judge": [
+          "The agent tells the caller the order has shipped and arrives on 12 October 2026, as the lookup returned, and invents nothing beyond it.",
+          "Every agent reply is in Telugu; English words mixed in the way callers mix them are fine."
+        ]
+      }
+    },
+    {
+      "id": "te-IN-switch-language",
+      "reviewed": false,
+      "tags": [
+        "support",
+        "switch_language",
+        "code-mix"
+      ],
+      "persona": "persona://support/v3",
+      "agentName": "Nivya",
+      "tools": [
+        "lookup_order",
+        "create_ticket",
+        "schedule_callback",
+        "current_time",
+        "end_call"
+      ],
+      "world": {
+        "clock": "2026-10-08T11:30:00+05:30",
+        "orders": {
+          "ORD-4821": {
+            "status": "shipped",
+            "item": "Pressure cooker, 5 litre",
+            "delivery": "2026-10-12"
+          }
+        }
+      },
+      "user": {
+        "mode": "simulated",
+        "opening": "నమస్తే, order గురించి అడగాలి... actually మీరు English లో మాట్లాడగలరా?",
+        "persona": "Sunita, 42, a homemaker in Hyderabad; polite but in a hurry.",
+        "goal": "After your first line, speak only English: ask when order ORD-4821 will arrive.",
+        "facts": {
+          "order id": "ORD-4821"
+        }
+      },
+      "expect": {
+        "calls": [
+          {
+            "tool": "lookup_order",
+            "arguments": {
+              "order_id": "ORD-4821"
+            }
+          }
+        ],
+        "effects": [],
+        "language": "en-IN",
+        "judge": [
+          "After the caller asks for English, every agent reply is in English."
+        ]
+      },
+      "switchable": [
+        "te-IN",
+        "en-IN"
+      ]
+    },
+    {
+      "id": "te-IN-group-side-talk",
+      "reviewed": false,
+      "tags": [
+        "group",
+        "addressing"
+      ],
+      "persona": "persona://support/v3",
+      "agentName": "Nivya",
+      "tools": [
+        "lookup_order",
+        "who_is_here"
+      ],
+      "world": {
+        "clock": "2026-10-08T11:30:00+05:30",
+        "orders": {
+          "ORD-4821": {
+            "status": "shipped",
+            "item": "Pressure cooker, 5 litre",
+            "delivery": "2026-10-12"
+          }
+        },
+        "people": [
+          {
+            "id": "priya",
+            "name": "Priya"
+          },
+          {
+            "id": "ravi",
+            "name": "Ravi"
+          }
+        ]
+      },
+      "user": {
+        "mode": "scripted",
+        "turns": [
+          {
+            "speaker": "priya",
+            "to": "room",
+            "text": "రవి, cooker bill జాగ్రత్తగా పెట్టావా?",
+            "reply": false
+          },
+          {
+            "speaker": "ravi",
+            "to": "room",
+            "text": "అవును, drawer లో పెట్టాను.",
+            "reply": false
+          },
+          {
+            "speaker": "priya",
+            "to": "you",
+            "text": "నివ్యా, order ORD-4821 ఒకసారి check చేయండి.",
+            "reply": true
+          }
+        ]
+      },
+      "expect": {
+        "calls": [
+          {
+            "tool": "lookup_order",
+            "arguments": {
+              "order_id": "ORD-4821"
+            }
+          }
+        ],
+        "effects": [],
+        "readBack": [
+          {
+            "kind": "date",
+            "forms": [
+              "12 అక్టోబర్",
+              "పన్నెండు అక్టోబర్",
+              "అక్టోబర్ 12",
+              "అక్టోబర్ పన్నెండు",
+              "12 October"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

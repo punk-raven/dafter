@@ -6,15 +6,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .wer import transcript_text, word_error_rate
+from .wer import error_rates, transcript_text
 
 
 def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="dafter-wer",
         description=(
-            "Word error rate of a transcript against the verified reference of a known clip, "
-            "after Indic normalisation. Offline: it calls no provider."
+            "Word, character and orthography-aware word error rates of a transcript against "
+            "the verified reference of a known clip, after Indic normalisation. Offline: it "
+            "calls no provider."
         ),
     )
     p.add_argument("--reference", type=Path, required=True, help="the clip's reference JSON")
@@ -40,7 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     args = arguments(argv)
     reference: dict[str, Any] = json.loads(args.reference.read_text(encoding="utf-8"))
     try:
-        result = word_error_rate(reference["reference"], hypothesis(args))
+        references = [reference["reference"], *reference.get("alternates", [])]
+        result = error_rates(references, hypothesis(args))
     except (KeyError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         return 1

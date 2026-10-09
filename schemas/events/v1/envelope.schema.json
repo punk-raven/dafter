@@ -341,7 +341,8 @@
         "language": {
           "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag",
           "description": "The language the agent replied in, as a session language tag. Present only in a session that switches languages (agent.languageSwitching), where it can differ from the session's language, so its turns can be measured per language."
-        }
+        },
+        "configVersion": { "$ref": "#/$defs/ConfigVersion" }
       },
       "dependentRequired": { "serial": ["llmNodeTtftMs", "llmNodeTtfsMs"] }
     },
@@ -364,7 +365,22 @@
         },
         "fillers": { "type": "boolean", "description": "True when a slow reply can be preceded by a filler phrase: agent.speech.fillers is enabled and the session's language has phrases." },
         "backchannel": { "type": "boolean", "description": "True when a caller's short acknowledgement over the agent is dropped rather than taken as a turn: turn.interruption.backchannel is enabled and lists words." },
-        "normalization": { "type": "string", "enum": ["platform", "provider"], "description": "platform when the worker's speech planner rewrites numbers, dates, prices and phone numbers for this language before TTS; provider when the text reaches TTS as the LLM wrote it, including under platform for a language the planner has no rules for." }
+        "normalization": { "type": "string", "enum": ["platform", "provider"], "description": "platform when the worker's speech planner rewrites numbers, dates, prices and phone numbers for this language before TTS; provider when the text reaches TTS as the LLM wrote it, including under platform for a language the planner has no rules for." },
+        "configVersion": { "$ref": "#/$defs/ConfigVersion" }
+      }
+    },
+    "ConfigVersion": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["id", "arm"],
+      "description": "The persona and config version the session runs (the resolved session config's version), so a consumer can compare one version's turns against another's. Absent when the session's config states no version.",
+      "properties": {
+        "id": { "$ref": "https://schemas.dafter.dev/config/v1/version.schema.json#/properties/id" },
+        "arm": {
+          "type": "string",
+          "enum": ["stable", "candidate"],
+          "description": "candidate when the control plane's canary routed the session to its profile's candidate, else stable."
+        }
       }
     },
     "ProviderDegradedPayload": {

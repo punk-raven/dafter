@@ -50,6 +50,25 @@ def test_semantic_is_chosen_only_where_the_on_device_detector_covers_the_languag
         assert turn["localVadEnabled"] is False
 
 
+@pytest.mark.parametrize(
+    ("language", "strategy", "silence_ms"),
+    [
+        ("en-IN", "semantic", 350),
+        ("hi", "semantic", 350),
+        ("mr-IN", "provider_endpointing", 350),
+        ("kn-IN", "provider_endpointing", 350),
+        ("te-IN", "provider_endpointing", 650),
+    ],
+)
+def test_each_language_ends_the_turn_on_its_chosen_detector(
+    language: str, strategy: str, silence_ms: int
+) -> None:
+    turn = catalog_languages()[language]["tuning"]["turn"]
+    assert (turn["strategy"], turn["silenceMs"]) == (strategy, silence_ms)
+    assert turn["localVadEnabled"] is (strategy == "semantic")
+    assert "detector" not in turn
+
+
 @pytest.mark.parametrize(("language", "fixture"), sorted(FOCUS.items()))
 def test_each_job_vector_hears_and_speaks_its_own_language(language: str, fixture: str) -> None:
     cfg = load((JOBS / fixture).read_bytes().strip())

@@ -4,13 +4,19 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
+import pytest
+from dafter_core.speech import Backchannel
+from dafter_runtime import barge_in as barge_in_module
 from dafter_runtime.answering import Roster, Voice
 from dafter_runtime.barge_in import BargeIn, Resume
+from dafter_runtime.lexicon import Lexicon
+from dafter_runtime.metrics import Moment
 
 ASHA = "p_4b81e0d7"
 RAVI = "p_9d02c3aa"
 MIN_S = 0.25
 RESUME_S = 2.0
+HINDI_NEGATIVES = Lexicon.of(Backchannel(negatives={"hi": ("nahi", "ruko")}))
 
 
 class Pending:
@@ -38,6 +44,7 @@ class Rig:
             self._schedule,
             resume=resume if resumes else None,
             waits_for_words=waits_for_words,
+            lexicon=HINDI_NEGATIVES,
         )
 
     def _pause(self) -> bool:
@@ -199,3 +206,26 @@ def test_nothing_to_pause_is_not_paused() -> None:
     assert not voice(Session(current_speech=Speech(allow_interruptions=False))).pause()
     assert not voice(Session(output=Outputs(audio=Output(can_pause=False)))).pause()
     assert not voice(Session(output=Outputs(audio=None))).pause()
+
+
+def test_a_dropped_affirmative_resumes_the_reply_and_counts_one_false_interruption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    counted: list[Moment] = []
+    monkeypatch.setattr(barge_in_module, "counted", counted.append)
+    rig = Rig()
+    rig.talks_over()
+    rig.barge_in.quiet(ASHA)
+    rig.barge_in.acknowledged(ASHA)
+    rig.fire(RESUME_S)
+    assert rig.log == ["pause", "resume"]
+    assert counted == [Moment.FALSE_INTERRUPTION]
+
+
+def test_a_negative_over_the_paused_reply_cuts_it_and_never_resumes() -> None:
+    rig = Rig()
+    rig.talks_over()
+    rig.barge_in.transcribed(ASHA, "nahi", final=False)
+    rig.barge_in.quiet(ASHA)
+    rig.fire(RESUME_S)
+    assert rig.log == ["pause", "stop"]

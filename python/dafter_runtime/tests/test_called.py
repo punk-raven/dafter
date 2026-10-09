@@ -142,7 +142,7 @@ def test_the_called_plan_names_the_agent_and_prompts_the_recognizer() -> None:
     assert "calls you by your name" in p.persona.instructions
     assert p.stt_prompt == "Nivya, निव्या, ನಿವ್ಯ, ನಿವ್ಯಾ, నివ్య, నివ్యా"
     assert p.voice_turn_handling["turn_detection"] == "manual"
-    assert p.turn_handling["turn_detection"] == "stt"
+    assert "turn_detection" not in p.turn_handling
 
 
 def test_the_voice_session_publishes_speech_and_hears_no_one_itself() -> None:

@@ -22,6 +22,8 @@ class Backchannel:
     max_words: int = 3
     answer_within_ms: int = 1500
     words: PhrasesByLanguage = field(default_factory=dict)
+    negatives: PhrasesByLanguage = field(default_factory=dict)
+    reviewed: dict[str, bool] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Backchannel:
@@ -30,6 +32,8 @@ class Backchannel:
             max_words=d.get("maxWords", 3),
             answer_within_ms=d.get("answerWithinMs", 1500),
             words=phrases_by_language(d.get("words")),
+            negatives=phrases_by_language(d.get("negatives")),
+            reviewed=dict(d.get("reviewed") or {}),
         )
 
 

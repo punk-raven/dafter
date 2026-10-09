@@ -16,7 +16,15 @@ from dafter_runtime.listeners import Listener, listener_session
 from dafter_runtime.plan import Plan, load, plan
 from dafter_runtime.toolbox import Answering, registry_for
 from livekit.agents import AgentSession, JobContext, llm
-from session_rig import Microphone, ScriptedSTT, ScriptedVAD, SlowReader, Speaker, until
+from session_rig import (
+    Microphone,
+    ScriptedSTT,
+    ScriptedVAD,
+    SlowReader,
+    Speaker,
+    until,
+    worker_turn_handling,
+)
 from stub_llm import StubLLM
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
@@ -71,7 +79,7 @@ def echoed_always(*heard: tuple[str, ...]) -> Outcome:
             llm=StubLLM(),
             tts=reader,
             vad=detector,
-            turn_handling=p.turn_handling,  # type: ignore[arg-type]
+            turn_handling=worker_turn_handling(p),  # type: ignore[arg-type]
             user_away_timeout=None,
             aec_warmup_duration=None,
         )
@@ -140,7 +148,7 @@ def echoed_called(
         delivery.start(voice_session, reader)
         called.listen()
         called.roster.join(ASHA)
-        listening = listener_session(recognizer, detector, p.turn_handling)
+        listening = listener_session(recognizer, detector, worker_turn_handling(p))
         listening.input.audio = Microphone()
         called._listening(ASHA, listening)
         turns: list[str] = []

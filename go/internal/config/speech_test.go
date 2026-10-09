@@ -67,3 +67,31 @@ func TestValidateBoundsTheBackchannelAnswerWindow(t *testing.T) {
 		refusedAt(t, c, "/turn/interruption/backchannel/answerWithinMs")
 	}
 }
+
+func TestValidateAcceptsBackchannelNegativesAndReviewMarks(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Turn.Interruption = &config.Interruption{Backchannel: &config.Backchannel{
+		Words:     config.PhrasesByLanguage{"hi": {"हाँ"}},
+		Negatives: config.PhrasesByLanguage{"hi": {"नहीं", "ruko"}},
+		Reviewed:  map[string]bool{"hi": false},
+	}}
+	if err := c.Validate(); err != nil {
+		t.Errorf("negatives and review marks rejected: %v", err)
+	}
+}
+
+func TestValidateRejectsAnEmptyNegativeAndAReviewMarkForNoLanguage(t *testing.T) {
+	t.Parallel()
+	c := validConfig(t)
+	c.Turn.Interruption = &config.Interruption{Backchannel: &config.Backchannel{
+		Negatives: config.PhrasesByLanguage{"hi": {""}},
+	}}
+	refusedAt(t, c, "/turn/interruption/backchannel/negatives")
+
+	c = validConfig(t)
+	c.Turn.Interruption = &config.Interruption{Backchannel: &config.Backchannel{
+		Reviewed: map[string]bool{"Hindi": true},
+	}}
+	refusedAt(t, c, "/turn/interruption/backchannel/reviewed")
+}

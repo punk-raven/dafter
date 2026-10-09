@@ -135,11 +135,12 @@
         "criteria": {
           "type": "object",
           "minProperties": 1,
-          "propertyNames": { "pattern": "^[a-z][a-zA-Z]{1,31}$" },
-          "additionalProperties": { "type": "string", "enum": ["pass", "fail", "maybe"] }
+          "patternProperties": { "^[a-z][a-zA-Z]{1,31}$": { "type": "string", "enum": ["pass", "fail", "maybe"] } },
+          "additionalProperties": false
         },
         "error": { "$ref": "https://schemas.dafter.dev/errors/v1/error.schema.json#/$defs/ErrorCode" },
-        "source": { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/TranscriptSource", "description": "The judge." }
+        "source": { "$ref": "https://schemas.dafter.dev/events/v1/transcript.schema.json#/$defs/TranscriptSource", "description": "The judge." },
+        "configVersion": { "$ref": "https://schemas.dafter.dev/events/v1/envelope.schema.json#/$defs/ConfigVersion" }
       },
       "oneOf": [
         { "required": ["score", "criteria"], "not": { "required": ["error"] } },

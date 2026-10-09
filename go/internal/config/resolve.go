@@ -35,6 +35,7 @@ type Request struct {
 	Channel   Channel
 	LLM       string
 	Overrides json.RawMessage
+	Candidate bool
 }
 
 type Resolution struct {
@@ -101,12 +102,12 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 	} else {
 		problems = append(problems, located("/tenantId", "no tenant configuration is registered"))
 	}
+	candidate := false
 	if profile != "" {
-		if raw, ok := c.Profiles[profile]; ok {
-			sources = append(sources, source{name: "profile", raw: raw})
-		} else {
-			problems = append(problems, located(profilePointer, "no profile of that name is registered"))
-		}
+		layer, routed, unknown := c.profileLayer(profile, profilePointer, req.Candidate)
+		problems = append(problems, unknown...)
+		sources = append(sources, layer)
+		candidate = routed
 	}
 	if len(req.Overrides) > 0 {
 		problems = append(problems, reservedProblems(req.Overrides)...)
@@ -171,6 +172,7 @@ func (c *Catalog) compose(req Request) (map[string]any, error) {
 	if problems = dropIdleTelephony(doc, overrides, req.Channel); len(problems) > 0 {
 		return nil, detailed(errs.CodeInvalidConfig, problems, "%d session override(s) tune phone calls in a session that takes none")
 	}
+	stampVersion(doc, candidate)
 	return doc, nil
 }
 
@@ -291,15 +293,37 @@ func operatorOnlyProblems(overrides map[string]any) []string {
 	scribe, _ := overrides["scribe"].(map[string]any)
 	var problems []string
 	for _, stage := range slices.Sorted(maps.Keys(pipeline)) {
+		if stage == "fallback" {
+			problems = append(problems, fallbackRedirections(pipeline[stage])...)
+			continue
+		}
 		problems = append(problems, redirections("/agent/pipeline/"+stage, pipeline[stage])...)
 	}
 	for _, field := range []string{"llm", "judge"} {
 		problems = append(problems, redirections("/scribe/"+field, scribe[field])...)
 	}
+	for _, field := range []string{"version", "canary"} {
+		if _, ok := overrides[field]; ok {
+			problems = append(problems, located("/"+field,
+				"names the persona and config version a session runs, which only the operator's configuration and its canary set, never a session override"))
+		}
+	}
 	telephony, _ := overrides["telephony"].(map[string]any)
 	if _, ok := telephony["trunk"]; ok {
 		problems = append(problems, located("/telephony/trunk",
 			"names the SIP trunk a call goes out on, which only the operator's configuration sets, never a session override"))
+	}
+	return problems
+}
+
+func fallbackRedirections(fallback any) []string {
+	chains, _ := fallback.(map[string]any)
+	var problems []string
+	for _, stage := range slices.Sorted(maps.Keys(chains)) {
+		routes, _ := chains[stage].([]any)
+		for i, route := range routes {
+			problems = append(problems, redirections(fmt.Sprintf("/agent/pipeline/fallback/%s/%d", stage, i), route)...)
+		}
 	}
 	return problems
 }
@@ -325,10 +349,8 @@ func present(doc map[string]any, path []string) bool {
 }
 
 func merge(base, over map[string]any, pointer string) map[string]any {
-	out := make(map[string]any, len(base)+len(over))
-	for k, v := range base {
-		out[k] = v
-	}
+	out := make(map[string]any)
+	maps.Copy(out, base)
 	for k, v := range over {
 		at := pointer + "/" + pointerEscaper.Replace(k)
 		bm, baseIsObject := out[k].(map[string]any)
