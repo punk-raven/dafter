@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -11,11 +12,11 @@ from dafter_core.enums import ErrorCode, TurnStrategy
 from dafter_core.errors import DafterError
 from dafter_core.hashing import seal
 from dafter_providers import TURN_DETECTORS, VENDORS, TurnDetectorKind
-from dafter_runtime import plan as planning
 from dafter_runtime.plan import TURN_DETECTOR_LANGUAGES, load, plan, turn_detection
 
 JOB = Path(__file__).resolve().parents[3] / "testdata" / "agent" / "hindi-webrtc-job.json"
 SARVAM = VENDORS["sarvam"]
+planning = importlib.import_module("dafter_runtime.plan")
 SEMANTIC = Turn(strategy=TurnStrategy.SEMANTIC, local_vad_enabled=True)
 
 
