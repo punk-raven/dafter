@@ -1,0 +1,58 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: dafter-agent
+    folder: Dafter
+    interval: 1m
+    rules:
+      - uid: dafter-agent-reply-gap-p95
+        title: Reply gap p95 over 1500 ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: >-
+                histogram_quantile(0.95, sum by (le, language)
+                (rate(dafter_agent_turn_layer_seconds_bucket{layer="reply_gap"}[5m]))) * 1000
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1500]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        isPaused: false
+        labels:
+          severity: warning
+          service: dafter-agent
+        annotations:
+          __dashboardUid__: dafter-agent-turns
+          __panelId__: "1"
+          summary: "Reply gap p95 is {{ humanize $values.B.Value }} ms in {{ $labels.language }}"
+          description: >-
+            The worker-measured reply gap (reply_gap, from the user's last voiced audio to the
+            agent starting to speak) has held its p95 above the 1500 ms target for 5 min in this
+            language. The Dafter agent latency dashboard shows which layer grew.

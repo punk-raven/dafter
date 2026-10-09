@@ -179,6 +179,10 @@ services:
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      DAFTER_METRICS_PORT: "9465"
+      DAFTER_SCRIBE_REVIEW_DIR: /var/lib/dafter/scribe-review
+    volumes:
+      - ./.scribe-review:/var/lib/dafter/scribe-review
     depends_on:
       livekit:
         condition: service_started
