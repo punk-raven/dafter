@@ -218,17 +218,6 @@
         }
       }
     },
-    "PhrasesByLanguage": {
-      "type": "object",
-      "description": "Words or short phrases keyed by base language (hi, en, kn, mr, te), so a language overlay restates its own list without repeating the others.",
-      "propertyNames": { "pattern": "^[a-z]{2,3}$" },
-      "additionalProperties": {
-        "type": "array",
-        "items": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "maxItems": 64,
-        "uniqueItems": true
-      }
-    },
     "Speech": {
       "type": "object",
       "unevaluatedProperties": false,
@@ -243,13 +232,15 @@
         "substitutions": {
           "type": "object",
           "description": "Words replaced before TTS, keyed by base language and then by the word as written, for names and brands the voice says wrongly. A TTS provider's own pronunciation dictionary, where it has one, is a provider option instead.",
-          "propertyNames": { "pattern": "^[a-z]{2,3}$" },
-          "additionalProperties": {
-            "type": "object",
-            "propertyNames": { "minLength": 1, "maxLength": 64 },
-            "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 128 },
-            "maxProperties": 200
-          }
+          "patternProperties": {
+            "^[a-z]{2,3}$": {
+              "type": "object",
+              "propertyNames": { "minLength": 1, "maxLength": 64 },
+              "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "maxProperties": 200
+            }
+          },
+          "additionalProperties": false
         },
         "fillers": { "$ref": "#/$defs/Fillers" },
         "situations": { "$ref": "#/$defs/Situations" },
@@ -267,7 +258,7 @@
       "properties": {
         "enabled": { "type": "boolean", "default": true },
         "afterMs": { "type": "integer", "minimum": 100, "maximum": 10000, "default": 1000 },
-        "phrases": { "$ref": "#/$defs/PhrasesByLanguage" }
+        "phrases": { "$ref": "https://schemas.dafter.dev/config/v1/phrases-by-language.schema.json" }
       }
     },
     "Situation": {
@@ -286,8 +277,8 @@
           "unevaluatedProperties": false,
           "description": "Cues per situation that has any; neutral is what is left when none is said.",
           "properties": {
-            "greeting": { "$ref": "#/$defs/PhrasesByLanguage" },
-            "concern": { "$ref": "#/$defs/PhrasesByLanguage" }
+            "greeting": { "$ref": "https://schemas.dafter.dev/config/v1/phrases-by-language.schema.json" },
+            "concern": { "$ref": "https://schemas.dafter.dev/config/v1/phrases-by-language.schema.json" }
           }
         }
       }

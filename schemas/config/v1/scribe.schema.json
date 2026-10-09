@@ -41,8 +41,8 @@
         },
         "languageSampleRates": {
           "type": "object",
-          "propertyNames": { "pattern": "^[a-z]{2,3}$" },
-          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
+          "patternProperties": { "^[a-z]{2,3}$": { "type": "number", "minimum": 0, "maximum": 1 } },
+          "additionalProperties": false,
           "description": "The share of agent turns scored per base language of the session (hi, en, te, kn, mr), overriding sampleRate for that language."
         },
         "maxTurnsPerSession": {

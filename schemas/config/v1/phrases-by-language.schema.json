@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/phrases-by-language.schema.json",
+  "title": "PhrasesByLanguage",
+  "type": "object",
+  "description": "Words or short phrases keyed by base language (hi, en, kn, mr, te), so a language overlay restates its own list without repeating the others.",
+  "patternProperties": {
+    "^[a-z]{2,3}$": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "maxItems": 64,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
