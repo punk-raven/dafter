@@ -25,6 +25,7 @@
     },
     "language": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/LanguageTag" },
     "channel": { "$ref": "https://schemas.dafter.dev/common/v1/ids.schema.json#/$defs/Channel" },
+    "version": { "$ref": "https://schemas.dafter.dev/config/v1/version.schema.json" },
     "llm": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{1,31}/[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
@@ -155,7 +156,9 @@
         "llm": { "$ref": "#/$defs/ProviderRef" },
         "tts": { "$ref": "#/$defs/ProviderRef" },
         "mt": { "$ref": "#/$defs/ProviderRef" },
-        "realtime": { "$ref": "#/$defs/ProviderRef" }
+        "realtime": { "$ref": "#/$defs/ProviderRef" },
+        "fallback": { "$ref": "https://schemas.dafter.dev/config/v1/fallback.schema.json" },
+        "noiseFilter": { "$ref": "https://schemas.dafter.dev/config/v1/noise-filter.schema.json" }
       }
     },
     "Turn": {
@@ -177,6 +180,7 @@
           "maximum": 10000,
           "description": "The longest the agent waits once speech has stopped: under the semantic strategy, the wait when the turn detector judges the caller unlikely to be done, and the ceiling its learned delay never passes."
         },
+        "detector": { "$ref": "https://schemas.dafter.dev/config/v1/turn-detector.schema.json" },
         "localVadEnabled": {
           "type": "boolean",
           "description": "Whether a local VAD takes part in deciding the user's turn, as it does under the vad and semantic strategies. False under provider_endpointing, where the recognizer's own VAD decides the turn and a second detector deciding it would fight the first. A local VAD that only catches the caller talking over the agent is interruption.localVadEnabled.",

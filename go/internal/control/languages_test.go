@@ -12,7 +12,7 @@ var focusLanguages = []struct {
 	strategy config.TurnStrategy
 	voice    string
 }{
-	{"hi", config.TurnProviderEndpointing, "priya"},
+	{"hi", config.TurnSemantic, "priya"},
 	{"en-IN", config.TurnSemantic, "priya"},
 	{"kn-IN", config.TurnProviderEndpointing, "priya"},
 	{"mr-IN", config.TurnProviderEndpointing, "priya"},

@@ -44,7 +44,7 @@ func (s *Service) answerCall(w http.ResponseWriter, r *http.Request) {
 	opened, err := s.openSession(r.Context(), config.Request{
 		TenantID: session.TenantID, Profile: session.Profile, Language: session.Language,
 		Channel: config.ChannelTelephony,
-	}, name)
+	}, name, vobiz.Caller(r.PostForm))
 	if err != nil {
 		s.hangUp(w, name, err)
 		return

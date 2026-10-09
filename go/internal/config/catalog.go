@@ -29,5 +29,8 @@ func LoadCatalog(raw []byte) (*Catalog, error) {
 	if err := c.checkAgents(); err != nil {
 		return nil, err
 	}
+	if err := c.checkVersions(); err != nil {
+		return nil, err
+	}
 	return &c, nil
 }

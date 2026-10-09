@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/turn-detector.schema.json",
+  "title": "TurnDetector",
+  "type": "string",
+  "description": "The end-of-turn model the semantic strategy runs on the caller's audio, beside the local VAD. livekit is the framework's on-device v1-mini detector, which covers English and Hindi among the focus languages. smart_turn is Pipecat's Smart Turn v3.2 (BSD-2), which also covers Marathi; it runs from weights the worker fetches at start, and a worker without them refuses the job. Neither covers Telugu or Kannada, so a session in a language its detector does not cover ends turns on the recognizer's own endpointing. Only the semantic strategy reads this; the catalog leaves it livekit, and smart_turn is a trial a session turns on.",
+  "enum": ["livekit", "smart_turn"],
+  "default": "livekit"
+}

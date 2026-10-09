@@ -21,6 +21,19 @@
       "maximum": 5000,
       "default": 1500
     },
-    "words": { "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/PhrasesByLanguage" }
+    "words": {
+      "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/PhrasesByLanguage",
+      "description": "The acknowledgements, and the affirmatives of the interruption lexicon: an affirmative said alone holds the agent's reply, an affirmative followed by more speech yields it."
+    },
+    "negatives": {
+      "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/PhrasesByLanguage",
+      "description": "Phrases (no, wait, ruko, नहीं) that yield the agent's reply wherever they fall in an utterance, below interruption.minWords. An utterance holding one is never an acknowledgement. The negatives of every language are used together."
+    },
+    "reviewed": {
+      "type": "object",
+      "description": "Whether a native speaker has checked a language's words and negatives, keyed by base language. Metadata only; it changes no behaviour.",
+      "propertyNames": { "pattern": "^[a-z]{2,3}$" },
+      "additionalProperties": { "type": "boolean" }
+    }
   }
 }

@@ -45,3 +45,41 @@ def test_a_scribe_states_its_defaults_when_the_document_leaves_them_out() -> Non
     assert (scribe.summary_interval_ms, scribe.after_call_timeout_seconds) == (60000, 900)
     assert scribe.judge is None
     assert scribe.llm is not None and scribe.llm.model == "sarvam-105b"
+
+
+def test_scribe_scoring_is_off_and_capped_by_default() -> None:
+    case = {"patch": {"scribe": {"enabled": True, "consentArtifactId": "c", "llm": "$llm"}}}
+    scoring = parse(document(case)).scribe.scoring
+    assert (scoring.sample_rate, scoring.max_turns_per_session) == (0.0, 20)
+    assert not scoring.keep_failures and scoring.rate_for("hi") == 0.0
+
+
+def test_scribe_scoring_reads_a_rate_per_base_language() -> None:
+    scribe = {
+        "enabled": True,
+        "consentArtifactId": "c",
+        "llm": "$llm",
+        "scoring": {"sampleRate": 0.05, "languageSampleRates": {"kn": 0.25}, "keepFailures": True},
+    }
+    scoring = parse(document({"patch": {"scribe": scribe}})).scribe.scoring
+    assert scoring.rate_for("kn-IN") == 0.25 and scoring.rate_for("hi") == 0.05
+    assert scoring.keep_failures
+
+
+@pytest.mark.parametrize(
+    ("scoring", "pointer"),
+    [
+        ({"sampleRate": 1.5}, "/scribe/scoring/sampleRate"),
+        ({"maxTurnsPerSession": 0}, "/scribe/scoring/maxTurnsPerSession"),
+        ({"languageSampleRates": {"hi-IN": 0.5}}, "/scribe/scoring/languageSampleRates"),
+        ({"everyTurn": True}, "/scribe/scoring"),
+    ],
+)
+def test_scribe_scoring_refuses_a_rate_or_cap_out_of_range(
+    scoring: dict[str, Any], pointer: str
+) -> None:
+    scribe = {"enabled": True, "consentArtifactId": "c", "llm": "$llm", "scoring": scoring}
+    with pytest.raises(DafterError) as caught:
+        parse(document({"patch": {"scribe": scribe}}))
+    assert caught.value.code is ErrorCode.INVALID_CONFIG
+    assert any(pointer in d for d in caught.value.details), caught.value.details

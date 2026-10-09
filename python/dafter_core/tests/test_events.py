@@ -151,6 +151,13 @@ MUTATIONS: list[tuple[str, str, Callable[[dict[str, Any]], object]]] = [
     ("filler not a boolean", "agent-turn-metrics.json", lambda p: p.update(filler="yes")),
     ("serial without its layers", "agent-turn-metrics.json", lambda p: p.pop("llmNodeTtfsMs")),
     ("reply language not a tag", "agent-turn-metrics.json", lambda p: p.update(language="Kannada")),
+    ("unknown arm", "agent-turn-metrics.json", lambda p: p["configVersion"].update(arm="beta")),
+    ("version without an id", "agent-turn-metrics.json", lambda p: p["configVersion"].pop("id")),
+    (
+        "configured version without an arm",
+        "agent-configured.json",
+        lambda p: p.update(configVersion={"id": "support-v3"}),
+    ),
     ("unpriced item with a cost", "session-usage.json", lambda p: _item(p, 1).update(costInr=0)),
     ("priced item without a cost", "session-usage.json", lambda p: _item(p, 0).pop("costInr")),
     ("unknown unit", "session-usage.json", lambda p: _item(p, 0).update(unit="minute")),

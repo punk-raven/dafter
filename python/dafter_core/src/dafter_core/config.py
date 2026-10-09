@@ -24,55 +24,16 @@ from .enums import (
     VideoResolution,
 )
 from .errors import DafterError
+from .pipeline import Pipeline as Pipeline
+from .pipeline import ProviderRef as ProviderRef
 from .rules import CROSS_FIELD_RULES
 from .speech import Backchannel, Speech
 from .switching import LanguageSwitching
 from .telephony import Telephony
 from .validation import validate_document
+from .versioning import Version
 
-
-@dataclass(frozen=True, slots=True)
-class ProviderRef:
-    provider: str
-    model: str | None = None
-    region: str | None = None
-    credential_ref: str | None = None
-    options: dict[str, Any] = field(default_factory=dict)
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> ProviderRef:
-        return cls(
-            provider=d["provider"],
-            model=d.get("model"),
-            region=d.get("region"),
-            credential_ref=d.get("credentialRef"),
-            options=d.get("options") or {},
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class Pipeline:
-    vad: ProviderRef | None = None
-    stt: ProviderRef | None = None
-    llm: ProviderRef | None = None
-    tts: ProviderRef | None = None
-    mt: ProviderRef | None = None
-    realtime: ProviderRef | None = None
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> Pipeline:
-        def ref(key: str) -> ProviderRef | None:
-            v = d.get(key)
-            return ProviderRef.from_dict(v) if v else None
-
-        return cls(
-            vad=ref("vad"),
-            stt=ref("stt"),
-            llm=ref("llm"),
-            tts=ref("tts"),
-            mt=ref("mt"),
-            realtime=ref("realtime"),
-        )
+DEFAULT_TURN_DETECTOR = "livekit"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +77,7 @@ class Turn:
     endpointing_delay_ms: int = 0
     endpointing_max_delay_ms: int | None = None
     local_vad_enabled: bool = True
+    detector: str = DEFAULT_TURN_DETECTOR
     preemptive_generation: PreemptiveGeneration = field(default_factory=PreemptiveGeneration)
     interruption: Interruption = field(default_factory=Interruption)
 
@@ -128,6 +90,7 @@ class Turn:
             endpointing_delay_ms=d.get("endpointingDelayMs", 0),
             endpointing_max_delay_ms=d.get("endpointingMaxDelayMs"),
             local_vad_enabled=d.get("localVadEnabled", True),
+            detector=d.get("detector") or DEFAULT_TURN_DETECTOR,
             preemptive_generation=PreemptiveGeneration.from_dict(
                 d.get("preemptiveGeneration") or {}
             ),
@@ -393,6 +356,30 @@ class Transcription:
 
 
 DEFAULT_SCRIBE_POOL = "dafter-scribe"
+DEFAULT_SCRIBE_MAX_SCORED_TURNS = 20
+
+
+@dataclass(frozen=True, slots=True)
+class ScribeScoring:
+    sample_rate: float = 0.0
+    language_sample_rates: dict[str, float] = field(default_factory=dict)
+    max_turns_per_session: int = DEFAULT_SCRIBE_MAX_SCORED_TURNS
+    keep_failures: bool = False
+
+    def rate_for(self, language: str) -> float:
+        base = language.split("-", 1)[0].lower()
+        return self.language_sample_rates.get(base, self.sample_rate)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ScribeScoring:
+        return cls(
+            sample_rate=float(d.get("sampleRate", 0.0)),
+            language_sample_rates={
+                k: float(v) for k, v in (d.get("languageSampleRates") or {}).items()
+            },
+            max_turns_per_session=d.get("maxTurnsPerSession", DEFAULT_SCRIBE_MAX_SCORED_TURNS),
+            keep_failures=d.get("keepFailures", False),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -402,6 +389,7 @@ class Scribe:
     consent_artifact_id: str | None = None
     llm: ProviderRef | None = None
     judge: ProviderRef | None = None
+    scoring: ScribeScoring = field(default_factory=ScribeScoring)
     summary_interval_ms: int = 60000
     after_call_timeout_seconds: int = 900
 
@@ -415,6 +403,7 @@ class Scribe:
             consent_artifact_id=d.get("consentArtifactId"),
             llm=ProviderRef.from_dict(llm) if llm else None,
             judge=ProviderRef.from_dict(judge) if judge else None,
+            scoring=ScribeScoring.from_dict(d.get("scoring") or {}),
             summary_interval_ms=d.get("summaryIntervalMs", 60000),
             after_call_timeout_seconds=d.get("afterCallTimeoutSeconds", 900),
         )
@@ -456,6 +445,7 @@ class ResolvedSessionConfig:
     config_hash: str | None = None
     allowed_regions: tuple[str, ...] = ()
     llm: str | None = None
+    version: Version | None = None
 
     def validate_cross_field_rules(self) -> None:
         broken = [rule for rule in CROSS_FIELD_RULES if rule.broken(self)]
@@ -473,6 +463,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         raw = raw.encode()
     doc = validate_document(schemas.RESOLVED_SESSION_CONFIG, raw, ErrorCode.INVALID_CONFIG)
     residency = doc.get("residency") or {}
+    version = doc.get("version")
     cfg = ResolvedSessionConfig(
         api_version=doc["apiVersion"],
         session_id=doc["sessionId"],
@@ -491,6 +482,7 @@ def parse(raw: bytes | str) -> ResolvedSessionConfig:
         config_hash=doc.get("configHash"),
         allowed_regions=tuple(residency.get("allowedRegions", ())),
         llm=doc.get("llm"),
+        version=None if version is None else Version.from_dict(version),
     )
     cfg.validate_cross_field_rules()
     return cfg

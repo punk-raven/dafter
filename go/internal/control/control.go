@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -141,7 +142,7 @@ func (s *Service) createSession(w http.ResponseWriter, r *http.Request) {
 		Channel:   req.Channel,
 		LLM:       req.LLM,
 		Overrides: req.Overrides,
-	}, "")
+	}, "", req.Device)
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -199,13 +200,14 @@ type openedSession struct {
 	scribeDispatchID string
 }
 
-func (s *Service) openSession(ctx context.Context, req config.Request, trunk string) (openedSession, error) {
+func (s *Service) openSession(ctx context.Context, req config.Request, trunk, caller string) (openedSession, error) {
 	sessionID, err := ids.NewID(ids.PrefixSession)
 	if err != nil {
 		return openedSession{}, errs.Wrap(errs.CodeInternal, err, "mint session id")
 	}
 	req.SessionID = sessionID
 	snapshot := s.Catalog.Snapshot()
+	req = routeCanary(snapshot.Catalog, req, cmp.Or(caller, sessionID))
 	resolved, err := snapshot.Catalog.Resolve(req)
 	if err != nil {
 		return openedSession{}, err
@@ -241,6 +243,7 @@ func (s *Service) openSession(ctx context.Context, req config.Request, trunk str
 	if err := s.Store.CreateSession(ctx, sess); err != nil {
 		return openedSession{}, err
 	}
+	incVersion(resolved.Config)
 	if resolved.Config.TakesDialIn() {
 		if err := s.openDialIn(ctx, sess); err != nil {
 			return openedSession{}, err

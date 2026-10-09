@@ -20,6 +20,10 @@
     "e2eLatencyMs": 1968,
     "replyGapMs": 2980,
     "serial": false,
-    "language": "kn-IN"
+    "language": "kn-IN",
+    "configVersion": {
+      "id": "support-v4",
+      "arm": "candidate"
+    }
   }
 }

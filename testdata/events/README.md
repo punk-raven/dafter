@@ -19,6 +19,8 @@ that audio to the agent speaking, is `endpointMs` plus `e2eLatencyMs` here. Its 
 token, inside the 500 ms the serial rule allows, so `serial` is false; a
 `serial` without both LLM layers is refused. It was a reply in Kannada in a
 session that switches languages, so it names its `language`, a language tag.
+It ran a canary's candidate, so it carries `configVersion` (`id`, `arm`);
+`agent-configured.json` comes from an unversioned session and carries none.
 
 `session-usage.json` is a session's consumption with one priced item and one
 unpriced one. An unpriced item carries no `costInr` at all, and `costInr` on

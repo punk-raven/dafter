@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/canary.schema.json",
+  "title": "Canary",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "description": "A profile's canary, stated in the profile's own document under canary and never part of a resolved session config: resolution reads it and drops it. The control plane sends this percentage of the new sessions that resolve with the profile to the candidate profile instead, by a deterministic hash of the candidate's version id and the caller (the device key, the phone number of an inbound call), else the session id, so one caller stays on one arm for as long as the candidate does. The candidate states its own version id and carries no canary of its own. Promote by pointing the agent, trunk or sessions at the candidate profile; roll back by setting the percentage to 0. Both are config changes through the admin API, never a redeploy. A candidate passes the dafter-scenarios pass^k gate in CI before its percentage is raised above 0. Operator only: a session override cannot state it.",
+  "required": ["profile", "percent"],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "The candidate profile, by its name in the catalog.",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "percent": {
+      "type": "integer",
+      "description": "The share of new sessions routed to the candidate, 0 to 100. 0 is off; 5 to 10 is a first rollout.",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0
+    }
+  }
+}

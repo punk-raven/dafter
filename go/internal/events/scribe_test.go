@@ -72,6 +72,9 @@ func TestScribePayloadsAreEnforced(t *testing.T) {
 			p["criteria"].(map[string]any)["language"] = "great"
 		}},
 		{"scored turn quoting the reply", turnScored, func(p map[string]any) { p["text"] = "जी" }},
+		{"scored turn version without an arm", turnScored, func(p map[string]any) {
+			p["configVersion"] = map[string]any{"id": "support-v3"}
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -104,5 +107,18 @@ func TestAJudgeThatFailedSaysWhyInsteadOfScoring(t *testing.T) {
 	}
 	if _, err := events.Parse(raw); err != nil {
 		t.Fatalf("a judge failure was refused: %v", err)
+	}
+}
+
+func TestAScoredTurnCarriesTheVersionTheSessionRuns(t *testing.T) {
+	t.Parallel()
+	doc := vector(t, turnScored)
+	doc["payload"].(map[string]any)["configVersion"] = map[string]any{"id": "support-v4", "arm": "candidate"}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := events.Parse(raw); err != nil {
+		t.Fatalf("a versioned score was refused: %v", err)
 	}
 }

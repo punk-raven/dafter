@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/noise-filter.schema.json",
+  "title": "NoiseFilter",
+  "type": "string",
+  "description": "The one noise or voice filter the agent runs on the audio it hears, before its VAD, turn detection and STT. off runs none. nc removes background noise and keeps every voice. bvc also removes voices other than the primary speaker's, and needs audio sampled above 8 kHz, so it is refused on the telephony channel, where every caller is an 8 kHz phone line. bvc_telephony is bvc tuned for narrowband phone audio. A phone guest in a session on another channel hears through the narrowband variant of the session's filter. The filters are Krisp models served only by LiveKit Cloud, so a self-hosted media server runs none of them, and they are off unless the operator chooses one. Exactly one filter runs on a path: a filter here forbids a model filter on the publishing client (media.audio.noiseCancellation rnnoise or rnnoise_gated), while the browser's native suppression and echo cancellation stay.",
+  "enum": ["off", "nc", "bvc", "bvc_telephony"],
+  "default": "off"
+}

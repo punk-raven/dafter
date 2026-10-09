@@ -1,6 +1,7 @@
 {
   "defaults": {
     "apiVersion": "dafter.dev/v1",
+    "version": { "id": "nivya-v1" },
     "privacyMode": "open",
     "agent": {
       "enabled": true,
@@ -13,7 +14,12 @@
           "provider": "silero",
           "model": "silero",
           "options": { "minSpeechMs": 50, "minSilenceMs": 250, "prefixPaddingMs": 500, "activationThreshold": 0.5 }
-        }
+        },
+        "fallback": {
+          "llm": [{"provider": "groq", "model": "qwen/qwen3.8-27b", "credentialRef": "secret://tenants/t_9c21a4be/groq/api-key", "options": {"temperature": 0.4, "maxTokens": 800, "reasoningEffort": "none"}}],
+          "tts": []
+        },
+        "noiseFilter": "off"
       },
       "addressing": {
         "mode": "transcript",
@@ -83,12 +89,20 @@
           "maxWords": 3,
           "answerWithinMs": 1500,
           "words": {
-            "hi": ["हाँ", "हां", "हा", "हाँजी", "हांजी", "जी", "हम्म", "हम", "हूँ", "हूं", "अच्छा", "अच्छा जी", "ठीक है", "सही", "सही है", "बिल्कुल", "ओके", "haan", "ha", "haanji", "ji", "hmm", "achha", "accha", "acha", "theek hai", "ok"],
-            "en": ["ok", "okay", "hmm", "hmmm", "hm", "mm", "mmm", "mhm", "uh huh", "aha", "yeah", "yes", "yep", "right", "sure", "alright", "got it", "i see", "oh okay"],
-            "kn": ["ಹೌದು", "ಹೂಂ", "ಹೂ", "ಹಾಂ", "ಹಾ", "ಸರಿ", "ಓಕೆ", "ಆಯ್ತು", "ಹ್ಮ್"],
-            "mr": ["हो", "हं", "हम्म", "बरं", "ठीक आहे", "ओके", "अच्छा"],
-            "te": ["అవును", "ఊ", "ఊం", "హా", "హాం", "సరే", "ఓకే", "అలాగే", "హ్మ్"]
-          }
+            "hi": ["हाँ", "हां", "हा", "हाँजी", "हांजी", "जी", "हम्म", "हम", "हूँ", "हूं", "अच्छा", "अच्छा जी", "ठीक है", "सही", "सही है", "बिल्कुल", "ओके", "haan", "ha", "haanji", "ji", "hmm", "achha", "accha", "acha", "theek hai", "ok", "हाँ जी", "haa", "haan ji", "achchha", "hm"],
+            "en": ["ok", "okay", "hmm", "hmmm", "hm", "mm", "mmm", "mhm", "uh huh", "aha", "yeah", "yes", "yep", "right", "sure", "alright", "got it", "i see", "oh okay", "uh-huh", "mm-hmm", "mm hmm"],
+            "kn": ["ಹೌದು", "ಹೂಂ", "ಹೂ", "ಹಾಂ", "ಹಾ", "ಸರಿ", "ಓಕೆ", "ಆಯ್ತು", "ಹ್ಮ್", "houdu", "haudu", "howdu", "sari", "hmm", "hm"],
+            "mr": ["हो", "हं", "हम्म", "बरं", "ठीक आहे", "ओके", "अच्छा", "हाँ", "हां", "बरोबर", "ho", "haan", "barobar"],
+            "te": ["అవును", "ఊ", "ఊం", "హా", "హాం", "సరే", "ఓకే", "అలాగే", "హ్మ్", "సరి", "sari", "sare", "avunu", "avnu", "hmm", "hm"]
+          },
+          "negatives": {
+            "hi": ["नहीं", "नही", "रुको", "रुकिए", "रुक", "no no", "nahi", "nahin", "nai", "ruko", "rukiye", "ruk"],
+            "en": ["no", "no no", "nope", "wait", "hold on", "stop"],
+            "kn": ["ಇಲ್ಲ", "ಬೇಡ", "ನಿಲ್ಲು", "ನಿಲ್ಲಿಸಿ", "illa", "beda", "nillu", "nillisi"],
+            "mr": ["नाही", "नको", "थांबा", "थांब", "nahi", "nako", "thamba", "thaamba", "thamb"],
+            "te": ["వద్దు", "కాదు", "లేదు", "ఆగు", "ఆగండి", "vaddu", "kaadu", "kadu", "ledu", "aagu", "aagandi"]
+          },
+          "reviewed": { "hi": false, "en": false, "kn": false, "mr": false, "te": false }
         }
       }
     },
@@ -132,6 +146,7 @@
         "credentialRef": "secret://tenants/t_9c21a4be/sarvam/api-key",
         "options": { "temperature": 0, "maxTokens": 800 }
       },
+      "scoring": { "sampleRate": 0, "maxTurnsPerSession": 20, "keepFailures": false },
       "summaryIntervalMs": 60000,
       "afterCallTimeoutSeconds": 900
     },
@@ -148,6 +163,7 @@
 
   "profiles": {
     "support": {
+      "version": { "id": "support-v3" },
       "agent": { "personaRef": "persona://support/v3" }
     },
     "scribe-gemini": {
@@ -186,9 +202,10 @@
     "hi": {
       "tuning": {
         "turn": {
-          "strategy": "provider_endpointing", "localVadEnabled": false,
+          "strategy": "semantic", "localVadEnabled": true,
           "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
-        }
+        },
+        "agent": { "pipeline": { "vad": { "options": { "activationThreshold": 0.5, "minSilenceMs": 250, "prefixPaddingMs": 500 } } } }
       },
       "overlay": {
         "transcription": {
@@ -231,7 +248,8 @@
         "turn": {
           "strategy": "semantic", "localVadEnabled": true,
           "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
-        }
+        },
+        "agent": { "pipeline": { "vad": { "options": { "activationThreshold": 0.5, "minSilenceMs": 250, "prefixPaddingMs": 500 } } } }
       },
       "overlay": {
         "transcription": {
@@ -274,7 +292,8 @@
         "turn": {
           "strategy": "provider_endpointing", "localVadEnabled": false,
           "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
-        }
+        },
+        "agent": { "pipeline": { "vad": { "options": { "activationThreshold": 0.5, "minSilenceMs": 250, "prefixPaddingMs": 500 } } } }
       },
       "overlay": {
         "transcription": {
@@ -317,7 +336,8 @@
         "turn": {
           "strategy": "provider_endpointing", "localVadEnabled": false,
           "silenceMs": 350, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
-        }
+        },
+        "agent": { "pipeline": { "vad": { "options": { "activationThreshold": 0.5, "minSilenceMs": 250, "prefixPaddingMs": 500 } } } }
       },
       "overlay": {
         "transcription": {
@@ -360,7 +380,8 @@
         "turn": {
           "strategy": "provider_endpointing", "localVadEnabled": false,
           "silenceMs": 650, "minSpeechMs": 120, "endpointingMaxDelayMs": 2500
-        }
+        },
+        "agent": { "pipeline": { "vad": { "options": { "activationThreshold": 0.5, "minSilenceMs": 250, "prefixPaddingMs": 500 } } } }
       },
       "overlay": {
         "transcription": {

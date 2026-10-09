@@ -63,6 +63,11 @@ MUTATIONS: list[tuple[str, str, Mutate]] = [
     ("score and error together", SCORED, lambda p: p.update(error="provider_timeout")),
     ("a verdict the judge cannot give", SCORED, lambda p: p["criteria"].update(language="great")),
     ("scored turn quoting the reply", SCORED, lambda p: p.update(text="जी")),
+    (
+        "scored turn version without an arm",
+        SCORED,
+        lambda p: p.update(configVersion={"id": "support-v3"}),
+    ),
 ]
 
 
@@ -82,3 +87,10 @@ def test_a_judge_that_failed_says_why_instead_of_scoring() -> None:
     del p["score"], p["criteria"]
     p["error"] = "provider_timeout"
     assert parse_event(json.dumps(doc)).payload["error"] == "provider_timeout"
+
+
+def test_a_scored_turn_carries_the_version_the_session_runs() -> None:
+    doc = vector(SCORED)
+    doc["payload"]["configVersion"] = {"id": "support-v4", "arm": "candidate"}
+    parsed = parse_event(json.dumps(doc)).payload
+    assert parsed["configVersion"] == {"id": "support-v4", "arm": "candidate"}

@@ -20,6 +20,7 @@ type ResolvedSessionConfig struct {
 	Language    string      `json:"language"`
 	Channel     Channel     `json:"channel"`
 	LLM         string      `json:"llm,omitempty"`
+	Version     *Version    `json:"version,omitempty"`
 
 	Residency *Residency `json:"residency,omitempty"`
 	Agent     Agent      `json:"agent"`
@@ -85,12 +86,19 @@ type ProviderRef struct {
 }
 
 type Pipeline struct {
-	VAD      *ProviderRef `json:"vad,omitempty"`
-	STT      *ProviderRef `json:"stt,omitempty"`
-	LLM      *ProviderRef `json:"llm,omitempty"`
-	TTS      *ProviderRef `json:"tts,omitempty"`
-	MT       *ProviderRef `json:"mt,omitempty"`
-	Realtime *ProviderRef `json:"realtime,omitempty"`
+	VAD         *ProviderRef `json:"vad,omitempty"`
+	STT         *ProviderRef `json:"stt,omitempty"`
+	LLM         *ProviderRef `json:"llm,omitempty"`
+	TTS         *ProviderRef `json:"tts,omitempty"`
+	MT          *ProviderRef `json:"mt,omitempty"`
+	Realtime    *ProviderRef `json:"realtime,omitempty"`
+	Fallback    *Fallback    `json:"fallback,omitempty"`
+	NoiseFilter string       `json:"noiseFilter,omitempty"`
+}
+
+type Fallback struct {
+	LLM []ProviderRef `json:"llm,omitempty"`
+	TTS []ProviderRef `json:"tts,omitempty"`
 }
 
 type Turn struct {
@@ -100,7 +108,8 @@ type Turn struct {
 	EndpointingDelayMs    int          `json:"endpointingDelayMs,omitempty"`
 	EndpointingMaxDelayMs int          `json:"endpointingMaxDelayMs,omitempty"`
 
-	LocalVADEnabled *bool `json:"localVadEnabled,omitempty"`
+	LocalVADEnabled *bool  `json:"localVadEnabled,omitempty"`
+	Detector        string `json:"detector,omitempty"`
 
 	PreemptiveGeneration *PreemptiveGeneration `json:"preemptiveGeneration,omitempty"`
 	Interruption         *Interruption         `json:"interruption,omitempty"`

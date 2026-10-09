@@ -164,6 +164,11 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 		{"filler not a boolean", "agent-turn-metrics.json", func(p map[string]any) { p["filler"] = "yes" }},
 		{"serial without its layers", "agent-turn-metrics.json", func(p map[string]any) { delete(p, "llmNodeTtfsMs") }},
 		{"reply language not a tag", "agent-turn-metrics.json", func(p map[string]any) { p["language"] = "Kannada" }},
+		{"unknown arm", "agent-turn-metrics.json", func(p map[string]any) { version(p)["arm"] = "beta" }},
+		{"version without an id", "agent-turn-metrics.json", func(p map[string]any) { delete(version(p), "id") }},
+		{"configured version without an arm", "agent-configured.json", func(p map[string]any) {
+			p["configVersion"] = map[string]any{"id": "support-v3"}
+		}},
 		{"unpriced item with a cost", "session-usage.json", func(p map[string]any) { item(p, 1)["costInr"] = 0 }},
 		{"priced item without a cost", "session-usage.json", func(p map[string]any) { delete(item(p, 0), "costInr") }},
 		{"unknown unit", "session-usage.json", func(p map[string]any) { item(p, 0)["unit"] = "minute" }},
@@ -203,6 +208,10 @@ func TestMeasurementPayloadsAreEnforced(t *testing.T) {
 
 func item(payload map[string]any, i int) map[string]any {
 	return payload["items"].([]any)[i].(map[string]any)
+}
+
+func version(payload map[string]any) map[string]any {
+	return payload["configVersion"].(map[string]any)
 }
 
 func TestGeneratedEnumsMatchSchema(t *testing.T) {

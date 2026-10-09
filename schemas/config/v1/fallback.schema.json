@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.dafter.dev/config/v1/fallback.schema.json",
+  "title": "Fallback",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "description": "Providers a stage switches to, in order, when its own provider fails mid-session. The LLM switches only before any token of the reply was sent; TTS switches for the next utterance, never mid-word. STT has no fallback: switching recognizers mid-utterance corrupts the transcript and turn state, so an STT failure degrades the session instead. Each fallback must serve the session's language. An empty list is a slot that is off.",
+  "properties": {
+    "llm": {
+      "type": "array",
+      "description": "LLM routes tried after agent.pipeline.llm, in order. A route identical to the primary is skipped.",
+      "items": { "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/ProviderRef" },
+      "maxItems": 2
+    },
+    "tts": {
+      "type": "array",
+      "description": "Voices tried after agent.pipeline.tts, in order. A different vendor speaks in a different voice, so a switch is heard.",
+      "items": { "$ref": "https://schemas.dafter.dev/config/v1/resolved-session-config.schema.json#/$defs/ProviderRef" },
+      "maxItems": 2
+    }
+  }
+}
