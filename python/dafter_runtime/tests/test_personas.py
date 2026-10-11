@@ -10,6 +10,7 @@ from dafter_runtime.personas import (
     SCRIPTS,
     SUPPORT_REF,
     SUPPORT_TALK,
+    called_by_name,
     persona_for,
     written_in,
 )
@@ -126,3 +127,28 @@ def test_replies_stay_short_unless_a_story_or_detail_is_asked_for(ref: str, lang
     assert "a story, an explanation or more detail" in instructions
     assert "finish it rather than stopping halfway" in instructions
     assert "Keep every reply to one or two" not in instructions
+
+
+FAKE_ACTIONS = ("check", "cancel", "हो गया", "ಆಗಿದೆ", "అయిపోయింది", "I'll")
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_the_support_example_claims_no_lookup_or_action(language: str) -> None:
+    example = SUPPORT_TALK.examples[language]
+    assert not any(claim in example for claim in FAKE_ACTIONS), example
+    assert "order" in example
+
+
+@pytest.mark.parametrize(("ref", "language"), EVERY)
+def test_a_reply_opens_with_the_answer_and_not_a_stock_word(ref: str, language: str) -> None:
+    instructions = persona_for(ref, language, NAME).instructions
+    assert "Open every reply with the actual answer, or with the one question" in instructions
+    assert "do not start every reply with the same word" in instructions
+    assert "one second" not in instructions
+
+
+@pytest.mark.parametrize("stays_awake", [True, False])
+def test_in_a_call_with_others_she_answers_only_the_one_who_asked(stays_awake: bool) -> None:
+    persona = called_by_name(persona_for(DEFAULT_REF, "te", NAME), stays_awake)
+    assert "answer only the person who asked, briefly" in persona.instructions
+    assert "hand out next steps to everyone unless someone asks" in persona.instructions
